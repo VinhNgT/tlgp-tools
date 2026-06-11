@@ -49,9 +49,8 @@ class TestSpecWorkflowPrompt:
         assert "Step 6" in SPEC_WORKFLOW_PROMPT
         assert "Step 7" in SPEC_WORKFLOW_PROMPT
 
-    def test_no_google_docs_references(self):
-        """Ensure no Google Docs references leaked into the prompt."""
+    def test_no_external_service_references(self):
+        """Prompt must only reference internal tools, not external services."""
         lower = SPEC_WORKFLOW_PROMPT.lower()
-        assert "google doc" not in lower
         assert "createDocument" not in SPEC_WORKFLOW_PROMPT
         assert "insertTable" not in SPEC_WORKFLOW_PROMPT

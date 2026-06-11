@@ -586,7 +586,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
                             parent=self
                         )
                 else:
-                    # If dimensions are missing from JSON (legacy files), we accept it directly
+                    # Accept directly if JSON does not include dimension metadata
                     resolved_img = os.path.abspath(img_path)
             except Exception:
                 pass
@@ -664,7 +664,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         # Reset navigation context
         self.controller.nav.parent_stack.clear()
         
-        # Reset and re-initialize history manager to clear undo/redo stack from the previous session
+        # Re-initialize history manager to start with a clean undo/redo stack
         self.controller.history = HistoryManager(self.session)
         
         # Load image and refresh UI
@@ -954,8 +954,8 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             return
 
         # Save-path mismatch warning: if a default path was provided by
-        # the MCP server and the user previously chose a different path,
-        # warn that the agent won't find the files at the new location.
+        # the MCP server but the user selects a different path, warn
+        # that the agent won't find the files at the new location.
         if (
             self.default_output_dir
             and os.path.abspath(output_dir) != self.default_output_dir

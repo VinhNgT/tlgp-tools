@@ -145,12 +145,6 @@ def main():
 
     doc.save(str(output_path))
     print(f"✅ Saved to: {output_path}")
-    print()
-    print("Next steps:")
-    print("  1. Open the .docx locally to verify formatting")
-    print("  2. Upload to Google Drive (drag-and-drop)")
-    print("  3. Open the converted Google Doc → Select All → Copy")
-    print("  4. Paste into your target Google Doc")
 
 
 if __name__ == "__main__":

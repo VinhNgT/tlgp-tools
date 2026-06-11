@@ -63,7 +63,7 @@ def _export_level_images(full_img: Image.Image, children: List[AnnotationBox],
                 seg_img.save(path, "PNG")
                 exported_paths.append(path)
         else:
-            # No cuts — single root image (original behavior)
+            # No cuts — export as a single root image
             img = full_img.copy()
             offset_x, offset_y = 0, 0
             filename = f"{safe_name}_annotated.png"

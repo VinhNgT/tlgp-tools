@@ -2,9 +2,8 @@
 
 All values are read from the TOML config at import time. The TOML file
 is the single source of truth for fonts, colors, table widths, headers,
-and cell styling. This module re-exports the values as module-level
-constants so downstream code (table_builder.py, doc_builder.py) can
-import them unchanged.
+and cell styling. This module exports the values as module-level constants
+for use by table_builder.py and doc_builder.py.
 """
 
 from __future__ import annotations

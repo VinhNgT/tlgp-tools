@@ -10,7 +10,7 @@ uv run python -m tlgp_doc_generator analysis.json [-o output.docx] [--dry-run]
 
 ## Input
 
-The script reads an `analysis.json` file produced by the agent during Phase 3 (screen analysis). See the schema in the implementation plan.
+The script reads an `analysis.json` file containing the structured screen analysis. See `tlgp://schema/analysis-json` (via the MCP server) for the full field reference.
 
 ## Output
 
@@ -18,11 +18,8 @@ A `.docx` file with:
 - Component sections with headings, info tables, UI element tables, interaction tables
 - Screen overview section
 - API documentation with request/response parameter tables
-- All formatting matching the TLGP reference document exactly
+- All formatting applied automatically from `spec_format.toml`
 
-## Copy-Paste Workflow
+## Formatting
 
-1. Upload the generated `.docx` to Google Drive
-2. Open the auto-converted Google Doc
-3. Select All → Copy
-4. Paste into the target Google Doc at the desired position
+All visual properties (fonts, colors, table widths, borders, cell padding) are defined in [`spec_format.toml`](src/tlgp_doc_generator/spec_format.toml). Edit this file to change any formatting — no Python code changes needed.

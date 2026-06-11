@@ -4,7 +4,7 @@ MCP (Model Context Protocol) server that exposes the TLGP annotation and documen
 
 ## Overview
 
-This server bridges the gap between the TLGP toolchain and AI coding agents. Instead of copy-pasting an 800-line workflow document, agents can discover and call structured tools via MCP.
+This server exposes the TLGP toolchain to AI coding agents. Agents discover and call structured tools via MCP, enabling automated annotation, analysis, and document generation workflows.
 
 ### What it provides
 

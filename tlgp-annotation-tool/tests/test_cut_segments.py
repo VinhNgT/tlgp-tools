@@ -24,7 +24,7 @@ def _make_controller(cut_lines=None, img_height=1000):
 # ── Segment Building ──────────────────────────────────────────────────
 
 class TestBuildSegments:
-    """Test the segment building logic extracted from the canvas."""
+    """Test the segment building logic for horizontal cut lines."""
 
     def _build_segments(self, cut_lines, img_height):
         """Simulate _build_segments from canvas without needing a real canvas."""

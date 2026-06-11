@@ -104,7 +104,7 @@ def test_controller_pill_corner_updates_and_history():
 
     # Verify undo restores it
     controller.undo()
-    # Note: revalidate_nav_after_history creates new component references matching the layout structure
+    # Undo restores from a deep-copy snapshot, so we re-fetch the component reference
     restored_box = controller.session.components[0]
     assert restored_box.pill_corner == "top_left"
 

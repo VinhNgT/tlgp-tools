@@ -38,7 +38,7 @@ class SessionController:
         self.history = HistoryManager(session)
         self.listeners: Dict[str, List[Callable]] = {}
 
-        # Navigation state — replaces the old level/selected_l1_box pattern
+        # Navigation state
         self.nav = NavigationContext()
         self.selected_boxes: List[AnnotationBox] = []
         self.mode: str = "select"
