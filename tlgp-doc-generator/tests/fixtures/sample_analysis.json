@@ -129,7 +129,7 @@
       "number": 1,
       "method": "GET",
       "title": "Chi tiết sản phẩm",
-      "url": "/mall-catalog/api/v1/products/{productID}",
+      "url": "/api/v1/products/{productID}",
       "requestParams": [
         {
           "name": "merchant_id",

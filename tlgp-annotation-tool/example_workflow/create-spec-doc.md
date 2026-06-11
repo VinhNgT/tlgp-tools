@@ -48,7 +48,7 @@ To ensure the generated document layout matches the reference exactly, you must 
 * **Component Title**: Format exactly as `### **X.Y.Z. Component <name>**` (Named Style: `HEADING_3`, bold inside markdown stars). E.g., `### **1.1.1. Component tiêu đề màn hình chi tiết sản phẩm**`.
 * **Sub-section Title**: Format exactly as `#### *X.Y.Z.N <title>*` (Named Style: `HEADING_4`, italic inside markdown stars). Ensure there is **NO trailing period** after the fourth digit in the numbering (e.g., `#### *1.1.1.1 Thông tin chung về chức năng*` instead of `1.1.1.1.`).
 * **API Title**: Format as bold normal text: `**N. METHOD <description>**` (e.g., `**1. GET Chi tiết sản phẩm**`). Do NOT use markdown heading tags (like `##` or `###`).
-* **API URL**: Format as plain (non-bold) normal text: `URL: <path>` (e.g., `URL: /mall-catalog/api/v1/...`). Do NOT bold the "URL: " prefix. The path must NOT be wrapped in backticks.
+* **API URL**: Format as plain (non-bold) normal text: `URL: <path>` (e.g., `URL: /api/v1/products`). Do NOT bold the "URL: " prefix. The path must NOT be wrapped in backticks.
 * **API Request Label**: Format as bold normal text: `**Request**` or `**Request Body (<DTOType>)**`. Do NOT use heading tags.
 * **API Response Label**: Format as bold normal text: `**Response (data = <DTOType>)**` (e.g., `**Response (data = ProductDetailDTO)**`). Do NOT use heading tags.
 * **Sub-DTO Table Title**: Format as regular, non-bold normal text with no heading tags (e.g., `PriceTiersDTO fields` or `StockUnitDTO fields (sku_list)`).
@@ -383,7 +383,7 @@ If the user used `-o` and you know the output directory, **use `list_dir`** on t
 
 Example prompt from the user:
 > Please generate the TLGP spec document using `/create-spec-doc`:
-> - JSON: `E:/exports/Chi_tiet_san_pham/Chi_tiet_san_pham.json`
+> - JSON: `./exports/Chi_tiet_san_pham/Chi_tiet_san_pham.json`
 
 ---
 
@@ -514,7 +514,7 @@ After completing Steps 3.1–3.3, compile ALL gathered data into the following s
     {
       "number": 1, "method": "GET",
       "title": "Chi tiết sản phẩm",
-      "url": "/mall-catalog/api/v1/...",
+      "url": "/api/v1/products/{productID}",
       "hasRequestParams": true,
       "requestParams": [...],
       "responseType": "ProductDetailDTO",
@@ -631,11 +631,11 @@ After all tables have been inserted, perform a **fresh `readDocument`** call, th
 > **One Image Per Component**: Each component section in the document must contain exactly one annotated image representing that component. The screen overview section is the only section that can contain multiple images (e.g., when the root screen is split into multiple parts like `_part1.png`, `_part2.png`, etc., due to cut lines).
 
 > [!WARNING]
-> **Path Sandboxing Restriction**: The Google Docs MCP server requires all `localImagePath` arguments to be located within the active working directory of the MCP server process (which is the IDE program installation directory, e.g., `C:\Users\Victor\AppData\Local\Programs\Antigravity IDE\`).
+> **Path Sandboxing Restriction**: The Google Docs MCP server requires all `localImagePath` arguments to be located within the active working directory of the MCP server process.
 > 
 > To bypass this restriction:
-> 1. Copy the images from the workspace to the IDE program directory: `C:\Users\Victor\AppData\Local\Programs\Antigravity IDE\`.
-> 2. Pass the absolute path under the program directory to `insertImage` (e.g., `C:/Users/Victor/AppData/Local/Programs/Antigravity IDE/<image>.png`).
+> 1. Copy the images from the workspace to the IDE program directory.
+> 2. Pass the absolute path under the program directory to `insertImage`.
 > 3. Once insertion succeeds (the image has been uploaded to Google Drive and placed in the document), delete the copied files from the program directory to keep it clean.
 
 **Steps**:
@@ -652,7 +652,7 @@ After all tables have been inserted, perform a **fresh `readDocument`** call, th
 {
   "documentId": "<docId>",
   "index": <startIndex>,
-  "localImagePath": "C:/Users/Victor/AppData/Local/Programs/Antigravity IDE/<image>.png",
+  "localImagePath": "<IDE_PROGRAM_DIR>/<image>.png",
   "width": 468
 }
 ```
