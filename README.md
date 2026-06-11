@@ -6,8 +6,9 @@ uv monorepo containing internal developer tools for TLGP screen specifications.
 
 | Package | Description |
 |---------|-------------|
-| `tlgp-annotation-tool` | Hierarchical screenshot annotator for TLGP screen specs |
-| `tlgp-doc-generator` | Generate TLGP screen spec `.docx` from `analysis.json` |
+| `tlgp-annotation-tool` | GUI screenshot annotator with hierarchical component boxing |
+| `tlgp-doc-generator` | Generate `.docx` specification documents from `analysis.json` |
+| `tlgp-mcp-server` | MCP server exposing the toolchain to AI agents |
 
 ## Setup
 
@@ -23,4 +24,13 @@ uv run python -m tlgp_annotation_tool
 
 # Generate a spec doc
 uv run python -m tlgp_doc_generator analysis.json
+
+# Start the MCP server (for AI agent integration)
+uv run python -m tlgp_mcp_server
+```
+
+## Testing
+
+```bash
+uv run pytest -v
 ```

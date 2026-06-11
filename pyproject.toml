@@ -1,2 +1,2 @@
 [tool.uv.workspace]
-members = ["tlgp-annotation-tool", "tlgp-doc-generator"]
+members = ["tlgp-annotation-tool", "tlgp-doc-generator", "tlgp-mcp-server"]

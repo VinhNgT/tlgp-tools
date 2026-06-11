@@ -1,0 +1,63 @@
+# TLGP Specification Document — Formatting Source of Truth
+#
+# This file defines every visual property of the generated .docx documents.
+# The doc-generator reads these values at import time via style_constants.py.
+# The MCP server exposes this file as the `tlgp://spec/formatting` resource.
+#
+# To change any formatting (fonts, colors, widths), edit this file.
+# No Python code changes are needed.
+
+[global]
+font_family = "Times New Roman"
+font_size_pt = 12
+heading_color = "#4F81BD"
+
+[border]
+color = "#7F7F7F"
+width_pt = 0.75
+
+[header]
+background_color = "#F2F2F2"
+
+[cell]
+padding_top_pt = 5
+padding_bottom_pt = 5
+padding_left_pt = 6
+padding_right_pt = 6
+space_above_pt = 3
+space_below_pt = 3
+
+# ── Table column widths ──────────────────────────────────────
+# All tables must total 468pt (6.5 inches) for uniform margins.
+
+[table.info]
+# 2-column: Tên chức năng | value
+col_widths_pt = [120.0, 348.0]
+
+[table.ui_elements]
+# 7-column: STT | Tên | Loại Control | Bắt buộc | Độ dài tối đa | Chỉnh sửa | Mô tả
+col_widths_pt = [35.0, 100.0, 57.0, 50.0, 50.0, 50.0, 126.0]
+headers = ["STT", "Tên", "Loại Control", "Bắt buộc", "Độ dài tối đa", "Chỉnh sửa", "Mô tả"]
+
+[table.interaction]
+# 2-column: Hành động của tác nhân | Phản ứng của hệ thống
+col_widths_pt = [164.5, 303.5]
+headers = ["Hành động của tác nhân", "Phản ứng của hệ thống"]
+
+[table.api]
+# 6-column: Tên tham số | Ý nghĩa | Bắt buộc | Kiểu dữ liệu | Giới hạn | Giá trị mặc định
+col_widths_pt = [110.0, 108.0, 45.0, 83.0, 62.0, 60.0]
+font_size_pt = 10.5
+headers = ["Tên tham số", "Ý nghĩa", "Bắt buộc", "Kiểu dữ liệu", "Giới hạn", "Giá trị mặc định"]
+
+# ── Screen General Info row labels ───────────────────────────
+
+[screen_info]
+labels = [
+    "Người thực hiện (Actor)",
+    "Điều kiện đầu vào (Precondition)",
+    "Điều kiện kích hoạt chức năng (Trigger)",
+    "Luồng thông thường (Main flow)",
+    "Điều kiện đầu ra (Post condition)",
+    "Business Rule",
+]

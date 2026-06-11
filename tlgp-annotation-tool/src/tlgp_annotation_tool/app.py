@@ -943,19 +943,47 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             )
             return
 
-        output_dir = self.default_output_dir or filedialog.askdirectory(title="Select output directory")
-        if output_dir:
-            try:
-                json_path, root_paths = export_session(self.session, output_dir)
-                actual_dir = os.path.dirname(json_path)
-                parts_info = f"{len(root_paths)} annotated image(s)" if root_paths else "annotated images"
-                messagebox.showinfo(
-                    "Success",
-                    f"Exported successfully:\n- JSON: {os.path.basename(json_path)}\n- {parts_info}\n- Directory: {actual_dir}",
-                    parent=self
-                )
-            except Exception as e:
-                messagebox.showerror("Error", f"Export failed: {e}", parent=self)
+        output_dir = None
+        if self.default_output_dir:
+            # MCP-provided save path: use silently on first save
+            output_dir = self.default_output_dir
+        else:
+            output_dir = filedialog.askdirectory(title="Select output directory")
+
+        if not output_dir:
+            return
+
+        # Save-path mismatch warning: if a default path was provided by
+        # the MCP server and the user previously chose a different path,
+        # warn that the agent won't find the files at the new location.
+        if (
+            self.default_output_dir
+            and os.path.abspath(output_dir) != self.default_output_dir
+        ):
+            proceed = messagebox.askyesno(
+                "⚠️ Save path mismatch",
+                f"The AI agent expects exported files at:\n"
+                f"{self.default_output_dir}\n\n"
+                f"Saving to a different location will cause the agent to "
+                f"fail when it tries to find your exported files. The agent "
+                f"will not be able to generate the specification document.\n\n"
+                f"Save to the expected path instead?",
+                parent=self,
+            )
+            if proceed:
+                output_dir = self.default_output_dir
+
+        try:
+            json_path, root_paths = export_session(self.session, output_dir)
+            actual_dir = os.path.dirname(json_path)
+            parts_info = f"{len(root_paths)} annotated image(s)" if root_paths else "annotated images"
+            messagebox.showinfo(
+                "Success",
+                f"Exported successfully:\n- JSON: {os.path.basename(json_path)}\n- {parts_info}\n- Directory: {actual_dir}",
+                parent=self
+            )
+        except Exception as e:
+            messagebox.showerror("Error", f"Export failed: {e}", parent=self)
 
     # Canvas select callback
     def on_canvas_select(self, box: Optional[AnnotationBox]):
