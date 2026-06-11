@@ -18,7 +18,6 @@ from tlgp_doc_generator.models import (
     ApiParam,
     ChildElement,
     Interaction,
-    Screen,
 )
 from tlgp_doc_generator.style_constants import (
     API_COLS_PT,
@@ -38,7 +37,6 @@ from tlgp_doc_generator.style_constants import (
     INFO_COLS_PT,
     INTERACTION_COLS_PT,
     INTERACTION_TABLE_HEADERS,
-    SCREEN_INFO_LABELS,
     UI_COLS_PT,
     UI_TABLE_HEADERS,
 )
@@ -228,40 +226,6 @@ def build_screen_level_info_table(
     )
     _style_cell_text(table.cell(1, 0), "Mô tả")
     _style_cell_text(table.cell(1, 1), description)
-    _style_table(table, INFO_COLS_PT)
-    return table
-
-
-def build_screen_info_table(doc: Document, screen: Screen) -> Table:
-    """Build an N×2 Screen General Info Table."""
-    values = [
-        screen.actor,
-        "\n".join(screen.preconditions) if screen.preconditions else "Không có",
-        screen.trigger or "Không có",
-        "\n".join(screen.mainFlow) if screen.mainFlow else "Không có",
-        "\n".join(screen.postConditions) if screen.postConditions else "Không có",
-        "\n".join(screen.businessRules) if screen.businessRules else "Không có",
-    ]
-
-    # Header row + data rows
-    num_rows = 1 + len(SCREEN_INFO_LABELS)
-    table = doc.add_table(rows=num_rows, cols=2)
-
-    # Header: "Mô tả chức năng" | description
-    _style_cell_text(
-        table.cell(0, 0), "Mô tả chức năng",
-        bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
-    )
-    _style_cell_text(
-        table.cell(0, 1), screen.description,
-        bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
-    )
-
-    # Data rows
-    for i, (label, value) in enumerate(zip(SCREEN_INFO_LABELS, values)):
-        _style_cell_text(table.cell(i + 1, 0), label)
-        _style_cell_text(table.cell(i + 1, 1), value)
-
     _style_table(table, INFO_COLS_PT)
     return table
 

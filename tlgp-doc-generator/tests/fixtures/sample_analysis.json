@@ -93,12 +93,6 @@
   "screen": {
     "name": "Chi tiết sản phẩm",
     "description": "Màn hình hiển thị thông tin chi tiết sản phẩm bao gồm hình ảnh, giá, mô tả, và các tùy chọn mua hàng",
-    "actor": "Người dùng",
-    "preconditions": ["Đã đăng nhập", "Đã chọn sản phẩm từ danh sách"],
-    "trigger": "Click vào sản phẩm từ danh sách",
-    "mainFlow": ["Hiển thị thông tin chi tiết sản phẩm"],
-    "postConditions": ["Hiển thị đầy đủ thông tin sản phẩm"],
-    "businessRules": [],
     "imageFiles": [],
     "topLevelChildren": [
       {

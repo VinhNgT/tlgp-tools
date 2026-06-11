@@ -18,7 +18,6 @@ from tlgp_doc_generator.table_builder import (
     build_api_table,
     build_info_table,
     build_interaction_table,
-    build_screen_info_table,
     build_screen_level_info_table,
     build_ui_elements_table,
 )
@@ -132,9 +131,6 @@ def _add_screen_section(
     _add_h4(doc, f"{section_number}.1 Thông tin chung về chức năng")
     build_screen_level_info_table(doc, screen.name, screen.description)
 
-    # Screen general info (N×2 table)
-    build_screen_info_table(doc, screen)
-
     # H4: 2. Screen image(s)
     _add_h4(doc, f"{section_number}.2 Màn hình chức năng")
     for img_file in screen.imageFiles:
@@ -164,19 +160,29 @@ def _add_api_section(doc: Document, api: Api):
     # API URL: plain normal text
     _add_normal_text(doc, f"URL: {api.url}")
 
-    # Request params
+    # Request section
     if api.requestParams:
-        _add_bold_text(doc, "Request")
+        if api.requestBodyType:
+            _add_bold_text(doc, f"Request Body ({api.requestBodyType})")
+        else:
+            _add_bold_text(doc, "Request")
         build_api_table(doc, api.requestParams)
+    elif api.requestDescription:
+        _add_bold_text(doc, "Request")
+        _add_normal_text(doc, api.requestDescription)
 
-    # Response fields
+    # Response section
     if api.responseFields:
-        response_label = f"Response (data = {api.responseType})" if api.responseType else "Response"
+        response_label = (
+            f"Response (data = {api.responseType})" if api.responseType
+            else "Response"
+        )
         _add_bold_text(doc, response_label)
         build_api_table(doc, api.responseFields)
     elif api.responseType:
-        # Primitive or simple response with no fields table
         _add_bold_text(doc, f"Response (data = {api.responseType})")
+        if api.responseDescription:
+            _add_normal_text(doc, api.responseDescription)
 
     # Sub-DTO tables
     for sub in api.subDtos:

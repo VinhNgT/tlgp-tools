@@ -129,17 +129,12 @@ def scaffold_analysis_impl(
         "screen": {
             "name": screen_name,
             "description": data.get("description", ""),
-            "actor": "Người dùng",       # Default, agent can change
-            "preconditions": [],          # Agent fills
-            "trigger": "",               # Agent fills
-            "mainFlow": [],              # Agent fills
-            "postConditions": [],        # Agent fills
-            "businessRules": [],         # Agent fills
             "imageFiles": root_images,
             "topLevelChildren": top_level_children,
             "interactions": [],          # Agent fills
         },
         "apis": [],                      # Agent fills entirely
+        "discrepancies": [],             # Agent fills if found
     }
 
     # Determine output path
@@ -168,11 +163,9 @@ def scaffold_analysis_impl(
         "components[].children[].controlType",
         "components[].children[].description",
         "components[].interactions[]",
-        "screen.actor (review default)",
-        "screen.preconditions", "screen.trigger",
-        "screen.mainFlow", "screen.postConditions",
-        "screen.businessRules", "screen.interactions[]",
+        "screen.interactions[]",
         "apis[] (all API data)",
+        "discrepancies[] (image-vs-code conflicts)",
     ]
 
     return {

@@ -29,6 +29,7 @@ doc generator. Every field maps to a specific location in the generated
 | `components` | `list[Component]` | ✅ (structure) | All annotated components |
 | `screen` | `Screen` | ✅ (partial) | Screen-level metadata |
 | `apis` | `list[Api]` | ❌ | API documentation from codebase analysis |
+| `discrepancies` | `list[Discrepancy]` | ❌ | Conflicts between screenshots and code |
 
 ## Component Fields
 
@@ -67,12 +68,6 @@ doc generator. Every field maps to a specific location in the generated
 |---|---|---|---|
 | `name` | `str` | ✅ | Screen name |
 | `description` | `str` | ✅ | Screen description |
-| `actor` | `str` | ✅ (default "Người dùng") | Who uses this screen |
-| `preconditions` | `list[str]` | ❌ | Entry conditions |
-| `trigger` | `str` | ❌ | What triggers the screen |
-| `mainFlow` | `list[str]` | ❌ | Main user flow steps |
-| `postConditions` | `list[str]` | ❌ | Exit conditions |
-| `businessRules` | `list[str]` | ❌ | Business rules |
 | `imageFiles` | `list[str]` | ✅ | Root-level annotated image filenames |
 | `topLevelChildren` | `list[ChildElement]` | ✅ (structure) | Top-level UI elements |
 | `interactions` | `list[Interaction]` | ❌ | Screen-level interactions |
@@ -86,8 +81,11 @@ doc generator. Every field maps to a specific location in the generated
 | `title` | `str` | Vietnamese API title |
 | `url` | `str` | Endpoint path |
 | `requestParams` | `list[ApiParam]` | Request parameters |
+| `requestBodyType` | `str` | DTO type name for request body (POST/PUT/DELETE). When set, renders "Request Body (DtoName)" instead of "Request" |
+| `requestDescription` | `str` | Free-text description when there are no request params (e.g., "Không có tham số") |
 | `responseType` | `str` | Response DTO type name |
 | `responseFields` | `list[ApiParam]` | Response fields |
+| `responseDescription` | `str` | Free-text description when there are no response fields (e.g., "Tổng số items trong giỏ hàng") |
 | `subDtos` | `list[SubDto]` | Nested DTO tables |
 
 ## ApiParam Fields
@@ -100,6 +98,15 @@ doc generator. Every field maps to a specific location in the generated
 | `dataType` | `str` | Dart type with nullability (e.g., "String?") |
 | `limit` | `str` | Value constraints |
 | `defaultValue` | `str` | Default value |
+
+## Discrepancy Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `location` | `str` | Where the discrepancy was found (e.g., "Component Header - Button Share") |
+| `imageObservation` | `str` | What the screenshot shows |
+| `codeObservation` | `str` | What the code shows |
+| `resolution` | `str` | How the discrepancy was resolved (optional) |
 """
 
 

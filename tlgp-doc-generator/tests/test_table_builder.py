@@ -9,7 +9,6 @@ from tlgp_doc_generator.models import (
     ApiParam,
     ChildElement,
     Interaction,
-    Screen,
 )
 from tlgp_doc_generator.style_constants import (
     BORDER_COLOR_HEX,
@@ -23,7 +22,6 @@ from tlgp_doc_generator.table_builder import (
     build_api_table,
     build_info_table,
     build_interaction_table,
-    build_screen_info_table,
     build_screen_level_info_table,
     build_ui_elements_table,
 )
@@ -108,51 +106,6 @@ class TestScreenLevelInfoTable:
         table = build_screen_level_info_table(doc, "X", "Y")
         assert table.cell(0, 0).text == "Tên màn hình"
 
-
-# ── Screen Info Table ─────────────────────────────────────────────────
-
-
-class TestScreenInfoTable:
-    def test_row_count(self):
-        doc = Document()
-        screen = Screen(
-            name="Test", description="Test screen",
-            preconditions=["Logged in"],
-        )
-        table = build_screen_info_table(doc, screen)
-        # 1 header row + 6 data rows
-        assert len(table.rows) == 7
-
-    def test_header_row_content(self):
-        doc = Document()
-        screen = Screen(name="Test", description="Mô tả test")
-        table = build_screen_info_table(doc, screen)
-        assert table.cell(0, 0).text == "Mô tả chức năng"
-        assert table.cell(0, 1).text == "Mô tả test"
-
-    def test_actor_row(self):
-        doc = Document()
-        screen = Screen(name="T", description="D", actor="Admin")
-        table = build_screen_info_table(doc, screen)
-        assert table.cell(1, 1).text == "Admin"
-
-    def test_empty_preconditions_show_khong_co(self):
-        doc = Document()
-        screen = Screen(name="T", description="D")
-        table = build_screen_info_table(doc, screen)
-        # Precondition row (index 2)
-        assert table.cell(2, 1).text == "Không có"
-
-    def test_multiple_preconditions_joined(self):
-        doc = Document()
-        screen = Screen(
-            name="T", description="D",
-            preconditions=["Đã đăng nhập", "Có quyền admin"],
-        )
-        table = build_screen_info_table(doc, screen)
-        text = table.cell(2, 1).text
-        assert "Đã đăng nhập" in text
-        assert "Có quyền admin" in text
 
 
 # ── UI Elements Table ─────────────────────────────────────────────────

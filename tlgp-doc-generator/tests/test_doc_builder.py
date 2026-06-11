@@ -193,6 +193,56 @@ class TestBuildDocumentWithApis:
         assert "1. GET List" in text
         assert "2. POST Create" in text
 
+    def test_post_api_shows_request_body_label(self, tmp_path):
+        analysis = _minimal_analysis(
+            tmp_path,
+            apis=[
+                Api(
+                    number=1, method="POST", title="Favorite",
+                    url="/api/fav",
+                    requestBodyType="FavoriteProductRequestDTO",
+                    requestParams=[
+                        ApiParam(name="product_id", dataType="String"),
+                    ],
+                ),
+            ],
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Request Body (FavoriteProductRequestDTO)" in text
+        assert "Request\n" not in text  # should NOT have plain "Request"
+
+    def test_free_text_request_description(self, tmp_path):
+        analysis = _minimal_analysis(
+            tmp_path,
+            apis=[
+                Api(
+                    number=1, method="GET", title="Health", url="/api/health",
+                    requestDescription="Không có tham số",
+                ),
+            ],
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Request" in text
+        assert "Không có tham số" in text
+
+    def test_free_text_response_description(self, tmp_path):
+        analysis = _minimal_analysis(
+            tmp_path,
+            apis=[
+                Api(
+                    number=1, method="GET", title="Count", url="/api/count",
+                    responseType="int",
+                    responseDescription="Tổng số items trong giỏ hàng",
+                ),
+            ],
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Response (data = int)" in text
+        assert "Tổng số items trong giỏ hàng" in text
+
 
 class TestBuildDocumentWithImages:
     def test_missing_image_shows_placeholder(self, tmp_path):

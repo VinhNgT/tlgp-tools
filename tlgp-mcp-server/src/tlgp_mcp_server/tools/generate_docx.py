@@ -59,7 +59,7 @@ def generate_docx_impl(
     table_count += len(non_leaf)  # info tables
     table_count += sum(1 for c in non_leaf if c.children)  # UI tables
     table_count += sum(1 for c in non_leaf if c.interactions)  # interaction tables
-    table_count += 2  # screen info + screen general info
+    table_count += 1  # screen info table
     if analysis.screen.topLevelChildren:
         table_count += 1
     if analysis.screen.interactions:

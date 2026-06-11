@@ -25,6 +25,19 @@ Section prefix: **{section_prefix}**
 - `tlgp://schema/control-types` — UI control classification guide
 - `tlgp://spec/formatting` — formatting config (read-only)
 
+## Source Priority
+
+Screenshots are the **primary** source of truth for UI components, element \
+names, interaction behavior, and visual structure.
+
+Source code is the **primary** source of truth for API endpoints, DTO field \
+names, types, required status, and data flow.
+
+When you find discrepancies between what's visible in the screenshots and \
+what's in the code (e.g., a UI element with no backing data, or an API field \
+with no visual representation), add them to the `discrepancies` array in \
+analysis.json rather than silently omitting either side.
+
 ---
 
 ## Step 1: Check Workspace
@@ -66,6 +79,8 @@ TextField, Checkbox, Switch, Tabbar, Slide).
 2. Determine if the element is required/editable.
 3. Write a concise Vietnamese description.
 4. Identify interaction patterns (user action → system reaction).
+5. Cross-reference with codebase knowledge — if an element suggests an \
+API call or navigation, note it for verification in Step 5.
 
 Update the analysis.json with your findings.
 
@@ -76,11 +91,18 @@ Search the project codebase for:
 1. **API endpoints** related to this screen:
    - Search for route definitions, Retrofit/Dio service methods.
    - Document method, URL, request params, response fields.
+   - For POST/PUT/DELETE APIs, set `requestBodyType` to the DTO name \
+   (e.g., "FavoriteProductRequestDTO") so the doc renders \
+   "Request Body (DtoName)" instead of just "Request".
 2. **DTOs and models**:
    - Find request/response DTOs.
    - Document every field: name, type, required, constraints.
 3. **Navigation routes**:
    - Find how this screen is reached and where it navigates to.
+4. **Cross-reference with vision analysis**:
+   - Verify that API fields map to visible UI elements.
+   - Flag any discrepancies (visible elements with no data source, \
+   or code fields with no visual representation) in the `discrepancies` array.
 
 Fill in the `apis` section and interaction reactions with codebase evidence.
 
@@ -90,7 +112,8 @@ Call `validate_analysis` with the analysis.json path.
 
 - If **errors**: fix them and re-validate.
 - If **warnings**: review them — fill in missing descriptions, \
-control types, or APIs if needed.
+control types, or APIs if needed. Pay special attention to discrepancy \
+warnings — these flag conflicts between screenshots and code.
 - If **valid with no warnings**: proceed.
 
 ## Step 7: Generate
@@ -106,8 +129,6 @@ Report the result to the user:
 ## Important Notes
 
 - Always write descriptions in Vietnamese.
-- Default actor is "Người dùng" (App User). Change if the screen \
-is for a different actor (e.g., admin, merchant).
 - Each component's `imageFile` points to the cropped annotated \
 image — verify these exist before generating.
 - If the annotation tool was not installed or cannot be launched, \

@@ -49,15 +49,3 @@ headers = ["Hành động của tác nhân", "Phản ứng của hệ thống"]
 col_widths_pt = [110.0, 108.0, 45.0, 83.0, 62.0, 60.0]
 font_size_pt = 10.5
 headers = ["Tên tham số", "Ý nghĩa", "Bắt buộc", "Kiểu dữ liệu", "Giới hạn", "Giá trị mặc định"]
-
-# ── Screen General Info row labels ───────────────────────────
-
-[screen_info]
-labels = [
-    "Người thực hiện (Actor)",
-    "Điều kiện đầu vào (Precondition)",
-    "Điều kiện kích hoạt chức năng (Trigger)",
-    "Luồng thông thường (Main flow)",
-    "Điều kiện đầu ra (Post condition)",
-    "Business Rule",
-]

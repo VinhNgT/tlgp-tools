@@ -65,8 +65,11 @@ class Api(BaseModel):
     title: str
     url: str
     requestParams: list[ApiParam] = []
+    requestBodyType: str = ""
+    requestDescription: str = ""
     responseType: str = ""
     responseFields: list[ApiParam] = []
+    responseDescription: str = ""
     subDtos: list[SubDto] = []
 
 
@@ -75,15 +78,18 @@ class Screen(BaseModel):
 
     name: str
     description: str = ""
-    actor: str = "Người dùng"
-    preconditions: list[str] = []
-    trigger: str = ""
-    mainFlow: list[str] = []
-    postConditions: list[str] = []
-    businessRules: list[str] = []
     imageFiles: list[str] = []
     topLevelChildren: list[ChildElement] = []
     interactions: list[Interaction] = []
+
+
+class Discrepancy(BaseModel):
+    """A conflict between what's visible on-screen and what's in the code."""
+
+    location: str
+    imageObservation: str
+    codeObservation: str
+    resolution: str = ""
 
 
 class AnalysisData(BaseModel):
@@ -94,6 +100,7 @@ class AnalysisData(BaseModel):
     components: list[Component] = []
     screen: Screen
     apis: list[Api] = []
+    discrepancies: list[Discrepancy] = []
 
     @field_validator("exportDir")
     @classmethod

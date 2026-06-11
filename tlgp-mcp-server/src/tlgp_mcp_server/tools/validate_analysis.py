@@ -105,6 +105,15 @@ def validate_analysis_impl(json_path: str) -> dict:
     if not analysis.apis:
         warnings.append("No APIs defined")
 
+    # Discrepancy warnings
+    for disc in analysis.discrepancies:
+        warnings.append(
+            f"⚠️ Discrepancy at '{disc.location}': "
+            f"Image shows: {disc.imageObservation} | "
+            f"Code shows: {disc.codeObservation}"
+            + (f" | Resolution: {disc.resolution}" if disc.resolution else "")
+        )
+
     # Build summary
     summary = {
         "screen_name": analysis.screen.name,

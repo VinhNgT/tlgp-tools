@@ -77,9 +77,3 @@ BORDER_WIDTH_PT: float = _cfg["border"]["width_pt"]
 UI_TABLE_HEADERS: list[str] = _cfg["table"]["ui_elements"]["headers"]
 INTERACTION_TABLE_HEADERS: list[str] = _cfg["table"]["interaction"]["headers"]
 API_TABLE_HEADERS: list[str] = _cfg["table"]["api"]["headers"]
-
-# ============================================================
-# Screen General Info Row Labels
-# ============================================================
-
-SCREEN_INFO_LABELS: list[str] = _cfg["screen_info"]["labels"]

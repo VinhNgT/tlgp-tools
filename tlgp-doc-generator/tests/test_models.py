@@ -13,6 +13,7 @@ from tlgp_doc_generator.models import (
     ApiParam,
     ChildElement,
     Component,
+    Discrepancy,
     Interaction,
     Screen,
     SubDto,
@@ -117,6 +118,54 @@ class TestApi:
         assert len(a.subDtos) == 1
         assert a.subDtos[0].fields[0].name == "min_qty"
 
+    def test_request_body_type(self):
+        a = Api(
+            number=1, method="POST", title="Favorite", url="/api/fav",
+            requestBodyType="FavoriteProductRequestDTO",
+        )
+        assert a.requestBodyType == "FavoriteProductRequestDTO"
+
+    def test_request_body_type_default_empty(self):
+        a = Api(number=1, method="GET", title="List", url="/api/list")
+        assert a.requestBodyType == ""
+
+    def test_free_text_descriptions(self):
+        a = Api(
+            number=3, method="GET", title="Cart count", url="/api/cart/count",
+            requestDescription="Không có tham số",
+            responseType="int",
+            responseDescription="Tổng số items trong giỏ hàng",
+        )
+        assert a.requestDescription == "Không có tham số"
+        assert a.responseDescription == "Tổng số items trong giỏ hàng"
+
+
+# ── Discrepancy ───────────────────────────────────────────────────────
+
+
+class TestDiscrepancy:
+    def test_required_fields(self):
+        d = Discrepancy(
+            location="Component Header",
+            imageObservation="Share button visible",
+            codeObservation="No share handler in code",
+        )
+        assert d.location == "Component Header"
+        assert d.resolution == ""
+
+    def test_with_resolution(self):
+        d = Discrepancy(
+            location="Price component",
+            imageObservation="Shows VND price",
+            codeObservation="API returns CNY only",
+            resolution="Price is converted client-side",
+        )
+        assert d.resolution == "Price is converted client-side"
+
+    def test_missing_required_raises(self):
+        with pytest.raises(ValidationError):
+            Discrepancy(location="X")  # missing observations
+
 
 # ── Screen ────────────────────────────────────────────────────────────
 
@@ -124,21 +173,16 @@ class TestApi:
 class TestScreen:
     def test_defaults(self):
         s = Screen(name="Home")
-        assert s.actor == "Người dùng"
-        assert s.preconditions == []
         assert s.imageFiles == []
         assert s.topLevelChildren == []
+        assert s.interactions == []
 
-    def test_full_screen(self):
+    def test_with_description(self):
         s = Screen(
             name="Product Detail",
             description="Shows product info",
-            preconditions=["Logged in", "Product selected"],
-            trigger="Click product",
-            mainFlow=["Show details"],
         )
-        assert len(s.preconditions) == 2
-        assert s.trigger == "Click product"
+        assert s.description == "Shows product info"
 
 
 # ── AnalysisData ──────────────────────────────────────────────────────
@@ -154,6 +198,7 @@ class TestAnalysisData:
         assert data.sectionPrefix == "1.1"
         assert data.components == []
         assert data.apis == []
+        assert data.discrepancies == []
 
     def test_invalid_export_dir_raises(self):
         with pytest.raises(ValidationError, match="exportDir does not exist"):
@@ -175,6 +220,21 @@ class TestAnalysisData:
     def test_missing_screen_raises(self):
         with pytest.raises(ValidationError):
             AnalysisData(exportDir="/tmp")  # missing screen
+
+    def test_with_discrepancies(self, tmp_path):
+        data = AnalysisData(
+            exportDir=str(tmp_path),
+            screen=Screen(name="Test"),
+            discrepancies=[
+                Discrepancy(
+                    location="Header",
+                    imageObservation="Button visible",
+                    codeObservation="No handler",
+                ),
+            ],
+        )
+        assert len(data.discrepancies) == 1
+        assert data.discrepancies[0].location == "Header"
 
 
 # ── JSON round-trip ───────────────────────────────────────────────────
