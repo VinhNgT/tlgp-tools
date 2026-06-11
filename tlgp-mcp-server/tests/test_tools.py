@@ -1,287 +1,522 @@
-"""Tests for tlgp-mcp-server tools."""
+"""Tests for MCP tools: prepare_analysis, update_analysis, finalize."""
 
 from __future__ import annotations
 
 import json
 import os
-import tempfile
-from pathlib import Path
 
 import pytest
 
-from tlgp_mcp_server.tools.list_exports import list_exports_impl
-from tlgp_mcp_server.tools.parse_annotations import parse_annotations_impl
-from tlgp_mcp_server.tools.scaffold_analysis import scaffold_analysis_impl
-from tlgp_mcp_server.tools.validate_analysis import validate_analysis_impl
+from tlgp_mcp_server.tools.prepare_analysis import prepare_analysis_impl
+from tlgp_mcp_server.tools.update_analysis import update_analysis_impl
+from tlgp_mcp_server.tools.finalize import finalize_impl
+from tlgp_mcp_server.tools.launch_annotator import launch_annotator_impl
 
 
 # ============================================================
-# Fixtures
+# Helpers
 # ============================================================
 
 
-@pytest.fixture
-def sample_annotation():
-    """Minimal annotation tool export JSON."""
-    return {
-        "screen_name": "TestScreen",
-        "description": "A test screen",
-        "original_image": "/fake/path/screenshot.png",
+def _create_annotation_export(tmp_path, screen_name="Test_Screen"):
+    """Create a minimal annotation export structure."""
+    screen_dir = tmp_path / screen_name
+    screen_dir.mkdir()
+
+    annotation = {
+        "screen_name": "Test Screen",
+        "description": "Màn hình test",
+        "original_image": "test.png",
         "image_width": 1080,
-        "image_height": 2340,
-        "cut_lines": [],
+        "image_height": 1920,
         "components": [
             {
                 "id": 1,
                 "label": "Header",
-                "bounds": {"x": 0, "y": 0, "w": 1080, "h": 200},
+                "bounds": {"left": 0, "top": 0, "right": 1080, "bottom": 200},
                 "children": [
                     {
                         "id": 2,
-                        "label": "Title",
-                        "bounds": {"x": 10, "y": 10, "w": 500, "h": 40},
+                        "label": "Back",
+                        "bounds": {"left": 0, "top": 0, "right": 50, "bottom": 50},
                         "children": [],
                     },
                     {
                         "id": 3,
-                        "label": "Back Button",
-                        "bounds": {"x": 0, "y": 10, "w": 50, "h": 50},
+                        "label": "Title",
+                        "bounds": {"left": 50, "top": 0, "right": 500, "bottom": 50},
                         "children": [],
                     },
                 ],
             },
             {
                 "id": 4,
-                "label": "Content",
-                "bounds": {"x": 0, "y": 200, "w": 1080, "h": 2000},
+                "label": "Banner",
+                "bounds": {"left": 0, "top": 200, "right": 1080, "bottom": 600},
                 "children": [],
             },
         ],
     }
 
+    json_path = screen_dir / f"{screen_name}.json"
+    json_path.write_text(
+        json.dumps(annotation, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
-@pytest.fixture
-def export_dir(tmp_path, sample_annotation):
-    """Create a realistic annotation export directory structure."""
-    screen_dir = tmp_path / "TestScreen"
-    screen_dir.mkdir()
+    # Create a valid 1x1 white PNG (python-docx validates PNG chunks strictly)
+    from PIL import Image as PILImage
+    import io
 
-    # Write annotation JSON
-    json_path = screen_dir / "TestScreen.json"
-    json_path.write_text(json.dumps(sample_annotation), encoding="utf-8")
+    buf = io.BytesIO()
+    PILImage.new("RGB", (1, 1), color=(255, 255, 255)).save(buf, format="PNG")
+    png_bytes = buf.getvalue()
 
-    # Create annotated images
-    (screen_dir / "TestScreen_annotated.png").write_bytes(b"fake-png")
-    (screen_dir / "TestScreen_1_annotated.png").write_bytes(b"fake-png")
+    img_path = screen_dir / f"{screen_name}_annotated.png"
+    img_path.write_bytes(png_bytes)
 
-    return tmp_path
+    # Create a dummy component image
+    comp_img = screen_dir / f"{screen_name}_1_annotated.png"
+    comp_img.write_bytes(png_bytes)
 
-
-# ============================================================
-# list_exports tests
-# ============================================================
+    return screen_dir, json_path
 
 
-class TestListExports:
-    def test_not_found(self, tmp_path):
-        result = list_exports_impl(str(tmp_path / "nonexistent"))
-        assert result["status"] == "not_found"
-
-    def test_empty_directory(self, tmp_path):
-        result = list_exports_impl(str(tmp_path))
-        assert result["status"] == "empty"
-
-    def test_annotations_only(self, export_dir):
-        result = list_exports_impl(str(export_dir))
-        assert result["status"] == "annotations_only"
-        assert len(result["screens"]) == 1
-        assert result["screens"][0]["screen_name"] == "TestScreen"
-        assert result["screens"][0]["annotation_json"] is not None
-        assert result["screens"][0]["analysis_json"] is None
-
-    def test_ready_status(self, export_dir, sample_annotation):
-        """When analysis.json exists but no .docx."""
-        screen_dir = export_dir / "TestScreen"
-        analysis = {
-            "sectionPrefix": "1.1",
-            "exportDir": str(screen_dir),
-            "components": [],
-            "screen": {
-                "name": "TestScreen",
-                "description": "test",
+def _create_analysis_json(screen_dir, extra_fields=None):
+    """Create a minimal analysis.json in the screen directory."""
+    analysis = {
+        "sectionPrefix": "1.1",
+        "exportDir": str(screen_dir),
+        "components": [
+            {
+                "id": 1,
+                "label": "Header",
+                "description": "",
+                "isLeaf": False,
+                "imageFile": f"{screen_dir.name}_1_annotated.png",
+                "children": [
+                    {
+                        "stt": 1,
+                        "label": "Back",
+                        "controlType": "",
+                        "required": "",
+                        "maxLength": "",
+                        "editable": "",
+                        "description": "",
+                    },
+                    {
+                        "stt": 2,
+                        "label": "Title",
+                        "controlType": "",
+                        "required": "",
+                        "maxLength": "",
+                        "editable": "",
+                        "description": "",
+                    },
+                ],
+                "interactions": [],
             },
-        }
-        (screen_dir / "analysis.json").write_text(
-            json.dumps(analysis), encoding="utf-8"
-        )
-        result = list_exports_impl(str(export_dir))
+            {
+                "id": 4,
+                "label": "Banner",
+                "description": "",
+                "isLeaf": True,
+                "imageFile": None,
+                "children": [],
+                "interactions": [],
+            },
+        ],
+        "screen": {
+            "name": "Test Screen",
+            "description": "Màn hình test",
+            "imageFiles": [f"{screen_dir.name}_annotated.png"],
+            "topLevelChildren": [
+                {
+                    "stt": 1,
+                    "label": "Header",
+                    "controlType": "",
+                    "required": "",
+                    "maxLength": "",
+                    "editable": "",
+                    "description": "",
+                },
+                {
+                    "stt": 2,
+                    "label": "Banner",
+                    "controlType": "",
+                    "required": "",
+                    "maxLength": "",
+                    "editable": "",
+                    "description": "",
+                },
+            ],
+            "interactions": [],
+        },
+        "apis": [],
+        "discrepancies": [],
+    }
+    if extra_fields:
+        analysis.update(extra_fields)
+
+    path = screen_dir / "analysis.json"
+    path.write_text(
+        json.dumps(analysis, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+    return path
+
+
+# ── prepare_analysis ──────────────────────────────────────────
+
+
+class TestPrepareAnalysis:
+    def test_needs_annotation_nonexistent_dir(self, tmp_path):
+        result = prepare_analysis_impl(str(tmp_path / "nope"))
+        assert result["status"] == "needs_annotation"
+
+    def test_needs_annotation_empty_dir(self, tmp_path):
+        result = prepare_analysis_impl(str(tmp_path))
+        assert result["status"] == "needs_annotation"
+
+    def test_scaffolds_analysis_json(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        result = prepare_analysis_impl(str(tmp_path))
+
+        assert result["status"] == "ready"
+        assert result["screen_name"] == "Test Screen"
+        assert (screen_dir / "analysis.json").exists()
+
+    def test_returns_components_summary(self, tmp_path):
+        _create_annotation_export(tmp_path)
+        result = prepare_analysis_impl(str(tmp_path))
+
+        # Only non-leaf components in summary
+        assert len(result["components"]) == 1
+        assert result["components"][0]["label"] == "Header"
+        assert result["components"][0]["children_count"] == 2
+        assert result["components"][0]["children_labels"] == ["Back", "Title"]
+
+    def test_returns_image_files(self, tmp_path):
+        _create_annotation_export(tmp_path)
+        result = prepare_analysis_impl(str(tmp_path))
+
+        assert len(result["image_files"]) >= 1
+
+    def test_returns_to_fill_list(self, tmp_path):
+        _create_annotation_export(tmp_path)
+        result = prepare_analysis_impl(str(tmp_path))
+
+        assert "apis" in result["to_fill"]
+        assert any("controlType" in f for f in result["to_fill"])
+
+    def test_returns_schema_inline(self, tmp_path):
+        _create_annotation_export(tmp_path)
+        result = prepare_analysis_impl(str(tmp_path))
+
+        assert "schema" in result
+        assert "sectionPrefix" in result["schema"]
+
+    def test_returns_control_types_inline(self, tmp_path):
+        _create_annotation_export(tmp_path)
+        result = prepare_analysis_impl(str(tmp_path))
+
+        assert "control_types" in result
+        assert "Button" in result["control_types"]
+
+    def test_existing_analysis_returns_ready(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        _create_analysis_json(screen_dir)
+
+        result = prepare_analysis_impl(str(tmp_path))
         assert result["status"] == "ready"
 
-    def test_complete_status(self, export_dir, sample_annotation):
-        """When both analysis.json and .docx exist."""
-        screen_dir = export_dir / "TestScreen"
-        analysis = {
-            "sectionPrefix": "1.1",
-            "exportDir": str(screen_dir),
-            "components": [],
-            "screen": {"name": "TestScreen"},
-        }
-        (screen_dir / "analysis.json").write_text(
-            json.dumps(analysis), encoding="utf-8"
-        )
-        (screen_dir / "TestScreen.docx").write_bytes(b"fake-docx")
-        result = list_exports_impl(str(export_dir))
+    def test_existing_docx_returns_complete(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        _create_analysis_json(screen_dir)
+        (screen_dir / "output.docx").write_bytes(b"fake-docx")
+
+        result = prepare_analysis_impl(str(tmp_path))
         assert result["status"] == "complete"
 
-    def test_file_instead_of_dir(self, tmp_path):
-        """Path is a file, not a directory."""
-        file_path = tmp_path / "not_a_dir"
-        file_path.write_text("content")
-        result = list_exports_impl(str(file_path))
-        assert result["status"] == "malformed"
+    def test_custom_section_prefix(self, tmp_path):
+        _create_annotation_export(tmp_path)
+        result = prepare_analysis_impl(str(tmp_path), section_prefix="2.3")
+
+        analysis_path = result["analysis_path"]
+        data = json.loads(Path(analysis_path).read_text(encoding="utf-8"))
+        assert data["sectionPrefix"] == "2.3"
+
+    def test_self_as_screen_dir(self, tmp_path):
+        """When output_dir itself is the screen dir."""
+        screen_name = tmp_path.name
+        annotation = {
+            "screen_name": "Direct Screen",
+            "description": "Test",
+            "components": [],
+        }
+        json_path = tmp_path / f"{screen_name}.json"
+        json_path.write_text(json.dumps(annotation), encoding="utf-8")
+
+        result = prepare_analysis_impl(str(tmp_path))
+        assert result["status"] == "ready"
+        assert result["screen_name"] == "Direct Screen"
 
 
-# ============================================================
-# parse_annotations tests
-# ============================================================
+# Import Path for the custom prefix test
+from pathlib import Path
 
 
-class TestParseAnnotations:
-    def test_valid_json(self, export_dir):
-        json_path = str(export_dir / "TestScreen" / "TestScreen.json")
-        result = parse_annotations_impl(json_path)
-        assert "error" not in result
-        assert result["screen_name"] == "TestScreen"
-        assert result["component_count"] == 2
-        assert result["components"][0]["has_children"] is True
-        assert result["components"][0]["children_count"] == 2
-        assert result["components"][1]["has_children"] is False
+# ── update_analysis ───────────────────────────────────────────
+
+
+class TestUpdateAnalysis:
+    def test_set_component_description(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "components[0].description", "value": "Tiêu đề màn hình"},
+        ])
+
+        assert result["success"] is True
+        data = json.loads(analysis_path.read_text(encoding="utf-8"))
+        assert data["components"][0]["description"] == "Tiêu đề màn hình"
+
+    def test_set_child_control_type(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "components[0].children[0].controlType", "value": "Icon"},
+        ])
+
+        assert result["success"] is True
+        data = json.loads(analysis_path.read_text(encoding="utf-8"))
+        assert data["components"][0]["children"][0]["controlType"] == "Icon"
+
+    def test_batch_updates(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "components[0].description", "value": "Header"},
+            {"path": "components[0].children[0].controlType", "value": "Icon"},
+            {"path": "components[0].children[0].description", "value": "Quay lại"},
+            {"path": "components[0].children[1].controlType", "value": "Text"},
+            {"path": "components[0].children[1].description", "value": "Tên màn hình"},
+        ])
+
+        assert result["success"] is True
+        assert result["updates_count"] == 5
+
+    def test_set_interactions(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "components[0].interactions", "value": [
+                {"action": "Click Back", "reaction": "Quay về"},
+            ]},
+        ])
+
+        assert result["success"] is True
+        data = json.loads(analysis_path.read_text(encoding="utf-8"))
+        assert len(data["components"][0]["interactions"]) == 1
+
+    def test_set_apis(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "apis", "value": [
+                {
+                    "number": 1,
+                    "method": "GET",
+                    "title": "List",
+                    "url": "/api/list",
+                },
+            ]},
+        ])
+
+        assert result["success"] is True
+        data = json.loads(analysis_path.read_text(encoding="utf-8"))
+        assert len(data["apis"]) == 1
+        assert data["apis"][0]["method"] == "GET"
+
+    def test_set_screen_interactions(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "screen.interactions", "value": [
+                {"action": "Khởi động", "reaction": "Gọi API"},
+            ]},
+        ])
+
+        assert result["success"] is True
+
+    def test_set_discrepancies(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "discrepancies", "value": [
+                {
+                    "location": "Header",
+                    "imageObservation": "Share button visible",
+                    "codeObservation": "No handler",
+                },
+            ]},
+        ])
+
+        assert result["success"] is True
+        data = json.loads(analysis_path.read_text(encoding="utf-8"))
+        assert len(data["discrepancies"]) == 1
+
+    def test_returns_summary(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "components[0].description", "value": "Header"},
+        ])
+
+        assert "summary" in result
+        assert "components_with_description" in result["summary"]
+
+    def test_invalid_path_returns_error(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "nonexistent.field", "value": "x"},
+        ])
+
+        assert "error" in result
+
+    def test_missing_path_key_returns_error(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"value": "x"},
+        ])
+
+        assert "error" in result
 
     def test_file_not_found(self):
-        result = parse_annotations_impl("/nonexistent/file.json")
+        result = update_analysis_impl("/nonexistent/file.json", [])
         assert "error" in result
 
-    def test_invalid_json(self, tmp_path):
-        bad_json = tmp_path / "bad.json"
-        bad_json.write_text("{not valid json}")
-        result = parse_annotations_impl(str(bad_json))
+    def test_out_of_bounds_index_returns_error(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = update_analysis_impl(str(analysis_path), [
+            {"path": "components[99].description", "value": "x"},
+        ])
+
         assert "error" in result
-        assert "Invalid JSON" in result["error"]
-
-    def test_missing_required_fields(self, tmp_path):
-        incomplete = tmp_path / "incomplete.json"
-        incomplete.write_text('{"foo": "bar"}')
-        result = parse_annotations_impl(str(incomplete))
-        assert "error" in result
-        assert "Missing required fields" in result["error"]
 
 
-# ============================================================
-# scaffold_analysis tests
-# ============================================================
+# ── finalize ──────────────────────────────────────────────────
 
 
-class TestScaffoldAnalysis:
-    def test_generates_template(self, export_dir):
-        json_path = str(export_dir / "TestScreen" / "TestScreen.json")
-        result = scaffold_analysis_impl(json_path)
-        assert "error" not in result
-        assert result["screen_name"] == "TestScreen"
-        assert result["component_count"] == 2
-        assert result["non_leaf_count"] == 1  # Header has children
-        assert result["leaf_count"] == 1  # Content is a leaf
+class TestFinalize:
+    def test_valid_generates_docx(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = finalize_impl(str(analysis_path))
+
+        assert result["valid"] is True
+        assert "output_path" in result
+        assert result["tables"] > 0
         assert Path(result["output_path"]).exists()
 
-        # Verify the generated JSON
-        analysis = json.loads(Path(result["output_path"]).read_text())
-        assert analysis["sectionPrefix"] == "1.1"
-        assert len(analysis["components"]) == 2
-
-        # Header should have children with sequential STT
-        header = analysis["components"][0]
-        assert header["isLeaf"] is False
-        assert len(header["children"]) == 2
-        assert header["children"][0]["stt"] == 1
-        assert header["children"][1]["stt"] == 2
-        assert header["children"][0]["label"] == "Title"
-
-        # Content should be a leaf with no children
-        content = analysis["components"][1]
-        assert content["isLeaf"] is True
-        assert content["children"] == []
-
-    def test_custom_section_prefix(self, export_dir):
-        json_path = str(export_dir / "TestScreen" / "TestScreen.json")
-        result = scaffold_analysis_impl(json_path, section_prefix="2.3")
-        analysis = json.loads(Path(result["output_path"]).read_text())
-        assert analysis["sectionPrefix"] == "2.3"
-
-    def test_custom_output_path(self, export_dir, tmp_path):
-        json_path = str(export_dir / "TestScreen" / "TestScreen.json")
-        custom_out = str(tmp_path / "custom" / "output.json")
-        result = scaffold_analysis_impl(json_path, output_path=custom_out)
-        assert result["output_path"] == custom_out
-        assert Path(custom_out).exists()
-
-    def test_pre_filled_and_to_fill_lists(self, export_dir):
-        json_path = str(export_dir / "TestScreen" / "TestScreen.json")
-        result = scaffold_analysis_impl(json_path)
-        assert len(result["pre_filled"]) > 0
-        assert len(result["to_fill"]) > 0
-        assert "components[].id" in result["pre_filled"]
-        assert "components[].children[].controlType" in result["to_fill"]
-
-    def test_annotation_not_found(self):
-        result = scaffold_analysis_impl("/nonexistent/file.json")
-        assert "error" in result
-
-
-# ============================================================
-# validate_analysis tests
-# ============================================================
-
-
-class TestValidateAnalysis:
-    def test_valid_analysis(self, export_dir):
-        """Scaffold and immediately validate should pass."""
-        json_path = str(export_dir / "TestScreen" / "TestScreen.json")
-        scaffold_result = scaffold_analysis_impl(json_path)
-        result = validate_analysis_impl(scaffold_result["output_path"])
-
-        # Scaffold produces valid schema but with content warnings
-        assert result["valid"] is True
-        assert len(result["errors"]) == 0
-        assert len(result["warnings"]) > 0  # Empty descriptions, controlTypes
-
     def test_file_not_found(self):
-        result = validate_analysis_impl("/nonexistent/analysis.json")
+        result = finalize_impl("/nonexistent/analysis.json")
         assert result["valid"] is False
-        assert len(result["errors"]) == 1
+        assert len(result["errors"]) > 0
 
     def test_invalid_json_syntax(self, tmp_path):
-        bad = tmp_path / "bad.json"
-        bad.write_text("{not valid}")
-        result = validate_analysis_impl(str(bad))
+        bad_json = tmp_path / "bad.json"
+        bad_json.write_text("{invalid json", encoding="utf-8")
+        result = finalize_impl(str(bad_json))
         assert result["valid"] is False
-        assert "Invalid JSON" in result["errors"][0]
 
     def test_schema_violation(self, tmp_path):
-        """Missing required 'screen' field."""
-        invalid = tmp_path / "invalid.json"
-        invalid.write_text(json.dumps({
-            "exportDir": str(tmp_path),
-            "components": [],
-        }))
-        result = validate_analysis_impl(str(invalid))
+        bad = tmp_path / "bad.json"
+        bad.write_text('{"sectionPrefix": "1.1"}', encoding="utf-8")
+        result = finalize_impl(str(bad))
         assert result["valid"] is False
-        assert any("screen" in e for e in result["errors"])
 
-    def test_summary_counts(self, export_dir):
-        json_path = str(export_dir / "TestScreen" / "TestScreen.json")
-        scaffold_result = scaffold_analysis_impl(json_path)
-        result = validate_analysis_impl(scaffold_result["output_path"])
-        summary = result["summary"]
-        assert summary["screen_name"] == "TestScreen"
-        assert summary["total_components"] == 2
-        assert summary["non_leaf_components"] == 1
-        assert summary["leaf_components"] == 1
+    def test_missing_image_is_error(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        # Remove a referenced image
+        (screen_dir / f"{screen_dir.name}_1_annotated.png").unlink()
+
+        result = finalize_impl(str(analysis_path))
+        assert result["valid"] is False
+        assert any("image not found" in e for e in result["errors"])
+
+    def test_warnings_for_empty_fields(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = finalize_impl(str(analysis_path))
+        assert result["valid"] is True
+        # Should have warnings about empty descriptions, controlTypes, no APIs
+        assert len(result["warnings"]) > 0
+
+    def test_discrepancy_warnings(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        # Add a discrepancy via update
+        data = json.loads(analysis_path.read_text(encoding="utf-8"))
+        data["discrepancies"] = [{
+            "location": "Header",
+            "imageObservation": "Share visible",
+            "codeObservation": "No handler",
+        }]
+        analysis_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+
+        result = finalize_impl(str(analysis_path))
+        assert result["valid"] is True
+        assert any("Discrepancy" in w for w in result["warnings"])
+
+    def test_custom_output_path(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        custom_out = tmp_path / "custom_output.docx"
+        result = finalize_impl(str(analysis_path), str(custom_out))
+
+        assert result["valid"] is True
+        assert result["output_path"] == str(custom_out)
+        assert custom_out.exists()
+
+    def test_success_message(self, tmp_path):
+        screen_dir, _ = _create_annotation_export(tmp_path)
+        analysis_path = _create_analysis_json(screen_dir)
+
+        result = finalize_impl(str(analysis_path))
+        assert "message" in result
+        assert "successfully" in result["message"]
+
+
+# ── launch_annotator ──────────────────────────────────────────
+
+
+class TestLaunchAnnotator:
+    def test_creates_output_dir(self, tmp_path):
+        target = tmp_path / "new_dir"
+        result = launch_annotator_impl(str(target))
+        assert os.path.isdir(target)
+        assert "pid" in result

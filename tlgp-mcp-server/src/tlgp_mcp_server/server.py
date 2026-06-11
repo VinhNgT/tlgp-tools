@@ -12,11 +12,9 @@ import logging
 from mcp.server.fastmcp import FastMCP
 
 from tlgp_mcp_server.tools.launch_annotator import launch_annotator_impl
-from tlgp_mcp_server.tools.list_exports import list_exports_impl
-from tlgp_mcp_server.tools.parse_annotations import parse_annotations_impl
-from tlgp_mcp_server.tools.scaffold_analysis import scaffold_analysis_impl
-from tlgp_mcp_server.tools.validate_analysis import validate_analysis_impl
-from tlgp_mcp_server.tools.generate_docx import generate_docx_impl
+from tlgp_mcp_server.tools.prepare_analysis import prepare_analysis_impl
+from tlgp_mcp_server.tools.update_analysis import update_analysis_impl
+from tlgp_mcp_server.tools.finalize import finalize_impl
 from tlgp_mcp_server.resources import (
     ANALYSIS_SCHEMA_TEXT,
     CONTROL_TYPES_TEXT,
@@ -66,100 +64,75 @@ def launch_annotator(
 
 
 @mcp.tool()
-def list_exports(output_dir: str) -> dict:
-    """Inspect an output directory and report its state.
+def prepare_analysis(
+    output_dir: str,
+    section_prefix: str = "1.1",
+) -> dict:
+    """Discover annotations, scaffold analysis.json, and return docs.
 
-    Discovers annotation JSONs, analysis JSONs, annotated images, and
-    generated .docx files. Returns a status indicating what the agent
-    should do next.
+    One-shot preparation that handles all workspace states. Discovers
+    annotation exports, scaffolds the analysis.json template (or loads
+    an existing one), and returns the schema docs + control-type guide
+    inline so everything is available in one response.
 
     Status values:
-    - "not_found": Directory doesn't exist. Create it, then launch annotator.
-    - "empty": Directory exists but has no recognized files. Launch annotator.
-    - "annotations_only": Has annotation JSON + images, no analysis.json yet.
-    - "ready": Has analysis.json ready for validation and generation.
-    - "complete": Has analysis.json + generated .docx already.
-    - "malformed": Has partial data with missing critical files.
+    - "needs_annotation": No exports found. Launch the annotator first.
+    - "ready": analysis.json exists, ready for vision/codebase work.
+    - "complete": analysis.json + .docx already exist.
+    - "error": Something went wrong (see message).
 
     Args:
         output_dir: Path to the output directory to inspect.
-
-    Returns:
-        dict with status, file inventory, and any issues found.
-    """
-    return list_exports_impl(output_dir)
-
-
-@mcp.tool()
-def parse_annotations(json_path: str) -> dict:
-    """Parse the annotation tool's exported JSON file.
-
-    Reads the JSON exported by tlgp-annotation-tool and returns the
-    validated, structured component hierarchy including screen metadata,
-    image dimensions, cut lines, and the full component tree.
-
-    Args:
-        json_path: Path to the annotation export JSON file.
-
-    Returns:
-        dict with screen_name, description, image dimensions, components tree.
-    """
-    return parse_annotations_impl(json_path)
-
-
-@mcp.tool()
-def scaffold_analysis(
-    annotation_json: str,
-    section_prefix: str = "1.1",
-    output_path: str | None = None,
-) -> dict:
-    """Auto-generate an analysis.json template from annotation exports.
-
-    Pre-fills everything that can be derived from the annotation data:
-    component IDs, labels, isLeaf flags, image file mappings, child STT
-    numbering, and screen metadata. Leaves empty slots for fields that
-    require agent intelligence: control types, descriptions, interactions,
-    and API data.
-
-    Args:
-        annotation_json: Path to the annotation export JSON.
         section_prefix: Section number prefix (default "1.1").
-        output_path: Where to save the generated analysis.json.
-            Defaults to <export_dir>/analysis.json.
 
     Returns:
-        dict with output_path, list of pre_filled fields, and to_fill fields.
+        dict with status, analysis_path, components summary,
+        image_files, to_fill list, schema, and control_types.
     """
-    return scaffold_analysis_impl(annotation_json, section_prefix, output_path)
+    return prepare_analysis_impl(output_dir, section_prefix)
 
 
 @mcp.tool()
-def validate_analysis(json_path: str) -> dict:
-    """Validate a completed analysis.json file.
+def update_analysis(
+    json_path: str,
+    updates: list[dict],
+) -> dict:
+    """Apply targeted updates to analysis.json.
 
-    Checks the JSON against the doc generator's Pydantic schema and
-    cross-references that all referenced image files exist on disk.
-    Reports errors (blocking) and warnings (informational).
+    Each update is a dict with "path" and "value" keys. The path uses
+    dot notation with array indices to target specific fields.
+
+    Path examples:
+    - "components[0].description" — set a component description
+    - "components[0].children[2].controlType" — set a control type
+    - "components[0].interactions" — set the interactions list
+    - "apis" — replace the entire APIs list
+    - "screen.interactions" — set screen-level interactions
+    - "discrepancies" — set the discrepancies list
+
+    The file is validated against the schema after updates are applied.
+    If validation fails, no changes are saved.
 
     Args:
         json_path: Path to the analysis.json file.
+        updates: List of {"path": "...", "value": ...} dicts.
 
     Returns:
-        dict with valid (bool), errors, warnings, and summary.
+        dict with success status, applied paths, and current summary.
     """
-    return validate_analysis_impl(json_path)
+    return update_analysis_impl(json_path, updates)
 
 
 @mcp.tool()
-def generate_docx(
+def finalize(
     json_path: str,
     output_path: str | None = None,
 ) -> dict:
-    """Generate a .docx specification document from analysis.json.
+    """Validate analysis.json and generate the .docx specification.
 
-    Reads the validated analysis.json, builds the full document with
-    headings, tables, and images using the formatting spec from
-    spec_format.toml, and saves the result as a .docx file.
+    Validates the analysis data, checks all image references, and
+    generates the formatted .docx document if everything is valid.
+    If validation fails, returns errors without generating.
 
     Args:
         json_path: Path to the analysis.json file.
@@ -167,9 +140,10 @@ def generate_docx(
             <screen_name>.docx next to the JSON.
 
     Returns:
-        dict with output_path, table count, and image count.
+        dict with valid (bool), output_path, tables, images,
+        warnings, and errors if any.
     """
-    return generate_docx_impl(json_path, output_path)
+    return finalize_impl(json_path, output_path)
 
 
 # ============================================================
@@ -204,9 +178,8 @@ def formatting_spec_resource() -> str:
 def create_spec_doc(section_prefix: str = "1.1") -> str:
     """Full workflow for creating a TLGP screen specification document.
 
-    Guides the agent through: launching the annotator, scaffolding
-    analysis.json, filling in control types and API data from codebase
-    analysis, validating, and generating the final .docx.
+    Guides the agent through: preparing the workspace, vision analysis,
+    codebase analysis, and generating the final .docx.
 
     Args:
         section_prefix: Section number prefix (default "1.1").

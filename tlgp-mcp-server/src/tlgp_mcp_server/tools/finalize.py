@@ -1,4 +1,8 @@
-"""Tool: validate_analysis — check analysis.json against the generator schema."""
+"""Tool: finalize — validate + generate .docx in one step.
+
+Combines the logic of validate_analysis and generate_docx into a single
+tool call. If validation passes, generates the document automatically.
+"""
 
 from __future__ import annotations
 
@@ -7,17 +11,18 @@ from pathlib import Path
 
 from pydantic import ValidationError
 
+from tlgp_doc_generator.doc_builder import build_document
 from tlgp_doc_generator.models import AnalysisData
 
 
-def validate_analysis_impl(json_path: str) -> dict:
-    """Validate an analysis.json file against the doc generator schema.
+def finalize_impl(
+    json_path: str,
+    output_path: str | None = None,
+) -> dict:
+    """Validate analysis.json and generate the .docx if valid.
 
-    Checks:
-    1. JSON syntax
-    2. Pydantic schema conformance (AnalysisData model)
-    3. Image file existence for all referenced images
-    4. Non-empty required content fields
+    If validation fails, returns errors without generating.
+    If validation passes, generates the document and returns the result.
     """
     path = Path(json_path).resolve()
 
@@ -26,7 +31,6 @@ def validate_analysis_impl(json_path: str) -> dict:
             "valid": False,
             "errors": [f"File not found: {path}"],
             "warnings": [],
-            "summary": {},
         }
 
     # Parse JSON
@@ -37,7 +41,6 @@ def validate_analysis_impl(json_path: str) -> dict:
             "valid": False,
             "errors": [f"Invalid JSON syntax: {e}"],
             "warnings": [],
-            "summary": {},
         }
 
     # Validate against Pydantic schema
@@ -46,20 +49,18 @@ def validate_analysis_impl(json_path: str) -> dict:
     except ValidationError as e:
         errors = []
         for err in e.errors():
-            loc = " → ".join(str(l) for l in err["loc"])
+            loc = " → ".join(str(loc) for loc in err["loc"])
             errors.append(f"{loc}: {err['msg']}")
         return {
             "valid": False,
             "errors": errors,
             "warnings": [],
-            "summary": {},
         }
 
     # Cross-check images
     errors = []
     warnings = []
 
-    # Check component images
     non_leaf = [c for c in analysis.components if not c.isLeaf]
     for comp in non_leaf:
         if comp.imageFile:
@@ -75,7 +76,6 @@ def validate_analysis_impl(json_path: str) -> dict:
                 f"no imageFile specified (non-leaf should have one)"
             )
 
-    # Check screen images
     for img_file in analysis.screen.imageFiles:
         img = analysis.resolve_image(img_file)
         if not img.exists():
@@ -85,22 +85,22 @@ def validate_analysis_impl(json_path: str) -> dict:
         warnings.append("No screen-level images specified")
 
     # Content completeness warnings
-    empty_descriptions = [
-        c.label for c in non_leaf if not c.description
-    ]
+    empty_descriptions = [c.label for c in non_leaf if not c.description]
     if empty_descriptions:
         warnings.append(
             f"{len(empty_descriptions)} component(s) have empty descriptions: "
             + ", ".join(empty_descriptions[:5])
         )
 
-    empty_controls = 0
-    for comp in non_leaf:
-        for child in comp.children:
-            if not child.controlType:
-                empty_controls += 1
+    empty_controls = sum(
+        1 for comp in non_leaf
+        for child in comp.children
+        if not child.controlType
+    )
     if empty_controls:
-        warnings.append(f"{empty_controls} child element(s) have empty controlType")
+        warnings.append(
+            f"{empty_controls} child element(s) have empty controlType"
+        )
 
     if not analysis.apis:
         warnings.append("No APIs defined")
@@ -114,26 +114,44 @@ def validate_analysis_impl(json_path: str) -> dict:
             + (f" | Resolution: {disc.resolution}" if disc.resolution else "")
         )
 
-    # Build summary
-    summary = {
-        "screen_name": analysis.screen.name,
-        "section_prefix": analysis.sectionPrefix,
-        "total_components": len(analysis.components),
-        "non_leaf_components": len(non_leaf),
-        "leaf_components": len(analysis.components) - len(non_leaf),
-        "total_children": sum(len(c.children) for c in non_leaf),
-        "total_interactions": sum(len(c.interactions) for c in non_leaf),
-        "screen_interactions": len(analysis.screen.interactions),
-        "api_count": len(analysis.apis),
-        "image_count": (
-            len(analysis.screen.imageFiles)
-            + sum(1 for c in non_leaf if c.imageFile)
-        ),
-    }
+    # If errors, stop here
+    if errors:
+        return {
+            "valid": False,
+            "errors": errors,
+            "warnings": warnings,
+        }
+
+    # Generate .docx
+    doc = build_document(analysis)
+
+    if output_path:
+        out = Path(output_path).resolve()
+    else:
+        safe_name = "".join(
+            c for c in analysis.screen.name
+            if c.isalnum() or c in (" ", "_", "-")
+        ).strip().replace(" ", "_")
+        out = path.parent / f"{safe_name}.docx"
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(out))
+
+    # Count tables and images
+    table_count = len(doc.tables)
+    image_count = (
+        len(analysis.screen.imageFiles)
+        + sum(1 for c in non_leaf if c.imageFile)
+    )
 
     return {
-        "valid": len(errors) == 0,
-        "errors": errors,
+        "valid": True,
+        "output_path": str(out),
+        "tables": table_count,
+        "images": image_count,
         "warnings": warnings,
-        "summary": summary,
+        "message": (
+            f"Generated {out.name} successfully "
+            f"({table_count} tables, {image_count} images)."
+        ),
     }

@@ -5,132 +5,98 @@ vision + codebase data, then generating the final .docx.
 """
 
 SPEC_WORKFLOW_PROMPT = """\
-# TLGP Screen Specification Document Workflow
+# TLGP Screen Specification Workflow
 
-You are creating a detailed specification document for a mobile app screen.
+You are creating a specification document for a mobile app screen.
 Section prefix: **{section_prefix}**
 
 ## Available Tools
 
-- `launch_annotator` — spawn the annotation GUI
-- `list_exports` — inspect directory state
-- `parse_annotations` — read annotation JSON
-- `scaffold_analysis` — auto-generate analysis.json template
-- `validate_analysis` — check analysis.json
-- `generate_docx` — produce the .docx
-
-## Available Resources
-
-- `tlgp://schema/analysis-json` — field reference for analysis.json
-- `tlgp://schema/control-types` — UI control classification guide
-- `tlgp://spec/formatting` — formatting config (read-only)
+- `launch_annotator` — open the annotation GUI for the user
+- `prepare_analysis` — discover exports, scaffold analysis.json, return docs
+- `update_analysis` — patch fields in analysis.json by path
+- `finalize` — validate and generate the .docx
 
 ## Source Priority
 
-Screenshots are the **primary** source of truth for UI components, element \
-names, interaction behavior, and visual structure.
-
-Source code is the **primary** source of truth for API endpoints, DTO field \
-names, types, required status, and data flow.
-
-When you find discrepancies between what's visible in the screenshots and \
-what's in the code (e.g., a UI element with no backing data, or an API field \
-with no visual representation), add them to the `discrepancies` array in \
-analysis.json rather than silently omitting either side.
+- **Screenshots** are the source of truth for UI elements and interactions.
+- **Source code** is the source of truth for API data and field types.
+- When they conflict, add the conflict to the `discrepancies` array.
 
 ---
 
-## Step 1: Check Workspace
+## Step 1: Prepare
 
-Call `list_exports` with the output directory.
+Call `prepare_analysis(output_dir=..., section_prefix="{section_prefix}")`.
 
-Based on the status:
-- **not_found** / **empty**: Proceed to Step 2.
-- **annotations_only**: Skip to Step 3.
-- **ready**: Skip to Step 6.
-- **complete**: Ask the user if they want to regenerate.
-- **malformed**: Report the issues and ask how to proceed.
+**If status is "needs_annotation":**
+1. Call `launch_annotator` with screenshot paths and output_dir.
+2. Tell the user: "Please annotate all components, then let me know when done."
+3. Wait for the user to confirm, then call `prepare_analysis` again.
 
-## Step 2: Launch Annotator
+**If status is "complete":** Ask the user if they want to regenerate.
 
-Call `launch_annotator` with the screenshot paths and output directory.
+**Otherwise:** Note the `analysis_path` and review the `components` list. \
+The response includes `schema` (field reference) and `control_types` \
+(classification guide) — use these in Step 2.
 
-Tell the user:
-> "The annotation tool is open. Please annotate all UI components \
-on the screen, then click Export (Ctrl+S). Let me know when you're done."
+## Step 2: Vision Analysis
 
-**Wait for the user to confirm they've finished annotating.**
+View each image from `image_files` and each component's `imageFile`.
 
-## Step 3: Parse & Scaffold
+For each non-leaf component, call `update_analysis` with:
 
-1. Call `list_exports` to discover the exported files.
-2. Call `parse_annotations` with the annotation JSON path.
-3. Call `scaffold_analysis` to generate the analysis.json template.
-4. Read the `tlgp://schema/analysis-json` resource for field reference.
-5. Read the `tlgp://schema/control-types` resource for classification guide.
+```json
+[
+  {{"path": "components[N].description", "value": "Vietnamese description"}},
+  {{"path": "components[N].children[M].controlType", "value": "Button"}},
+  {{"path": "components[N].children[M].description", "value": "Vietnamese description"}},
+  {{"path": "components[N].interactions", "value": [
+    {{"action": "Click vào nút X", "reaction": "Hệ thống thực hiện Y"}}
+  ]}}
+]
+```
 
-## Step 4: Vision Analysis
+Valid controlType values: Button, Text, Icon, Image, Component, \
+TextField, Checkbox, Switch, Tabbar, Slide.
 
-View each annotated image (use your vision capabilities) and for each \
-component's children:
+Also fill `screen.interactions` and screen `topLevelChildren` descriptions.
 
-1. Identify the control type (Button, Text, Icon, Image, Component, \
-TextField, Checkbox, Switch, Tabbar, Slide).
-2. Determine if the element is required/editable.
-3. Write a concise Vietnamese description.
-4. Identify interaction patterns (user action → system reaction).
-5. Cross-reference with codebase knowledge — if an element suggests an \
-API call or navigation, note it for verification in Step 5.
+Write all descriptions in Vietnamese.
 
-Update the analysis.json with your findings.
+## Step 3: Codebase Analysis
 
-## Step 5: Codebase Analysis
+Search the project code for APIs, DTOs, and navigation routes related \
+to this screen. Call `update_analysis` with:
 
-Search the project codebase for:
+```json
+[
+  {{"path": "apis", "value": [
+    {{
+      "number": 1,
+      "method": "GET",
+      "title": "Vietnamese title",
+      "url": "/api/endpoint",
+      "requestParams": [{{"name": "field", "meaning": "...", "required": "Có", "dataType": "String", "limit": "", "defaultValue": ""}}],
+      "requestBodyType": "",
+      "responseType": "DtoName",
+      "responseFields": [...],
+      "subDtos": [...]
+    }}
+  ]}},
+  {{"path": "discrepancies", "value": [
+    {{"location": "Component Name", "imageObservation": "...", "codeObservation": "..."}}
+  ]}}
+]
+```
 
-1. **API endpoints** related to this screen:
-   - Search for route definitions, Retrofit/Dio service methods.
-   - Document method, URL, request params, response fields.
-   - For POST/PUT/DELETE APIs, set `requestBodyType` to the DTO name \
-   (e.g., "FavoriteProductRequestDTO") so the doc renders \
-   "Request Body (DtoName)" instead of just "Request".
-2. **DTOs and models**:
-   - Find request/response DTOs.
-   - Document every field: name, type, required, constraints.
-3. **Navigation routes**:
-   - Find how this screen is reached and where it navigates to.
-4. **Cross-reference with vision analysis**:
-   - Verify that API fields map to visible UI elements.
-   - Flag any discrepancies (visible elements with no data source, \
-   or code fields with no visual representation) in the `discrepancies` array.
+For POST/PUT/DELETE APIs, set `requestBodyType` to the DTO name \
+(renders as "Request Body (DtoName)" in the document).
 
-Fill in the `apis` section and interaction reactions with codebase evidence.
+## Step 4: Finalize
 
-## Step 6: Validate
+Call `finalize(json_path=...)`.
 
-Call `validate_analysis` with the analysis.json path.
-
-- If **errors**: fix them and re-validate.
-- If **warnings**: review them — fill in missing descriptions, \
-control types, or APIs if needed. Pay special attention to discrepancy \
-warnings — these flag conflicts between screenshots and code.
-- If **valid with no warnings**: proceed.
-
-## Step 7: Generate
-
-Call `generate_docx` with the analysis.json path.
-
-Report the result to the user:
-> "Generated specification document: [filename] \
-(X tables, Y images). The file is at: [path]"
-
----
-
-## Important Notes
-
-- Always write descriptions in Vietnamese.
-- Each component's `imageFile` points to the cropped annotated \
-image — verify these exist before generating.
-- If the annotation tool was not installed or cannot be launched, \
-ask the user to install it: `uv pip install tlgp-annotation-tool`
+- **If errors:** Fix with `update_analysis` and call `finalize` again.
+- **If success:** Report the .docx path and any warnings to the user.
 """
