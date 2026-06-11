@@ -4,15 +4,12 @@ MCP (Model Context Protocol) server that exposes the TLGP annotation and documen
 
 ## Overview
 
-This server exposes the TLGP toolchain to AI coding agents. Agents discover and call structured tools via MCP, enabling automated annotation, analysis, and document generation workflows.
-
-### What it provides
+This server exposes two tools — one per underlying package — and one orchestration prompt:
 
 | Type | Count | Purpose |
 |---|---|---|
-| **Tools** | 6 | Executable actions: launch annotator, inspect directories, scaffold/validate/generate |
-| **Resources** | 3 | Reference data: analysis.json schema, control type guide, formatting spec |
-| **Prompts** | 1 | Step-by-step workflow for creating a specification document |
+| **Tools** | 2 | Launch the annotation GUI, generate .docx specification documents |
+| **Prompts** | 1 | Step-by-step workflow guiding the agent through the full pipeline |
 
 ## Installation
 
@@ -40,7 +37,7 @@ uv sync
 ```
 
 3. Save the file and click **Refresh** in the MCP Servers panel.
-4. The server should appear with 6 tools, 3 resources, and 1 prompt.
+4. The server should appear with 2 tools and 1 prompt.
 
 ### Android Studio (Gemini)
 
@@ -81,54 +78,40 @@ uv run python -m tlgp_mcp_server
 
 ### `launch_annotator`
 
-Spawns the TLGP Annotation Tool GUI as a background process. The user annotates screenshots and exports when finished.
+Spawns the TLGP Annotation Tool GUI as a background process. The user annotates screenshots with component boxes and exports when finished.
 
-### `list_exports`
+**Args:**
+- `output_dir` — directory where the tool saves exported files
+- `screenshot_paths` — optional list of screenshot image paths to pre-load
 
-Inspects an output directory and reports its state: `empty`, `annotations_only`, `ready`, `complete`, `malformed`, or `not_found`. Guides the agent on what to do next.
+### `generate_spec_doc`
 
-### `parse_annotations`
+Validates analysis data and generates a formatted `.docx` specification document. Accepts a complete analysis dict (conforming to the AnalysisData schema), validates it against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
 
-Reads the annotation tool's exported JSON and returns a validated, structured component hierarchy.
-
-### `scaffold_analysis`
-
-Auto-generates an `analysis.json` template from annotation exports. Pre-fills everything derivable (component IDs, labels, image mappings, child numbering). Leaves empty slots for fields requiring agent intelligence: control types, descriptions, interactions, and API data.
-
-### `validate_analysis`
-
-Validates a completed `analysis.json` against the doc generator's Pydantic schema. Cross-checks that all referenced images exist. Reports blocking errors and informational warnings.
-
-### `generate_docx`
-
-Builds a `.docx` specification document from a validated `analysis.json`. All formatting (fonts, colors, table widths) is applied automatically from `spec_format.toml`.
-
-## Resources
-
-| URI | Description |
-|---|---|
-| `tlgp://schema/analysis-json` | Documented schema for every field in `analysis.json` |
-| `tlgp://schema/control-types` | Visual guide for classifying UI controls |
-| `tlgp://spec/formatting` | Current formatting configuration (read-only) |
+**Args:**
+- `analysis` — complete analysis data dict (see the `create_spec_doc` prompt for the full schema reference)
+- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `exportDir`)
+- `validate_only` — if `True`, validate without generating (useful for catching errors early)
 
 ## Prompts
 
 ### `create_spec_doc`
 
-Complete workflow for creating a screen specification document. Guides the agent through: inspecting the workspace → launching the annotator → scaffolding → vision analysis → codebase analysis → validation → generation.
+Complete workflow for creating a screen specification document. Guides the agent through: launching the annotator → reading annotation exports → vision analysis → codebase analysis → validation → generation. Includes the full analysis schema reference, control type classification guide, annotation export format documentation, and a concrete example inline.
 
-**Arguments:**
-
-- `section_prefix` (default: `"1.1"`): Section number prefix for headings.
+**Args:**
+- `section_prefix` (default: `"1.1"`) — section number prefix for headings
 
 ## Architecture
 
 ```
-Agent ──MCP──▸ tlgp-mcp-server ──import──▸ tlgp-doc-generator
-                    │
-                    └──subprocess──▸ tlgp-annotation-tool (GUI)
+Agent ──MCP──▸ tlgp-mcp-server
+                     │
+                     ├── launch_annotator ──subprocess──▸ tlgp-annotation-tool (GUI)
+                     │
+                     └── generate_spec_doc ──import──▸ tlgp-doc-generator
 ```
 
-- The MCP server imports `tlgp-doc-generator` directly for validation and generation.
+- The MCP server imports `tlgp-doc-generator` directly for validation and document generation.
 - The annotation tool runs as a detached subprocess (GUI cannot run inside an MCP tool call).
-- All formatting is driven by `spec_format.toml` in the doc-generator package.
+- All document formatting is driven by `spec_format.toml` in the doc-generator package.

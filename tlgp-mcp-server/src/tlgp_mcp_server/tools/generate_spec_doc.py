@@ -1,7 +1,8 @@
-"""Tool: finalize — validate + generate .docx in one step.
+"""Tool: generate_spec_doc — validate analysis data and generate .docx.
 
-Combines the logic of validate_analysis and generate_docx into a single
-tool call. If validation passes, generates the document automatically.
+Accepts a complete analysis dict from the agent, validates it against the
+AnalysisData Pydantic schema, cross-checks image references, and generates
+a formatted .docx specification document via tlgp-doc-generator.
 """
 
 from __future__ import annotations
@@ -15,37 +16,25 @@ from tlgp_doc_generator.doc_builder import build_document
 from tlgp_doc_generator.models import AnalysisData
 
 
-def finalize_impl(
-    json_path: str,
+def generate_spec_doc_impl(
+    analysis: dict,
     output_path: str | None = None,
+    validate_only: bool = False,
 ) -> dict:
-    """Validate analysis.json and generate the .docx if valid.
+    """Validate analysis data and generate the .docx if valid.
 
-    If validation fails, returns errors without generating.
-    If validation passes, generates the document and returns the result.
+    Args:
+        analysis: Complete analysis data dict conforming to AnalysisData.
+        output_path: Where to save the .docx. Defaults to
+            <screen_name>.docx in exportDir.
+        validate_only: If True, validate without generating.
+
+    Returns:
+        dict with valid, output_path, tables, images, warnings, errors.
     """
-    path = Path(json_path).resolve()
-
-    if not path.exists():
-        return {
-            "valid": False,
-            "errors": [f"File not found: {path}"],
-            "warnings": [],
-        }
-
-    # Parse JSON
-    try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
-    except json.JSONDecodeError as e:
-        return {
-            "valid": False,
-            "errors": [f"Invalid JSON syntax: {e}"],
-            "warnings": [],
-        }
-
     # Validate against Pydantic schema
     try:
-        analysis = AnalysisData.model_validate(raw)
+        data = AnalysisData.model_validate(analysis)
     except ValidationError as e:
         errors = []
         for err in e.errors():
@@ -61,10 +50,10 @@ def finalize_impl(
     errors = []
     warnings = []
 
-    non_leaf = [c for c in analysis.components if not c.isLeaf]
+    non_leaf = [c for c in data.components if not c.isLeaf]
     for comp in non_leaf:
         if comp.imageFile:
-            img = analysis.resolve_image(comp.imageFile)
+            img = data.resolve_image(comp.imageFile)
             if not img.exists():
                 errors.append(
                     f"Component '{comp.label}' (id={comp.id}): "
@@ -76,12 +65,12 @@ def finalize_impl(
                 f"no imageFile specified (non-leaf should have one)"
             )
 
-    for img_file in analysis.screen.imageFiles:
-        img = analysis.resolve_image(img_file)
+    for img_file in data.screen.imageFiles:
+        img = data.resolve_image(img_file)
         if not img.exists():
             errors.append(f"Screen image not found: {img}")
 
-    if not analysis.screen.imageFiles:
+    if not data.screen.imageFiles:
         warnings.append("No screen-level images specified")
 
     # Content completeness warnings
@@ -102,11 +91,11 @@ def finalize_impl(
             f"{empty_controls} child element(s) have empty controlType"
         )
 
-    if not analysis.apis:
+    if not data.apis:
         warnings.append("No APIs defined")
 
     # Discrepancy warnings
-    for disc in analysis.discrepancies:
+    for disc in data.discrepancies:
         warnings.append(
             f"⚠️ Discrepancy at '{disc.location}': "
             f"Image shows: {disc.imageObservation} | "
@@ -114,7 +103,7 @@ def finalize_impl(
             + (f" | Resolution: {disc.resolution}" if disc.resolution else "")
         )
 
-    # If errors, stop here
+    # Stop here if errors found
     if errors:
         return {
             "valid": False,
@@ -122,25 +111,41 @@ def finalize_impl(
             "warnings": warnings,
         }
 
+    # Validate-only mode: return results without generating
+    if validate_only:
+        return {
+            "valid": True,
+            "warnings": warnings,
+            "message": "Validation passed. Call again without validate_only to generate.",
+        }
+
     # Generate .docx
-    doc = build_document(analysis)
+    doc = build_document(data)
 
     if output_path:
         out = Path(output_path).resolve()
     else:
         safe_name = "".join(
-            c for c in analysis.screen.name
+            c for c in data.screen.name
             if c.isalnum() or c in (" ", "_", "-")
         ).strip().replace(" ", "_")
-        out = path.parent / f"{safe_name}.docx"
+        out = Path(data.exportDir) / f"{safe_name}.docx"
 
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
 
+    # Save analysis.json for record-keeping
+    export_dir = Path(data.exportDir)
+    analysis_json_path = export_dir / "analysis.json"
+    analysis_json_path.write_text(
+        json.dumps(analysis, indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
     # Count tables and images
     table_count = len(doc.tables)
     image_count = (
-        len(analysis.screen.imageFiles)
+        len(data.screen.imageFiles)
         + sum(1 for c in non_leaf if c.imageFile)
     )
 
