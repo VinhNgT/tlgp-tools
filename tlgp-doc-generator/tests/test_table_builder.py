@@ -17,6 +17,7 @@ from tlgp_doc_generator.style_constants import (
     UI_COLS_PT,
     INTERACTION_COLS_PT,
     API_COLS_PT,
+    SPACE_AFTER_TABLE_PT,
 )
 from tlgp_doc_generator.table_builder import (
     build_api_table,
@@ -232,3 +233,26 @@ class TestApiTable:
         table = build_api_table(doc, params)
         for c in range(6):
             assert _get_cell_shading(table.cell(0, c)) == HEADER_BG_HEX
+
+
+# ── Table Spacing ─────────────────────────────────────────────────────
+
+
+class TestTableSpacing:
+    def test_spacing_added_after_info_table(self):
+        doc = Document()
+        build_info_table(doc, "Header", "Description")
+        # There should be at least one paragraph added for spacing
+        spacer_para = doc.paragraphs[-1]
+        assert spacer_para.paragraph_format.space_before == Pt(0)
+        assert spacer_para.paragraph_format.space_after == Pt(SPACE_AFTER_TABLE_PT)
+        assert spacer_para.paragraph_format.line_spacing == Pt(1)
+
+    def test_spacing_added_after_ui_table(self):
+        doc = Document()
+        build_ui_elements_table(doc, [])
+        spacer_para = doc.paragraphs[-1]
+        assert spacer_para.paragraph_format.space_before == Pt(0)
+        assert spacer_para.paragraph_format.space_after == Pt(SPACE_AFTER_TABLE_PT)
+        assert spacer_para.paragraph_format.line_spacing == Pt(1)
+

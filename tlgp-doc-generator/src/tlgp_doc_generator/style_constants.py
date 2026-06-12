@@ -29,6 +29,8 @@ with _CONFIG_PATH.open("rb") as _f:
 FONT_FAMILY: str = _cfg["global"]["font_family"]
 FONT_SIZE_DEFAULT: Pt = Pt(_cfg["global"]["font_size_pt"])
 FONT_SIZE_API: Pt = Pt(_cfg["table"]["api"]["font_size_pt"])
+SPACE_AFTER_TABLE_PT: float = float(_cfg["global"].get("space_after_table_pt", 12.0))
+
 
 # ============================================================
 # Colors

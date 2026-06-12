@@ -37,6 +37,7 @@ from tlgp_doc_generator.style_constants import (
     INFO_COLS_PT,
     INTERACTION_COLS_PT,
     INTERACTION_TABLE_HEADERS,
+    SPACE_AFTER_TABLE_PT,
     UI_COLS_PT,
     UI_TABLE_HEADERS,
 )
@@ -189,6 +190,15 @@ def _style_table(table: Table, col_widths_pt: list[float], font_size: Pt | None 
                         run.font.size = font_size or FONT_SIZE_DEFAULT
 
 
+
+def _add_table_spacing(doc: Document):
+    """Add spacing after a table using a spacer paragraph."""
+    p = doc.add_paragraph()
+    p.paragraph_format.space_before = Pt(0)
+    p.paragraph_format.space_after = Pt(SPACE_AFTER_TABLE_PT)
+    p.paragraph_format.line_spacing = Pt(1)
+
+
 # ============================================================
 # Public table builders
 # ============================================================
@@ -208,6 +218,7 @@ def build_info_table(doc: Document, label: str, description: str) -> Table:
     _style_cell_text(table.cell(1, 0), "Mô tả")
     _style_cell_text(table.cell(1, 1), description)
     _style_table(table, INFO_COLS_PT)
+    _add_table_spacing(doc)
     return table
 
 
@@ -227,6 +238,7 @@ def build_screen_level_info_table(
     _style_cell_text(table.cell(1, 0), "Mô tả")
     _style_cell_text(table.cell(1, 1), description)
     _style_table(table, INFO_COLS_PT)
+    _add_table_spacing(doc)
     return table
 
 
@@ -254,6 +266,7 @@ def build_ui_elements_table(
             _style_cell_text(table.cell(r + 1, c), text)
 
     _style_table(table, UI_COLS_PT)
+    _add_table_spacing(doc)
     return table
 
 
@@ -274,6 +287,7 @@ def build_interaction_table(
         _style_cell_text(table.cell(r + 1, 1), interaction.reaction)
 
     _style_table(table, INTERACTION_COLS_PT)
+    _add_table_spacing(doc)
     return table
 
 
@@ -297,4 +311,5 @@ def build_api_table(doc: Document, params: list[ApiParam]) -> Table:
             _style_cell_text(table.cell(r + 1, c), text, font_size=FONT_SIZE_API)
 
     _style_table(table, API_COLS_PT, font_size=FONT_SIZE_API)
+    _add_table_spacing(doc)
     return table

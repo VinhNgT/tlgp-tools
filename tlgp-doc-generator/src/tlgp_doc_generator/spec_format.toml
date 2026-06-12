@@ -11,6 +11,8 @@
 font_family = "Times New Roman"
 font_size_pt = 12
 heading_color = "#4F81BD"
+space_after_table_pt = 12
+
 
 [border]
 color = "#7F7F7F"
