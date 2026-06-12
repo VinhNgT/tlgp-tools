@@ -10,7 +10,7 @@ The user may converse in Vietnamese or English. However, **all content written t
 ## Available Tools
 
 - `launch_annotator` — open the annotation GUI for the user
-- `generate_spec_doc` — validate analysis data and generate the .docx
+- `generate_spec_doc` — validate analysis data and generate the .docx (supports direct `analysis` dict or path-based load via `analysis_path`)
 
 ## Source Priority
 
@@ -73,11 +73,25 @@ but always describe the UI based on what the image shows.
 
 ### 2d. Validate
 
-Call `generate_spec_doc(analysis=..., validate_only=True)` to check for errors before generating. Fix any issues and re-validate.
+Validate the analysis data to check for errors before generating.
+
+> [!IMPORTANT]
+> **IDE Payload Limitation Bypass**:
+> If your `analysis` data is large (e.g. over 10-20KB), the IDE client middleware may corrupt the tool call parameters (causing `analysis` is missing validation errors).
+> To bypass this:
+> 1. Save the analysis dict as a JSON file locally (e.g., to `<exportDir>/analysis.json` or `./agent-tmp/analysis.json`).
+> 2. Call `generate_spec_doc` passing a minimal empty dictionary `analysis={}` (to satisfy the client-side schema requirement) along with the absolute path `analysis_path="..."`.
+>
+> **Example**:
+> ```json
+> generate_spec_doc(analysis={}, analysis_path="E:/tendoo_flutter/tendoo_mall/tlgp-annotation-tool/agent-tmp/Trang_chủ/analysis.json", validate_only=true)
+> ```
+
+Otherwise, for small payloads, call `generate_spec_doc(analysis=..., validate_only=True)`. Fix any issues and re-validate.
 
 ## Step 3: Generate
 
-Call `generate_spec_doc(analysis=...)`.
+Call `generate_spec_doc(analysis=...)` (or `generate_spec_doc(analysis={}, analysis_path="...")` for large payloads).
 
 - **If errors:** Fix the analysis dict and retry.
 - **If success:** Report the .docx path and any warnings to the user.

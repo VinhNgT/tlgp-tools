@@ -62,7 +62,8 @@ def launch_annotator(
 
 @mcp.tool()
 def generate_spec_doc(
-    analysis: dict,
+    analysis: dict | None = None,
+    analysis_path: str | None = None,
     output_path: str | None = None,
     validate_only: bool = False,
 ) -> dict:
@@ -80,6 +81,7 @@ def generate_spec_doc(
             exportDir, components, screen, apis, and discrepancies.
             exportDir must point to the annotation export directory
             containing the annotated images.
+        analysis_path: Optional path to analysis JSON file.
         output_path: Where to save the .docx. Defaults to
             <screen_name>.docx in exportDir.
         validate_only: If True, validate the data and check images
@@ -89,7 +91,12 @@ def generate_spec_doc(
     Returns:
         dict with valid, output_path, tables, images, warnings, errors.
     """
-    return generate_spec_doc_impl(analysis, output_path, validate_only)
+    return generate_spec_doc_impl(
+        analysis=analysis,
+        analysis_path=analysis_path,
+        output_path=output_path,
+        validate_only=validate_only,
+    )
 
 
 # ============================================================

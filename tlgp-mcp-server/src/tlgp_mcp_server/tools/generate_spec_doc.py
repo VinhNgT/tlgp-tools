@@ -17,7 +17,8 @@ from tlgp_doc_generator.models import AnalysisData
 
 
 def generate_spec_doc_impl(
-    analysis: dict,
+    analysis: dict | None = None,
+    analysis_path: str | None = None,
     output_path: str | None = None,
     validate_only: bool = False,
 ) -> dict:
@@ -25,6 +26,7 @@ def generate_spec_doc_impl(
 
     Args:
         analysis: Complete analysis data dict conforming to AnalysisData.
+        analysis_path: Optional path to analysis JSON file.
         output_path: Where to save the .docx. Defaults to
             <screen_name>.docx in exportDir.
         validate_only: If True, validate without generating.
@@ -32,6 +34,24 @@ def generate_spec_doc_impl(
     Returns:
         dict with valid, output_path, tables, images, warnings, errors.
     """
+    if analysis_path:
+        try:
+            with open(analysis_path, "r", encoding="utf-8") as f:
+                analysis = json.load(f)
+        except Exception as e:
+            return {
+                "valid": False,
+                "errors": [f"Failed to read analysis_path: {e}"],
+                "warnings": [],
+            }
+
+    if not analysis:
+        return {
+            "valid": False,
+            "errors": ["Either 'analysis' or 'analysis_path' must be provided"],
+            "warnings": [],
+        }
+
     # Validate against Pydantic schema
     try:
         data = AnalysisData.model_validate(analysis)

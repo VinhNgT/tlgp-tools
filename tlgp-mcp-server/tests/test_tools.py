@@ -259,6 +259,25 @@ class TestGenerateSpecDoc:
 
         assert result["valid"] is False
 
+    def test_generate_with_analysis_path(self, tmp_path):
+        screen_dir = _create_export_dir(tmp_path)
+        analysis = _build_analysis(screen_dir)
+
+        # Write analysis to file
+        analysis_json_file = tmp_path / "test_analysis.json"
+        analysis_json_file.write_text(json.dumps(analysis, ensure_ascii=False), encoding="utf-8")
+
+        result = generate_spec_doc_impl(analysis_path=str(analysis_json_file))
+
+        assert result["valid"] is True
+        assert Path(result["output_path"]).exists()
+
+    def test_analysis_path_does_not_exist(self):
+        result = generate_spec_doc_impl(analysis_path="nonexistent_file.json")
+
+        assert result["valid"] is False
+        assert "Failed to read analysis_path" in result["errors"][0]
+
 
 # ── launch_annotator ──────────────────────────────────────────
 
