@@ -44,6 +44,7 @@ def launch_annotator_impl(
     # Spawn detached — don't wait for the GUI to close
     proc = subprocess.Popen(
         cmd,
+        stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         start_new_session=True,
