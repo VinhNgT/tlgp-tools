@@ -3,28 +3,42 @@
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
-import sys
 
 
 def launch_annotator_impl(
     output_dir: str,
-    screenshot_paths: list[str] | None = None,
+    screenshot_path: str | None = None,
+    session_path: str | None = None,
 ) -> dict:
     """Spawn the annotation tool as a background subprocess.
 
     Constructs a command line equivalent to:
-        python -m tlgp_annotation_tool [screenshots...] -o <output_dir>
+        uv run python -m tlgp_annotation_tool [screenshot] -o <output_dir>
+        uv run python -m tlgp_annotation_tool -s <session.json> -o <output_dir>
+
+    Uses ``uv run`` instead of ``sys.executable`` so the annotation tool
+    resolves correctly from the uv workspace regardless of which Python
+    interpreter the MCP server was started with.
 
     The process is detached so it doesn't block the MCP server.
     """
+    if screenshot_path and session_path:
+        raise ValueError("screenshot_path and session_path are mutually exclusive")
+
     output_dir = os.path.abspath(output_dir)
     os.makedirs(output_dir, exist_ok=True)
 
-    cmd = [sys.executable, "-m", "tlgp_annotation_tool"]
-    if screenshot_paths:
-        for p in screenshot_paths:
-            cmd.append(os.path.abspath(p))
+    uv_bin = shutil.which("uv")
+    if not uv_bin:
+        raise RuntimeError("uv is not installed or not on PATH")
+
+    cmd = [uv_bin, "run", "python", "-m", "tlgp_annotation_tool"]
+    if screenshot_path:
+        cmd.append(os.path.abspath(screenshot_path))
+    if session_path:
+        cmd.extend(["-s", os.path.abspath(session_path)])
     cmd.extend(["-o", output_dir])
 
     # Spawn detached — don't wait for the GUI to close
@@ -37,10 +51,4 @@ def launch_annotator_impl(
 
     return {
         "pid": proc.pid,
-        "output_dir": output_dir,
-        "message": (
-            "Annotation tool launched. The user will annotate screenshots "
-            "and export when finished. Wait for the user to confirm they "
-            "are done before proceeding."
-        ),
     }

@@ -58,12 +58,12 @@ Rectangular regions drawn on the screenshot. Each box has:
 - **Coordinates** (x1, y1, x2, y2) in absolute image space
 - An optional list of **children** (nested boxes)
 
-### Hierarchical Nesting (up to 3 levels)
+### Hierarchical Nesting (n-level)
 
-Boxes support recursive nesting up to 3 levels deep:
+Boxes support arbitrary recursive nesting:
 - **Level 0 (Root)** — "Components" drawn on the full screenshot
 - **Level 1** — "Sub-components" drawn inside a component
-- **Level 2** — "Items" drawn inside a sub-component
+- **Level 2+** — Further nested elements drawn inside any parent
 
 Drill into a box to annotate its children; drill out to go back.
 

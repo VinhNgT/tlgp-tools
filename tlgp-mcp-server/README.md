@@ -82,20 +82,21 @@ Spawns the TLGP Annotation Tool GUI as a background process. The user annotates 
 
 **Args:**
 - `output_dir` — directory where the tool saves exported files
-- `screenshot_paths` — optional list of screenshot image paths to pre-load
+- `screenshot_path` — optional screenshot image path to pre-load
+- `session_path` — optional previously exported session JSON to re-edit (mutually exclusive with `screenshot_path`)
 
 ### `generate_spec_doc`
 
 Validates analysis data and generates a formatted `.docx` specification document. Accepts a complete analysis dict (conforming to the AnalysisData schema), validates it against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
 
 **Args:**
-- `analysis` — complete analysis data dict (see the `create_spec_doc` prompt for the full schema reference)
+- `analysis` — complete analysis data dict (see the `spec_doc_workflow` prompt for the full schema reference)
 - `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `exportDir`)
 - `validate_only` — if `True`, validate without generating (useful for catching errors early)
 
 ## Prompts
 
-### `create_spec_doc`
+### `spec_doc_workflow`
 
 Complete workflow for creating a screen specification document. Guides the agent through: launching the annotator → reading annotation exports → vision analysis → codebase analysis → validation → generation. Includes the full analysis schema reference, control type classification guide, annotation export format documentation, and a concrete example inline.
 

@@ -143,7 +143,11 @@ class TestGenerateSpecDoc:
 
         assert result["valid"] is True
         assert "output_path" not in result
-        assert "Validation passed" in result["message"]
+        assert result["components"] == 2
+        assert result["non_leaf"] == 1
+        assert result["ui_elements"] == 2
+        assert result["apis"] == 0
+        assert result["images"] >= 1
 
     def test_schema_validation_failure(self):
         result = generate_spec_doc_impl({"sectionPrefix": "1.1"})
@@ -239,14 +243,14 @@ class TestGenerateSpecDoc:
         saved = json.loads(analysis_json.read_text(encoding="utf-8"))
         assert saved["sectionPrefix"] == "1.1"
 
-    def test_success_message(self, tmp_path):
+    def test_no_message_in_response(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
 
         result = generate_spec_doc_impl(analysis)
 
-        assert "message" in result
-        assert "successfully" in result["message"]
+        assert "message" not in result
+        assert result["valid"] is True
 
     def test_nonexistent_export_dir(self, tmp_path):
         analysis = _build_analysis(tmp_path / "nonexistent")
@@ -261,7 +265,7 @@ class TestGenerateSpecDoc:
 
 class TestLaunchAnnotator:
     def test_creates_output_dir(self, tmp_path, monkeypatch):
-        from unittest.mock import MagicMock
+        from unittest.mock import MagicMock, patch
 
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
@@ -269,10 +273,28 @@ class TestLaunchAnnotator:
             "tlgp_mcp_server.tools.launch_annotator.subprocess.Popen",
             mock_popen,
         )
+        monkeypatch.setattr(
+            "tlgp_mcp_server.tools.launch_annotator.shutil.which",
+            lambda name: "/usr/local/bin/uv",
+        )
 
         target = tmp_path / "new_dir"
         result = launch_annotator_impl(str(target))
         assert os.path.isdir(target)
         assert result["pid"] == 12345
         mock_popen.assert_called_once()
+
+        # Verify uv run is used instead of sys.executable
+        call_args = mock_popen.call_args[0][0]
+        assert call_args[0] == "/usr/local/bin/uv"
+        assert "run" in call_args
+
+    def test_raises_when_uv_not_found(self, tmp_path, monkeypatch):
+        monkeypatch.setattr(
+            "tlgp_mcp_server.tools.launch_annotator.shutil.which",
+            lambda name: None,
+        )
+
+        with pytest.raises(RuntimeError, match="uv is not installed"):
+            launch_annotator_impl(str(tmp_path / "out"))
 

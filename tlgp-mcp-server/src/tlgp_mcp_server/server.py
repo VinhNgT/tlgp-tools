@@ -3,7 +3,7 @@
 Exposes two tools (one per underlying package) and one orchestration prompt:
 - launch_annotator  → tlgp-annotation-tool
 - generate_spec_doc → tlgp-doc-generator
-- create_spec_doc   → prompt that guides the agent through the full workflow
+- spec_doc_workflow → prompt that guides the agent through the full workflow
 """
 
 from __future__ import annotations
@@ -27,7 +27,7 @@ mcp = FastMCP(
     instructions=(
         "TLGP Tools MCP server. Provides tools for annotating screenshots "
         "and generating .docx specification documents. "
-        "Use the `create_spec_doc` prompt to get the full workflow guide."
+        "Use the `spec_doc_workflow` prompt to get the full workflow guide."
     ),
 )
 
@@ -39,7 +39,8 @@ mcp = FastMCP(
 @mcp.tool()
 def launch_annotator(
     output_dir: str,
-    screenshot_paths: list[str] | None = None,
+    screenshot_path: str | None = None,
+    session_path: str | None = None,
 ) -> dict:
     """Launch the TLGP Annotation Tool GUI.
 
@@ -49,12 +50,14 @@ def launch_annotator(
 
     Args:
         output_dir: Directory where the tool will save exported files.
-        screenshot_paths: Optional list of screenshot image paths to pre-load.
+        screenshot_path: Optional screenshot image path to pre-load.
+        session_path: Optional previously exported session JSON to re-edit.
+            Mutually exclusive with screenshot_path.
 
     Returns:
-        dict with pid and output_dir.
+        dict with pid.
     """
-    return launch_annotator_impl(output_dir, screenshot_paths)
+    return launch_annotator_impl(output_dir, screenshot_path, session_path)
 
 
 @mcp.tool()
@@ -95,7 +98,7 @@ def generate_spec_doc(
 
 
 @mcp.prompt()
-def create_spec_doc(section_prefix: str = "1.1") -> str:
+def spec_doc_workflow(section_prefix: str = "1.1") -> str:
     """Full workflow for creating a TLGP screen specification document.
 
     Guides the agent through: annotating screenshots, performing vision

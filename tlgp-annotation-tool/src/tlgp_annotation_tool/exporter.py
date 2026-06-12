@@ -96,6 +96,22 @@ def _export_level_images(full_img: Image.Image, children: List[AnnotationBox],
     return exported_paths
 
 
+def _annotate_image_files(comp_dicts, safe_name, parent_path=""):
+    """Recursively add imageFile to each component dict.
+
+    Components with children get the filename of their cropped annotated image.
+    Leaf components (no children) get null.
+    """
+    for comp in comp_dicts:
+        has_children = "children" in comp and len(comp["children"]) > 0
+        if has_children:
+            path = f"{parent_path}_{comp['id']}" if parent_path else str(comp['id'])
+            comp["imageFile"] = f"{safe_name}_{path}_annotated.png"
+            _annotate_image_files(comp["children"], safe_name, path)
+        else:
+            comp["imageFile"] = None
+
+
 def export_session(session: ScreenSession, output_dir: str):
     """Exports ScreenSession data as JSON and annotated PNG images.
 
@@ -105,6 +121,11 @@ def export_session(session: ScreenSession, output_dir: str):
 
     When cut_lines are present, the root-level export produces N+1 separate
     part images instead of a single annotated image.
+
+    The exported JSON includes:
+    - imageFiles: list of root-level annotated image filenames
+    - imageFile per component: filename of cropped image (null for leaves)
+    - segments: when cuts are used, maps each part to its component IDs
 
     Returns (json_path, list_of_root_annotated_paths).
     """
@@ -124,21 +145,7 @@ def export_session(session: ScreenSession, output_dir: str):
 
     img = Image.open(session.original_image)
 
-    # JSON export
-    data = {
-        "screen_name": session.screen_name,
-        "description": session.description,
-        "original_image": session.original_image,
-        "image_width": img.width,
-        "image_height": img.height,
-        "components": [comp.to_dict() for comp in session.components],
-    }
-    if session.cut_lines:
-        data["cut_lines"] = sorted(session.cut_lines)
-
-    with open(json_path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
-
+    # Export images first so we know the filenames before writing JSON
     root_paths = _export_level_images(
         full_img=img,
         children=session.components,
@@ -150,4 +157,46 @@ def export_session(session: ScreenSession, output_dir: str):
         cut_lines=session.cut_lines if session.cut_lines else None,
     )
 
+    # Build JSON data
+    comp_dicts = [comp.to_dict() for comp in session.components]
+    _annotate_image_files(comp_dicts, safe_name)
+
+    data = {
+        "screen_name": session.screen_name,
+        "description": session.description,
+        "original_image": session.original_image,
+        "image_width": img.width,
+        "image_height": img.height,
+        "imageFiles": [os.path.basename(p) for p in root_paths],
+        "components": comp_dicts,
+    }
+
+    if session.cut_lines:
+        sorted_cuts = sorted(session.cut_lines)
+        data["cut_lines"] = sorted_cuts
+
+        # Build segment-to-component mapping
+        boundaries = [0] + sorted_cuts + [img.height]
+        segments = []
+        for part_idx in range(len(boundaries) - 1):
+            seg_y_start = boundaries[part_idx]
+            seg_y_end = boundaries[part_idx + 1]
+            if seg_y_end <= seg_y_start:
+                continue
+            comp_ids = [
+                c.id for c in session.components
+                if seg_y_start <= (c.top + c.bottom) / 2 < seg_y_end
+            ]
+            segments.append({
+                "part": part_idx + 1,
+                "imageFile": f"{safe_name}_annotated_part{part_idx + 1}.png",
+                "componentIds": comp_ids,
+            })
+        data["segments"] = segments
+
+    # Write JSON last — after images are successfully exported
+    with open(json_path, "w", encoding="utf-8") as f:
+        json.dump(data, f, indent=2, ensure_ascii=False)
+
     return json_path, root_paths
+

@@ -2,7 +2,7 @@ import os
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import ttkbootstrap as tb
-from typing import List, Optional, Tuple
+from typing import Optional, Tuple
 from PIL import Image
 
 from tlgp_annotation_tool.models import ScreenSession, AnnotationBox
@@ -24,7 +24,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
     manages keyboard shortcuts, and synchronizes interaction modes (Select, Draw, Pan)
     centrally through the SessionController.
     """
-    def __init__(self, initial_images: List[str] = None, default_output_dir: str = None):
+    def __init__(self, initial_image: str | None = None, session_path: str | None = None, default_output_dir: str | None = None):
         super().__init__(themename="darkly", title="TLGP Annotation Tool")
         self.geometry("1200x800")
         try:
@@ -34,10 +34,11 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
         # Core data structures
         self.session = ScreenSession()
-        if initial_images:
-            self.session.original_image = os.path.abspath(initial_images[0])
+        if initial_image:
+            self.session.original_image = os.path.abspath(initial_image)
 
         self.default_output_dir = os.path.abspath(default_output_dir) if default_output_dir else None
+        self._pending_session_path = os.path.abspath(session_path) if session_path else None
 
         self.controller = SessionController(self.session)
         self._last_touchpad_scroll_time = 0.0
@@ -57,7 +58,12 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
 
         # Set initial toolbar state and load initial image if provided
-        if self.session.original_image:
+        if self._pending_session_path:
+            # Load a previously exported session — deferred to ensure widgets are ready
+            self.update()
+            self._load_session_from_path(self._pending_session_path)
+            self._pending_session_path = None
+        elif self.session.original_image:
             self.update()
             self.load_session_image()
             self.sidebar.refresh_list()
@@ -542,6 +548,19 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         )
         if not path:
             return
+
+        self._load_session_from_path(path)
+
+    def _load_session_from_path(self, path: str):
+        """Load an exported session JSON and restore the annotation state.
+
+        Handles image resolution, dimension validation, component
+        deserialization, and UI refresh. If the original image cannot be
+        found automatically, prompts the user to select it manually.
+        """
+        import json
+        from PIL import Image
+        from tlgp_annotation_tool.history import HistoryManager
 
         # 1. Parse JSON
         try:

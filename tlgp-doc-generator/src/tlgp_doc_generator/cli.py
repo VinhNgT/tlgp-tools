@@ -144,6 +144,14 @@ def main():
         output_path = analysis_path.parent / f"{safe_name}.docx"
 
     doc.save(str(output_path))
+
+    # Copy analysis.json alongside the .docx for record-keeping
+    # (consistent with the MCP tool behavior)
+    analysis_dest = output_path.parent / "analysis.json"
+    if analysis_path.resolve() != analysis_dest.resolve():
+        import shutil
+        shutil.copy2(analysis_path, analysis_dest)
+
     print(f"✅ Saved to: {output_path}")
 
 

@@ -8,9 +8,15 @@ def main():
     
     parser = argparse.ArgumentParser(description="TLGP Annotation Tool")
     parser.add_argument(
-        "images",
-        nargs="*",
-        help="Screenshot image paths to open/stitch"
+        "image",
+        nargs="?",
+        default=None,
+        help="Screenshot image path to open"
+    )
+    parser.add_argument(
+        "-s", "--session",
+        default=None,
+        help="Previously exported session JSON to re-edit"
     )
     parser.add_argument(
         "-o", "--output",
@@ -19,7 +25,11 @@ def main():
     )
     args = parser.parse_args()
     
-    app = TlgpAnnotationApp(initial_images=args.images, default_output_dir=args.output)
+    app = TlgpAnnotationApp(
+        initial_image=args.image,
+        session_path=args.session,
+        default_output_dir=args.output,
+    )
     app.mainloop()
 
 if __name__ == "__main__":

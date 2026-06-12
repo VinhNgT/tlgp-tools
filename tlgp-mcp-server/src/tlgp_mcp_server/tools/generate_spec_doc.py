@@ -111,12 +111,21 @@ def generate_spec_doc_impl(
             "warnings": warnings,
         }
 
-    # Validate-only mode: return results without generating
+    # Validate-only mode: return summary without generating
     if validate_only:
+        image_count = (
+            len(data.screen.imageFiles)
+            + sum(1 for c in non_leaf if c.imageFile)
+        )
         return {
             "valid": True,
             "warnings": warnings,
-            "message": "Validation passed. Call again without validate_only to generate.",
+            "components": len(data.components),
+            "non_leaf": len(non_leaf),
+            "ui_elements": sum(len(c.children) for c in non_leaf),
+            "interactions": sum(len(c.interactions) for c in non_leaf),
+            "apis": len(data.apis),
+            "images": image_count,
         }
 
     # Generate .docx
@@ -155,8 +164,4 @@ def generate_spec_doc_impl(
         "tables": table_count,
         "images": image_count,
         "warnings": warnings,
-        "message": (
-            f"Generated {out.name} successfully "
-            f"({table_count} tables, {image_count} images)."
-        ),
     }
