@@ -8,17 +8,17 @@ Exposes two tools (one per underlying package) and one orchestration prompt:
 
 from __future__ import annotations
 
-import logging
 import os
 
 import requests
 from mcp.server.fastmcp import FastMCP
+from tlgp_logger import get_logger
 
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
 from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
 from mcp_server.tools.launch_annotator import launch_annotator_impl
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # ============================================================
 # Server instance

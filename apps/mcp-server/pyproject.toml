@@ -8,6 +8,7 @@ dependencies = [
     "mcp[cli]>=1.0",
     "doc-generator",
     "requests>=2.34.2",
+    "tlgp-logger",
 ]
 
 [project.scripts]
@@ -18,6 +19,7 @@ dev = ["pytest>=8.0"]
 
 [tool.uv.sources]
 doc-generator = { workspace = true }
+tlgp-logger = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

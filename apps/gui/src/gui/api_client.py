@@ -7,9 +7,12 @@ import jsonpatch
 import requests
 import websockets
 from models import WorkspaceState
+from tlgp_logger import get_logger
 
 API_URL = "http://127.0.0.1:8000"
 WS_URL = "ws://127.0.0.1:8000/ws"
+
+logger = get_logger(__name__)
 
 
 class EngineClient:
@@ -33,7 +36,7 @@ class EngineClient:
         while True:
             try:
                 async with websockets.connect(WS_URL) as ws:
-                    print("Connected to Engine WebSocket")
+                    logger.info("Connected to Engine WebSocket")
                     async for message in ws:
                         data = json.loads(message)
 
@@ -49,7 +52,7 @@ class EngineClient:
                                 self.state = WorkspaceState.model_validate(new_dict)
                                 self._trigger_update()
             except Exception as e:
-                print(f"WS Connection lost, retrying in 2s... ({e})")
+                logger.error("WS Connection lost, retrying in 2s...", error=str(e))
                 await asyncio.sleep(2)
 
     def _trigger_update(self):

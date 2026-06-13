@@ -11,7 +11,9 @@ dependencies = [
     "requests>=2.34.2",
     "tkinterdnd2-universal>=1.7.3",
     "websockets>=16.0",
+    "tlgp-logger",
 ]
 
 [tool.uv.sources]
 models = { workspace = true }
+tlgp-logger = { workspace = true }

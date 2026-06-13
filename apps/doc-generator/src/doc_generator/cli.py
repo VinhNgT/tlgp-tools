@@ -4,32 +4,36 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
 
 from pydantic import ValidationError
+from tlgp_logger import get_logger, setup_logging
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import AnalysisData
+
+logger = get_logger(__name__)
 
 
 def _load_analysis(path: Path) -> AnalysisData:
     """Load and validate analysis.json."""
     if not path.exists():
-        print(f"❌ File not found: {path}", file=sys.stderr)
+        logger.error(f"File not found: {path}")
         sys.exit(1)
 
     try:
         raw = json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
-        print(f"❌ Invalid JSON: {e}", file=sys.stderr)
+        logger.error("Invalid JSON", error=str(e))
         sys.exit(1)
 
     try:
         return AnalysisData.model_validate(raw)
     except ValidationError as e:
-        print(f"❌ Schema validation failed:\n{e}", file=sys.stderr)
+        logger.error("Schema validation failed", error=str(e))
         sys.exit(1)
 
 
@@ -104,6 +108,9 @@ def _print_summary(analysis: AnalysisData):
 
 
 def main():
+    env = os.environ.get("TLGP_ENV", "dev")
+    setup_logging(json_format=(env == "prod"))
+
     parser = argparse.ArgumentParser(
         prog="doc-generator",
         description="Generate TLGP screen spec .docx from analysis.json",

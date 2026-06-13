@@ -3,8 +3,11 @@ from tkinter import simpledialog
 
 from models import WorkspaceState
 from PIL import Image, ImageTk
+from tlgp_logger import get_logger
 
 from .api_client import EngineClient
+
+logger = get_logger(__name__)
 
 
 class AnnotationCanvas(tk.Canvas):
@@ -181,7 +184,7 @@ class AnnotationCanvas(tk.Canvas):
                     try:
                         self.client.add_component(lbl, bounds)
                     except Exception as e:
-                        print(f"Failed to add: {e}")
+                        logger.error("Failed to add", error=str(e))
 
         elif mode == "move" and self.drag_data["item_id"]:
             coords = self.coords(self.drag_data["item_id"])
@@ -190,7 +193,7 @@ class AnnotationCanvas(tk.Canvas):
                     self.drag_data["comp_id"], int(coords[0]), int(coords[1])
                 )
             except Exception as e:
-                print(f"Failed to move: {e}")
+                logger.error("Failed to move", error=str(e))
 
         elif mode == "resize_br" and self.drag_data["item_id"]:
             coords = self.coords(self.drag_data["item_id"])
@@ -203,7 +206,7 @@ class AnnotationCanvas(tk.Canvas):
             try:
                 self.client.update_component(self.drag_data["comp_id"], bounds=bounds)
             except Exception as e:
-                print(f"Failed to resize: {e}")
+                logger.error("Failed to resize", error=str(e))
 
         self.drag_data = {
             "item_id": None,
@@ -219,7 +222,7 @@ class AnnotationCanvas(tk.Canvas):
                 self.client.delete_component(self.selected_comp_id)
                 self.selected_comp_id = None
             except Exception as e:
-                print(f"Failed to delete: {e}")
+                logger.error("Failed to delete", error=str(e))
 
     def on_double_click(self, event):
         items = self.find_withtag("current")
@@ -235,4 +238,4 @@ class AnnotationCanvas(tk.Canvas):
                 try:
                     self.client.update_component(comp_id, label=new_label)
                 except Exception as e:
-                    print(f"Failed to rename: {e}")
+                    logger.error("Failed to rename", error=str(e))

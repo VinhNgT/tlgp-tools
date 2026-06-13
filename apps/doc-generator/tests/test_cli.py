@@ -30,7 +30,7 @@ class TestCliValidation:
                 main()
             assert exc.value.code == 1
         captured = capsys.readouterr()
-        assert "File not found" in captured.err
+        assert "File not found" in captured.out or "File not found" in captured.err
 
     def test_invalid_json(self, tmp_path, capsys):
         bad_json = tmp_path / "bad.json"
@@ -40,7 +40,7 @@ class TestCliValidation:
                 main()
             assert exc.value.code == 1
         captured = capsys.readouterr()
-        assert "Invalid JSON" in captured.err
+        assert "Invalid JSON" in captured.out or "Invalid JSON" in captured.err
 
     def test_invalid_schema(self, tmp_path, capsys):
         bad_schema = tmp_path / "bad_schema.json"
@@ -50,7 +50,10 @@ class TestCliValidation:
                 main()
             assert exc.value.code == 1
         captured = capsys.readouterr()
-        assert "Schema validation failed" in captured.err
+        assert (
+            "Schema validation failed" in captured.out
+            or "Schema validation failed" in captured.err
+        )
 
 
 class TestCliDryRun:

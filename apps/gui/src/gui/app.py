@@ -4,9 +4,12 @@ import urllib.request
 from tkinter import filedialog, messagebox, ttk
 
 from PIL import Image
+from tlgp_logger import get_logger
 
 from .api_client import EngineClient
 from .canvas import AnnotationCanvas
+
+logger = get_logger(__name__)
 
 
 class TlgpApp(tk.Tk):
@@ -85,7 +88,7 @@ class TlgpApp(tk.Tk):
             img = Image.open(io.BytesIO(img_data))
             self.canvas.set_background_image(img)
         except Exception as e:
-            print(f"Could not load image from Engine: {e}")
+            logger.error("Could not load image from Engine", error=str(e))
 
         # Draw all components
         self.canvas.render_state(self.client.state)
