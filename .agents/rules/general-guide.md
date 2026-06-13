@@ -10,6 +10,10 @@ trigger: always_on
 - **Encourage Architectural Rewrites:** If you encounter poorly structured code, tangled logic, or obsolete patterns, you are strongly encouraged to propose and execute architectural rewrites. Prioritize long-term maintainability, scalability, and elegance over quick fixes.
 - **Simplicity over Cleverness (KISS / YAGNI):** Pursuing perfection means writing code that is elegant, readable, and easy to maintain—not over-engineered. Avoid premature optimization, "clever" one-liners, and unnecessary abstractions. 
 
+## Developer Experience (DX)
+- **Prioritize Ergonomics:** Ensure that running simple commands, scripts, or daily tasks is straightforward and frictionless.
+- **Eliminate Friction and Workarounds:** Avoid introducing patchy workarounds or complex, brittle setups just to perform routine development tasks. If a process is painful or requires hacks to run, you MUST fix the underlying tooling or configuration rather than passing the burden to the developer.
+
 ## Bug Fixing & Error Handling
 - **Address Root Causes:** You MUST investigate and fix the underlying root cause of a bug rather than treating symptoms. Avoid temporary workarounds wherever possible.
 - **Document Workarounds:** If a workaround is absolutely necessary, or if you are addressing a complex/unclear issue, you MUST add comprehensive inline documentation explaining *why* the code is written that way. This prevents future maintainers from inadvertently removing critical logic.
@@ -25,7 +29,8 @@ trigger: always_on
 - **Start from Scratch Perspective:** Write comments as if the feature or function were written from scratch. Keep them direct, declarative, and clean.
 
 ## Python & Frameworks
-- **Package Management:** ALWAYS use `uv` for Python dependency management and script execution.
+- **Package Management (uv):** ALWAYS use `uv` for Python dependency management and script execution. You MUST strictly follow the latest `uv` recommendations and best practices.
+- **Workspace Layout:** In a monorepo or workspace using a `src/` layout, every workspace member MUST be configured as a proper installable package by defining a `[build-system]` (e.g., `hatchling`). This ensures `uv` installs them in editable mode natively, allowing tools like `pytest` to resolve modules out-of-the-box without relying on `pythonpath` hacks or manual `PYTHONPATH` injection.
 - **FastAPI & FastMCP Best Practices:** You MUST strictly adhere to the latest official documentation, recommended patterns, and best practices for FastAPI and FastMCP. Avoid outdated approaches or generic web server anti-patterns.
 
 ## Core Design Ideologies
