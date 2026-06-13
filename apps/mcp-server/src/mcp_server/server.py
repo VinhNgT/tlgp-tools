@@ -39,9 +39,8 @@ mcp = FastMCP(
 
 @mcp.tool()
 def launch_annotator(
-    output_dir: str,
     screenshot_path: str | None = None,
-    session_path: str | None = None,
+    workspace_zip: str | None = None,
 ) -> dict:
     """Launch the TLGP Annotation Tool GUI.
 
@@ -50,15 +49,13 @@ def launch_annotator(
     runs in the background — the agent should wait for the user to finish.
 
     Args:
-        output_dir: Directory where the tool will save exported files.
-        screenshot_path: Optional screenshot image path to pre-load.
-        session_path: Optional previously exported session JSON to re-edit.
-            Mutually exclusive with screenshot_path.
+        screenshot_path: Optional path to a raw screenshot image to load initially.
+        workspace_zip: Optional path to a previously exported .zip workspace.
 
     Returns:
         dict with engine_pid and gui_pid.
     """
-    return launch_annotator_impl(output_dir, screenshot_path, session_path)
+    return launch_annotator_impl(screenshot_path, workspace_zip)
 
 @mcp.tool()
 def get_engine_state() -> dict:

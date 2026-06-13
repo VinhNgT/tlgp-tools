@@ -25,12 +25,9 @@ The user may converse in Vietnamese or English. However, **all content written t
 
 ## Step 1: Annotate
 
-Call `launch_annotator(output_dir=..., screenshot_path=...)`.
+Call `launch_annotator(screenshot_path=...)` if you have a local image to start with, `launch_annotator(workspace_zip=...)` if you have a previously exported .zip workspace, or just `launch_annotator()` if the user will manually import one.
 Tell the user: "Please annotate all components, then let me know when done."
 Wait for the user to confirm before proceeding.
-
-If you do not know the output directory, ask the user where they saved
-the exported files after annotation is complete.
 
 ## Step 2: Analyze & Prepare Workspace
 

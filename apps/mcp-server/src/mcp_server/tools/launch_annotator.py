@@ -5,12 +5,13 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import time
+import requests
 
 
 def launch_annotator_impl(
-    output_dir: str,
     screenshot_path: str | None = None,
-    session_path: str | None = None,
+    workspace_zip: str | None = None,
 ) -> dict:
     """Spawn the annotation tool as a background subprocess.
 
@@ -24,11 +25,8 @@ def launch_annotator_impl(
 
     The process is detached so it doesn't block the MCP server.
     """
-    if screenshot_path and session_path:
-        raise ValueError("screenshot_path and session_path are mutually exclusive")
-
-    output_dir = os.path.abspath(output_dir)
-    os.makedirs(output_dir, exist_ok=True)
+    if screenshot_path and workspace_zip:
+        raise ValueError("screenshot_path and workspace_zip are mutually exclusive")
 
     uv_bin = shutil.which("uv")
     if not uv_bin:
@@ -56,7 +54,28 @@ def launch_annotator_impl(
         start_new_session=True,
     )
 
+    # Wait for Engine to be ready
+    engine_ready = False
+    for _ in range(30): # Wait up to 3 seconds
+        try:
+            res = requests.get("http://127.0.0.1:8000/state")
+            if res.status_code == 200:
+                engine_ready = True
+                break
+        except requests.exceptions.ConnectionError:
+            pass
+        time.sleep(0.1)
+
+    if engine_ready:
+        if screenshot_path:
+            with open(os.path.abspath(screenshot_path), "rb") as f:
+                requests.post("http://127.0.0.1:8000/import/image", files={"file": f})
+        elif workspace_zip:
+            with open(os.path.abspath(workspace_zip), "rb") as f:
+                requests.post("http://127.0.0.1:8000/import", files={"file": f})
+
     return {
         "engine_pid": engine_proc.pid,
         "gui_pid": gui_proc.pid,
+        "engine_ready": engine_ready
     }

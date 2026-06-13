@@ -51,6 +51,30 @@ async def import_workspace(file: UploadFile = File(...), workspace: WorkspaceMan
     await workspace.mutate(mutate)
     return {"status": "imported", "sessionId": workspace.state.sessionId}
 
+@router.post("/import/image")
+async def import_image(file: UploadFile = File(...), workspace: WorkspaceManager = Depends(get_workspace)):
+    """Accepts a raw image file, clears the workspace, and sets it as the root image."""
+    extract_dir = os.path.join(STORAGE_DIR, "workspace")
+    os.makedirs(extract_dir, exist_ok=True)
+    
+    # Save image
+    image_filename = file.filename or "screenshot.png"
+    image_path = os.path.join(extract_dir, image_filename)
+    with open(image_path, "wb") as f:
+        shutil.copyfileobj(file.file, f)
+        
+    def mutate(state: WorkspaceState):
+        state.sessionId = uuid.uuid4()
+        from models import ImageRef
+        state.image = ImageRef(filename=image_filename, originalPath=image_path)
+        # Clear components
+        state.cutLines = []
+        state.rootComponents = []
+        state.components = {}
+        
+    await workspace.mutate(mutate)
+    return {"status": "image_imported", "sessionId": workspace.state.sessionId}
+
 @router.get("/export")
 async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
     """Packs the current WorkspaceState and image into a .zip file and returns it."""

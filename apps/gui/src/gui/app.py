@@ -27,14 +27,33 @@ class TlgpApp(tk.Tk):
         btn_import = ttk.Button(toolbar, text="Import Session...", command=self.do_import)
         btn_import.pack(side=tk.LEFT, padx=2)
 
+        btn_import_img = ttk.Button(toolbar, text="Import Image...", command=self.do_import_image)
+        btn_import_img.pack(side=tk.LEFT, padx=2)
+
         self.lbl_status = ttk.Label(toolbar, text="Connecting to Engine...")
         self.lbl_status.pack(side=tk.RIGHT, padx=5)
 
-        # Main Layout (Canvas)
-        main_frame = ttk.Frame(self)
-        main_frame.pack(fill=tk.BOTH, expand=True)
+        # Main Layout (PanedWindow)
+        paned = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
+        paned.pack(fill=tk.BOTH, expand=True)
 
-        self.canvas = AnnotationCanvas(main_frame, self.client)
+        # Left Sidebar (Treeview)
+        left_frame = ttk.Frame(paned)
+        paned.add(left_frame, weight=1)
+        
+        tree_scroll = ttk.Scrollbar(left_frame)
+        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        self.tree = ttk.Treeview(left_frame, yscrollcommand=tree_scroll.set, selectmode="browse")
+        self.tree.heading("#0", text="Components", anchor=tk.W)
+        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        tree_scroll.config(command=self.tree.yview)
+
+        # Right Area (Canvas)
+        right_frame = ttk.Frame(paned)
+        paned.add(right_frame, weight=3)
+
+        self.canvas = AnnotationCanvas(right_frame, self.client)
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
     def on_state_sync(self):
@@ -60,6 +79,28 @@ class TlgpApp(tk.Tk):
             
         # Draw all components
         self.canvas.render_state(self.client.state)
+        
+        # Rebuild Tree
+        self._rebuild_tree()
+
+    def _rebuild_tree(self):
+        self.tree.delete(*self.tree.get_children())
+        if not self.client.state:
+            return
+            
+        def insert_node(parent_tvid, comp_id):
+            comp = self.client.state.components.get(str(comp_id))
+            if not comp:
+                return
+            
+            node_text = f"{comp.number} {comp.label}" if comp.number else comp.label
+            tvid = self.tree.insert(parent_tvid, tk.END, text=node_text, open=True)
+            
+            for child_id in comp.childrenIds:
+                insert_node(tvid, child_id)
+                
+        for root_id in self.client.state.rootComponents:
+            insert_node("", root_id)
 
     def do_import(self):
         path = filedialog.askopenfilename(
@@ -73,6 +114,19 @@ class TlgpApp(tk.Tk):
             messagebox.showinfo("Success", "Workspace imported to Engine!")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to import: {e}")
+
+    def do_import_image(self):
+        path = filedialog.askopenfilename(
+            title="Select raw image",
+            filetypes=[("Image files", "*.png *.jpg *.jpeg")]
+        )
+        if not path:
+            return
+        try:
+            self.client.import_image(path)
+            messagebox.showinfo("Success", "Image imported to Engine!")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to import image: {e}")
 
 def main():
     app = TlgpApp()

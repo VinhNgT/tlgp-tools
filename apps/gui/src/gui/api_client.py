@@ -61,6 +61,11 @@ class EngineClient:
             res = requests.post(f"{API_URL}/import", files={"file": f})
             res.raise_for_status()
 
+    def import_image(self, image_path: str):
+        with open(image_path, 'rb') as f:
+            res = requests.post(f"{API_URL}/import/image", files={"file": f})
+            res.raise_for_status()
+
     def add_component(self, label: str, bounds: dict, parent_id: Optional[str] = None) -> str:
         payload = {
             "label": label,
