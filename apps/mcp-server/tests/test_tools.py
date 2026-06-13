@@ -284,7 +284,7 @@ class TestGenerateSpecDoc:
 
 
 class TestLaunchAnnotator:
-    def test_creates_output_dir(self, tmp_path, monkeypatch):
+    def test_launch_annotator_success(self, tmp_path, monkeypatch):
 
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
@@ -297,16 +297,29 @@ class TestLaunchAnnotator:
             lambda name: "/usr/local/bin/uv",
         )
 
-        target = tmp_path / "new_dir"
-        result = launch_annotator_impl(str(target))
-        assert os.path.isdir(target)
-        assert result["pid"] == 12345
-        mock_popen.assert_called_once()
+        # Mock requests.get and requests.post to avoid actual HTTP calls and timeouts
+        mock_get = MagicMock()
+        mock_get.return_value.status_code = 200
+        monkeypatch.setattr("mcp_server.tools.launch_annotator.requests.get", mock_get)
+
+        mock_post = MagicMock()
+        monkeypatch.setattr("mcp_server.tools.launch_annotator.requests.post", mock_post)
+
+        # Create dummy screenshot to pass validation
+        screenshot = tmp_path / "test.png"
+        screenshot.write_bytes(b"dummy")
+
+        result = launch_annotator_impl(screenshot_path=str(screenshot))
+        assert result["engine_pid"] == 12345
+        assert result["gui_pid"] == 12345
+        assert result["engine_ready"] is True
+        assert mock_popen.call_count == 2
 
         # Verify uv run is used instead of sys.executable
-        call_args = mock_popen.call_args[0][0]
-        assert call_args[0] == "/usr/local/bin/uv"
-        assert "run" in call_args
+        for call in mock_popen.call_args_list:
+            call_args = call[0][0]
+            assert call_args[0] == "/usr/local/bin/uv"
+            assert "run" in call_args
 
     def test_raises_when_uv_not_found(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
@@ -315,4 +328,4 @@ class TestLaunchAnnotator:
         )
 
         with pytest.raises(RuntimeError, match="uv is not installed"):
-            launch_annotator_impl(str(tmp_path / "out"))
+            launch_annotator_impl(screenshot_path=str(tmp_path / "out"))

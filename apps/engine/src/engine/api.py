@@ -16,10 +16,12 @@ from fastapi.responses import Response
 from models import Bounds, Component, ImageRef, Style, Visibility, WorkspaceState
 from PIL import Image
 from pydantic import BaseModel
+from tlgp_logger import get_logger
 
 from .state import WorkspaceManager, get_workspace
 from .tree_math import recalculate_tree
 
+logger = get_logger(__name__)
 router = APIRouter()
 
 
@@ -31,6 +33,7 @@ async def import_workspace(
     file: UploadFile = File(...), workspace: WorkspaceManager = Depends(get_workspace)
 ):
     """Accepts a .zip file, unzips it entirely in RAM, and loads the WorkspaceState into memory."""
+    logger.info("Importing workspace zip file", filename=file.filename)
     if not file.filename.endswith(".zip"):
         raise HTTPException(status_code=400, detail="Must be a .zip file")
 
@@ -64,6 +67,7 @@ async def import_workspace(
         recalculate_tree(state)
 
     await workspace.mutate(mutate)
+    logger.info("Successfully imported workspace", sessionId=str(workspace.state.sessionId))
     return {"status": "imported", "sessionId": workspace.state.sessionId}
 
 
@@ -72,6 +76,7 @@ async def import_image(
     file: UploadFile = File(...), workspace: WorkspaceManager = Depends(get_workspace)
 ):
     """Accepts a raw image file, clears the workspace, and sets it as the root image in RAM."""
+    logger.info("Importing raw image file", filename=file.filename)
     # Read bytes to RAM
     file_bytes = await file.read()
     workspace.raw_image_bytes = file_bytes
@@ -87,12 +92,14 @@ async def import_image(
         state.components = {}
 
     await workspace.mutate(mutate)
+    logger.info("Successfully imported raw image", sessionId=str(workspace.state.sessionId))
     return {"status": "image_imported", "sessionId": workspace.state.sessionId}
 
 
 @router.get("/export")
 async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
     """Packs the current WorkspaceState and image into a .zip file and returns it from RAM."""
+    logger.info("Exporting workspace archive", sessionId=str(workspace.state.sessionId))
     if not workspace.state.image or not workspace.state.image.filename:
         raise HTTPException(status_code=400, detail="No image in workspace")
 
@@ -172,11 +179,13 @@ async def websocket_endpoint(
     followed by JSON Patch deltas broadcasted on every mutation.
     Clients do NOT send data here; they use the Semantic REST endpoints below.
     """
+    logger.info("WebSocket client connected")
     await workspace.connect(websocket)
     try:
         while True:
             _ = await websocket.receive_text()
     except WebSocketDisconnect:
+        logger.info("WebSocket client disconnected")
         workspace.disconnect(websocket)
 
 
@@ -197,6 +206,7 @@ async def add_component(
     req: AddComponentRequest, workspace: WorkspaceManager = Depends(get_workspace)
 ):
     comp_id = req.id or uuid.uuid4()
+    logger.info("Adding component", comp_id=str(comp_id), label=req.label, parentId=str(req.parentId) if req.parentId else None)
 
     def mutate(state: WorkspaceState):
         if req.parentId and req.parentId not in state.components:
@@ -241,6 +251,7 @@ async def move_component(
     req: MoveComponentRequest,
     workspace: WorkspaceManager = Depends(get_workspace),
 ):
+    logger.info("Moving component", comp_id=str(comp_id), x=req.x, y=req.y)
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
             raise ValueError("Component not found")
@@ -271,6 +282,7 @@ async def update_component(
     req: UpdateComponentRequest,
     workspace: WorkspaceManager = Depends(get_workspace),
 ):
+    logger.info("Updating component", comp_id=str(comp_id), label=req.label, parentId=str(req.parentId) if req.parentId else None)
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
             raise ValueError("Component not found")
@@ -315,6 +327,7 @@ async def update_component(
 async def delete_component(
     comp_id: uuid.UUID, workspace: WorkspaceManager = Depends(get_workspace)
 ):
+    logger.info("Deleting component", comp_id=str(comp_id))
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
             raise ValueError("Component not found")

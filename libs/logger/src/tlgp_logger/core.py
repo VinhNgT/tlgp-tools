@@ -45,7 +45,7 @@ def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
         ],
     )
 
-    handler = logging.StreamHandler(sys.stdout)
+    handler = logging.StreamHandler(sys.stderr)
     handler.setFormatter(formatter)
 
     root_logger = logging.getLogger()

@@ -18,11 +18,19 @@ class TlgpApp(tk.Tk):
         self.title("TLGP Annotation Client (Thin GUI)")
         self.geometry("1000x700")
 
+        # Set up global exception handler for Tkinter callbacks
+        self.report_callback_exception = self.global_error_handler
+
         # Initialize the Engine Client
         # We pass a callback to trigger a full UI refresh when the Engine broadcasts state
         self.client = EngineClient(on_state_changed=self.on_state_sync)
 
         self.create_widgets()
+
+    def global_error_handler(self, exc, val, tb):
+        """Centralized logging and visual error presentation for uncaught GUI exceptions."""
+        logger.exception("Unhandled GUI exception", exc_info=(exc, val, tb))
+        messagebox.showerror("Unhandled Error", f"An unexpected error occurred:\n{val}")
 
     def create_widgets(self):
         # Top toolbar

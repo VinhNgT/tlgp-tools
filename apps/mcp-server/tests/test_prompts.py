@@ -62,12 +62,12 @@ class TestSpecWorkflowPrompt:
         assert "Classification Rules" in SPEC_WORKFLOW_PROMPT
 
     def test_includes_annotation_format(self):
-        assert "_annotated.png" in SPEC_WORKFLOW_PROMPT
-        assert "screen_name" in SPEC_WORKFLOW_PROMPT
-        assert "pill_corner" in SPEC_WORKFLOW_PROMPT
+        assert "raw.png" in SPEC_WORKFLOW_PROMPT
+        assert "exportDir" in SPEC_WORKFLOW_PROMPT
+        assert "sectionPrefix" in SPEC_WORKFLOW_PROMPT
 
     def test_includes_example(self):
-        assert "Chi_tiet_san_pham" in SPEC_WORKFLOW_PROMPT
+        assert "Chi tiết sản phẩm" in SPEC_WORKFLOW_PROMPT
         assert "Thanh tiêu đề" in SPEC_WORKFLOW_PROMPT
 
     def test_source_priority_documented(self):

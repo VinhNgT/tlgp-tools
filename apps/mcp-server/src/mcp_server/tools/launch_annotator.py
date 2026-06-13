@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 import time
 
 import requests
@@ -39,8 +40,8 @@ def launch_annotator_impl(
         engine_cmd,
         cwd=os.path.abspath("apps/engine"),
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=sys.stderr,
+        stderr=sys.stderr,
         start_new_session=True,
     )
 
@@ -50,8 +51,8 @@ def launch_annotator_impl(
         gui_cmd,
         cwd=os.path.abspath("apps/gui"),
         stdin=subprocess.DEVNULL,
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
+        stdout=sys.stderr,
+        stderr=sys.stderr,
         start_new_session=True,
     )
 
