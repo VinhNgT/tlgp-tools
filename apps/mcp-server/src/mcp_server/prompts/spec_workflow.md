@@ -10,7 +10,8 @@ The user may converse in Vietnamese or English. However, **all content written t
 ## Available Tools
 
 - `launch_annotator` — spawn the Engine and the Annotation GUI for the user
-- `get_engine_state` — fetch the current Flat Map workspace state from the Engine directly
+- `get_engine_state` — fetch the current Flat Map workspace state from the Engine
+- `download_engine_crops` — explicitly download all component crops into a local directory
 - `generate_spec_doc` — validate analysis data and generate the .docx
 
 ## Source Priority
@@ -31,14 +32,19 @@ Wait for the user to confirm before proceeding.
 If you do not know the output directory, ask the user where they saved
 the exported files after annotation is complete.
 
-## Step 2: Analyze
+## Step 2: Analyze & Prepare Workspace
 
 ### 2a. Read Annotation State
 
 Call `get_engine_state()`. This returns the `WorkspaceState` JSON.
 Note each component's `id` (a UUID), `label`, and whether it has children in `childrenIds` (non-leaf) or not (leaf).
 
-### 2b. Vision analysis
+### 2b. Download Images
+
+Call `download_engine_crops(output_dir="./workspace_xyz")` to explicitly prepare a local directory.
+This will save `raw.png` and `<uuid>.png` for every component into `./workspace_xyz`.
+
+### 2c. Vision analysis
 
 View the annotated screenshots (either provided in the prompt, or by inspecting the UI). For each non-leaf component:
 
@@ -64,19 +70,14 @@ Validate the analysis data to check for errors before generating.
 > **IDE Payload Limitation Bypass**:
 > If your `analysis` data is large (e.g. over 10-20KB), the IDE client middleware may corrupt the tool call parameters (causing `analysis` is missing validation errors).
 > To bypass this:
-> 1. Save the analysis dict as a JSON file locally (e.g., to `<exportDir>/analysis.json` or `./agent-tmp/analysis.json`).
-> 2. Call `generate_spec_doc` passing a minimal empty dictionary `analysis={}` (to satisfy the client-side schema requirement) along with the absolute path `analysis_path="..."`.
->
-> **Example**:
-> ```json
-> generate_spec_doc(analysis={}, analysis_path="E:/tendoo_flutter/tendoo_mall/tlgp-annotation-tool/agent-tmp/Trang_chủ/analysis.json", validate_only=true)
-> ```
+> 1. Save the analysis dict as a JSON file locally inside your downloaded workspace (e.g., `./workspace_xyz/analysis.json`). Note: ensure `exportDir` inside the JSON points to this directory (e.g., `./workspace_xyz`).
+> 2. Call `generate_spec_doc` passing an empty dictionary `analysis={}` along with the absolute path `analysis_path="./workspace_xyz/analysis.json"`.
 
-Otherwise, for small payloads, call `generate_spec_doc(analysis=..., validate_only=True)`. Fix any issues and re-validate.
+Otherwise, call `generate_spec_doc(analysis_path="./workspace_xyz/analysis.json", validate_only=True)`. Fix any issues and re-validate.
 
 ## Step 3: Generate
 
-Call `generate_spec_doc(analysis=...)` (or `generate_spec_doc(analysis={}, analysis_path="...")` for large payloads).
+Call `generate_spec_doc(analysis_path="./workspace_xyz/analysis.json")`.
 
 - **If errors:** Fix the analysis dict and retry.
 - **If success:** Report the .docx path and any warnings to the user.
@@ -106,7 +107,7 @@ Every field maps to a specific location in the generated .docx document.
 | `label` | `str` | Component name (from annotation label) |
 | `description` | `str` | Vietnamese description of the component's purpose |
 | `isLeaf` | `bool` | True if component has no children |
-| `componentId` | `str?` | UUID from the Engine state. `generate_spec_doc` will use this to automatically fetch crops! |
+| `imageFile` | `str?` | Filename of the cropped annotated image (e.g. `<uuid>.png`) |
 | `children` | `list[ChildElement]` | UI elements inside this component |
 | `interactions` | `list[Interaction]` | User action / system reaction pairs |
 
@@ -227,14 +228,14 @@ discrepancies for transparency, but they do not appear in the output document.
 ```json
 {
   "sectionPrefix": "{section_prefix}",
-  "exportDir": "/path/to/output/Chi_tiet_san_pham",
+  "exportDir": "./workspace_xyz",
   "components": [
     {
       "id": 1,
       "label": "Header",
       "description": "Thanh tiêu đề phía trên cùng của màn hình",
       "isLeaf": false,
-      "componentId": "a1b2c3d4-e5f6-7890-1234-56789abcdef0",
+      "imageFile": "a1b2c3d4-e5f6-7890-1234-56789abcdef0.png",
       "children": [
         {
           "stt": 1,
@@ -267,7 +268,7 @@ discrepancies for transparency, but they do not appear in the output document.
       "label": "Banner",
       "description": "",
       "isLeaf": true,
-      "componentId": null,
+      "imageFile": null,
       "children": [],
       "interactions": []
     }
@@ -275,7 +276,7 @@ discrepancies for transparency, but they do not appear in the output document.
   "screen": {
     "name": "Chi tiết sản phẩm",
     "description": "Màn hình hiển thị thông tin chi tiết của sản phẩm",
-    "imageFiles": ["Chi_tiet_san_pham_annotated.png"],
+    "imageFiles": ["raw.png"],
     "topLevelChildren": [
       {
         "stt": 1,

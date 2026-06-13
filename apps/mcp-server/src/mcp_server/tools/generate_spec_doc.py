@@ -8,8 +8,6 @@ a formatted .docx specification document via doc-generator.
 from __future__ import annotations
 
 import json
-import requests
-import tempfile
 from pathlib import Path
 
 from pydantic import ValidationError
@@ -67,37 +65,6 @@ def generate_spec_doc_impl(
             "errors": errors,
             "warnings": [],
         }
-
-    # Fetch Images from Engine if componentId is provided
-    export_dir = Path(data.exportDir)
-    export_dir.mkdir(parents=True, exist_ok=True)
-    
-    non_leaf = [c for c in data.components if not c.isLeaf]
-    for comp in non_leaf:
-        if getattr(comp, "componentId", None):
-            # Fetch crop from engine
-            try:
-                res = requests.get(f"http://127.0.0.1:8000/image/crop/{comp.componentId}")
-                if res.status_code == 200:
-                    img_name = f"crop_{comp.componentId}.png"
-                    img_path = export_dir / img_name
-                    with open(img_path, "wb") as f:
-                        f.write(res.content)
-                    comp.imageFile = img_name
-            except Exception as e:
-                pass
-                
-    # Also fetch the root image if there are no screen imageFiles yet
-    if not data.screen.imageFiles:
-        try:
-            res = requests.get(f"http://127.0.0.1:8000/image/raw")
-            if res.status_code == 200:
-                img_path = export_dir / "raw.png"
-                with open(img_path, "wb") as f:
-                    f.write(res.content)
-                data.screen.imageFiles.append("raw.png")
-        except Exception:
-            pass
 
     # Cross-check images
     errors = []

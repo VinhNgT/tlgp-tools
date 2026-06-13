@@ -75,6 +75,59 @@ def get_engine_state() -> dict:
         return {"error": str(e)}
 
 @mcp.tool()
+def download_engine_crops(output_dir: str) -> dict:
+    """Download all component crops and the raw image from the Engine.
+    
+    Creates a clean directory containing all component crops named as `<uuid>.png`.
+    Also downloads the root screenshot as `raw.png`.
+    Use this to prepare a local directory before writing analysis.json.
+    
+    Args:
+        output_dir: The directory to save the images to.
+    
+    Returns:
+        dict with status and list of downloaded files.
+    """
+    import os
+    
+    out_path = os.path.abspath(output_dir)
+    os.makedirs(out_path, exist_ok=True)
+    
+    downloaded = []
+    errors = []
+    
+    try:
+        state_res = requests.get("http://127.0.0.1:8000/state")
+        state_res.raise_for_status()
+        state = state_res.json()
+        
+        # Download raw image
+        raw_res = requests.get("http://127.0.0.1:8000/image/raw")
+        if raw_res.status_code == 200:
+            with open(os.path.join(out_path, "raw.png"), "wb") as f:
+                f.write(raw_res.content)
+            downloaded.append("raw.png")
+            
+        # Download crops
+        for comp_id in state.get("components", {}).keys():
+            crop_res = requests.get(f"http://127.0.0.1:8000/image/crop/{comp_id}")
+            if crop_res.status_code == 200:
+                filename = f"{comp_id}.png"
+                with open(os.path.join(out_path, filename), "wb") as f:
+                    f.write(crop_res.content)
+                downloaded.append(filename)
+                
+        return {
+            "status": "success",
+            "output_dir": out_path,
+            "downloaded": len(downloaded),
+            "files": downloaded,
+            "errors": errors
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+@mcp.tool()
 def generate_spec_doc(
     analysis: dict | None = None,
     analysis_path: str | None = None,

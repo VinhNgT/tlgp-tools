@@ -34,7 +34,6 @@ class Component(BaseModel):
     description: str = ""
     isLeaf: bool = False
     imageFile: str | None = None
-    componentId: str | None = None
     children: list[ChildElement] = []
     interactions: list[Interaction] = []
 
@@ -106,13 +105,9 @@ class AnalysisData(BaseModel):
     @field_validator("exportDir")
     @classmethod
     def validate_export_dir(cls, v: str) -> str:
-        # Relax validation since exportDir might be a temp dir created by MCP
         path = Path(v)
         if not path.is_dir():
-            try:
-                path.mkdir(parents=True, exist_ok=True)
-            except Exception:
-                pass
+            raise ValueError(f"exportDir does not exist: {v}")
         return v
 
     def resolve_image(self, relative_path: str) -> Path:
