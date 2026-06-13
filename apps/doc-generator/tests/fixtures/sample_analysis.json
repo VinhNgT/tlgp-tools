@@ -1,0 +1,206 @@
+{
+  "sectionPrefix": "1.1",
+  "exportDir": "/Volumes/Lexar2TB/Dev/tlgp-tools/doc-generator/tests/fixtures",
+  "components": [
+    {
+      "id": 1,
+      "label": "tiêu đề màn hình chi tiết sản phẩm",
+      "description": "Hiển thị tiêu đề và các nút điều hướng trên cùng của màn hình chi tiết sản phẩm",
+      "isLeaf": false,
+      "imageFile": null,
+      "children": [
+        {
+          "stt": 1,
+          "label": "Nút quay lại",
+          "controlType": "Icon",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Quay về màn hình trước"
+        },
+        {
+          "stt": 2,
+          "label": "Tiêu đề màn hình",
+          "controlType": "Text",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Hiển thị tên màn hình"
+        },
+        {
+          "stt": 3,
+          "label": "Nút chia sẻ",
+          "controlType": "Icon",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Chia sẻ sản phẩm qua các kênh"
+        },
+        {
+          "stt": 4,
+          "label": "Nút giỏ hàng",
+          "controlType": "Icon",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Mở giỏ hàng"
+        }
+      ],
+      "interactions": [
+        { "action": "Click vào nút Back", "reaction": "Quay về màn trước" },
+        { "action": "Click vào nút Chia sẻ", "reaction": "Mở bottom sheet chia sẻ sản phẩm" },
+        { "action": "Click vào nút Giỏ hàng", "reaction": "Chuyển đến màn hình giỏ hàng" }
+      ]
+    },
+    {
+      "id": 2,
+      "label": "thông tin giá sản phẩm",
+      "description": "Hiển thị giá bán, giá gốc, và phần trăm giảm giá của sản phẩm",
+      "isLeaf": false,
+      "imageFile": null,
+      "children": [
+        {
+          "stt": 1,
+          "label": "Giá bán",
+          "controlType": "Text",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Giá bán hiện tại của sản phẩm"
+        },
+        {
+          "stt": 2,
+          "label": "Giá gốc",
+          "controlType": "Text",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Giá gốc trước khi giảm (gạch ngang)"
+        },
+        {
+          "stt": 3,
+          "label": "Phần trăm giảm giá",
+          "controlType": "Badge",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Hiển thị % giảm giá"
+        }
+      ],
+      "interactions": []
+    }
+  ],
+  "screen": {
+    "name": "Chi tiết sản phẩm",
+    "description": "Màn hình hiển thị thông tin chi tiết sản phẩm bao gồm hình ảnh, giá, mô tả, và các tùy chọn mua hàng",
+    "imageFiles": [],
+    "topLevelChildren": [
+      {
+        "stt": 1,
+        "label": "Component tiêu đề",
+        "controlType": "Component",
+        "required": "",
+        "maxLength": "",
+        "editable": "",
+        "description": "Khu vực tiêu đề và điều hướng"
+      },
+      {
+        "stt": 2,
+        "label": "Component thông tin giá",
+        "controlType": "Component",
+        "required": "",
+        "maxLength": "",
+        "editable": "",
+        "description": "Khu vực hiển thị giá sản phẩm"
+      }
+    ],
+    "interactions": [
+      { "action": "Khởi động màn hình", "reaction": "Gọi API lấy thông tin chi tiết sản phẩm và hiển thị UI" }
+    ]
+  },
+  "apis": [
+    {
+      "number": 1,
+      "method": "GET",
+      "title": "Chi tiết sản phẩm",
+      "url": "/api/v1/products/{productID}",
+      "requestParams": [
+        {
+          "name": "merchant_id",
+          "meaning": "Mã đối tác",
+          "required": "Có",
+          "dataType": "String",
+          "limit": "",
+          "defaultValue": ""
+        },
+        {
+          "name": "product_id",
+          "meaning": "Mã sản phẩm",
+          "required": "Có",
+          "dataType": "String",
+          "limit": "",
+          "defaultValue": ""
+        }
+      ],
+      "responseType": "ProductDetailDTO",
+      "responseFields": [
+        {
+          "name": "product_id",
+          "meaning": "Mã sản phẩm",
+          "required": "",
+          "dataType": "String",
+          "limit": "",
+          "defaultValue": ""
+        },
+        {
+          "name": "product_name",
+          "meaning": "Tên sản phẩm",
+          "required": "",
+          "dataType": "String?",
+          "limit": "",
+          "defaultValue": ""
+        },
+        {
+          "name": "price",
+          "meaning": "Giá sản phẩm",
+          "required": "",
+          "dataType": "double",
+          "limit": "",
+          "defaultValue": ""
+        },
+        {
+          "name": "original_price",
+          "meaning": "Giá gốc",
+          "required": "",
+          "dataType": "double?",
+          "limit": "",
+          "defaultValue": ""
+        }
+      ],
+      "subDtos": [
+        {
+          "name": "PriceTiersDTO",
+          "fieldRef": "price_tiers",
+          "fields": [
+            {
+              "name": "min_quantity",
+              "meaning": "Số lượng tối thiểu",
+              "required": "",
+              "dataType": "int",
+              "limit": "",
+              "defaultValue": ""
+            },
+            {
+              "name": "price",
+              "meaning": "Giá tương ứng",
+              "required": "",
+              "dataType": "double",
+              "limit": "",
+              "defaultValue": ""
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

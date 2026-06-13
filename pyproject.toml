@@ -1,2 +1,11 @@
 [tool.uv.workspace]
-members = ["tlgp-annotation-tool", "tlgp-doc-generator", "tlgp-mcp-server"]
+members = [
+    "legacy/tlgp-annotation-tool",
+    "apps/mcp-server",
+    "apps/doc-generator",
+    "apps/engine",
+    "apps/gui",
+    "libs/models",
+    "libs/rendering",
+    "libs/file-io"
+]
