@@ -67,7 +67,9 @@ async def import_workspace(
         recalculate_tree(state)
 
     await workspace.mutate(mutate)
-    logger.info("Successfully imported workspace", sessionId=str(workspace.state.sessionId))
+    logger.info(
+        "Successfully imported workspace", sessionId=str(workspace.state.sessionId)
+    )
     return {"status": "imported", "sessionId": workspace.state.sessionId}
 
 
@@ -92,7 +94,9 @@ async def import_image(
         state.components = {}
 
     await workspace.mutate(mutate)
-    logger.info("Successfully imported raw image", sessionId=str(workspace.state.sessionId))
+    logger.info(
+        "Successfully imported raw image", sessionId=str(workspace.state.sessionId)
+    )
     return {"status": "image_imported", "sessionId": workspace.state.sessionId}
 
 
@@ -206,7 +210,12 @@ async def add_component(
     req: AddComponentRequest, workspace: WorkspaceManager = Depends(get_workspace)
 ):
     comp_id = req.id or uuid.uuid4()
-    logger.info("Adding component", comp_id=str(comp_id), label=req.label, parentId=str(req.parentId) if req.parentId else None)
+    logger.info(
+        "Adding component",
+        comp_id=str(comp_id),
+        label=req.label,
+        parentId=str(req.parentId) if req.parentId else None,
+    )
 
     def mutate(state: WorkspaceState):
         if req.parentId and req.parentId not in state.components:
@@ -252,6 +261,7 @@ async def move_component(
     workspace: WorkspaceManager = Depends(get_workspace),
 ):
     logger.info("Moving component", comp_id=str(comp_id), x=req.x, y=req.y)
+
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
             raise ValueError("Component not found")
@@ -282,7 +292,13 @@ async def update_component(
     req: UpdateComponentRequest,
     workspace: WorkspaceManager = Depends(get_workspace),
 ):
-    logger.info("Updating component", comp_id=str(comp_id), label=req.label, parentId=str(req.parentId) if req.parentId else None)
+    logger.info(
+        "Updating component",
+        comp_id=str(comp_id),
+        label=req.label,
+        parentId=str(req.parentId) if req.parentId else None,
+    )
+
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
             raise ValueError("Component not found")
@@ -328,6 +344,7 @@ async def delete_component(
     comp_id: uuid.UUID, workspace: WorkspaceManager = Depends(get_workspace)
 ):
     logger.info("Deleting component", comp_id=str(comp_id))
+
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
             raise ValueError("Component not found")

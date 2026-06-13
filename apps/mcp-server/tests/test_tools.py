@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import io
 import json
-import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -303,7 +302,9 @@ class TestLaunchAnnotator:
         monkeypatch.setattr("mcp_server.tools.launch_annotator.requests.get", mock_get)
 
         mock_post = MagicMock()
-        monkeypatch.setattr("mcp_server.tools.launch_annotator.requests.post", mock_post)
+        monkeypatch.setattr(
+            "mcp_server.tools.launch_annotator.requests.post", mock_post
+        )
 
         # Create dummy screenshot to pass validation
         screenshot = tmp_path / "test.png"
