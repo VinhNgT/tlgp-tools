@@ -59,3 +59,21 @@ def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:
     Retrieves a structured logger instance.
     """
     return structlog.get_logger(name)
+
+
+def setup_excepthook() -> None:
+    """
+    Configures a global excepthook to capture and log any unhandled system exception.
+    """
+    logger = get_logger("sys.excepthook")
+
+    def handle_exception(exc_type, exc_value, exc_traceback):
+        if issubclass(exc_type, KeyboardInterrupt):
+            sys.__excepthook__(exc_type, exc_value, exc_traceback)
+            return
+        logger.critical(
+            "Unhandled exception caught by global hook",
+            exc_info=(exc_type, exc_value, exc_traceback),
+        )
+
+    sys.excepthook = handle_exception

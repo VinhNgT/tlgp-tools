@@ -43,7 +43,6 @@ class Component(BaseModel):
     parentId: UUID | None = None
     childrenIds: list[UUID] = Field(default_factory=list)
     bounds: Bounds
-    absoluteBounds: Bounds
     style: Style = Field(default_factory=Style)
     visibility: Visibility = Field(default_factory=Visibility)
     metadata: dict[str, Any] = Field(default_factory=dict)

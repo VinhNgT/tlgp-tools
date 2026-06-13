@@ -7,17 +7,24 @@ from fastapi import (
     APIRouter,
     Depends,
     File,
-    HTTPException,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
 )
 from fastapi.responses import Response
-from models import Bounds, Component, ImageRef, Style, Visibility, WorkspaceState
+from models import Bounds, Component, ImageInfo, Style, Visibility, WorkspaceState
 from PIL import Image
 from pydantic import BaseModel
 from tlgp_logger import get_logger
 
+from .exceptions import (
+    ComponentNotFoundError,
+    InvalidArchiveError,
+    InvalidImageError,
+    InvalidStateError,
+    ParentNotFoundError,
+    UndoRedoError,
+)
 from .state import WorkspaceManager, get_workspace
 from .tree_math import recalculate_tree
 
@@ -35,17 +42,25 @@ async def import_workspace(
     """Accepts a .zip file, unzips it entirely in RAM, and loads the WorkspaceState into memory."""
     logger.info("Importing workspace zip file", filename=file.filename)
     if not file.filename.endswith(".zip"):
-        raise HTTPException(status_code=400, detail="Must be a .zip file")
+        raise InvalidArchiveError("Must be a .zip file", filename=file.filename)
 
     file_bytes = await file.read()
 
     try:
         with zipfile.ZipFile(io.BytesIO(file_bytes), "r") as zf:
             if "workspace.json" not in zf.namelist():
-                raise ValueError("Invalid archive: Missing workspace.json")
+                raise InvalidArchiveError(
+                    "Invalid archive: Missing workspace.json", filename=file.filename
+                )
 
-            state_data = json.loads(zf.read("workspace.json").decode("utf-8"))
-            new_state = WorkspaceState.model_validate(state_data)
+            try:
+                state_data = json.loads(zf.read("workspace.json").decode("utf-8"))
+                new_state = WorkspaceState.model_validate(state_data)
+            except Exception as e:
+                raise InvalidArchiveError(
+                    f"Failed to parse workspace JSON: {e}",
+                    filename=file.filename,
+                ) from e
 
             image_filename = new_state.image.filename if new_state.image else None
             if image_filename and image_filename in zf.namelist():
@@ -53,8 +68,8 @@ async def import_workspace(
             else:
                 workspace.raw_image_bytes = b""
 
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
+    except zipfile.BadZipFile as e:
+        raise InvalidArchiveError(f"Bad zip file: {e}", filename=file.filename) from e
 
     # Replace the global state entirely
     def mutate(state: WorkspaceState):
@@ -83,11 +98,20 @@ async def import_image(
     file_bytes = await file.read()
     workspace.raw_image_bytes = file_bytes
 
+    try:
+        with Image.open(io.BytesIO(file_bytes)) as img:
+            width, height = img.width, img.height
+    except Exception as e:
+        raise InvalidImageError(
+            f"Invalid image format: {e}",
+            filename=file.filename or "screenshot.png",
+        ) from e
+
     image_filename = file.filename or "screenshot.png"
 
     def mutate(state: WorkspaceState):
         state.sessionId = uuid.uuid4()
-        state.image = ImageRef(filename=image_filename, originalPath="")
+        state.image = ImageInfo(filename=image_filename, width=width, height=height)
         # Clear components
         state.cutLines = []
         state.rootComponents = []
@@ -105,19 +129,20 @@ async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace))
     """Packs the current WorkspaceState and image into a .zip file and returns it from RAM."""
     logger.info("Exporting workspace archive", sessionId=str(workspace.state.sessionId))
     if not workspace.state.image or not workspace.state.image.filename:
-        raise HTTPException(status_code=400, detail="No image in workspace")
+        raise InvalidStateError(
+            "No image in workspace", session_id=str(workspace.state.sessionId)
+        )
 
     if not workspace.raw_image_bytes:
-        raise HTTPException(status_code=400, detail="No image bytes in RAM")
+        raise InvalidStateError(
+            "No image bytes in RAM", session_id=str(workspace.state.sessionId)
+        )
 
     buf = io.BytesIO()
-    try:
-        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-            state_json = workspace.state.model_dump_json(indent=2)
-            zf.writestr("workspace.json", state_json)
-            zf.writestr(workspace.state.image.filename, workspace.raw_image_bytes)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        state_json = workspace.state.model_dump_json(indent=2)
+        zf.writestr("workspace.json", state_json)
+        zf.writestr(workspace.state.image.filename, workspace.raw_image_bytes)
 
     return Response(
         content=buf.getvalue(),
@@ -139,7 +164,9 @@ async def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
 async def get_raw_image(workspace: WorkspaceManager = Depends(get_workspace)):
     """Returns the raw unannotated image straight from RAM."""
     if not workspace.raw_image_bytes:
-        raise HTTPException(status_code=404, detail="No image")
+        raise ComponentNotFoundError(
+            "No image in workspace", session_id=str(workspace.state.sessionId)
+        )
 
     return Response(content=workspace.raw_image_bytes, media_type="image/png")
 
@@ -150,25 +177,22 @@ async def get_image_crop(
 ):
     """Returns a cropped unannotated image for a specific component straight from RAM."""
     if comp_id not in workspace.state.components:
-        raise HTTPException(status_code=404, detail="Component not found")
+        raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
 
     if not workspace.raw_image_bytes:
-        raise HTTPException(status_code=404, detail="No image in RAM")
+        raise InvalidStateError("No image in RAM", component_id=str(comp_id))
 
     comp = workspace.state.components[comp_id]
 
     # We use PIL to crop on the fly from RAM
-    try:
-        with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
-            bounds = comp.absoluteBounds
-            cropped = img.crop((bounds.left, bounds.top, bounds.right, bounds.bottom))
+    with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
+        bounds = comp.bounds
+        cropped = img.crop((bounds.left, bounds.top, bounds.right, bounds.bottom))
 
-            buf = io.BytesIO()
-            cropped.save(buf, format="PNG")
+        buf = io.BytesIO()
+        cropped.save(buf, format="PNG")
 
-        return Response(content=buf.getvalue(), media_type="image/png")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e)) from e
+    return Response(content=buf.getvalue(), media_type="image/png")
 
 
 # ── WebSockets ─────────────────────────────────────────────────────────
@@ -219,7 +243,11 @@ async def add_component(
 
     def mutate(state: WorkspaceState):
         if req.parentId and req.parentId not in state.components:
-            raise ValueError(f"Parent {req.parentId} not found")
+            raise ParentNotFoundError(
+                f"Parent {req.parentId} not found",
+                parent_id=str(req.parentId),
+                component_id=str(comp_id),
+            )
 
         new_comp = Component(
             id=comp_id,
@@ -227,7 +255,6 @@ async def add_component(
             label=req.label,
             parentId=req.parentId,
             bounds=req.bounds,
-            absoluteBounds=req.bounds,  # Will be overwritten by tree_math
             style=req.style or Style(),
             visibility=req.visibility or Visibility(),
         )
@@ -241,11 +268,7 @@ async def add_component(
 
         recalculate_tree(state)
 
-    try:
-        await workspace.mutate(mutate)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
+    await workspace.mutate(mutate)
     return {"id": comp_id, "status": "added"}
 
 
@@ -264,7 +287,9 @@ async def move_component(
 
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
-            raise ValueError("Component not found")
+            raise ComponentNotFoundError(
+                "Component not found", component_id=str(comp_id)
+            )
 
         comp = state.components[comp_id]
         comp.bounds.x = req.x
@@ -272,11 +297,7 @@ async def move_component(
 
         recalculate_tree(state)
 
-    try:
-        await workspace.mutate(mutate)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
+    await workspace.mutate(mutate)
     return {"status": "moved"}
 
 
@@ -301,7 +322,9 @@ async def update_component(
 
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
-            raise ValueError("Component not found")
+            raise ComponentNotFoundError(
+                "Component not found", component_id=str(comp_id)
+            )
 
         comp = state.components[comp_id]
 
@@ -327,15 +350,15 @@ async def update_component(
             if new_parent:
                 new_parent.childrenIds.append(comp_id)
             else:
-                raise ValueError("New parent not found")
+                raise ParentNotFoundError(
+                    "New parent not found",
+                    component_id=str(comp_id),
+                    parent_id=str(req.parentId),
+                )
 
         recalculate_tree(state)
 
-    try:
-        await workspace.mutate(mutate)
-    except ValueError as e:
-        raise HTTPException(status_code=400, detail=str(e)) from e
-
+    await workspace.mutate(mutate)
     return {"status": "updated"}
 
 
@@ -347,7 +370,9 @@ async def delete_component(
 
     def mutate(state: WorkspaceState):
         if comp_id not in state.components:
-            raise ValueError("Component not found")
+            raise ComponentNotFoundError(
+                "Component not found", component_id=str(comp_id)
+            )
 
         comp = state.components[comp_id]
 
@@ -371,9 +396,23 @@ async def delete_component(
         delete_recursive(comp_id)
         recalculate_tree(state)
 
-    try:
-        await workspace.mutate(mutate)
-    except ValueError as e:
-        raise HTTPException(status_code=404, detail=str(e)) from e
-
+    await workspace.mutate(mutate)
     return {"status": "deleted"}
+
+
+@router.post("/session/undo")
+async def session_undo(workspace: WorkspaceManager = Depends(get_workspace)):
+    logger.info("Performing undo")
+    success = await workspace.undo()
+    if not success:
+        raise UndoRedoError("Cannot undo", session_id=str(workspace.state.sessionId))
+    return {"status": "undone"}
+
+
+@router.post("/session/redo")
+async def session_redo(workspace: WorkspaceManager = Depends(get_workspace)):
+    logger.info("Performing redo")
+    success = await workspace.redo()
+    if not success:
+        raise UndoRedoError("Cannot redo", session_id=str(workspace.state.sessionId))
+    return {"status": "redone"}

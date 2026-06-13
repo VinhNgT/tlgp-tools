@@ -19,10 +19,20 @@ class WorkspaceManager:
         self._clients: list[WebSocket] = []
         self._lock = asyncio.Lock()
         self.raw_image_bytes: bytes = b""
+        self._history: list[dict] = []
+        self._pointer: int = -1
+        self._save_history_snapshot()
 
     @property
     def state(self) -> WorkspaceState:
         return self._state
+
+    def _save_history_snapshot(self):
+        # Prune redo history
+        if self._pointer < len(self._history) - 1:
+            self._history = self._history[: self._pointer + 1]
+        self._history.append(self._state.model_dump(mode="json"))
+        self._pointer += 1
 
     async def connect(self, websocket: WebSocket):
         await websocket.accept()
@@ -54,20 +64,72 @@ class WorkspaceManager:
         """
         async with self._lock:
             old_dict = self._state.model_dump(mode="json")
+            old_session_id = self._state.sessionId
 
             # Execute the mutation in-place
             mutation_fn(self._state)
+
+            if self._state.sessionId != old_session_id:
+                # Clear history for a new session
+                self._history = []
+                self._pointer = -1
+                self._state.revision = 0
+                self._save_history_snapshot()
+
+                # Broadcast full sync since sessionId changed
+                for client in list(self._clients):
+                    try:
+                        await client.send_json(
+                            {
+                                "type": "full_sync",
+                                "state": self._state.model_dump(mode="json"),
+                            }
+                        )
+                    except Exception:
+                        pass
+                return
 
             # Increment OCC revision integer
             self._state.revision += 1
 
             new_dict = self._state.model_dump(mode="json")
 
+            # Save to history
+            self._save_history_snapshot()
+
             # Compute exact JSON patch
             patch = jsonpatch.make_patch(old_dict, new_dict).patch
 
             # Broadcast the deltas
             await self.broadcast_patch(patch)
+
+    async def undo(self) -> bool:
+        async with self._lock:
+            if self._pointer > 0:
+                old_dict = self._state.model_dump(mode="json")
+                self._pointer -= 1
+                state_data = self._history[self._pointer]
+                self._state = WorkspaceState.model_validate(state_data)
+                self._state.revision += 1
+                new_dict = self._state.model_dump(mode="json")
+                patch = jsonpatch.make_patch(old_dict, new_dict).patch
+                await self.broadcast_patch(patch)
+                return True
+            return False
+
+    async def redo(self) -> bool:
+        async with self._lock:
+            if self._pointer < len(self._history) - 1:
+                old_dict = self._state.model_dump(mode="json")
+                self._pointer += 1
+                state_data = self._history[self._pointer]
+                self._state = WorkspaceState.model_validate(state_data)
+                self._state.revision += 1
+                new_dict = self._state.model_dump(mode="json")
+                patch = jsonpatch.make_patch(old_dict, new_dict).patch
+                await self.broadcast_patch(patch)
+                return True
+            return False
 
 
 # The global singleton instance injected via FastAPI Depends

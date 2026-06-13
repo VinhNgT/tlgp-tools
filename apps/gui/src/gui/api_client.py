@@ -15,9 +15,43 @@ WS_URL = "ws://127.0.0.1:8000/ws"
 logger = get_logger(__name__)
 
 
-class EngineClient:
+class ApiClientError(Exception):
+    """Raised when an API request to the engine backend fails.
+
+    Carries rich diagnostic metadata including the status code, URL, and server details.
     """
-    Handles all REST and WebSocket communication with the backend FastAPI engine.
+
+    def __init__(
+        self,
+        message: str,
+        status_code: int | None = None,
+        response_detail: str | None = None,
+        url: str | None = None,
+        details: dict | None = None,
+    ):
+        super().__init__(message)
+        self.message = message
+        self.status_code = status_code
+        self.response_detail = response_detail
+        self.url = url
+        self.details = details
+
+    def __str__(self):
+        parts = [self.message]
+        if self.status_code:
+            parts.append(f"Status: {self.status_code}")
+        if self.response_detail:
+            parts.append(f"Detail: {self.response_detail}")
+        if self.details:
+            parts.append(f"Context: {self.details}")
+        if self.url:
+            parts.append(f"URL: {self.url}")
+        return " | ".join(parts)
+
+
+class EngineClient:
+    """Handles all REST and WebSocket communication with the backend FastAPI engine.
+
     Maintains a local copy of the WorkspaceState, which is kept in sync via JSON Patches.
     """
 
@@ -60,17 +94,41 @@ class EngineClient:
         if self.on_state_changed:
             self.on_state_changed()
 
+    def _request(self, method: str, url: str, **kwargs) -> requests.Response:
+        """Centralized helper for HTTP requests to standardise error handling and exception logging."""
+        try:
+            res = requests.request(method, url, **kwargs)
+        except requests.RequestException as e:
+            raise ApiClientError(f"Connection failed: {e}", url=url) from e
+
+        if not (200 <= res.status_code < 300):
+            detail = None
+            details_ctx = None
+            try:
+                data = res.json()
+                detail = data.get("detail")
+                details_ctx = data.get("details")
+            except Exception:
+                pass
+
+            raise ApiClientError(
+                message=f"Request failed: {res.reason}",
+                status_code=res.status_code,
+                response_detail=detail or res.text,
+                url=url,
+                details=details_ctx,
+            )
+        return res
+
     # ── REST API Methods ───────────────────────────────────────────────
 
     def import_zip(self, zip_path: str):
         with open(zip_path, "rb") as f:
-            res = requests.post(f"{API_URL}/import", files={"file": f})
-            res.raise_for_status()
+            self._request("POST", f"{API_URL}/import", files={"file": f})
 
     def import_image(self, image_path: str):
         with open(image_path, "rb") as f:
-            res = requests.post(f"{API_URL}/import/image", files={"file": f})
-            res.raise_for_status()
+            self._request("POST", f"{API_URL}/import/image", files={"file": f})
 
     def add_component(
         self, label: str, bounds: dict, parent_id: str | None = None
@@ -79,15 +137,13 @@ class EngineClient:
         if parent_id:
             payload["parentId"] = parent_id
 
-        res = requests.post(f"{API_URL}/components", json=payload)
-        res.raise_for_status()
+        res = self._request("POST", f"{API_URL}/components", json=payload)
         return res.json().get("id")
 
     def move_component(self, comp_id: str, x: int, y: int):
-        res = requests.put(
-            f"{API_URL}/components/{comp_id}/move", json={"x": x, "y": y}
+        self._request(
+            "PUT", f"{API_URL}/components/{comp_id}/move", json={"x": x, "y": y}
         )
-        res.raise_for_status()
 
     def update_component(
         self,
@@ -104,12 +160,19 @@ class EngineClient:
         if parent_id is not None:
             payload["parentId"] = parent_id
 
-        res = requests.put(f"{API_URL}/components/{comp_id}", json=payload)
-        res.raise_for_status()
+        self._request("PUT", f"{API_URL}/components/{comp_id}", json=payload)
 
     def delete_component(self, comp_id: str):
-        res = requests.delete(f"{API_URL}/components/{comp_id}")
-        res.raise_for_status()
+        self._request("DELETE", f"{API_URL}/components/{comp_id}")
+
+    def undo(self):
+        self._request("POST", f"{API_URL}/session/undo")
+
+    def redo(self):
+        self._request("POST", f"{API_URL}/session/redo")
+
+    def export_zip_data(self) -> requests.Response:
+        return self._request("GET", f"{API_URL}/export")
 
     def get_raw_image_url(self) -> str:
         return f"{API_URL}/image/raw"

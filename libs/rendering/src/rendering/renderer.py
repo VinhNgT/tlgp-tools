@@ -106,7 +106,7 @@ def compute_level_scale(
     """
     if parent_comp is None or full_img_width <= 0:
         return 1.0
-    return parent_comp.absoluteBounds.w / full_img_width
+    return parent_comp.bounds.w / full_img_width
 
 
 def compute_pill_font_size(
@@ -225,11 +225,11 @@ def draw_annotations_on_image(
         if not comp.visibility.visible:
             continue
 
-        # Use absoluteBounds
-        bx1 = comp.absoluteBounds.left - offset_x
-        by1 = comp.absoluteBounds.top - offset_y
-        bx2 = comp.absoluteBounds.right - offset_x
-        by2 = comp.absoluteBounds.bottom - offset_y
+        # Use bounds
+        bx1 = comp.bounds.left - offset_x
+        by1 = comp.bounds.top - offset_y
+        bx2 = comp.bounds.right - offset_x
+        by2 = comp.bounds.bottom - offset_y
 
         # Red border — scaled by level so it looks uniform after upscaling
         for i in range(box_border_w):
