@@ -7,8 +7,14 @@ authors = [
     { name = "VinhNgT", email = "victorpublic0000@gmail.com" }
 ]
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "models",
+    "pydantic>=2.13.4",
+]
 
 [build-system]
 requires = ["uv_build>=0.11.8,<0.12.0"]
 build-backend = "uv_build"
+
+[tool.uv.sources]
+models = { workspace = true }
