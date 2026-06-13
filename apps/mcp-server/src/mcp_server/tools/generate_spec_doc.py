@@ -10,10 +10,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from pydantic import ValidationError
-
 from doc_generator.doc_builder import build_document
 from doc_generator.models import AnalysisData
+from pydantic import ValidationError
 
 
 def generate_spec_doc_impl(
@@ -36,7 +35,7 @@ def generate_spec_doc_impl(
     """
     if analysis_path:
         try:
-            with open(analysis_path, "r", encoding="utf-8") as f:
+            with open(analysis_path, encoding="utf-8") as f:
                 analysis = json.load(f)
         except Exception as e:
             return {
@@ -76,8 +75,7 @@ def generate_spec_doc_impl(
             img = data.resolve_image(comp.imageFile)
             if not img.exists():
                 errors.append(
-                    f"Component '{comp.label}' (id={comp.id}): "
-                    f"image not found: {img}"
+                    f"Component '{comp.label}' (id={comp.id}): image not found: {img}"
                 )
         else:
             warnings.append(
@@ -102,14 +100,10 @@ def generate_spec_doc_impl(
         )
 
     empty_controls = sum(
-        1 for comp in non_leaf
-        for child in comp.children
-        if not child.controlType
+        1 for comp in non_leaf for child in comp.children if not child.controlType
     )
     if empty_controls:
-        warnings.append(
-            f"{empty_controls} child element(s) have empty controlType"
-        )
+        warnings.append(f"{empty_controls} child element(s) have empty controlType")
 
     if not data.apis:
         warnings.append("No APIs defined")
@@ -133,9 +127,8 @@ def generate_spec_doc_impl(
 
     # Validate-only mode: return summary without generating
     if validate_only:
-        image_count = (
-            len(data.screen.imageFiles)
-            + sum(1 for c in non_leaf if c.imageFile)
+        image_count = len(data.screen.imageFiles) + sum(
+            1 for c in non_leaf if c.imageFile
         )
         return {
             "valid": True,
@@ -154,10 +147,11 @@ def generate_spec_doc_impl(
     if output_path:
         out = Path(output_path).resolve()
     else:
-        safe_name = "".join(
-            c for c in data.screen.name
-            if c.isalnum() or c in (" ", "_", "-")
-        ).strip().replace(" ", "_")
+        safe_name = (
+            "".join(c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-"))
+            .strip()
+            .replace(" ", "_")
+        )
         out = Path(data.exportDir) / f"{safe_name}.docx"
 
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -173,10 +167,7 @@ def generate_spec_doc_impl(
 
     # Count tables and images
     table_count = len(doc.tables)
-    image_count = (
-        len(data.screen.imageFiles)
-        + sum(1 for c in non_leaf if c.imageFile)
-    )
+    image_count = len(data.screen.imageFiles) + sum(1 for c in non_leaf if c.imageFile)
 
     return {
         "valid": True,

@@ -1,8 +1,7 @@
 """Tests for HistoryManager undo/redo and snapshot behavior."""
 
-import pytest
-from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
 from tlgp_annotation_tool.history import HistoryManager
+from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
 
 
 def _make_session(**kwargs):

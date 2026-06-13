@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import shutil
 import sys
 from pathlib import Path
 
@@ -49,8 +50,12 @@ def _print_summary(analysis: AnalysisData):
     print(f"  Screen:             {analysis.screen.name}")
     print()
     print(f"  Components:         {len(non_leaf)} non-leaf, {len(leaf)} leaf")
-    print(f"  UI elements:        {total_children} (components) + {screen_children} (screen)")
-    print(f"  Interactions:       {total_interactions} (components) + {screen_interactions} (screen)")
+    print(
+        f"  UI elements:        {total_children} (components) + {screen_children} (screen)"
+    )
+    print(
+        f"  Interactions:       {total_interactions} (components) + {screen_interactions} (screen)"
+    )
     print(f"  APIs:               {len(analysis.apis)}")
     print()
 
@@ -109,7 +114,8 @@ def main():
         help="Path to the analysis.json file",
     )
     parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         help="Output .docx file path (default: <screen_name>.docx next to the JSON)",
     )
     parser.add_argument(
@@ -149,7 +155,6 @@ def main():
     # (consistent with the MCP tool behavior)
     analysis_dest = output_path.parent / "analysis.json"
     if analysis_path.resolve() != analysis_dest.resolve():
-        import shutil
         shutil.copy2(analysis_path, analysis_dest)
 
     print(f"✅ Saved to: {output_path}")

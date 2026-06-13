@@ -9,13 +9,14 @@ Exposes two tools (one per underlying package) and one orchestration prompt:
 from __future__ import annotations
 
 import logging
+import os
 
+import requests
 from mcp.server.fastmcp import FastMCP
 
-from mcp_server.tools.launch_annotator import launch_annotator_impl
-from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
-import requests
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
+from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
+from mcp_server.tools.launch_annotator import launch_annotator_impl
 
 logger = logging.getLogger(__name__)
 
@@ -57,10 +58,11 @@ def launch_annotator(
     """
     return launch_annotator_impl(screenshot_path, workspace_zip)
 
+
 @mcp.tool()
 def get_engine_state() -> dict:
     """Fetch the current flat-map JSON WorkspaceState from the running Engine.
-    
+
     Use this tool to read the latest annotation hierarchy automatically,
     instead of relying on local JSON files.
     """
@@ -71,40 +73,40 @@ def get_engine_state() -> dict:
     except Exception as e:
         return {"error": str(e)}
 
+
 @mcp.tool()
 def download_engine_crops(output_dir: str) -> dict:
     """Download all component crops and the raw image from the Engine.
-    
+
     Creates a clean directory containing all component crops named as `<uuid>.png`.
     Also downloads the root screenshot as `raw.png`.
     Use this to prepare a local directory before writing analysis.json.
-    
+
     Args:
         output_dir: The directory to save the images to.
-    
+
     Returns:
         dict with status and list of downloaded files.
     """
-    import os
-    
+
     out_path = os.path.abspath(output_dir)
     os.makedirs(out_path, exist_ok=True)
-    
+
     downloaded = []
     errors = []
-    
+
     try:
         state_res = requests.get("http://127.0.0.1:8000/state")
         state_res.raise_for_status()
         state = state_res.json()
-        
+
         # Download raw image
         raw_res = requests.get("http://127.0.0.1:8000/image/raw")
         if raw_res.status_code == 200:
             with open(os.path.join(out_path, "raw.png"), "wb") as f:
                 f.write(raw_res.content)
             downloaded.append("raw.png")
-            
+
         # Download crops
         for comp_id in state.get("components", {}).keys():
             crop_res = requests.get(f"http://127.0.0.1:8000/image/crop/{comp_id}")
@@ -113,16 +115,17 @@ def download_engine_crops(output_dir: str) -> dict:
                 with open(os.path.join(out_path, filename), "wb") as f:
                     f.write(crop_res.content)
                 downloaded.append(filename)
-                
+
         return {
             "status": "success",
             "output_dir": out_path,
             "downloaded": len(downloaded),
             "files": downloaded,
-            "errors": errors
+            "errors": errors,
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
 
 @mcp.tool()
 def generate_spec_doc(

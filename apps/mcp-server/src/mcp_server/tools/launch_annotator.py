@@ -6,6 +6,7 @@ import os
 import shutil
 import subprocess
 import time
+
 import requests
 
 
@@ -42,7 +43,7 @@ def launch_annotator_impl(
         stderr=subprocess.DEVNULL,
         start_new_session=True,
     )
-    
+
     # Spawn GUI
     gui_cmd = [uv_bin, "run", "python", "-m", "gui"]
     gui_proc = subprocess.Popen(
@@ -56,7 +57,7 @@ def launch_annotator_impl(
 
     # Wait for Engine to be ready
     engine_ready = False
-    for _ in range(30): # Wait up to 3 seconds
+    for _ in range(30):  # Wait up to 3 seconds
         try:
             res = requests.get("http://127.0.0.1:8000/state")
             if res.status_code == 200:
@@ -77,5 +78,5 @@ def launch_annotator_impl(
     return {
         "engine_pid": engine_proc.pid,
         "gui_pid": gui_proc.pid,
-        "engine_ready": engine_ready
+        "engine_ready": engine_ready,
     }

@@ -15,7 +15,6 @@ Key design properties:
   even if A doesn't directly overlap C.
 """
 
-from typing import List
 from tlgp_annotation_tool.models import AnnotationBox
 
 # Minimum vertical overlap ratio (relative to the smaller box's height)
@@ -24,6 +23,7 @@ ROW_OVERLAP_THRESHOLD = 0.5
 
 
 # ── Overlap Ratio ──────────────────────────────────────────────────────
+
 
 def _compute_overlap_ratio(a: AnnotationBox, b: AnnotationBox) -> float:
     """Compute the vertical overlap between two boxes as a ratio.
@@ -43,6 +43,7 @@ def _compute_overlap_ratio(a: AnnotationBox, b: AnnotationBox) -> float:
 
 
 # ── Union-Find ─────────────────────────────────────────────────────────
+
 
 class _UnionFind:
     """Lightweight union-find (disjoint set) data structure."""
@@ -71,10 +72,11 @@ class _UnionFind:
 
 # ── Row Grouping ──────────────────────────────────────────────────────
 
+
 def _build_row_groups(
-    boxes: List[AnnotationBox],
+    boxes: list[AnnotationBox],
     threshold: float = ROW_OVERLAP_THRESHOLD,
-) -> List[List[AnnotationBox]]:
+) -> list[list[AnnotationBox]]:
     """Group boxes into rows using vertical overlap and connected components.
 
     Two boxes are considered to be on the same row if their vertical overlap
@@ -98,7 +100,7 @@ def _build_row_groups(
                 uf.union(i, j)
 
     # Collect connected components
-    groups: dict[int, List[int]] = {}
+    groups: dict[int, list[int]] = {}
     for i in range(n):
         root = uf.find(i)
         if root not in groups:
@@ -106,7 +108,7 @@ def _build_row_groups(
         groups[root].append(i)
 
     # Build row groups with actual box references
-    row_groups: List[List[AnnotationBox]] = []
+    row_groups: list[list[AnnotationBox]] = []
     for indices in groups.values():
         row = [boxes[i] for i in indices]
         # Sort within each row left-to-right
@@ -114,7 +116,7 @@ def _build_row_groups(
         row_groups.append(row)
 
     # Sort rows top-to-bottom by median vertical center
-    def row_median_center(row: List[AnnotationBox]) -> float:
+    def row_median_center(row: list[AnnotationBox]) -> float:
         centers = sorted((b.top + b.bottom) / 2 for b in row)
         mid = len(centers) // 2
         if len(centers) % 2 == 0:
@@ -127,7 +129,8 @@ def _build_row_groups(
 
 # ── Public API ─────────────────────────────────────────────────────────
 
-def sort_boxes_reading_order(boxes: List[AnnotationBox]) -> List[AnnotationBox]:
+
+def sort_boxes_reading_order(boxes: list[AnnotationBox]) -> list[AnnotationBox]:
     """Sort boxes into natural reading order (row-major).
 
     Returns a new flat list sorted top-to-bottom by row, left-to-right
@@ -137,13 +140,13 @@ def sort_boxes_reading_order(boxes: List[AnnotationBox]) -> List[AnnotationBox]:
         return list(boxes)
 
     row_groups = _build_row_groups(boxes)
-    result: List[AnnotationBox] = []
+    result: list[AnnotationBox] = []
     for row in row_groups:
         result.extend(row)
     return result
 
 
-def sort_and_renumber_recursive(boxes: List[AnnotationBox]) -> None:
+def sort_and_renumber_recursive(boxes: list[AnnotationBox]) -> None:
     """Sort boxes in-place using reading order, renumber 1..N, and recurse.
 
     This mirrors the recursive structure of the export pipeline

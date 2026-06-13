@@ -6,12 +6,12 @@ import io
 import json
 import os
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
-
 from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
 from mcp_server.tools.launch_annotator import launch_annotator_impl
-
+from PIL import Image as PILImage
 
 # ============================================================
 # Helpers
@@ -20,7 +20,6 @@ from mcp_server.tools.launch_annotator import launch_annotator_impl
 
 def _make_png_bytes() -> bytes:
     """Create a valid 1x1 white PNG for image validation tests."""
-    from PIL import Image as PILImage
 
     buf = io.BytesIO()
     PILImage.new("RGB", (1, 1), color=(255, 255, 255)).save(buf, format="PNG")
@@ -265,7 +264,9 @@ class TestGenerateSpecDoc:
 
         # Write analysis to file
         analysis_json_file = tmp_path / "test_analysis.json"
-        analysis_json_file.write_text(json.dumps(analysis, ensure_ascii=False), encoding="utf-8")
+        analysis_json_file.write_text(
+            json.dumps(analysis, ensure_ascii=False), encoding="utf-8"
+        )
 
         result = generate_spec_doc_impl(analysis_path=str(analysis_json_file))
 
@@ -284,7 +285,6 @@ class TestGenerateSpecDoc:
 
 class TestLaunchAnnotator:
     def test_creates_output_dir(self, tmp_path, monkeypatch):
-        from unittest.mock import MagicMock, patch
 
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
@@ -316,4 +316,3 @@ class TestLaunchAnnotator:
 
         with pytest.raises(RuntimeError, match="uv is not installed"):
             launch_annotator_impl(str(tmp_path / "out"))
-

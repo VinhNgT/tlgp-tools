@@ -5,7 +5,7 @@ from __future__ import annotations
 from docx import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
-from docx.shared import Inches, Pt
+from docx.shared import Inches
 
 from doc_generator.image_handler import insert_image
 from doc_generator.models import AnalysisData, Api, Component, Screen
@@ -22,7 +22,6 @@ from doc_generator.table_builder import (
     build_ui_elements_table,
 )
 
-
 # ============================================================
 # Heading helpers
 # ============================================================
@@ -34,7 +33,7 @@ def _set_run_font(run, font_name: str = FONT_FAMILY):
     rPr = run._element.get_or_add_rPr()
     rFonts = rPr.find(qn("w:rFonts"))
     if rFonts is None:
-        rFonts = parse_xml(f'<w:rFonts {nsdecls("w")}/>')
+        rFonts = parse_xml(f"<w:rFonts {nsdecls('w')}/>")
         rPr.insert(0, rFonts)
     rFonts.set(qn("w:eastAsia"), font_name)
 
@@ -174,8 +173,7 @@ def _add_api_section(doc: Document, api: Api):
     # Response section
     if api.responseFields:
         response_label = (
-            f"Response (data = {api.responseType})" if api.responseType
-            else "Response"
+            f"Response (data = {api.responseType})" if api.responseType else "Response"
         )
         _add_bold_text(doc, response_label)
         build_api_table(doc, api.responseFields)

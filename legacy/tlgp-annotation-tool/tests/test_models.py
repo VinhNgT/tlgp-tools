@@ -1,8 +1,6 @@
 """Tests for AnnotationBox model properties and serialization."""
 
-import pytest
 from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
-
 
 # ── Property Accessors ────────────────────────────────────────────────
 
@@ -63,7 +61,12 @@ class TestAnnotationBoxSerialization:
     def test_to_dict_with_children(self):
         child = AnnotationBox(id=1, label="C1", x1=20, y1=20, x2=80, y2=80)
         parent = AnnotationBox(
-            id=1, label="Parent", x1=10, y1=10, x2=100, y2=100,
+            id=1,
+            label="Parent",
+            x1=10,
+            y1=10,
+            x2=100,
+            y2=100,
             children=[child],
         )
         d = parent.to_dict()
@@ -77,11 +80,21 @@ class TestAnnotationBoxSerialization:
     def test_to_dict_recursive_nesting(self):
         grandchild = AnnotationBox(id=1, label="GC", x1=30, y1=30, x2=50, y2=50)
         child = AnnotationBox(
-            id=1, label="C", x1=20, y1=20, x2=80, y2=80,
+            id=1,
+            label="C",
+            x1=20,
+            y1=20,
+            x2=80,
+            y2=80,
             children=[grandchild],
         )
         parent = AnnotationBox(
-            id=1, label="P", x1=10, y1=10, x2=100, y2=100,
+            id=1,
+            label="P",
+            x1=10,
+            y1=10,
+            x2=100,
+            y2=100,
             children=[child],
         )
         d = parent.to_dict()
@@ -102,7 +115,12 @@ class TestHasDescendants:
     def test_direct_children(self):
         child = AnnotationBox(id=1, label="C", x1=0, y1=0, x2=50, y2=50)
         parent = AnnotationBox(
-            id=1, label="P", x1=0, y1=0, x2=100, y2=100,
+            id=1,
+            label="P",
+            x1=0,
+            y1=0,
+            x2=100,
+            y2=100,
             children=[child],
         )
         assert parent.has_descendants() is True
@@ -113,7 +131,12 @@ class TestHasDescendants:
 
     def test_custom_pill_corner(self):
         box = AnnotationBox(
-            id=1, label="A", x1=0, y1=0, x2=100, y2=100,
+            id=1,
+            label="A",
+            x1=0,
+            y1=0,
+            x2=100,
+            y2=100,
             pill_corner="bottom_right",
         )
         assert box.pill_corner == "bottom_right"

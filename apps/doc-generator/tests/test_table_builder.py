@@ -1,10 +1,5 @@
 """Tests for table_builder — verifies table structure and styling."""
 
-import pytest
-from docx import Document
-from docx.oxml.ns import qn
-from docx.shared import Pt
-
 from doc_generator.models import (
     ApiParam,
     ChildElement,
@@ -13,10 +8,6 @@ from doc_generator.models import (
 from doc_generator.style_constants import (
     BORDER_COLOR_HEX,
     HEADER_BG_HEX,
-    INFO_COLS_PT,
-    UI_COLS_PT,
-    INTERACTION_COLS_PT,
-    API_COLS_PT,
     SPACE_AFTER_TABLE_PT,
 )
 from doc_generator.table_builder import (
@@ -26,6 +17,9 @@ from doc_generator.table_builder import (
     build_screen_level_info_table,
     build_ui_elements_table,
 )
+from docx import Document
+from docx.oxml.ns import qn
+from docx.shared import Pt
 
 
 def _get_cell_shading(cell) -> str | None:
@@ -108,7 +102,6 @@ class TestScreenLevelInfoTable:
         assert table.cell(0, 0).text == "Tên màn hình"
 
 
-
 # ── UI Elements Table ─────────────────────────────────────────────────
 
 
@@ -136,7 +129,9 @@ class TestUiElementsTable:
         doc = Document()
         children = [
             ChildElement(
-                stt=1, label="Share", controlType="Icon",
+                stt=1,
+                label="Share",
+                controlType="Icon",
                 description="Share product",
             ),
         ]
@@ -207,8 +202,10 @@ class TestApiTable:
         doc = Document()
         params = [
             ApiParam(
-                name="merchant_id", meaning="Mã đối tác",
-                required="Có", dataType="String",
+                name="merchant_id",
+                meaning="Mã đối tác",
+                required="Có",
+                dataType="String",
             ),
         ]
         table = build_api_table(doc, params)
@@ -255,4 +252,3 @@ class TestTableSpacing:
         assert spacer_para.paragraph_format.space_before == Pt(0)
         assert spacer_para.paragraph_format.space_after == Pt(SPACE_AFTER_TABLE_PT)
         assert spacer_para.paragraph_format.line_spacing == Pt(1)
-

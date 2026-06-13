@@ -1,26 +1,28 @@
-import copy
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import List, Callable, Optional, Dict, Tuple
-from tlgp_annotation_tool.models import ScreenSession, AnnotationBox
+
 from tlgp_annotation_tool.history import HistoryManager
+from tlgp_annotation_tool.layout_sort import sort_and_renumber_recursive
+from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
 
 
 @dataclass
 class NavigationContext:
     """Tracks the current drill-in position within the annotation tree.
-    
+
     The parent_stack holds the chain of ancestor boxes from root to the
     current parent. An empty stack means the user is viewing root-level
     components.
     """
-    parent_stack: List[AnnotationBox] = field(default_factory=list)
+
+    parent_stack: list[AnnotationBox] = field(default_factory=list)
 
     @property
     def depth(self) -> int:
         return len(self.parent_stack)
 
     @property
-    def current_parent(self) -> Optional[AnnotationBox]:
+    def current_parent(self) -> AnnotationBox | None:
         return self.parent_stack[-1] if self.parent_stack else None
 
     def breadcrumb(self) -> str:
@@ -28,7 +30,7 @@ class NavigationContext:
             return "Root"
         return " › ".join(b.label for b in self.parent_stack)
 
-    def copy(self) -> 'NavigationContext':
+    def copy(self) -> "NavigationContext":
         return NavigationContext(parent_stack=list(self.parent_stack))
 
 
@@ -36,11 +38,11 @@ class SessionController:
     def __init__(self, session: ScreenSession):
         self.session = session
         self.history = HistoryManager(session)
-        self.listeners: Dict[str, List[Callable]] = {}
+        self.listeners: dict[str, list[Callable]] = {}
 
         # Navigation state
         self.nav = NavigationContext()
-        self.selected_boxes: List[AnnotationBox] = []
+        self.selected_boxes: list[AnnotationBox] = []
         self.mode: str = "select"
 
     # ── Event System ───────────────────────────────────────────────────
@@ -67,7 +69,7 @@ class SessionController:
 
     # ── Navigation ─────────────────────────────────────────────────────
 
-    def active_list(self) -> List[AnnotationBox]:
+    def active_list(self) -> list[AnnotationBox]:
         """Returns the list of boxes at the current navigation depth."""
         parent = self.nav.current_parent
         if parent:
@@ -101,7 +103,7 @@ class SessionController:
 
     # ── Selection ──────────────────────────────────────────────────────
 
-    def set_selection(self, boxes: List[AnnotationBox]):
+    def set_selection(self, boxes: list[AnnotationBox]):
         """Update the selected boxes at the current navigation depth."""
         self.selected_boxes = boxes
         self._notify("selection_change", self.nav, boxes)
@@ -115,7 +117,7 @@ class SessionController:
         self._notify("add", box)
         self.set_selection([box])
 
-    def delete_boxes(self, boxes: List[AnnotationBox]):
+    def delete_boxes(self, boxes: list[AnnotationBox]):
         """Delete boxes from the current active list."""
         active = self.active_list()
         deleted_any = False
@@ -152,17 +154,19 @@ class SessionController:
             if child.children:
                 self._shift_box_descendants(child, dx, dy)
 
-    def update_boxes_coords(self, coords_list: List[Tuple[AnnotationBox, Tuple[int, int, int, int]]]):
+    def update_boxes_coords(
+        self, coords_list: list[tuple[AnnotationBox, tuple[int, int, int, int]]]
+    ):
         for box, coords in coords_list:
             new_x1, new_y1, new_x2, new_y2 = coords
             dx = new_x1 - box.x1
             dy = new_y1 - box.y1
-            
+
             box.x1, box.y1, box.x2, box.y2 = new_x1, new_y1, new_x2, new_y2
-            
+
             if dx != 0 or dy != 0:
                 self._shift_box_descendants(box, dx, dy)
-                
+
         self._notify("update_coords", None)
 
     def commit_coords_change(self):
@@ -210,15 +214,18 @@ class SessionController:
                 self.history.save_snapshot()
             self._notify("stack_reorder", box)
 
-    def move_boxes_to_target(self, src_boxes: List[AnnotationBox],
-                             tgt_parent: Optional[AnnotationBox],
-                             tgt_box: Optional[AnnotationBox],
-                             position: str):
+    def move_boxes_to_target(
+        self,
+        src_boxes: list[AnnotationBox],
+        tgt_parent: AnnotationBox | None,
+        tgt_box: AnnotationBox | None,
+        position: str,
+    ):
         """Moves/reorders src_boxes relative to a target.
-        
+
         tgt_parent: The parent whose children list is the drop target.
                     None means root (session.components).
-        tgt_box: The specific sibling box to position relative to. 
+        tgt_box: The specific sibling box to position relative to.
                  None means append to the end.
         position: "before", "after", or "inside"
         """
@@ -270,7 +277,7 @@ class SessionController:
 
     def renumber_all(self):
         """Sort boxes in the entire tree recursively by coordinates and renumber."""
-        from tlgp_annotation_tool.layout_sort import sort_and_renumber_recursive
+
         sort_and_renumber_recursive(self.session.components)
         self.history.save_snapshot()
         self._notify("renumber", None)
@@ -281,11 +288,11 @@ class SessionController:
         self.history.save_snapshot()
         self._notify("screen_info", None)
 
-    def get_cut_lines(self) -> List[int]:
+    def get_cut_lines(self) -> list[int]:
         """Returns the current sorted cut lines."""
         return list(self.session.cut_lines)
 
-    def set_cut_lines(self, lines: List[int]):
+    def set_cut_lines(self, lines: list[int]):
         """Replaces the cut lines list (sorted), saves snapshot, notifies."""
         self.session.cut_lines = sorted(lines)
         self.history.save_snapshot()
@@ -331,18 +338,24 @@ class SessionController:
 
     # ── Overlap Detection ──────────────────────────────────────────────
 
-    def get_all_overlaps(self) -> List[tuple]:
+    def get_all_overlaps(self) -> list[tuple]:
         """Returns a list of (box1, box2) pairs that overlap, checked recursively."""
         overlaps = []
         self._check_overlaps_recursive(self.session.components, overlaps)
         return overlaps
 
-    def _check_overlaps_recursive(self, boxes: List[AnnotationBox], overlaps: List[tuple]):
+    def _check_overlaps_recursive(
+        self, boxes: list[AnnotationBox], overlaps: list[tuple]
+    ):
         for i in range(len(boxes)):
             for j in range(i + 1, len(boxes)):
                 b1, b2 = boxes[i], boxes[j]
-                if (b1.left < b2.right and b1.right > b2.left and
-                    b1.top < b2.bottom and b1.bottom > b2.top):
+                if (
+                    b1.left < b2.right
+                    and b1.right > b2.left
+                    and b1.top < b2.bottom
+                    and b1.bottom > b2.top
+                ):
                     overlaps.append((b1, b2))
 
         for box in boxes:
@@ -351,7 +364,9 @@ class SessionController:
 
     # ── Boundary ───────────────────────────────────────────────────────
 
-    def get_boundary(self, img_width: int = 99999, img_height: int = 99999) -> Tuple[int, int, int, int]:
+    def get_boundary(
+        self, img_width: int = 99999, img_height: int = 99999
+    ) -> tuple[int, int, int, int]:
         """Returns the drawing boundary for the current navigation depth."""
         parent = self.nav.current_parent
         if parent:

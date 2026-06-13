@@ -1,20 +1,24 @@
+import json
 import os
+import sys
+import time
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+
+import tkinterdnd2
+import tkinterdnd2.TkinterDnD
 import ttkbootstrap as tb
-from typing import Optional, Tuple
 from PIL import Image
 
-from tlgp_annotation_tool.models import ScreenSession, AnnotationBox
-from tlgp_annotation_tool.controller import SessionController, NavigationContext
 from tlgp_annotation_tool.canvas import AnnotationCanvas
-from tlgp_annotation_tool.sidebar import ComponentSidebar
-from tlgp_annotation_tool.properties import PropertiesPanel
-from tlgp_annotation_tool.exporter import export_session
-from tlgp_annotation_tool.dialogs import ScreenInfoDialog
+from tlgp_annotation_tool.controller import SessionController
 from tlgp_annotation_tool.cut_editor import CutEditorDialog
-import tkinterdnd2.TkinterDnD
-
+from tlgp_annotation_tool.dialogs import ScreenInfoDialog
+from tlgp_annotation_tool.exporter import export_session
+from tlgp_annotation_tool.history import HistoryManager
+from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
+from tlgp_annotation_tool.properties import PropertiesPanel
+from tlgp_annotation_tool.sidebar import ComponentSidebar
 
 
 class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
@@ -24,7 +28,13 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
     manages keyboard shortcuts, and synchronizes interaction modes (Select, Draw, Pan)
     centrally through the SessionController.
     """
-    def __init__(self, initial_image: str | None = None, session_path: str | None = None, default_output_dir: str | None = None):
+
+    def __init__(
+        self,
+        initial_image: str | None = None,
+        session_path: str | None = None,
+        default_output_dir: str | None = None,
+    ):
         super().__init__(themename="darkly", title="TLGP Annotation Tool")
         self.geometry("1200x800")
         try:
@@ -37,8 +47,12 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         if initial_image:
             self.session.original_image = os.path.abspath(initial_image)
 
-        self.default_output_dir = os.path.abspath(default_output_dir) if default_output_dir else None
-        self._pending_session_path = os.path.abspath(session_path) if session_path else None
+        self.default_output_dir = (
+            os.path.abspath(default_output_dir) if default_output_dir else None
+        )
+        self._pending_session_path = (
+            os.path.abspath(session_path) if session_path else None
+        )
 
         self.controller = SessionController(self.session)
         self._last_touchpad_scroll_time = 0.0
@@ -52,10 +66,11 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         self.controller.subscribe("undo_redo", lambda arg: self.on_undo_redo_sync())
         self.controller.subscribe("screen_info", lambda arg: self.title_label_update())
         self.controller.subscribe("zoom_change", self.on_zoom_changed)
-        self.controller.subscribe("selection_change", lambda nav, boxes: self._update_status())
+        self.controller.subscribe(
+            "selection_change", lambda nav, boxes: self._update_status()
+        )
         self.controller.subscribe("navigation_change", self._on_navigation_change)
         self.controller.subscribe("mode_change", self.on_mode_changed)
-
 
         # Set initial toolbar state and load initial image if provided
         if self._pending_session_path:
@@ -81,28 +96,54 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         # Tool mode selectors
         self.tool_mode_var = tk.StringVar(value="select")
 
-        tool_radio_opts = {
-            "variable": self.tool_mode_var,
-            "bootstyle": "toolbutton"
-        }
+        tool_radio_opts = {"variable": self.tool_mode_var, "bootstyle": "toolbutton"}
 
-        self.btn_select = tb.Radiobutton(toolbar, text="Select (V)", value="select", command=self.toggle_tool_mode, width=8, **tool_radio_opts)
+        self.btn_select = tb.Radiobutton(
+            toolbar,
+            text="Select (V)",
+            value="select",
+            command=self.toggle_tool_mode,
+            width=8,
+            **tool_radio_opts,
+        )
         self.btn_select.pack(side=tk.LEFT, padx=2)
 
-        self.btn_draw = tb.Radiobutton(toolbar, text="Draw (R)", value="draw", command=self.toggle_tool_mode, width=8, **tool_radio_opts)
+        self.btn_draw = tb.Radiobutton(
+            toolbar,
+            text="Draw (R)",
+            value="draw",
+            command=self.toggle_tool_mode,
+            width=8,
+            **tool_radio_opts,
+        )
         self.btn_draw.pack(side=tk.LEFT, padx=2)
 
-        self.btn_pan = tb.Radiobutton(toolbar, text="Pan (H)", value="pan", command=self.toggle_tool_mode, width=8, **tool_radio_opts)
+        self.btn_pan = tb.Radiobutton(
+            toolbar,
+            text="Pan (H)",
+            value="pan",
+            command=self.toggle_tool_mode,
+            width=8,
+            **tool_radio_opts,
+        )
         self.btn_pan.pack(side=tk.LEFT, padx=2)
 
         # Back button for navigation
-        self.btn_back = tb.Button(toolbar, text="← Back", command=self.drill_out, bootstyle="secondary", state=tk.DISABLED)
+        self.btn_back = tb.Button(
+            toolbar,
+            text="← Back",
+            command=self.drill_out,
+            bootstyle="secondary",
+            state=tk.DISABLED,
+        )
         self.btn_back.pack(side=tk.LEFT, padx=2)
 
         tb.Label(toolbar, text="|").pack(side=tk.LEFT, padx=5)
 
         # Breadcrumb label
-        self.breadcrumb_label = tb.Label(toolbar, text="Root", font=("", 9), bootstyle="info")
+        self.breadcrumb_label = tb.Label(
+            toolbar, text="Root", font=("", 9), bootstyle="info"
+        )
         self.breadcrumb_label.pack(side=tk.LEFT, padx=5)
 
         tb.Label(toolbar, text="|").pack(side=tk.LEFT, padx=5)
@@ -111,29 +152,67 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         self.zoom_label = tb.Label(toolbar, text="100%", font=("", 9), width=6)
         self.zoom_label.pack(side=tk.LEFT, padx=2)
 
-        self.btn_zoom_out = tb.Button(toolbar, text="-", width=3, bootstyle="primary-outline", command=lambda: self.do_zoom(-0.1))
+        self.btn_zoom_out = tb.Button(
+            toolbar,
+            text="-",
+            width=3,
+            bootstyle="primary-outline",
+            command=lambda: self.do_zoom(-0.1),
+        )
         self.btn_zoom_out.pack(side=tk.LEFT, padx=1)
 
-        self.btn_zoom_in = tb.Button(toolbar, text="+", width=3, bootstyle="primary-outline", command=lambda: self.do_zoom(0.1))
+        self.btn_zoom_in = tb.Button(
+            toolbar,
+            text="+",
+            width=3,
+            bootstyle="primary-outline",
+            command=lambda: self.do_zoom(0.1),
+        )
         self.btn_zoom_in.pack(side=tk.LEFT, padx=1)
 
-        self.btn_zoom_focus = tb.Button(toolbar, text="Focus", width=6, bootstyle="primary-outline", command=self.zoom_focus_target)
+        self.btn_zoom_focus = tb.Button(
+            toolbar,
+            text="Focus",
+            width=6,
+            bootstyle="primary-outline",
+            command=self.zoom_focus_target,
+        )
         self.btn_zoom_focus.pack(side=tk.LEFT, padx=1)
 
         # Auto-Number button
-        self.btn_auto_number = tb.Button(toolbar, text="Auto-Number", command=self.auto_number_components, bootstyle="secondary-outline")
+        self.btn_auto_number = tb.Button(
+            toolbar,
+            text="Auto-Number",
+            command=self.auto_number_components,
+            bootstyle="secondary-outline",
+        )
         self.btn_auto_number.pack(side=tk.LEFT, padx=10)
 
         # Cut Lines button
-        self.btn_cut_lines = tb.Button(toolbar, text="Cut Lines (C)", command=self.open_cut_editor, bootstyle="secondary-outline")
+        self.btn_cut_lines = tb.Button(
+            toolbar,
+            text="Cut Lines (C)",
+            command=self.open_cut_editor,
+            bootstyle="secondary-outline",
+        )
         self.btn_cut_lines.pack(side=tk.LEFT, padx=2)
 
         # Screen Info button
-        self.btn_screen_info = tb.Button(toolbar, text="Screen Info...", command=self.edit_screen_info, bootstyle="info-outline")
+        self.btn_screen_info = tb.Button(
+            toolbar,
+            text="Screen Info...",
+            command=self.edit_screen_info,
+            bootstyle="info-outline",
+        )
         self.btn_screen_info.pack(side=tk.RIGHT, padx=3)
 
         # Export button
-        self.btn_export_toolbar = tb.Button(toolbar, text="Export (Ctrl+S)", command=self.export_spec, bootstyle="success")
+        self.btn_export_toolbar = tb.Button(
+            toolbar,
+            text="Export (Ctrl+S)",
+            command=self.export_spec,
+            bootstyle="success",
+        )
         self.btn_export_toolbar.pack(side=tk.RIGHT, padx=3)
 
         # Overlap warning label
@@ -141,7 +220,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             toolbar,
             text="⚠️ Overlapping regions",
             bootstyle="warning",
-            font=("", 9, "bold")
+            font=("", 9, "bold"),
         )
 
         # Main Layout
@@ -154,7 +233,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             sashwidth=4,
             sashpad=0,
             bd=0,
-            showhandle=False
+            showhandle=False,
         )
         self.paned_window.pack(fill=tk.BOTH, expand=True)
 
@@ -165,7 +244,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             left_panel,
             controller=self.controller,
             on_select_callback=self.on_layers_select,
-            width=320
+            width=320,
         )
         self.sidebar.pack(fill=tk.BOTH, expand=True)
 
@@ -185,7 +264,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             xscrollcommand=hbar.set,
             yscrollcommand=vbar.set,
             xscrollincrement=1,
-            yscrollincrement=1
+            yscrollincrement=1,
         )
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
@@ -194,33 +273,33 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
         # Placeholder frame for empty state
         self.placeholder_frame = tb.Frame(self.canvas)
-        
+
         lbl_welcome = tb.Label(
             self.placeholder_frame,
             text="TLGP Annotation Tool",
             font=("", 14, "bold"),
-            bootstyle="secondary"
+            bootstyle="secondary",
         )
         lbl_welcome.pack(pady=(0, 15))
-        
+
         btn_open_img = tb.Button(
             self.placeholder_frame,
             text="Open Screenshot...",
             command=self.open_images,
             bootstyle="primary",
-            width=22
+            width=22,
         )
         btn_open_img.pack(pady=5)
-        
+
         btn_open_json = tb.Button(
             self.placeholder_frame,
             text="Open Session JSON...",
             command=self.open_session,
             bootstyle="info-outline",
-            width=22
+            width=22,
         )
         btn_open_json.pack(pady=5)
-        
+
         if not self.session.original_image:
             self.placeholder_frame.place(relx=0.5, rely=0.5, anchor=tk.CENTER)
 
@@ -232,7 +311,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             controller=self.controller,
             on_export_callback=self.export_spec,
             width=280,
-            padding=10
+            padding=10,
         )
         self.properties.pack(fill=tk.BOTH, expand=True)
 
@@ -244,17 +323,27 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         # Status bar
         self.statusbar = tb.Frame(self, height=22)
         self.statusbar.pack(fill=tk.X, side=tk.BOTTOM)
-        self.status_mode_label = tb.Label(self.statusbar, text="Mode: Select", font=("", 8), padding=5)
+        self.status_mode_label = tb.Label(
+            self.statusbar, text="Mode: Select", font=("", 8), padding=5
+        )
         self.status_mode_label.pack(side=tk.LEFT)
-        self.status_info_label = tb.Label(self.statusbar, text="Depth: Root", font=("", 8), padding=5)
+        self.status_info_label = tb.Label(
+            self.statusbar, text="Depth: Root", font=("", 8), padding=5
+        )
         self.status_info_label.pack(side=tk.RIGHT)
 
         # Subscribe to overlap-related events
         self.controller.subscribe("add", lambda box: self.check_and_update_overlaps())
         self.controller.subscribe("delete", lambda box: self.on_delete_sync())
-        self.controller.subscribe("update_coords", lambda box: self.check_and_update_overlaps())
-        self.controller.subscribe("reorder", lambda box: self.check_and_update_overlaps())
-        self.controller.subscribe("undo_redo", lambda box: self.check_and_update_overlaps())
+        self.controller.subscribe(
+            "update_coords", lambda box: self.check_and_update_overlaps()
+        )
+        self.controller.subscribe(
+            "reorder", lambda box: self.check_and_update_overlaps()
+        )
+        self.controller.subscribe(
+            "undo_redo", lambda box: self.check_and_update_overlaps()
+        )
 
     def bind_shortcuts(self):
         self.bind("<v>", lambda e: self._hotkey_set_mode("select"))
@@ -297,7 +386,6 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         self.canvas.bind("<Shift-MouseWheel>", self.on_shift_scroll)
         self.canvas.bind("<MouseWheel>", self.on_canvas_scroll)
 
-        import sys
         if sys.platform == "darwin":
             self.bind_all("<TouchpadScroll>", self.on_canvas_touchpad_scroll)
 
@@ -309,7 +397,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
     def is_text_focused(self) -> bool:
         focused = self.focus_get()
-        return isinstance(focused, (tb.Entry, tb.Text, tk.Entry, tk.Text, ttk.Entry, ttk.Combobox))
+        return isinstance(
+            focused, (tb.Entry, tb.Text, tk.Entry, tk.Text, ttk.Entry, ttk.Combobox)
+        )
 
     def on_global_click(self, event):
         clicked_widget = event.widget
@@ -320,7 +410,18 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
             # Check if the clicked widget is an input widget, a combobox, a popdown listbox, or scrollbars
             is_input = (
-                isinstance(clicked_widget, (tk.Entry, tk.Text, ttk.Entry, ttk.Combobox, tk.Listbox, tk.Scrollbar, ttk.Scrollbar))
+                isinstance(
+                    clicked_widget,
+                    (
+                        tk.Entry,
+                        tk.Text,
+                        ttk.Entry,
+                        ttk.Combobox,
+                        tk.Listbox,
+                        tk.Scrollbar,
+                        ttk.Scrollbar,
+                    ),
+                )
                 or "popdown" in str(clicked_widget).lower()
                 or "scrollbar" in str(clicked_widget).lower()
             )
@@ -362,9 +463,8 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         self._update_status()
 
     def on_control_scroll(self, event):
-        import sys
+
         if sys.platform == "darwin":
-            import time
             if time.time() - getattr(self, "_last_touchpad_scroll_time", 0.0) < 0.1:
                 return "break"
         if event.delta > 0:
@@ -409,7 +509,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         """Handles macOS trackpad gestures via TouchpadScroll events."""
         if str(event.widget) == str(self.canvas):
             try:
-                res = self.tk.call('tk::PreciseScrollDeltas', event.delta)
+                res = self.tk.call("tk::PreciseScrollDeltas", event.delta)
                 deltas = self.tk.splitlist(res)
                 delta_x = float(deltas[0])
                 delta_y = float(deltas[1])
@@ -420,7 +520,6 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             is_command = (event.state & 0x0008) != 0 or (event.state & 0x0010) != 0
 
             if is_control or is_command:
-                import time
                 self._last_touchpad_scroll_time = time.time()
                 zoom_delta = delta_y * 0.01
                 self.do_zoom(zoom_delta, mouse_pos=(event.x, event.y))
@@ -433,7 +532,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
                 self.canvas.check_viewport_crop()
             return "break"
 
-    def do_zoom(self, delta: float, mouse_pos: Optional[Tuple[int, int]] = None):
+    def do_zoom(self, delta: float, mouse_pos: tuple[int, int] | None = None):
         self.canvas.zoom(delta, mouse_pos)
 
     def _update_status(self):
@@ -490,14 +589,16 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         self.btn_select.config(state=state)
         self.btn_draw.config(state=state)
         self.btn_pan.config(state=state)
-        self.btn_back.config(state=state if self.controller.nav.depth > 0 else tk.DISABLED)
+        self.btn_back.config(
+            state=state if self.controller.nav.depth > 0 else tk.DISABLED
+        )
         self.btn_zoom_in.config(state=state)
         self.btn_zoom_out.config(state=state)
         self.btn_zoom_focus.config(state=state)
         self.btn_auto_number.config(state=state)
         self.btn_cut_lines.config(state=state)
         self.btn_screen_info.config(state=state)
-        
+
         # Export controls state
         self.btn_export_toolbar.config(state=state)
         try:
@@ -506,7 +607,14 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             pass
 
         # Edit menu items
-        for label in ["Undo (Ctrl+Z)", "Redo (Ctrl+Y)", "Delete (Delete)", "Select All (Ctrl+A)", "Auto-Number", "Screen Info..."]:
+        for label in [
+            "Undo (Ctrl+Z)",
+            "Redo (Ctrl+Y)",
+            "Delete (Delete)",
+            "Select All (Ctrl+A)",
+            "Auto-Number",
+            "Screen Info...",
+        ]:
             try:
                 self.edit_menu.entryconfig(label, state=state)
             except Exception:
@@ -525,7 +633,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
     def open_images(self):
         path = filedialog.askopenfilename(
             title="Select screenshot",
-            filetypes=[("Image files", "*.png *.jpg *.jpeg *.webp")]
+            filetypes=[("Image files", "*.png *.jpg *.jpeg *.webp")],
         )
         if path:
             self.session.original_image = os.path.abspath(path)
@@ -538,13 +646,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             self.check_trigger_screen_info()
 
     def open_session(self):
-        import json
-        from PIL import Image
-        from tlgp_annotation_tool.history import HistoryManager
 
         path = filedialog.askopenfilename(
-            title="Select session JSON file",
-            filetypes=[("JSON files", "*.json")]
+            title="Select session JSON file", filetypes=[("JSON files", "*.json")]
         )
         if not path:
             return
@@ -558,21 +662,24 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         deserialization, and UI refresh. If the original image cannot be
         found automatically, prompts the user to select it manually.
         """
-        import json
-        from PIL import Image
-        from tlgp_annotation_tool.history import HistoryManager
 
         # 1. Parse JSON
         try:
-            with open(path, "r", encoding="utf-8") as f:
+            with open(path, encoding="utf-8") as f:
                 data = json.load(f)
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to parse JSON file: {e}", parent=self)
+            messagebox.showerror(
+                "Error", f"Failed to parse JSON file: {e}", parent=self
+            )
             return
 
         # Check required fields
         if "original_image" not in data or "components" not in data:
-            messagebox.showerror("Error", "Invalid session file format: missing image or components data.", parent=self)
+            messagebox.showerror(
+                "Error",
+                "Invalid session file format: missing image or components data.",
+                parent=self,
+            )
             return
 
         # 2. Resolve image path
@@ -602,7 +709,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
                             f"The screenshot found at '{img_path}' has dimensions ({w}x{h}), "
                             f"which do not match the expected ({expected_w}x{expected_h}).\n"
                             f"Please select the correct screenshot manually.",
-                            parent=self
+                            parent=self,
                         )
                 else:
                     # Accept directly if JSON does not include dimension metadata
@@ -614,17 +721,19 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         while not resolved_img:
             man_path = filedialog.askopenfilename(
                 title="Select screenshot",
-                filetypes=[("Image files", "*.png *.jpg *.jpeg *.webp")]
+                filetypes=[("Image files", "*.png *.jpg *.jpeg *.webp")],
             )
             if not man_path:
                 # Abort session loading
                 return
-            
+
             try:
                 with Image.open(man_path) as temp_img:
                     w, h = temp_img.width, temp_img.height
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to read selected image: {e}", parent=self)
+                messagebox.showerror(
+                    "Error", f"Failed to read selected image: {e}", parent=self
+                )
                 continue
 
             if expected_w is not None and expected_h is not None:
@@ -633,20 +742,22 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
                         "Dimension Mismatch",
                         f"Selected image dimensions ({w}x{h}) do not match "
                         f"expected ({expected_w}x{expected_h}).\n\nPlease select the correct image.",
-                        parent=self
+                        parent=self,
                     )
                     continue
 
             resolved_img = os.path.abspath(man_path)
 
         # 3. Recursive deserialization helper
-        def parse_box(box_data: dict, parent_x: int = 0, parent_y: int = 0) -> AnnotationBox:
+        def parse_box(
+            box_data: dict, parent_x: int = 0, parent_y: int = 0
+        ) -> AnnotationBox:
             b = box_data["bounds"]
             abs_x1 = b["x"] + parent_x
             abs_y1 = b["y"] + parent_y
             abs_x2 = abs_x1 + b["w"]
             abs_y2 = abs_y1 + b["h"]
-            
+
             box_obj = AnnotationBox(
                 id=box_data["id"],
                 label=box_data["label"],
@@ -655,7 +766,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
                 x2=abs_x2,
                 y2=abs_y2,
                 children=[],
-                pill_corner=box_data.get("pill_corner", "top_left")
+                pill_corner=box_data.get("pill_corner", "top_left"),
             )
             if "children" in box_data:
                 box_obj.children = [
@@ -670,7 +781,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             for comp_data in data["components"]:
                 loaded_components.append(parse_box(comp_data))
         except Exception as e:
-            messagebox.showerror("Error", f"Failed to parse annotation components: {e}", parent=self)
+            messagebox.showerror(
+                "Error", f"Failed to parse annotation components: {e}", parent=self
+            )
             return
 
         # 4. Apply new session state
@@ -682,10 +795,10 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
         # Reset navigation context
         self.controller.nav.parent_stack.clear()
-        
+
         # Re-initialize history manager to start with a clean undo/redo stack
         self.controller.history = HistoryManager(self.session)
-        
+
         # Load image and refresh UI
         self.load_session_image()
         self.sidebar.refresh_list()
@@ -803,7 +916,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
         self.file_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.file_menu.add_command(label="Open image...", command=self.open_images)
-        self.file_menu.add_command(label="Open session (JSON)...", command=self.open_session)
+        self.file_menu.add_command(
+            label="Open session (JSON)...", command=self.open_session
+        )
         self.file_menu.add_command(label="Export (Ctrl+S)", command=self.export_spec)
         self.file_menu.add_separator()
         self.file_menu.add_command(label="Quit", command=self.quit)
@@ -812,24 +927,38 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         self.edit_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.edit_menu.add_command(label="Undo (Ctrl+Z)", command=self.undo)
         self.edit_menu.add_command(label="Redo (Ctrl+Y)", command=self.redo)
-        self.edit_menu.add_command(label="Delete (Delete)", command=self.delete_selected_box)
-        self.edit_menu.add_command(label="Select All (Ctrl+A)", command=self.select_all_boxes)
-        self.edit_menu.add_command(label="Auto-Number", command=self.auto_number_components)
+        self.edit_menu.add_command(
+            label="Delete (Delete)", command=self.delete_selected_box
+        )
+        self.edit_menu.add_command(
+            label="Select All (Ctrl+A)", command=self.select_all_boxes
+        )
+        self.edit_menu.add_command(
+            label="Auto-Number", command=self.auto_number_components
+        )
         self.edit_menu.add_command(label="Cut Lines...", command=self.open_cut_editor)
-        self.edit_menu.add_command(label="Screen Info...", command=self.edit_screen_info)
+        self.edit_menu.add_command(
+            label="Screen Info...", command=self.edit_screen_info
+        )
         self.menu_bar.add_cascade(label="Edit", menu=self.edit_menu)
 
         self.view_menu = tk.Menu(self.menu_bar, tearoff=0)
         self.view_menu.add_command(label="Zoom in", command=lambda: self.do_zoom(0.1))
         self.view_menu.add_command(label="Zoom out", command=lambda: self.do_zoom(-0.1))
         self.view_menu.add_command(label="Focus Target", command=self.zoom_focus_target)
-        self.view_menu.add_command(label="Toggle labels (T)", command=self.toggle_labels_visibility)
+        self.view_menu.add_command(
+            label="Toggle labels (T)", command=self.toggle_labels_visibility
+        )
         self.menu_bar.add_cascade(label="View", menu=self.view_menu)
 
         self.nav_menu = tk.Menu(self.menu_bar, tearoff=0)
-        self.nav_menu.add_command(label="Drill into (Enter)", command=lambda: self.on_key_enter(None))
+        self.nav_menu.add_command(
+            label="Drill into (Enter)", command=lambda: self.on_key_enter(None)
+        )
         self.nav_menu.add_command(label="Go back (Escape)", command=self.drill_out)
-        self.nav_menu.add_command(label="Go to root", command=self.controller.drill_to_root)
+        self.nav_menu.add_command(
+            label="Go to root", command=self.controller.drill_to_root
+        )
         self.menu_bar.add_cascade(label="Navigate", menu=self.nav_menu)
 
         self.help_menu = tk.Menu(self.menu_bar, tearoff=0)
@@ -844,7 +973,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
     def open_cut_editor(self):
         """Opens the cut line editor dialog."""
         if not self.canvas.full_pil_img:
-            messagebox.showwarning("Warning", "Please open an image first!", parent=self)
+            messagebox.showwarning(
+                "Warning", "Please open an image first!", parent=self
+            )
             return
         dialog = CutEditorDialog(
             self,
@@ -871,8 +1002,6 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         pct = int(zoom_factor * 100)
         self.zoom_label.config(text=f"{pct}%")
 
-
-
     def show_shortcuts_help(self):
         dialog = tb.Toplevel(self)
         dialog.title("Keyboard Shortcuts")
@@ -890,7 +1019,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         frame = tb.Frame(dialog, padding=20)
         frame.pack(fill=tk.BOTH, expand=True)
 
-        tb.Label(frame, text="KEYBOARD SHORTCUTS", font=("", 11, "bold"), bootstyle="info").pack(anchor="w", pady=(0, 15))
+        tb.Label(
+            frame, text="KEYBOARD SHORTCUTS", font=("", 11, "bold"), bootstyle="info"
+        ).pack(anchor="w", pady=(0, 15))
 
         shortcuts = [
             ("V, S", "Select mode"),
@@ -914,7 +1045,15 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             row = tb.Frame(frame)
             row.pack(fill=tk.X, pady=4)
 
-            lbl_key = tb.Label(row, text=key, font=("Courier", 8, "bold"), bootstyle="inverse-info", padding=(6, 2), anchor="center", width=20)
+            lbl_key = tb.Label(
+                row,
+                text=key,
+                font=("Courier", 8, "bold"),
+                bootstyle="inverse-info",
+                padding=(6, 2),
+                anchor="center",
+                width=20,
+            )
             lbl_key.pack(side=tk.LEFT)
 
             lbl_desc = tb.Label(row, text=desc, font=("", 9), padding=(10, 0))
@@ -922,7 +1061,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
         tb.Separator(frame, orient="horizontal").pack(fill=tk.X, pady=15)
 
-        btn_close = tb.Button(frame, text="Close", command=dialog.destroy, bootstyle="secondary")
+        btn_close = tb.Button(
+            frame, text="Close", command=dialog.destroy, bootstyle="secondary"
+        )
         btn_close.pack(side=tk.BOTTOM, anchor="e")
 
         dialog.bind("<Escape>", lambda e: dialog.destroy())
@@ -932,12 +1073,11 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         dialog = ScreenInfoDialog(
             self,
             screen_name=self.session.screen_name,
-            description=self.session.description
+            description=self.session.description,
         )
         if dialog.result:
             self.controller.update_screen_info(
-                dialog.result["screen_name"],
-                dialog.result["description"]
+                dialog.result["screen_name"], dialog.result["description"]
             )
 
     def check_trigger_screen_info(self):
@@ -946,11 +1086,17 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
     def export_spec(self):
         if not self.session.original_image:
-            messagebox.showwarning("Warning", "Please open images before exporting!", parent=self)
+            messagebox.showwarning(
+                "Warning", "Please open images before exporting!", parent=self
+            )
             return
 
         if not self.session.screen_name:
-            messagebox.showwarning("Warning", "Please fill in the Screen Info before exporting!", parent=self)
+            messagebox.showwarning(
+                "Warning",
+                "Please fill in the Screen Info before exporting!",
+                parent=self,
+            )
             return
 
         overlaps = self.controller.get_all_overlaps()
@@ -958,7 +1104,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             messagebox.showerror(
                 "Export error",
                 "Cannot export: overlapping annotation regions exist. Please fix them first.",
-                parent=self
+                parent=self,
             )
             return
 
@@ -995,17 +1141,21 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         try:
             json_path, root_paths = export_session(self.session, output_dir)
             actual_dir = os.path.dirname(json_path)
-            parts_info = f"{len(root_paths)} annotated image(s)" if root_paths else "annotated images"
+            parts_info = (
+                f"{len(root_paths)} annotated image(s)"
+                if root_paths
+                else "annotated images"
+            )
             messagebox.showinfo(
                 "Success",
                 f"Exported successfully:\n- JSON: {os.path.basename(json_path)}\n- {parts_info}\n- Directory: {actual_dir}",
-                parent=self
+                parent=self,
             )
         except Exception as e:
             messagebox.showerror("Error", f"Export failed: {e}", parent=self)
 
     # Canvas select callback
-    def on_canvas_select(self, box: Optional[AnnotationBox]):
+    def on_canvas_select(self, box: AnnotationBox | None):
         pass
 
     # Layers sidebar select callback
@@ -1014,26 +1164,24 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
 
     def setup_drag_and_drop(self):
         try:
-            import tkinterdnd2.TkinterDnD
             tkinterdnd2.TkinterDnD.require(self)
 
-            import tkinterdnd2
             self.drop_target_register(tkinterdnd2.DND_FILES)
 
             # Bind the Drop event
-            self.dnd_bind('<<Drop>>', self.on_file_dropped_dnd)
+            self.dnd_bind("<<Drop>>", self.on_file_dropped_dnd)
         except Exception as e:
             print("Failed to initialize platform-agnostic Drag & Drop:", e)
 
     def on_file_dropped_dnd(self, event):
         filepath = event.data
         if filepath:
-            if filepath.startswith('{') and filepath.endswith('}'):
+            if filepath.startswith("{") and filepath.endswith("}"):
                 filepath = filepath[1:-1]
             self.on_file_dropped(filepath)
 
     def on_file_dropped(self, filepath: str):
-        if filepath.lower().endswith(('.png', '.jpg', '.jpeg', '.webp')):
+        if filepath.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
             self.session.original_image = os.path.abspath(filepath)
             self.session.components = []
             self.session.cut_lines = []

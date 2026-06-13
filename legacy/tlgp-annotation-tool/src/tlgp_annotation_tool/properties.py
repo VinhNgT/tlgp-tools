@@ -1,21 +1,17 @@
 import tkinter as tk
 from tkinter import messagebox
+
 import ttkbootstrap as tb
-from typing import Optional, List
+
+from tlgp_annotation_tool.controller import NavigationContext, SessionController
 from tlgp_annotation_tool.models import AnnotationBox
-from tlgp_annotation_tool.controller import SessionController, NavigationContext
 
 
 class CornerSelector(tk.Canvas):
     def __init__(self, parent, on_corner_selected_callback, **kwargs):
         # Create a compact square canvas with a solid border
         super().__init__(
-            parent,
-            width=64,
-            height=64,
-            highlightthickness=1,
-            bd=0,
-            **kwargs
+            parent, width=64, height=64, highlightthickness=1, bd=0, **kwargs
         )
         self.on_corner_selected = on_corner_selected_callback
         self.selected_corner = "top_left"
@@ -29,7 +25,7 @@ class CornerSelector(tk.Canvas):
             "top_left": (self.x1, self.y1),
             "top_right": (self.x2, self.y1),
             "bottom_left": (self.x1, self.y2),
-            "bottom_right": (self.x2, self.y2)
+            "bottom_right": (self.x2, self.y2),
         }
 
         self.bind("<Button-1>", self.on_click)
@@ -42,7 +38,7 @@ class CornerSelector(tk.Canvas):
             self.draw()
 
     def set_state(self, state: str):
-        self.enabled = (state != "disabled")
+        self.enabled = state != "disabled"
         self.draw()
 
     def get_colors(self):
@@ -64,16 +60,20 @@ class CornerSelector(tk.Canvas):
 
     def draw(self):
         self.delete("all")
-        
+
         primary, bg, border = self.get_colors()
 
         self.configure(bg=bg, highlightbackground=border)
 
         # Draw the virtual container dashed boundary box
         self.create_rectangle(
-            self.x1, self.y1, self.x2, self.y2,
+            self.x1,
+            self.y1,
+            self.x2,
+            self.y2,
             outline="#555555" if self.enabled else "#3a3a3a",
-            dash=(2, 2), width=1
+            dash=(2, 2),
+            width=1,
         )
 
         # Draw crosshairs
@@ -89,19 +89,29 @@ class CornerSelector(tk.Canvas):
             if self.enabled and self.selected_corner == name:
                 # Selected dot
                 self.create_oval(
-                    cx - r, cy - r, cx + r, cy + r,
-                    fill=primary, outline="#ffffff", width=1.5
+                    cx - r,
+                    cy - r,
+                    cx + r,
+                    cy + r,
+                    fill=primary,
+                    outline="#ffffff",
+                    width=1.5,
                 )
             else:
                 # Unselected or disabled dot
                 dot_fill = "#333333" if not self.enabled else "#555555"
                 dot_outline = "#444444" if not self.enabled else "#888888"
                 self.create_oval(
-                    cx - r, cy - r, cx + r, cy + r,
-                    fill=dot_fill, outline=dot_outline, width=1
+                    cx - r,
+                    cy - r,
+                    cx + r,
+                    cy + r,
+                    fill=dot_fill,
+                    outline=dot_outline,
+                    width=1,
                 )
 
-    def get_closest_corner(self, mx: int, my: int) -> Optional[str]:
+    def get_closest_corner(self, mx: int, my: int) -> str | None:
         best_corner = None
         min_dist = 18.0
         for name, (cx, cy) in self.corners.items():
@@ -132,13 +142,15 @@ class CornerSelector(tk.Canvas):
 
 
 class PropertiesPanel(tb.Frame):
-    def __init__(self, parent, controller: SessionController, on_export_callback, **kwargs):
+    def __init__(
+        self, parent, controller: SessionController, on_export_callback, **kwargs
+    ):
         super().__init__(parent, **kwargs)
         self.controller = controller
         self.session = controller.session
         self.on_export = on_export_callback
 
-        self.selected_boxes: List[AnnotationBox] = []
+        self.selected_boxes: list[AnnotationBox] = []
 
         # Build UI Sections
         self.create_layer_section()
@@ -157,12 +169,16 @@ class PropertiesPanel(tb.Frame):
         sep.pack(fill=tk.X, pady=10)
 
     def create_layer_section(self):
-        tb.Label(self, text="LAYER PROPERTIES", font=("", 9, "bold")).pack(anchor="w", pady=(0, 8))
+        tb.Label(self, text="LAYER PROPERTIES", font=("", 9, "bold")).pack(
+            anchor="w", pady=(0, 8)
+        )
 
         # Name field
         name_frame = tb.Frame(self)
         name_frame.pack(fill=tk.X, pady=3)
-        tb.Label(name_frame, text="Name:", font=("", 9), width=5, anchor="w").pack(side=tk.LEFT)
+        tb.Label(name_frame, text="Name:", font=("", 9), width=5, anchor="w").pack(
+            side=tk.LEFT
+        )
         self.entry_name = tb.Entry(name_frame, font=("", 9))
         self.entry_name.pack(fill=tk.X, expand=True)
         self.entry_name.bind("<Return>", self.save_box_name)
@@ -173,33 +189,48 @@ class PropertiesPanel(tb.Frame):
         coords_frame = tb.Frame(self)
         coords_frame.pack(fill=tk.X, pady=8)
 
-        tb.Label(coords_frame, text="X", font=("", 8, "bold"), width=3).grid(row=0, column=0, sticky="w")
-        self.lbl_x = tb.Entry(coords_frame, font=("", 9), width=10, justify="center", state="readonly")
+        tb.Label(coords_frame, text="X", font=("", 8, "bold"), width=3).grid(
+            row=0, column=0, sticky="w"
+        )
+        self.lbl_x = tb.Entry(
+            coords_frame, font=("", 9), width=10, justify="center", state="readonly"
+        )
         self.lbl_x.grid(row=0, column=1, padx=(0, 10), pady=2)
 
-        tb.Label(coords_frame, text="Y", font=("", 8, "bold"), width=3).grid(row=0, column=2, sticky="w")
-        self.lbl_y = tb.Entry(coords_frame, font=("", 9), width=10, justify="center", state="readonly")
+        tb.Label(coords_frame, text="Y", font=("", 8, "bold"), width=3).grid(
+            row=0, column=2, sticky="w"
+        )
+        self.lbl_y = tb.Entry(
+            coords_frame, font=("", 9), width=10, justify="center", state="readonly"
+        )
         self.lbl_y.grid(row=0, column=3, pady=2)
 
-        tb.Label(coords_frame, text="W", font=("", 8, "bold"), width=3).grid(row=1, column=0, sticky="w", pady=5)
-        self.lbl_w = tb.Entry(coords_frame, font=("", 9), width=10, justify="center", state="readonly")
+        tb.Label(coords_frame, text="W", font=("", 8, "bold"), width=3).grid(
+            row=1, column=0, sticky="w", pady=5
+        )
+        self.lbl_w = tb.Entry(
+            coords_frame, font=("", 9), width=10, justify="center", state="readonly"
+        )
         self.lbl_w.grid(row=1, column=1, padx=(0, 10), pady=5)
 
-        tb.Label(coords_frame, text="H", font=("", 8, "bold"), width=3).grid(row=1, column=2, sticky="w", pady=5)
-        self.lbl_h = tb.Entry(coords_frame, font=("", 9), width=10, justify="center", state="readonly")
+        tb.Label(coords_frame, text="H", font=("", 8, "bold"), width=3).grid(
+            row=1, column=2, sticky="w", pady=5
+        )
+        self.lbl_h = tb.Entry(
+            coords_frame, font=("", 9), width=10, justify="center", state="readonly"
+        )
         self.lbl_h.grid(row=1, column=3, pady=5)
 
         # Pill Corner selector
         pill_frame = tb.Frame(self)
         pill_frame.pack(fill=tk.X, pady=(5, 8))
-        tb.Label(pill_frame, text="Pill Corner:", font=("", 9), width=10, anchor="w").pack(side=tk.LEFT, pady=10)
+        tb.Label(
+            pill_frame, text="Pill Corner:", font=("", 9), width=10, anchor="w"
+        ).pack(side=tk.LEFT, pady=10)
         self.corner_selector = CornerSelector(
-            pill_frame,
-            on_corner_selected_callback=self.on_pill_corner_selected
+            pill_frame, on_corner_selected_callback=self.on_pill_corner_selected
         )
         self.corner_selector.pack(side=tk.LEFT, padx=(5, 0), pady=10)
-
-
 
     # ── Internal Helpers ───────────────────────────────────────────────
 
@@ -216,17 +247,21 @@ class PropertiesPanel(tb.Frame):
         self.focus_set()
         return "break"
 
-
-
     def _save_pending_name(self):
-        if len(self.selected_boxes) == 1 and hasattr(self, "entry_name") and self.entry_name.winfo_exists():
+        if (
+            len(self.selected_boxes) == 1
+            and hasattr(self, "entry_name")
+            and self.entry_name.winfo_exists()
+        ):
             try:
                 if str(self.entry_name["state"]) == tk.NORMAL:
                     self.save_box_name()
             except Exception:
                 pass
 
-    def _on_selection_change(self, nav: 'NavigationContext', boxes: List[AnnotationBox]):
+    def _on_selection_change(
+        self, nav: "NavigationContext", boxes: list[AnnotationBox]
+    ):
         self._save_pending_name()
         self.selected_boxes = boxes
         self.refresh_layer_display()
@@ -236,17 +271,17 @@ class PropertiesPanel(tb.Frame):
             self.entry_name.config(state=tk.NORMAL)
             self.entry_name.delete(0, tk.END)
             self.entry_name.config(state=tk.DISABLED)
-            
+
             self._set_entry_val(self.lbl_x, "-")
             self._set_entry_val(self.lbl_y, "-")
             self._set_entry_val(self.lbl_w, "-")
             self._set_entry_val(self.lbl_h, "-")
-            
+
             self.lbl_x.config(state=tk.DISABLED)
             self.lbl_y.config(state=tk.DISABLED)
             self.lbl_w.config(state=tk.DISABLED)
             self.lbl_h.config(state=tk.DISABLED)
-            
+
             # Disable selector
             self.corner_selector.set_state("disabled")
         elif len(self.selected_boxes) > 1:
@@ -254,17 +289,17 @@ class PropertiesPanel(tb.Frame):
             self.entry_name.delete(0, tk.END)
             self.entry_name.insert(0, f"{len(self.selected_boxes)} selected")
             self.entry_name.config(state=tk.DISABLED)
-            
+
             self._set_entry_val(self.lbl_x, "-")
             self._set_entry_val(self.lbl_y, "-")
             self._set_entry_val(self.lbl_w, "-")
             self._set_entry_val(self.lbl_h, "-")
-            
+
             self.lbl_x.config(state=tk.DISABLED)
             self.lbl_y.config(state=tk.DISABLED)
             self.lbl_w.config(state=tk.DISABLED)
             self.lbl_h.config(state=tk.DISABLED)
-            
+
             # Disable selector
             self.corner_selector.set_state("disabled")
         else:
@@ -305,8 +340,6 @@ class PropertiesPanel(tb.Frame):
         if event and event.keysym == "Return":
             self.focus_set()
 
-
-
     # ── Actions ────────────────────────────────────────────────────────
 
     def delete_box(self):
@@ -319,7 +352,7 @@ class PropertiesPanel(tb.Frame):
             ans = messagebox.askyesno(
                 "Confirm",
                 "One or more selected items contain children. Delete anyway?",
-                parent=self.winfo_toplevel()
+                parent=self.winfo_toplevel(),
             )
             if not ans:
                 return
@@ -336,7 +369,7 @@ class PropertiesPanel(tb.Frame):
 
     # ── Event Handlers ─────────────────────────────────────────────────
 
-    def on_coords_updated(self, box: Optional[AnnotationBox]):
+    def on_coords_updated(self, box: AnnotationBox | None):
         if len(self.selected_boxes) == 1 and self.selected_boxes[0] is box:
             self.refresh_layer_display()
         elif not box:

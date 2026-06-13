@@ -1,23 +1,28 @@
 import tkinter as tk
-from tkinter import ttk, messagebox
+from tkinter import ttk
+
 import ttkbootstrap as tb
-from typing import List, Optional, Tuple
-from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
-from tlgp_annotation_tool.controller import SessionController, NavigationContext
+
+from tlgp_annotation_tool.controller import NavigationContext, SessionController
+from tlgp_annotation_tool.models import AnnotationBox
 
 
 class ComponentSidebar(tb.Frame):
-    def __init__(self, parent, controller: SessionController, on_select_callback, **kwargs):
+    def __init__(
+        self, parent, controller: SessionController, on_select_callback, **kwargs
+    ):
         super().__init__(parent, **kwargs)
         self.controller = controller
         self.session = controller.session
         self.on_select = on_select_callback
 
-        self.selected_boxes: List[AnnotationBox] = []
-        self._drag_iids: List[str] = []
+        self.selected_boxes: list[AnnotationBox] = []
+        self._drag_iids: list[str] = []
 
         # UI Setup
-        tb.Label(self, text="LAYERS", font=("", 9, "bold")).pack(anchor="w", padx=10, pady=(10, 5))
+        tb.Label(self, text="LAYERS", font=("", 9, "bold")).pack(
+            anchor="w", padx=10, pady=(10, 5)
+        )
 
         # Scrollable Treeview
         tree_frame = tb.Frame(self)
@@ -36,7 +41,12 @@ class ComponentSidebar(tb.Frame):
                 scrollbar.grid(row=0, column=1, sticky="ns")
             scrollbar.set(lo, hi)
 
-        self.tree = ttk.Treeview(tree_frame, columns=("id", "label"), show="tree headings", yscrollcommand=yscroll_set)
+        self.tree = ttk.Treeview(
+            tree_frame,
+            columns=("id", "label"),
+            show="tree headings",
+            yscrollcommand=yscroll_set,
+        )
         self.tree.heading("#0", text="Layer Structure")
         self.tree.heading("id", text="ID")
         self.tree.heading("label", text="Name")
@@ -56,28 +66,46 @@ class ComponentSidebar(tb.Frame):
         self.tree.bind("<Double-1>", self.on_double_click)
 
         # Subscribe to controller events
-        self.controller.subscribe("add", lambda box: self.refresh_list(select_boxes=[box] if box else None))
+        self.controller.subscribe(
+            "add", lambda box: self.refresh_list(select_boxes=[box] if box else None)
+        )
         self.controller.subscribe("delete", lambda box: self.refresh_list())
         self.controller.subscribe("rename", self.on_box_renamed)
-        self.controller.subscribe("reorder", lambda box: self.refresh_list(select_boxes=self.selected_boxes))
-        self.controller.subscribe("renumber", lambda box: self.refresh_list(select_boxes=self.selected_boxes))
+        self.controller.subscribe(
+            "reorder", lambda box: self.refresh_list(select_boxes=self.selected_boxes)
+        )
+        self.controller.subscribe(
+            "renumber", lambda box: self.refresh_list(select_boxes=self.selected_boxes)
+        )
         self.controller.subscribe("undo_redo", lambda box: self.refresh_list())
-        self.controller.subscribe("coords_committed", lambda arg: self.refresh_list(select_boxes=self.selected_boxes))
+        self.controller.subscribe(
+            "coords_committed",
+            lambda arg: self.refresh_list(select_boxes=self.selected_boxes),
+        )
         self.controller.subscribe("selection_change", self._on_selection_change)
         self.controller.subscribe("navigation_change", lambda: self.refresh_list())
 
         # Visual indicators for drag-and-drop
         self._drop_indicator = tk.Frame(self.tree, height=2, bg="#0c8ce9")
-        self._drag_ghost = tk.Label(self.tree, text="", bg="#0c8ce9", fg="white", font=("", 9), padx=6, pady=3, relief="flat")
+        self._drag_ghost = tk.Label(
+            self.tree,
+            text="",
+            bg="#0c8ce9",
+            fg="white",
+            font=("", 9),
+            padx=6,
+            pady=3,
+            relief="flat",
+        )
 
     # ── IID Scheme ─────────────────────────────────────────────────────
     # Path-based: "N_{id}" for root, "N_{id}_{child_id}" for depth 2, etc.
 
-    def _build_iid(self, path_ids: List[int]) -> str:
+    def _build_iid(self, path_ids: list[int]) -> str:
         """Build a treeview IID from a list of box IDs representing the path."""
         return "N_" + "_".join(str(i) for i in path_ids)
 
-    def _parse_iid(self, iid: str) -> List[int]:
+    def _parse_iid(self, iid: str) -> list[int]:
         """Parse a treeview IID back to a list of box IDs."""
         if not iid.startswith("N_"):
             return []
@@ -87,9 +115,9 @@ class ComponentSidebar(tb.Frame):
         except ValueError:
             return []
 
-    def resolve_iid(self, iid: str) -> Tuple[List[AnnotationBox], Optional[AnnotationBox]]:
+    def resolve_iid(self, iid: str) -> tuple[list[AnnotationBox], AnnotationBox | None]:
         """Resolves a treeview IID to (ancestor_chain, box).
-        
+
         ancestor_chain: list of parent boxes from root down (not including the box itself).
         box: the resolved AnnotationBox, or None if not found.
         """
@@ -117,13 +145,15 @@ class ComponentSidebar(tb.Frame):
 
         return ancestors, box
 
-    def _find_iid_for_box(self, target_box: Optional[AnnotationBox]) -> Optional[str]:
+    def _find_iid_for_box(self, target_box: AnnotationBox | None) -> str | None:
         """Find the IID for a given box by walking the tree."""
         if not target_box:
             return None
         return self._search_box_in_list(self.session.components, target_box, [])
 
-    def _search_box_in_list(self, boxes: List[AnnotationBox], target: AnnotationBox, path: List[int]) -> Optional[str]:
+    def _search_box_in_list(
+        self, boxes: list[AnnotationBox], target: AnnotationBox, path: list[int]
+    ) -> str | None:
         for box in boxes:
             current_path = path + [box.id]
             if box is target:
@@ -135,7 +165,7 @@ class ComponentSidebar(tb.Frame):
 
     # ── Tree Population ────────────────────────────────────────────────
 
-    def refresh_list(self, select_boxes: Optional[List[AnnotationBox]] = None):
+    def refresh_list(self, select_boxes: list[AnnotationBox] | None = None):
         for item in self.tree.get_children():
             self.tree.delete(item)
 
@@ -152,8 +182,13 @@ class ComponentSidebar(tb.Frame):
         if select_boxes:
             self.select_boxes_in_tree(select_boxes)
 
-    def _insert_boxes_recursive(self, boxes: List[AnnotationBox], parent_iid: str, 
-                                 path: List[int], overlapping_boxes: set):
+    def _insert_boxes_recursive(
+        self,
+        boxes: list[AnnotationBox],
+        parent_iid: str,
+        path: list[int],
+        overlapping_boxes: set,
+    ):
         """Recursively insert boxes into the treeview."""
         sorted_boxes = sorted(boxes, key=lambda x: x.id)
         for box in sorted_boxes:
@@ -173,15 +208,17 @@ class ComponentSidebar(tb.Frame):
                 iid=iid,
                 text=f"{icon} {node_type}",
                 values=(id_str, box.label),
-                open=True
+                open=True,
             )
 
             if box.children:
-                self._insert_boxes_recursive(box.children, iid, current_path, overlapping_boxes)
+                self._insert_boxes_recursive(
+                    box.children, iid, current_path, overlapping_boxes
+                )
 
     # ── Selection ──────────────────────────────────────────────────────
 
-    def select_boxes_in_tree(self, boxes: List[AnnotationBox]):
+    def select_boxes_in_tree(self, boxes: list[AnnotationBox]):
         """Programmatically select multiple boxes in the Treeview."""
         self.selected_boxes = boxes
         self._is_programmatic_selection = True
@@ -198,7 +235,7 @@ class ComponentSidebar(tb.Frame):
         finally:
             self._is_programmatic_selection = False
 
-    def select_box_in_tree(self, box: Optional[AnnotationBox]):
+    def select_box_in_tree(self, box: AnnotationBox | None):
         self.select_boxes_in_tree([box] if box else [])
 
     def on_box_renamed(self, box: AnnotationBox):
@@ -261,11 +298,13 @@ class ComponentSidebar(tb.Frame):
         self.selected_boxes = matched_boxes
         self.controller.set_selection(matched_boxes)
 
-    def _on_selection_change(self, nav: 'NavigationContext', boxes: List[AnnotationBox]):
+    def _on_selection_change(
+        self, nav: "NavigationContext", boxes: list[AnnotationBox]
+    ):
         self.selected_boxes = boxes
         self.select_boxes_in_tree(boxes)
 
-    def get_selected_box(self) -> Optional[AnnotationBox]:
+    def get_selected_box(self) -> AnnotationBox | None:
         return self.selected_boxes[-1] if self.selected_boxes else None
 
     # ── Double-Click (Drill Into) ──────────────────────────────────────
@@ -348,10 +387,18 @@ class ComponentSidebar(tb.Frame):
                     h = bbox[3]
                     if y_rel < h / 3:
                         target_y = bbox[1]
-                        self._drop_indicator.place(x=bbox[0], y=target_y - 1, width=self.tree.winfo_width() - bbox[0] - 20)
+                        self._drop_indicator.place(
+                            x=bbox[0],
+                            y=target_y - 1,
+                            width=self.tree.winfo_width() - bbox[0] - 20,
+                        )
                     elif y_rel > 2 * h / 3:
                         target_y = bbox[1] + h
-                        self._drop_indicator.place(x=bbox[0], y=target_y - 1, width=self.tree.winfo_width() - bbox[0] - 20)
+                        self._drop_indicator.place(
+                            x=bbox[0],
+                            y=target_y - 1,
+                            width=self.tree.winfo_width() - bbox[0] - 20,
+                        )
                     else:
                         self._drop_indicator.place_forget()
                 else:
@@ -394,7 +441,7 @@ class ComponentSidebar(tb.Frame):
                         src_boxes=src_boxes,
                         tgt_parent=tgt_parent,
                         tgt_box=tgt_box,
-                        position=position
+                        position=position,
                     )
 
             sel = self.tree.selection()
@@ -426,7 +473,7 @@ class ComponentSidebar(tb.Frame):
             fg=fg,
             selectbackground=select_bg,
             selectforeground=select_fg,
-            insertbackground=fg
+            insertbackground=fg,
         )
         entry.insert(0, box.label)
         entry.select_range(0, tk.END)

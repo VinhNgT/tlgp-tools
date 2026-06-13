@@ -1,13 +1,19 @@
+import sys
+import time
 import tkinter as tk
-from PIL import Image, ImageTk, ImageDraw
 
-from typing import List, Optional, Tuple, Dict
-from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
-from tlgp_annotation_tool.controller import SessionController, NavigationContext
+from PIL import Image, ImageDraw, ImageTk
+
 from tlgp_annotation_tool.annotation_renderer import (
-    compute_pill_font_size, compute_pill_padding, compute_border_widths,
-    get_font, get_text_dimensions, get_pill_coords,
+    compute_border_widths,
+    compute_pill_font_size,
+    compute_pill_padding,
+    get_font,
+    get_pill_coords,
+    get_text_dimensions,
 )
+from tlgp_annotation_tool.controller import NavigationContext, SessionController
+from tlgp_annotation_tool.models import AnnotationBox
 
 # Visual gap (in image-space pixels) inserted between cut segments on the canvas.
 CUT_GAP_PX = 20
@@ -37,7 +43,10 @@ class AnnotationCanvas(tk.Canvas):
        - Hand cursor.
        - Dragging anywhere pans the viewport.
     """
-    def __init__(self, parent, controller: SessionController, on_select_callback, **kwargs):
+
+    def __init__(
+        self, parent, controller: SessionController, on_select_callback, **kwargs
+    ):
         kwargs.setdefault("bg", "#121212")
         super().__init__(parent, **kwargs)
         self.controller = controller
@@ -48,42 +57,42 @@ class AnnotationCanvas(tk.Canvas):
         self.zoom_factor: float = 1.0
         self._rendered_zoom_factor: float = 1.0
         self.mode: str = "select"
-        self.prev_mode_before_space: Optional[str] = None
-        self.selected_boxes: List[AnnotationBox] = []
+        self.prev_mode_before_space: str | None = None
+        self.selected_boxes: list[AnnotationBox] = []
         self.show_labels: bool = True
 
         # Drag state
-        self._drag_mouse_start_abs: Optional[Tuple[int, int]] = None
+        self._drag_mouse_start_abs: tuple[int, int] | None = None
         self._drag_start_time: float = 0.0
         self._deadzone_active: bool = False
-        self._drag_mouse_start_canvas: Tuple[int, int] = (0, 0)
-        self._drag_orig_coords: Dict[int, Tuple[AnnotationBox, int, int, int, int]] = {}
+        self._drag_mouse_start_canvas: tuple[int, int] = (0, 0)
+        self._drag_orig_coords: dict[int, tuple[AnnotationBox, int, int, int, int]] = {}
         self._drag_orig_x1: int = 0
         self._drag_orig_y1: int = 0
         self._drag_orig_x2: int = 0
         self._drag_orig_y2: int = 0
-        self.resize_handle: Optional[str] = None
+        self.resize_handle: str | None = None
         self._is_dragging: bool = False
 
         # Image refs
-        self.full_pil_img: Optional[Image.Image] = None
-        self.current_pil_img: Optional[Image.Image] = None
+        self.full_pil_img: Image.Image | None = None
+        self.current_pil_img: Image.Image | None = None
         self.tk_photo = None
         self._prev_tk_photo = None
         self.image_item_id = None
 
         # Last rendering states
-        self._last_nav_key: Optional[tuple] = None
-        self._last_pil_img: Optional[Image.Image] = None
+        self._last_nav_key: tuple | None = None
+        self._last_pil_img: Image.Image | None = None
 
         # Drill-in mask cache
-        self._mask_cached_img: Optional[Image.Image] = None
-        self._mask_cached_key: Optional[Tuple] = None
+        self._mask_cached_img: Image.Image | None = None
+        self._mask_cached_key: tuple | None = None
 
         # Cut segments cache: list of (src_y_start, src_y_end, display_y_offset)
-        self._segments: List[Tuple[int, int, int]] = []
-        self._gapped_img: Optional[Image.Image] = None
-        self._gapped_img_key: Optional[Tuple] = None
+        self._segments: list[tuple[int, int, int]] = []
+        self._gapped_img: Image.Image | None = None
+        self._gapped_img_key: tuple | None = None
 
         # Overlapping boxes list
         self.overlapping_boxes = []
@@ -101,10 +110,10 @@ class AnnotationCanvas(tk.Canvas):
 
         # Performance & Redraw Queue state
         self._is_active_interaction: bool = False
-        self._active_interaction_timer: Optional[str] = None
+        self._active_interaction_timer: str | None = None
         self._redraw_pending: bool = False
-        self._pending_center_abs: Optional[Tuple[float, float]] = None
-        self._pending_viewport_pos: Optional[Tuple[float, float]] = None
+        self._pending_center_abs: tuple[float, float] | None = None
+        self._pending_viewport_pos: tuple[float, float] | None = None
         self.scroll_x: float = 0.0
         self.scroll_y: float = 0.0
 
@@ -181,7 +190,7 @@ class AnnotationCanvas(tk.Canvas):
         self.update_view()
 
     def _composite_gapped_image(
-        self, src_img: Image.Image, segments: List[Tuple[int, int, int]]
+        self, src_img: Image.Image, segments: list[tuple[int, int, int]]
     ) -> Image.Image:
         """Create a composite image with gap strips between cut segments.
 
@@ -219,14 +228,15 @@ class AnnotationCanvas(tk.Canvas):
             x = 0
             while x < img_w:
                 x_end = min(x + dash_len, img_w)
-                draw.line([(x, gap_mid_y), (x_end, gap_mid_y)],
-                          fill=(100, 100, 100), width=2)
+                draw.line(
+                    [(x, gap_mid_y), (x_end, gap_mid_y)], fill=(100, 100, 100), width=2
+                )
                 x += dash_len + gap_len
 
         return composite
 
     def _get_pan_cursor(self, active: bool = False) -> str:
-        import sys
+
         if sys.platform == "darwin":
             return "closedhand" if active else "openhand"
         return "fleur"
@@ -242,7 +252,7 @@ class AnnotationCanvas(tk.Canvas):
             self.config(cursor="")
         self.draw_boxes()
 
-    def zoom(self, delta: float, mouse_pos: Optional[Tuple[int, int]] = None):
+    def zoom(self, delta: float, mouse_pos: tuple[int, int] | None = None):
         vw = self.winfo_width()
         vh = self.winfo_height()
 
@@ -255,8 +265,12 @@ class AnnotationCanvas(tk.Canvas):
         actual_sy = self.canvasy(0)
         is_zooming = self._redraw_pending or self._is_active_interaction
         if not is_zooming:
-            if (not hasattr(self, "scroll_x") or not hasattr(self, "scroll_y") or
-                abs(self.scroll_x - actual_sx) > 1.0 or abs(self.scroll_y - actual_sy) > 1.0):
+            if (
+                not hasattr(self, "scroll_x")
+                or not hasattr(self, "scroll_y")
+                or abs(self.scroll_x - actual_sx) > 1.0
+                or abs(self.scroll_y - actual_sy) > 1.0
+            ):
                 self.scroll_x = float(actual_sx)
                 self.scroll_y = float(actual_sy)
 
@@ -284,9 +298,15 @@ class AnnotationCanvas(tk.Canvas):
         self._rendered_zoom_factor = self.zoom_factor
 
         self._start_active_interaction()
-        self.queue_update_view(center_abs=(norm_x, norm_y), target_viewport_pos=(mx, my))
+        self.queue_update_view(
+            center_abs=(norm_x, norm_y), target_viewport_pos=(mx, my)
+        )
 
-    def queue_update_view(self, center_abs: Optional[Tuple[float, float]] = None, target_viewport_pos: Optional[Tuple[float, float]] = None):
+    def queue_update_view(
+        self,
+        center_abs: tuple[float, float] | None = None,
+        target_viewport_pos: tuple[float, float] | None = None,
+    ):
         if center_abs is not None:
             self._pending_center_abs = center_abs
         if target_viewport_pos is not None:
@@ -320,7 +340,7 @@ class AnnotationCanvas(tk.Canvas):
             self._is_active_interaction = False
             self.update_view()
 
-    def _get_viewport_center_abs(self) -> Optional[Tuple[float, float]]:
+    def _get_viewport_center_abs(self) -> tuple[float, float] | None:
         vw = self.winfo_width()
         vh = self.winfo_height()
         if vw <= 1 or vh <= 1:
@@ -328,8 +348,12 @@ class AnnotationCanvas(tk.Canvas):
 
         actual_sx = self.canvasx(0)
         actual_sy = self.canvasy(0)
-        if (hasattr(self, "scroll_x") and hasattr(self, "scroll_y") and
-            abs(self.scroll_x - actual_sx) <= 1.0 and abs(self.scroll_y - actual_sy) <= 1.0):
+        if (
+            hasattr(self, "scroll_x")
+            and hasattr(self, "scroll_y")
+            and abs(self.scroll_x - actual_sx) <= 1.0
+            and abs(self.scroll_y - actual_sy) <= 1.0
+        ):
             cx = self.scroll_x + vw / 2
             cy = self.scroll_y + vh / 2
         else:
@@ -337,9 +361,15 @@ class AnnotationCanvas(tk.Canvas):
             cy = actual_sy + vh / 2
 
         px, py = self._parent_offset()
-        return (cx / self._rendered_zoom_factor) + px, (cy / self._rendered_zoom_factor) + py
+        return (cx / self._rendered_zoom_factor) + px, (
+            cy / self._rendered_zoom_factor
+        ) + py
 
-    def update_view(self, center_abs: Optional[Tuple[float, float]] = None, target_viewport_pos: Optional[Tuple[float, float]] = None):
+    def update_view(
+        self,
+        center_abs: tuple[float, float] | None = None,
+        target_viewport_pos: tuple[float, float] | None = None,
+    ):
         if not self.full_pil_img:
             return
 
@@ -348,12 +378,15 @@ class AnnotationCanvas(tk.Canvas):
 
         nav_key = self._nav_key()
         structure_changed = (
-            nav_key != self._last_nav_key or
-            self.full_pil_img != self._last_pil_img
+            nav_key != self._last_nav_key or self.full_pil_img != self._last_pil_img
         )
 
         # Preserve the current zoom and viewport center if we are navigating within the same image
-        if center_abs is None and self._last_nav_key is not None and self.full_pil_img == self._last_pil_img:
+        if (
+            center_abs is None
+            and self._last_nav_key is not None
+            and self.full_pil_img == self._last_pil_img
+        ):
             center_abs = self._get_viewport_center_abs()
 
         self._last_nav_key = nav_key
@@ -380,9 +413,14 @@ class AnnotationCanvas(tk.Canvas):
         # Build segments and create gapped composite image when cuts are active
         self._segments = self._build_segments()
         if self._has_active_cuts() and len(self._segments) > 1:
-            cuts_key = (tuple(self.controller.session.cut_lines), id(self.current_pil_img))
+            cuts_key = (
+                tuple(self.controller.session.cut_lines),
+                id(self.current_pil_img),
+            )
             if self._gapped_img_key != cuts_key:
-                self._gapped_img = self._composite_gapped_image(self.current_pil_img, self._segments)
+                self._gapped_img = self._composite_gapped_image(
+                    self.current_pil_img, self._segments
+                )
                 self._gapped_img_key = cuts_key
             display_img = self._gapped_img
         else:
@@ -410,7 +448,11 @@ class AnnotationCanvas(tk.Canvas):
             new_cx = (norm_x - px) * self.zoom_factor
             new_cy = (norm_y - py) * self.zoom_factor
 
-            tx, ty = target_viewport_pos if target_viewport_pos is not None else (vw / 2, vh / 2)
+            tx, ty = (
+                target_viewport_pos
+                if target_viewport_pos is not None
+                else (vw / 2, vh / 2)
+            )
             new_left = new_cx - tx
             new_top = new_cy - ty
         else:
@@ -447,9 +489,14 @@ class AnnotationCanvas(tk.Canvas):
 
         new_crop = (crop_x1, crop_y1, crop_x2, crop_y2)
 
-        if (hasattr(self, "_rendered_crop") and self._rendered_crop == new_crop and
-            hasattr(self, "_resized_image_zoom_factor") and self._resized_image_zoom_factor == self.zoom_factor and
-            self.tk_photo is not None and not structure_changed):
+        if (
+            hasattr(self, "_rendered_crop")
+            and self._rendered_crop == new_crop
+            and hasattr(self, "_resized_image_zoom_factor")
+            and self._resized_image_zoom_factor == self.zoom_factor
+            and self.tk_photo is not None
+            and not structure_changed
+        ):
             img_cx = (crop_x1 - px) * self.zoom_factor
             img_cy = (crop_y1 - py) * self.zoom_factor
         else:
@@ -463,13 +510,19 @@ class AnnotationCanvas(tk.Canvas):
             w_crop = max(1, round((crop_x2 - crop_x1) * self.zoom_factor))
             h_crop = max(1, round((crop_y2 - crop_y1) * self.zoom_factor))
 
-            resampler = Image.Resampling.BILINEAR if self.zoom_factor > 1.0 else Image.Resampling.LANCZOS
+            resampler = (
+                Image.Resampling.BILINEAR
+                if self.zoom_factor > 1.0
+                else Image.Resampling.LANCZOS
+            )
             resized = cropped_img.resize((w_crop, h_crop), resampler)
             self._prev_tk_photo = self.tk_photo
             self.tk_photo = ImageTk.PhotoImage(resized)
 
         if self.image_item_id is None:
-            self.image_item_id = self.create_image(img_cx, img_cy, anchor="nw", image=self.tk_photo)
+            self.image_item_id = self.create_image(
+                img_cx, img_cy, anchor="nw", image=self.tk_photo
+            )
         else:
             self.itemconfig(self.image_item_id, image=self.tk_photo)
             self.coords(self.image_item_id, img_cx, img_cy)
@@ -497,7 +550,9 @@ class AnnotationCanvas(tk.Canvas):
         self._last_vw = self.winfo_width()
         self._last_vh = self.winfo_height()
 
-    def get_center_abs_for_size(self, vw: float, vh: float) -> Optional[Tuple[float, float]]:
+    def get_center_abs_for_size(
+        self, vw: float, vh: float
+    ) -> tuple[float, float] | None:
         if not self.full_pil_img:
             return None
         if vw <= 1 or vh <= 1:
@@ -518,12 +573,17 @@ class AnnotationCanvas(tk.Canvas):
         new_vw = event.width
         new_vh = event.height
 
-        if self._last_vw and self._last_vh and (self._last_vw != new_vw or self._last_vh != new_vh):
-            import time
+        if (
+            self._last_vw
+            and self._last_vh
+            and (self._last_vw != new_vw or self._last_vh != new_vh)
+        ):
             now = time.time()
 
             if not self._resize_anchor or (now - self._last_resize_time > 0.5):
-                self._resize_anchor = self.get_center_abs_for_size(self._last_vw, self._last_vh)
+                self._resize_anchor = self.get_center_abs_for_size(
+                    self._last_vw, self._last_vh
+                )
 
             self._last_resize_time = now
 
@@ -535,19 +595,21 @@ class AnnotationCanvas(tk.Canvas):
 
     # ── Coordinate Helpers ─────────────────────────────────────────────
 
-    def _parent_offset(self) -> Tuple[int, int]:
+    def _parent_offset(self) -> tuple[int, int]:
         return 0, 0
 
-    def _boundary(self) -> Tuple[int, int, int, int]:
+    def _boundary(self) -> tuple[int, int, int, int]:
         if self.full_pil_img:
-            return self.controller.get_boundary(self.full_pil_img.width, self.full_pil_img.height)
+            return self.controller.get_boundary(
+                self.full_pil_img.width, self.full_pil_img.height
+            )
         return 0, 0, 99999, 99999
 
     def _has_active_cuts(self) -> bool:
         """Returns True if there are cut lines."""
         return len(self.controller.session.cut_lines) > 0
 
-    def _build_segments(self) -> List[Tuple[int, int, int]]:
+    def _build_segments(self) -> list[tuple[int, int, int]]:
         """Build segment list: [(src_y_start, src_y_end, display_y_offset), ...].
 
         Each segment's display_y_offset is the cumulative gap pixels above it.
@@ -583,7 +645,7 @@ class AnnotationCanvas(tk.Canvas):
         """
         if not self._segments or len(self._segments) <= 1:
             return 0
-        for src_start, src_end, offset in self._segments:
+        for _src_start, src_end, offset in self._segments:
             if abs_y < src_end:
                 return offset
         # Past the last segment — use last offset
@@ -594,14 +656,14 @@ class AnnotationCanvas(tk.Canvas):
         if not self._segments or len(self._segments) <= 1:
             return display_y
         for src_start, src_end, offset in self._segments:
-            disp_start = src_start + offset
+            src_start + offset
             disp_end = src_end + offset
             if display_y < disp_end:
                 return display_y - offset
         # Past all segments — use last offset
         return display_y - self._segments[-1][2]
 
-    def to_canvas(self, abs_x: int, abs_y: int) -> Tuple[float, float]:
+    def to_canvas(self, abs_x: int, abs_y: int) -> tuple[float, float]:
         """Converts absolute image coordinates to canvas coordinates.
 
         When cuts are active at root depth, the Y coordinate is shifted
@@ -609,10 +671,12 @@ class AnnotationCanvas(tk.Canvas):
         """
         px, py = self._parent_offset()
         gap_y = self._gap_offset_for_y(abs_y) if self._has_active_cuts() else 0
-        return ((abs_x - px) * self._rendered_zoom_factor,
-                (abs_y + gap_y - py) * self._rendered_zoom_factor)
+        return (
+            (abs_x - px) * self._rendered_zoom_factor,
+            (abs_y + gap_y - py) * self._rendered_zoom_factor,
+        )
 
-    def to_abs(self, cx: float, cy: float) -> Tuple[int, int]:
+    def to_abs(self, cx: float, cy: float) -> tuple[int, int]:
         """Converts canvas coordinates to absolute image coordinates.
 
         When cuts are active at root depth, the Y coordinate is unshifted
@@ -628,7 +692,7 @@ class AnnotationCanvas(tk.Canvas):
     def _clamp(self, v: int, lo: int, hi: int) -> int:
         return max(lo, min(hi, v))
 
-    def _get_segment_y_bounds(self, abs_y: int) -> Tuple[int, int]:
+    def _get_segment_y_bounds(self, abs_y: int) -> tuple[int, int]:
         """Returns (seg_top, seg_bottom) for the segment containing abs_y.
 
         Only meaningful at root depth when cuts are active. If no cuts,
@@ -654,7 +718,7 @@ class AnnotationCanvas(tk.Canvas):
 
     # ── Box Accessors ──────────────────────────────────────────────────
 
-    def _active_boxes(self) -> List[AnnotationBox]:
+    def _active_boxes(self) -> list[AnnotationBox]:
         return self.controller.active_list()
 
     def set_overlapping_boxes(self, boxes: list):
@@ -697,7 +761,9 @@ class AnnotationCanvas(tk.Canvas):
             cx1, cy1 = self.to_canvas(box.left, box.top)
             cx2, cy2 = self.to_canvas(box.right, box.bottom)
 
-            self.create_rectangle(cx1, cy1, cx2, cy2, outline=color, width=lw, tags="ann")
+            self.create_rectangle(
+                cx1, cy1, cx2, cy2, outline=color, width=lw, tags="ann"
+            )
 
             # Number pill — uses the shared annotation_renderer for sizing so that
             # the canvas preview matches the exported images exactly.
@@ -712,20 +778,47 @@ class AnnotationCanvas(tk.Canvas):
             # Scale the absolute pill dimensions by the canvas zoom factor for display
             pill_w = max(4, round((tw + pad_x) * self._rendered_zoom_factor))
             pill_h = max(4, round((th + pad_y) * self._rendered_zoom_factor))
-            canvas_font_size = max(4, min(72, round(abs_font_size * self._rendered_zoom_factor)))
+            canvas_font_size = max(
+                4, min(72, round(abs_font_size * self._rendered_zoom_factor))
+            )
 
             pill_corner = getattr(box, "pill_corner", "top_left")
-            pill_x, pill_y = get_pill_coords(cx1, cy1, cx2, cy2, pill_w, pill_h, pill_corner)
-            pill_outline_w = max(1, round(abs_pill_outline * self._rendered_zoom_factor))
-            self.create_rectangle(pill_x, pill_y, pill_x + pill_w, pill_y + pill_h,
-                                  fill="white", outline=color, width=pill_outline_w, tags="ann")
-            self.create_text(pill_x + (pill_w / 2), pill_y + (pill_h / 2), text=num, fill=color,
-                             font=("Arial", canvas_font_size, "bold"), tags="ann")
+            pill_x, pill_y = get_pill_coords(
+                cx1, cy1, cx2, cy2, pill_w, pill_h, pill_corner
+            )
+            pill_outline_w = max(
+                1, round(abs_pill_outline * self._rendered_zoom_factor)
+            )
+            self.create_rectangle(
+                pill_x,
+                pill_y,
+                pill_x + pill_w,
+                pill_y + pill_h,
+                fill="white",
+                outline=color,
+                width=pill_outline_w,
+                tags="ann",
+            )
+            self.create_text(
+                pill_x + (pill_w / 2),
+                pill_y + (pill_h / 2),
+                text=num,
+                fill=color,
+                font=("Arial", canvas_font_size, "bold"),
+                tags="ann",
+            )
 
             # Box text label below the box (toggled by 'T' key)
             if self.show_labels and box.label:
-                self.create_text(cx1, cy2 + 4, text=box.label, anchor="nw",
-                                 fill=color, font=("", 9), tags="ann")
+                self.create_text(
+                    cx1,
+                    cy2 + 4,
+                    text=box.label,
+                    anchor="nw",
+                    fill=color,
+                    font=("", 9),
+                    tags="ann",
+                )
 
         if len(self.selected_boxes) == 1:
             self._draw_handles(self.selected_boxes[0])
@@ -738,24 +831,44 @@ class AnnotationCanvas(tk.Canvas):
         mx, my = (cx1 + cx2) / 2, (cy1 + cy2) / 2
         hs = 5
 
-        for hx, hy in [(cx1, cy1), (mx, cy1), (cx2, cy1),
-                        (cx1, my),             (cx2, my),
-                        (cx1, cy2), (mx, cy2), (cx2, cy2)]:
-            self.create_rectangle(hx - hs, hy - hs, hx + hs, hy + hs,
-                                  fill="white", outline="#0c8ce9", width=1.5, tags="ann")
+        for hx, hy in [
+            (cx1, cy1),
+            (mx, cy1),
+            (cx2, cy1),
+            (cx1, my),
+            (cx2, my),
+            (cx1, cy2),
+            (mx, cy2),
+            (cx2, cy2),
+        ]:
+            self.create_rectangle(
+                hx - hs,
+                hy - hs,
+                hx + hs,
+                hy + hs,
+                fill="white",
+                outline="#0c8ce9",
+                width=1.5,
+                tags="ann",
+            )
 
-    def _handle_positions(self, box: AnnotationBox) -> Dict[str, Tuple[float, float]]:
+    def _handle_positions(self, box: AnnotationBox) -> dict[str, tuple[float, float]]:
         cx1, cy1 = self.to_canvas(box.left, box.top)
         cx2, cy2 = self.to_canvas(box.right, box.bottom)
         mx, my = (cx1 + cx2) / 2, (cy1 + cy2) / 2
 
         return {
-            "tl": (cx1, cy1), "tm": (mx, cy1), "tr": (cx2, cy1),
-            "ml": (cx1, my),                    "mr": (cx2, my),
-            "bl": (cx1, cy2), "bm": (mx, cy2), "br": (cx2, cy2),
+            "tl": (cx1, cy1),
+            "tm": (mx, cy1),
+            "tr": (cx2, cy1),
+            "ml": (cx1, my),
+            "mr": (cx2, my),
+            "bl": (cx1, cy2),
+            "bm": (mx, cy2),
+            "br": (cx2, cy2),
         }
 
-    def _hit_handle(self, cx: float, cy: float) -> Optional[str]:
+    def _hit_handle(self, cx: float, cy: float) -> str | None:
         if len(self.selected_boxes) != 1:
             return None
         box = self.selected_boxes[0]
@@ -764,7 +877,7 @@ class AnnotationCanvas(tk.Canvas):
                 return name
         return None
 
-    def _hit_box(self, cx: float, cy: float) -> Optional[AnnotationBox]:
+    def _hit_box(self, cx: float, cy: float) -> AnnotationBox | None:
         for box in reversed(self._active_boxes()):
             bx1, by1 = self.to_canvas(box.left, box.top)
             bx2, by2 = self.to_canvas(box.right, box.bottom)
@@ -772,7 +885,7 @@ class AnnotationCanvas(tk.Canvas):
                 return box
         return None
 
-    def _get_all_hit_boxes(self, cx: float, cy: float) -> List[AnnotationBox]:
+    def _get_all_hit_boxes(self, cx: float, cy: float) -> list[AnnotationBox]:
         hits = []
         for box in reversed(self._active_boxes()):
             bx1, by1 = self.to_canvas(box.left, box.top)
@@ -793,7 +906,6 @@ class AnnotationCanvas(tk.Canvas):
             self._start_pan_event(event)
             return
 
-        import time
         now = time.time()
 
         is_multi = (event.state & 0x0001) or (event.state & 0x0004)
@@ -801,10 +913,13 @@ class AnnotationCanvas(tk.Canvas):
         hit_boxes_at_click = self._get_all_hit_boxes(cx, cy)
         primary_sel = self.selected_boxes[-1] if self.selected_boxes else None
 
-        if (now - self._last_click_time < 0.5 and
-            abs(cx - self._last_click_cx) < 15 and
-            abs(cy - self._last_click_cy) < 15 and
-            primary_sel and primary_sel in hit_boxes_at_click):
+        if (
+            now - self._last_click_time < 0.5
+            and abs(cx - self._last_click_cx) < 15
+            and abs(cy - self._last_click_cy) < 15
+            and primary_sel
+            and primary_sel in hit_boxes_at_click
+        ):
             self._click_sequence_count += 1
         else:
             self._click_sequence_count = 1
@@ -814,7 +929,11 @@ class AnnotationCanvas(tk.Canvas):
         self._last_click_cx = cx
         self._last_click_cy = cy
 
-        if (self._click_sequence_count % 2 == 0) and self.mode == "select" and not is_multi:
+        if (
+            (self._click_sequence_count % 2 == 0)
+            and self.mode == "select"
+            and not is_multi
+        ):
             handle = self._hit_handle(cx, cy)
             if not handle:
                 if self._cycle_boxes is None:
@@ -827,7 +946,9 @@ class AnnotationCanvas(tk.Canvas):
                             self._last_cycle_index = 0
 
                 if self._cycle_boxes is not None:
-                    self._last_cycle_index = (self._last_cycle_index + 1) % len(self._cycle_boxes)
+                    self._last_cycle_index = (self._last_cycle_index + 1) % len(
+                        self._cycle_boxes
+                    )
                     new_box = self._cycle_boxes[self._last_cycle_index]
                     self.controller.set_selection([new_box])
                     self._begin_move(new_box, cx, cy, event)
@@ -867,15 +988,17 @@ class AnnotationCanvas(tk.Canvas):
                 self.controller.set_selection([])
             self.draw_start_x = cx
             self.draw_start_y = cy
-            self.temp_rect_id = self.create_rectangle(cx, cy, cx, cy,
-                                                       outline="#0c8ce9", width=1.5, dash=(4, 4))
+            self.temp_rect_id = self.create_rectangle(
+                cx, cy, cx, cy, outline="#0c8ce9", width=1.5, dash=(4, 4)
+            )
             return
 
         if self.mode == "draw":
             self.draw_start_x = cx
             self.draw_start_y = cy
-            self.temp_rect_id = self.create_rectangle(cx, cy, cx, cy,
-                                                       outline="#0c8ce9", width=2, dash=(4, 4))
+            self.temp_rect_id = self.create_rectangle(
+                cx, cy, cx, cy, outline="#0c8ce9", width=2, dash=(4, 4)
+            )
 
     def _begin_resize(self, handle: str, event=None):
         self.resize_handle = handle
@@ -888,7 +1011,6 @@ class AnnotationCanvas(tk.Canvas):
         hx, hy = self._handle_positions(box)[handle]
         self._drag_mouse_start_abs = self.to_abs(hx, hy)
         if event:
-            import time
             self._drag_start_time = time.time()
             self._deadzone_active = False
             self._drag_mouse_start_canvas = (event.x, event.y)
@@ -909,7 +1031,6 @@ class AnnotationCanvas(tk.Canvas):
         self._drag_orig_y2 = primary.y2
 
         if event:
-            import time
             self._drag_start_time = time.time()
             self._deadzone_active = True
             self._drag_mouse_start_canvas = (event.x, event.y)
@@ -945,7 +1066,6 @@ class AnnotationCanvas(tk.Canvas):
 
         if self.mode == "select" and self._is_dragging and self.selected_boxes:
             if self._deadzone_active:
-                import time
                 elapsed = time.time() - self._drag_start_time
                 dx = event.x - self._drag_mouse_start_canvas[0]
                 dy = event.y - self._drag_mouse_start_canvas[1]
@@ -976,10 +1096,14 @@ class AnnotationCanvas(tk.Canvas):
         h = self.resize_handle
 
         nx1, ny1, nx2, ny2 = ox1, oy1, ox2, oy2
-        if "l" in h: nx1 = ox1 + dx
-        if "r" in h: nx2 = ox2 + dx
-        if "t" in h: ny1 = oy1 + dy
-        if "b" in h: ny2 = oy2 + dy
+        if "l" in h:
+            nx1 = ox1 + dx
+        if "r" in h:
+            nx2 = ox2 + dx
+        if "t" in h:
+            ny1 = oy1 + dy
+        if "b" in h:
+            ny2 = oy2 + dy
 
         nx1 = self._clamp(nx1, bx1, bx2)
         ny1 = self._clamp(ny1, by1, by2)
@@ -992,14 +1116,14 @@ class AnnotationCanvas(tk.Canvas):
         ny2 = self._clamp(ny2, seg_top, seg_bot)
 
         self.controller.update_box_coords(
-            box,
-            min(nx1, nx2), min(ny1, ny2),
-            max(nx1, nx2), max(ny1, ny2)
+            box, min(nx1, nx2), min(ny1, ny2), max(nx1, nx2), max(ny1, ny2)
         )
 
-    def _apply_move_multiple(self, dx: int, dy: int, bx1: int, by1: int, bx2: int, by2: int):
+    def _apply_move_multiple(
+        self, dx: int, dy: int, bx1: int, by1: int, bx2: int, by2: int
+    ):
         coords_list = []
-        for bid, (box, ox1, oy1, ox2, oy2) in self._drag_orig_coords.items():
+        for _bid, (box, ox1, oy1, ox2, oy2) in self._drag_orig_coords.items():
             w = ox2 - ox1
             h = oy2 - oy1
 
@@ -1013,26 +1137,32 @@ class AnnotationCanvas(tk.Canvas):
 
             if left < bx1:
                 shift = bx1 - left
-                nx1 += shift; nx2 += shift
+                nx1 += shift
+                nx2 += shift
             elif right > bx2:
                 shift = bx2 - right
-                nx1 += shift; nx2 += shift
+                nx1 += shift
+                nx2 += shift
             if top < by1:
                 shift = by1 - top
-                ny1 += shift; ny2 += shift
+                ny1 += shift
+                ny2 += shift
             elif bottom > by2:
                 shift = by2 - bottom
-                ny1 += shift; ny2 += shift
+                ny1 += shift
+                ny2 += shift
 
             # Clamp to cut segment boundary (based on original position)
             seg_top, seg_bot = self._get_segment_y_bounds(oy1)
             top2, bottom2 = min(ny1, ny2), max(ny1, ny2)
             if top2 < seg_top:
                 shift = seg_top - top2
-                ny1 += shift; ny2 += shift
+                ny1 += shift
+                ny2 += shift
             elif bottom2 > seg_bot:
                 shift = seg_bot - bottom2
-                ny1 += shift; ny2 += shift
+                ny1 += shift
+                ny2 += shift
 
             coords_list.append((box, (nx1, ny1, nx2, ny2)))
 
@@ -1062,8 +1192,12 @@ class AnnotationCanvas(tk.Canvas):
                 if (right - left) > 3 or (bot - top_) > 3:
                     intersected = []
                     for box in self._active_boxes():
-                        if (box.left < right and box.right > left and
-                            box.top < bot and box.bottom > top_):
+                        if (
+                            box.left < right
+                            and box.right > left
+                            and box.top < bot
+                            and box.bottom > top_
+                        ):
                             intersected.append(box)
 
                     is_multi = (event.state & 0x0001) or (event.state & 0x0004)
@@ -1081,8 +1215,12 @@ class AnnotationCanvas(tk.Canvas):
                 for box in self.selected_boxes:
                     if id(box) in self._drag_orig_coords:
                         _, ox1, oy1, ox2, oy2 = self._drag_orig_coords[id(box)]
-                        if (box.x1 != ox1 or box.y1 != oy1 or
-                            box.x2 != ox2 or box.y2 != oy2):
+                        if (
+                            box.x1 != ox1
+                            or box.y1 != oy1
+                            or box.x2 != ox2
+                            or box.y2 != oy2
+                        ):
                             coords_changed = True
                             break
 
@@ -1125,7 +1263,10 @@ class AnnotationCanvas(tk.Canvas):
                     new_box = AnnotationBox(
                         id=new_id,
                         label=default_label,
-                        x1=left, y1=top_, x2=right, y2=bot
+                        x1=left,
+                        y1=top_,
+                        x2=right,
+                        y2=bot,
                     )
                     self.controller.add_box(new_box)
 
@@ -1147,23 +1288,34 @@ class AnnotationCanvas(tk.Canvas):
         cx = self.canvasx(event.x)
         cy = self.canvasy(event.y)
 
-        if self.mode == "select" and len(self.selected_boxes) == 1 and not self._is_dragging:
+        if (
+            self.mode == "select"
+            and len(self.selected_boxes) == 1
+            and not self._is_dragging
+        ):
             handle = self._hit_handle(cx, cy)
             if handle:
-                import sys
                 if sys.platform == "darwin":
                     cursors = {
-                        "tl": "resizetopleft",     "br": "resizebottomright",
-                        "tr": "resizetopright",    "bl": "resizebottomleft",
-                        "tm": "resizeupdown",      "bm": "resizeupdown",
-                        "ml": "resizeleftright",   "mr": "resizeleftright",
+                        "tl": "resizetopleft",
+                        "br": "resizebottomright",
+                        "tr": "resizetopright",
+                        "bl": "resizebottomleft",
+                        "tm": "resizeupdown",
+                        "bm": "resizeupdown",
+                        "ml": "resizeleftright",
+                        "mr": "resizeleftright",
                     }
                 else:
                     cursors = {
-                        "tl": "size_nw_se", "br": "size_nw_se",
-                        "tr": "size_ne_sw", "bl": "size_ne_sw",
-                        "tm": "size_ns",    "bm": "size_ns",
-                        "ml": "size_we",    "mr": "size_we",
+                        "tl": "size_nw_se",
+                        "br": "size_nw_se",
+                        "tr": "size_ne_sw",
+                        "bl": "size_ne_sw",
+                        "tm": "size_ns",
+                        "bm": "size_ns",
+                        "ml": "size_we",
+                        "mr": "size_we",
                     }
                 self.config(cursor=cursors.get(handle, ""))
                 return
@@ -1253,7 +1405,9 @@ class AnnotationCanvas(tk.Canvas):
         self._invalidate_gapped_cache()
         self.update_view()
 
-    def _on_selection_change(self, nav: 'NavigationContext', boxes: List[AnnotationBox]):
+    def _on_selection_change(
+        self, nav: "NavigationContext", boxes: list[AnnotationBox]
+    ):
         self.selected_boxes = boxes
         self.draw_boxes()
 
@@ -1304,18 +1458,22 @@ class AnnotationCanvas(tk.Canvas):
             elif bottom > by2:
                 shift_y = by2 - bottom
 
-            nx1 += shift_x; nx2 += shift_x
-            ny1 += shift_y; ny2 += shift_y
+            nx1 += shift_x
+            nx2 += shift_x
+            ny1 += shift_y
+            ny2 += shift_y
 
             # Clamp to cut segment boundary
             seg_top, seg_bot = self._get_segment_y_bounds(oy1)
             top2, bottom2 = min(ny1, ny2), max(ny1, ny2)
             if top2 < seg_top:
                 shift = seg_top - top2
-                ny1 += shift; ny2 += shift
+                ny1 += shift
+                ny2 += shift
             elif bottom2 > seg_bot:
                 shift = seg_bot - bottom2
-                ny1 += shift; ny2 += shift
+                ny1 += shift
+                ny2 += shift
 
             coords_list.append((box, (nx1, ny1, nx2, ny2)))
 
@@ -1332,24 +1490,21 @@ class AnnotationCanvas(tk.Canvas):
         if clicked:
             self.context_menu.add_command(
                 label=f"Drill Into '{clicked.label}'",
-                command=lambda: self.controller.drill_into(clicked)
+                command=lambda: self.controller.drill_into(clicked),
             )
             self.context_menu.add_separator()
 
         if self.controller.nav.depth > 0:
             self.context_menu.add_command(
-                label="Drill Out (Go Back)",
-                command=self.controller.drill_out
+                label="Drill Out (Go Back)", command=self.controller.drill_out
             )
             self.context_menu.add_separator()
 
         self.context_menu.add_command(
-            label="Focus Target",
-            command=self.zoom_focus_target
+            label="Focus Target", command=self.zoom_focus_target
         )
         self.context_menu.add_command(
-            label="Toggle Labels (T)",
-            command=self.toggle_labels_visibility
+            label="Toggle Labels (T)", command=self.toggle_labels_visibility
         )
 
         self.context_menu.post(event.x_root, event.y_root)

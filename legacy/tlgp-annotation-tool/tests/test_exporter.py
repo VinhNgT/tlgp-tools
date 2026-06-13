@@ -2,16 +2,12 @@
 
 from __future__ import annotations
 
-import io
 import json
 import os
 
-import pytest
 from PIL import Image as PILImage
-
-from tlgp_annotation_tool.exporter import export_session, _annotate_image_files
+from tlgp_annotation_tool.exporter import _annotate_image_files, export_session
 from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
-
 
 # ============================================================
 # Helpers
@@ -83,7 +79,11 @@ class TestAnnotateImageFiles:
 
     def test_multiple_roots(self):
         comp_dicts = [
-            {"id": 1, "label": "A", "children": [{"id": 1, "label": "A1", "bounds": {}}]},
+            {
+                "id": 1,
+                "label": "A",
+                "children": [{"id": 1, "label": "A1", "bounds": {}}],
+            },
             {"id": 2, "label": "B", "bounds": {}},
         ]
         _annotate_image_files(comp_dicts, "S")
@@ -100,17 +100,24 @@ class TestExportSession:
     def test_basic_export_has_image_files(self, tmp_path):
         img_path = _make_test_image(tmp_path)
         components = [
-            AnnotationBox(id=1, label="Header", x1=0, y1=0, x2=200, y2=100,
-                          children=[
-                              AnnotationBox(id=1, label="Back", x1=10, y1=10, x2=50, y2=50),
-                          ]),
+            AnnotationBox(
+                id=1,
+                label="Header",
+                x1=0,
+                y1=0,
+                x2=200,
+                y2=100,
+                children=[
+                    AnnotationBox(id=1, label="Back", x1=10, y1=10, x2=50, y2=50),
+                ],
+            ),
             AnnotationBox(id=2, label="Banner", x1=0, y1=100, x2=200, y2=200),
         ]
         session = _make_session(img_path, components)
 
         json_path, root_paths = export_session(session, str(tmp_path))
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # Root imageFiles
@@ -128,13 +135,16 @@ class TestExportSession:
 
     def test_no_segments_without_cuts(self, tmp_path):
         img_path = _make_test_image(tmp_path)
-        session = _make_session(img_path, [
-            AnnotationBox(id=1, label="A", x1=0, y1=0, x2=200, y2=200),
-        ])
+        session = _make_session(
+            img_path,
+            [
+                AnnotationBox(id=1, label="A", x1=0, y1=0, x2=200, y2=200),
+            ],
+        )
 
         json_path, _ = export_session(session, str(tmp_path))
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         assert "segments" not in data
@@ -150,7 +160,7 @@ class TestExportSession:
 
         json_path, root_paths = export_session(session, str(tmp_path))
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # Should have segments
@@ -177,29 +187,39 @@ class TestExportSession:
         """Verify that all image files referenced in JSON actually exist."""
         img_path = _make_test_image(tmp_path)
         components = [
-            AnnotationBox(id=1, label="A", x1=0, y1=0, x2=200, y2=200,
-                          children=[
-                              AnnotationBox(id=1, label="A1", x1=10, y1=10, x2=100, y2=100),
-                          ]),
+            AnnotationBox(
+                id=1,
+                label="A",
+                x1=0,
+                y1=0,
+                x2=200,
+                y2=200,
+                children=[
+                    AnnotationBox(id=1, label="A1", x1=10, y1=10, x2=100, y2=100),
+                ],
+            ),
         ]
         session = _make_session(img_path, components)
 
         json_path, _ = export_session(session, str(tmp_path))
         export_dir = os.path.dirname(json_path)
 
-        with open(json_path, "r", encoding="utf-8") as f:
+        with open(json_path, encoding="utf-8") as f:
             data = json.load(f)
 
         # All root imageFiles must exist on disk
         for img_file in data["imageFiles"]:
-            assert os.path.exists(os.path.join(export_dir, img_file)), f"Missing: {img_file}"
+            assert os.path.exists(os.path.join(export_dir, img_file)), (
+                f"Missing: {img_file}"
+            )
 
         # All component imageFiles must exist on disk
         def check_image_files(comps):
             for comp in comps:
                 if comp.get("imageFile"):
-                    assert os.path.exists(os.path.join(export_dir, comp["imageFile"])), \
-                        f"Missing: {comp['imageFile']}"
+                    assert os.path.exists(
+                        os.path.join(export_dir, comp["imageFile"])
+                    ), f"Missing: {comp['imageFile']}"
                 if "children" in comp:
                     check_image_files(comp["children"])
 

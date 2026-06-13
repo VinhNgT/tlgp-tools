@@ -1,12 +1,9 @@
 """Tests for Pydantic models — validation, defaults, and image resolution."""
 
-import pytest
 import json
-import tempfile
 from pathlib import Path
 
-from pydantic import ValidationError
-
+import pytest
 from doc_generator.models import (
     AnalysisData,
     Api,
@@ -18,7 +15,7 @@ from doc_generator.models import (
     Screen,
     SubDto,
 )
-
+from pydantic import ValidationError
 
 # ── ChildElement ──────────────────────────────────────────────────────
 
@@ -65,7 +62,8 @@ class TestComponent:
 
     def test_with_children_and_interactions(self):
         c = Component(
-            id=1, label="Header",
+            id=1,
+            label="Header",
             children=[ChildElement(stt=1, label="Back", controlType="Icon")],
             interactions=[Interaction(action="Click", reaction="Go back")],
         )
@@ -89,9 +87,12 @@ class TestApiParam:
 
     def test_full_param(self):
         p = ApiParam(
-            name="page", meaning="Page number",
-            required="Có", dataType="int",
-            limit="1-100", defaultValue="1",
+            name="page",
+            meaning="Page number",
+            required="Có",
+            dataType="int",
+            limit="1-100",
+            defaultValue="1",
         )
         assert p.limit == "1-100"
 
@@ -108,11 +109,18 @@ class TestApi:
 
     def test_with_sub_dtos(self):
         a = Api(
-            number=1, method="GET", title="Detail", url="/api/detail",
+            number=1,
+            method="GET",
+            title="Detail",
+            url="/api/detail",
             subDtos=[
-                SubDto(name="PriceTiersDTO", fieldRef="price_tiers", fields=[
-                    ApiParam(name="min_qty", dataType="int"),
-                ]),
+                SubDto(
+                    name="PriceTiersDTO",
+                    fieldRef="price_tiers",
+                    fields=[
+                        ApiParam(name="min_qty", dataType="int"),
+                    ],
+                ),
             ],
         )
         assert len(a.subDtos) == 1
@@ -120,7 +128,10 @@ class TestApi:
 
     def test_request_body_type(self):
         a = Api(
-            number=1, method="POST", title="Favorite", url="/api/fav",
+            number=1,
+            method="POST",
+            title="Favorite",
+            url="/api/fav",
             requestBodyType="FavoriteProductRequestDTO",
         )
         assert a.requestBodyType == "FavoriteProductRequestDTO"
@@ -131,7 +142,10 @@ class TestApi:
 
     def test_free_text_descriptions(self):
         a = Api(
-            number=3, method="GET", title="Cart count", url="/api/cart/count",
+            number=3,
+            method="GET",
+            title="Cart count",
+            url="/api/cart/count",
             requestDescription="Không có tham số",
             responseType="int",
             responseDescription="Tổng số items trong giỏ hàng",
@@ -266,9 +280,13 @@ class TestJsonRoundTrip:
             exportDir=str(tmp_path),
             screen=Screen(name="Cart"),
             components=[
-                Component(id=1, label="Header", children=[
-                    ChildElement(stt=1, label="Back", controlType="Icon"),
-                ]),
+                Component(
+                    id=1,
+                    label="Header",
+                    children=[
+                        ChildElement(stt=1, label="Back", controlType="Icon"),
+                    ],
+                ),
             ],
             apis=[
                 Api(number=1, method="POST", title="Add to cart", url="/api/cart"),

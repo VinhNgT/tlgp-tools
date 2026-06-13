@@ -1,11 +1,11 @@
 from .core import (
     Bounds,
+    Component,
+    ImageInfo,
+    ScreenInfo,
     Style,
     Visibility,
-    Component,
-    ScreenInfo,
-    ImageInfo,
-    WorkspaceState
+    WorkspaceState,
 )
 from .tree import TreeUtils
 
@@ -17,5 +17,5 @@ __all__ = [
     "ScreenInfo",
     "ImageInfo",
     "WorkspaceState",
-    "TreeUtils"
+    "TreeUtils",
 ]

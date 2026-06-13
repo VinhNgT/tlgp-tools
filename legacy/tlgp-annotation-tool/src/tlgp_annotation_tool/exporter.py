@@ -1,16 +1,22 @@
-import os
 import json
-from typing import List, Tuple
+import os
+
 from PIL import Image
-from tlgp_annotation_tool.models import ScreenSession, AnnotationBox
+
 from tlgp_annotation_tool.annotation_renderer import draw_annotations_on_image
+from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
 
 
-def _export_level_images(full_img: Image.Image, children: List[AnnotationBox],
-                         depth: int, output_dir: str, safe_name: str,
-                         parent_box: AnnotationBox = None,
-                         parent_path: str = "",
-                         cut_lines: List[int] = None):
+def _export_level_images(
+    full_img: Image.Image,
+    children: list[AnnotationBox],
+    depth: int,
+    output_dir: str,
+    safe_name: str,
+    parent_box: AnnotationBox = None,
+    parent_path: str = "",
+    cut_lines: list[int] = None,
+):
     """Recursively exports one annotated image per parent that has children.
 
     Each image shows only the immediate children of that parent.
@@ -52,8 +58,10 @@ def _export_level_images(full_img: Image.Image, children: List[AnnotationBox],
                 # absolute box coords are correctly translated to segment-local coords.
                 # full_img_width stays the ORIGINAL image width for consistent pill sizing.
                 draw_annotations_on_image(
-                    seg_img, seg_children,
-                    offset_x=0, offset_y=seg_y_start,
+                    seg_img,
+                    seg_children,
+                    offset_x=0,
+                    offset_y=seg_y_start,
                     parent_box=None,
                     full_img_width=full_img.width,
                 )
@@ -68,18 +76,27 @@ def _export_level_images(full_img: Image.Image, children: List[AnnotationBox],
             offset_x, offset_y = 0, 0
             filename = f"{safe_name}_annotated.png"
 
-            draw_annotations_on_image(img, children, offset_x, offset_y, parent_box, full_img.width)
+            draw_annotations_on_image(
+                img, children, offset_x, offset_y, parent_box, full_img.width
+            )
             path = os.path.join(output_dir, filename)
             img.save(path, "PNG")
             exported_paths.append(path)
     else:
         # Crop to the parent box bounds
-        crop_box = (parent_box.left, parent_box.top, parent_box.right, parent_box.bottom)
+        crop_box = (
+            parent_box.left,
+            parent_box.top,
+            parent_box.right,
+            parent_box.bottom,
+        )
         img = full_img.crop(crop_box)
         offset_x, offset_y = parent_box.left, parent_box.top
         filename = f"{safe_name}_{parent_path}_annotated.png"
 
-        draw_annotations_on_image(img, children, offset_x, offset_y, parent_box, full_img.width)
+        draw_annotations_on_image(
+            img, children, offset_x, offset_y, parent_box, full_img.width
+        )
         img.save(os.path.join(output_dir, filename), "PNG")
 
     # Recurse for each child that has its own children
@@ -87,8 +104,11 @@ def _export_level_images(full_img: Image.Image, children: List[AnnotationBox],
         if child.children:
             child_path = f"{parent_path}_{child.id}" if parent_path else str(child.id)
             _export_level_images(
-                full_img, child.children,
-                depth + 1, output_dir, safe_name,
+                full_img,
+                child.children,
+                depth + 1,
+                output_dir,
+                safe_name,
                 parent_box=child,
                 parent_path=child_path,
             )
@@ -105,7 +125,7 @@ def _annotate_image_files(comp_dicts, safe_name, parent_path=""):
     for comp in comp_dicts:
         has_children = "children" in comp and len(comp["children"]) > 0
         if has_children:
-            path = f"{parent_path}_{comp['id']}" if parent_path else str(comp['id'])
+            path = f"{parent_path}_{comp['id']}" if parent_path else str(comp["id"])
             comp["imageFile"] = f"{safe_name}_{path}_annotated.png"
             _annotate_image_files(comp["children"], safe_name, path)
         else:
@@ -129,7 +149,11 @@ def export_session(session: ScreenSession, output_dir: str):
 
     Returns (json_path, list_of_root_annotated_paths).
     """
-    safe_name = "".join(c for c in session.screen_name if c.isalnum() or c in (" ", "_", "-")).strip().replace(" ", "_")
+    safe_name = (
+        "".join(c for c in session.screen_name if c.isalnum() or c in (" ", "_", "-"))
+        .strip()
+        .replace(" ", "_")
+    )
     if not safe_name:
         safe_name = "screen_spec"
 
@@ -184,14 +208,17 @@ def export_session(session: ScreenSession, output_dir: str):
             if seg_y_end <= seg_y_start:
                 continue
             comp_ids = [
-                c.id for c in session.components
+                c.id
+                for c in session.components
                 if seg_y_start <= (c.top + c.bottom) / 2 < seg_y_end
             ]
-            segments.append({
-                "part": part_idx + 1,
-                "imageFile": f"{safe_name}_annotated_part{part_idx + 1}.png",
-                "componentIds": comp_ids,
-            })
+            segments.append(
+                {
+                    "part": part_idx + 1,
+                    "imageFile": f"{safe_name}_annotated_part{part_idx + 1}.png",
+                    "componentIds": comp_ids,
+                }
+            )
         data["segments"] = segments
 
     # Write JSON last — after images are successfully exported
@@ -199,4 +226,3 @@ def export_session(session: ScreenSession, output_dir: str):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
     return json_path, root_paths
-

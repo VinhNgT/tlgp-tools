@@ -7,7 +7,6 @@ from pathlib import Path
 from docx.document import Document
 from docx.shared import Inches
 
-
 # Full page width matches the table width (6.5 inches = 468pt)
 IMAGE_FULL_WIDTH = Inches(6.5)
 

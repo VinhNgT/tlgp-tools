@@ -1,20 +1,21 @@
 from dataclasses import dataclass, field
-from typing import List, Optional
+
 
 @dataclass
 class AnnotationBox:
     """A rectangular annotation region that can contain nested child annotations.
-    
+
     Supports arbitrary recursive nesting. Coordinates are always
     stored in absolute image space regardless of nesting depth.
     """
+
     id: int  # 1-based sequential number within its sibling list
     label: str
     x1: int
     y1: int
     x2: int
     y2: int
-    children: List['AnnotationBox'] = field(default_factory=list)
+    children: list["AnnotationBox"] = field(default_factory=list)
     pill_corner: str = "top_left"
 
     @property
@@ -43,12 +44,7 @@ class AnnotationBox:
 
     @property
     def bounds(self) -> dict:
-        return {
-            "x": self.left,
-            "y": self.top,
-            "w": self.width,
-            "h": self.height
-        }
+        return {"x": self.left, "y": self.top, "w": self.width, "h": self.height}
 
     @property
     def bounds_tuple(self) -> tuple:
@@ -64,9 +60,9 @@ class AnnotationBox:
                 "x": self.left - parent_x,
                 "y": self.top - parent_y,
                 "w": self.width,
-                "h": self.height
+                "h": self.height,
             },
-            "pill_corner": self.pill_corner
+            "pill_corner": self.pill_corner,
         }
         if self.children:
             result["children"] = [
@@ -86,8 +82,8 @@ class AnnotationBox:
 class ScreenSession:
     screen_name: str = ""
     description: str = ""
-    original_image: Optional[str] = None
-    components: List[AnnotationBox] = field(default_factory=list)
+    original_image: str | None = None
+    components: list[AnnotationBox] = field(default_factory=list)
     # Sorted list of Y-coordinates (absolute image space) for horizontal cuts.
     # Only supported at root level.
-    cut_lines: List[int] = field(default_factory=list)
+    cut_lines: list[int] = field(default_factory=list)

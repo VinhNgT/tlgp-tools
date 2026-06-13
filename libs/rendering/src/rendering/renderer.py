@@ -7,10 +7,8 @@ This module is the single source of truth for:
 - Drawing annotation boxes + number pills onto a PIL Image
 """
 
-from typing import List, Tuple, Optional
-from PIL import Image, ImageDraw, ImageFont
 from models import Component
-
+from PIL import Image, ImageDraw, ImageFont
 
 # ── Constants ──────────────────────────────────────────────────────────
 
@@ -25,8 +23,8 @@ MIN_FONT_SIZE = 12
 
 # Pill padding ratios relative to font size.
 # At BASE_FONT_SIZE (30), these produce proportional padding.
-PILL_PAD_X_RATIO = 0.7   # total horizontal padding = font_size * 0.7
-PILL_PAD_Y_RATIO = 0.4   # total vertical padding  = font_size * 0.4
+PILL_PAD_X_RATIO = 0.7  # total horizontal padding = font_size * 0.7
+PILL_PAD_Y_RATIO = 0.4  # total vertical padding  = font_size * 0.4
 
 # Box border thickness (in image pixels).
 BOX_BORDER_WIDTH = 5
@@ -37,30 +35,34 @@ PILL_OUTLINE_WIDTH = 3
 
 # ── Font Loading ───────────────────────────────────────────────────────
 
+
 def get_font(size: int):
     """Load a TrueType font with the given size, trying common Windows and macOS system paths."""
     font_candidates = [
-        "arialbd.ttf",                                       # Windows Arial Bold
-        "arial.ttf",                                         # Windows Arial Regular
-        "/Library/Fonts/Arial Bold.ttf",                     # macOS Arial Bold
-        "/System/Library/Fonts/Supplemental/Arial Bold.ttf", # macOS Supplemental Arial Bold
-        "/Library/Fonts/Arial.ttf",                          # macOS Arial Regular
-        "/System/Library/Fonts/Supplemental/Arial.ttf",      # macOS Supplemental Arial Regular
-        "/System/Library/Fonts/Helvetica.ttc",               # macOS Helvetica
-        "/System/Library/Fonts/HelveticaNeue.ttc",           # macOS Helvetica Neue
-        "Courier.dfont",                                     # macOS Courier
+        "arialbd.ttf",  # Windows Arial Bold
+        "arial.ttf",  # Windows Arial Regular
+        "/Library/Fonts/Arial Bold.ttf",  # macOS Arial Bold
+        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",  # macOS Supplemental Arial Bold
+        "/Library/Fonts/Arial.ttf",  # macOS Arial Regular
+        "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS Supplemental Arial Regular
+        "/System/Library/Fonts/Helvetica.ttc",  # macOS Helvetica
+        "/System/Library/Fonts/HelveticaNeue.ttc",  # macOS Helvetica Neue
+        "Courier.dfont",  # macOS Courier
     ]
     for font_name in font_candidates:
         try:
             return ImageFont.truetype(font_name, size)
-        except IOError:
+        except OSError:
             continue
     return ImageFont.load_default()
 
 
 # ── Text Measurement ───────────────────────────────────────────────────
 
-def get_text_dimensions(draw: Optional[ImageDraw.Draw], text: str, font) -> Tuple[int, int, int]:
+
+def get_text_dimensions(
+    draw: ImageDraw.Draw | None, text: str, font
+) -> tuple[int, int, int]:
     """Safely get text width, height, and top offset across different Pillow versions.
 
     If `draw` is None, falls back to font-based measurement or character estimation.
@@ -88,8 +90,9 @@ def get_text_dimensions(draw: Optional[ImageDraw.Draw], text: str, font) -> Tupl
 
 # ── Level Scaling ──────────────────────────────────────────────────────
 
+
 def compute_level_scale(
-    parent_comp: Optional[Component],
+    parent_comp: Component | None,
     full_img_width: int,
 ) -> float:
     """Compute the scale factor for a given nesting level.
@@ -107,7 +110,7 @@ def compute_level_scale(
 
 
 def compute_pill_font_size(
-    parent_comp: Optional[Component],
+    parent_comp: Component | None,
     full_img_width: int,
 ) -> int:
     """Compute the uniform pill font size for all children at a given nesting level.
@@ -120,9 +123,9 @@ def compute_pill_font_size(
 
 
 def compute_border_widths(
-    parent_comp: Optional[Component],
+    parent_comp: Component | None,
     full_img_width: int,
-) -> Tuple[int, int]:
+) -> tuple[int, int]:
     """Compute scaled box border and pill outline widths for a given nesting level.
 
     Deeper levels get thinner lines so that when the cropped image is upscaled
@@ -136,7 +139,7 @@ def compute_border_widths(
     return border, outline
 
 
-def compute_pill_padding(font_size: int) -> Tuple[int, int]:
+def compute_pill_padding(font_size: int) -> tuple[int, int]:
     """Compute proportional pill padding for the given font size.
 
     Padding scales with font size so that the pill aspect ratio stays consistent
@@ -150,9 +153,14 @@ def compute_pill_padding(font_size: int) -> Tuple[int, int]:
 
 
 def get_pill_coords(
-    left: float, top: float, right: float, bottom: float,
-    pill_w: float, pill_h: float, pill_corner: str
-) -> Tuple[float, float]:
+    left: float,
+    top: float,
+    right: float,
+    bottom: float,
+    pill_w: float,
+    pill_h: float,
+    pill_corner: str,
+) -> tuple[float, float]:
     """Compute the pill's top-left coordinates given the box bounds and pill size.
 
     Snaps the pill to one of the 4 corners.
@@ -181,12 +189,13 @@ def get_pill_coords(
 
 # ── Drawing ────────────────────────────────────────────────────────────
 
+
 def draw_annotations_on_image(
     img: Image.Image,
-    children: List[Component],
+    children: list[Component],
     offset_x: int,
     offset_y: int,
-    parent_comp: Optional[Component],
+    parent_comp: Component | None,
     full_img_width: int,
 ) -> Image.Image:
     """Draw annotation boxes and number pills for immediate children onto the image.
@@ -233,18 +242,24 @@ def draw_annotations_on_image(
 
         pill_w = tw + pad_x
         pill_h = th + pad_y
-        
+
         pill_corner = comp.style.pillCorner
-        pill_x1, pill_y1 = get_pill_coords(bx1, by1, bx2, by2, pill_w, pill_h, pill_corner)
+        pill_x1, pill_y1 = get_pill_coords(
+            bx1, by1, bx2, by2, pill_w, pill_h, pill_corner
+        )
         pill_x2, pill_y2 = pill_x1 + pill_w, pill_y1 + pill_h
 
         draw.rectangle(
             [pill_x1, pill_y1, pill_x2, pill_y2],
-            fill="white", outline="red", width=pill_outline_w,
+            fill="white",
+            outline="red",
+            width=pill_outline_w,
         )
         draw.text(
             (pill_x1 + pad_x // 2, pill_y1 + pad_y // 2 - top),
-            num_str, fill="red", font=font,
+            num_str,
+            fill="red",
+            font=font,
         )
 
     return img

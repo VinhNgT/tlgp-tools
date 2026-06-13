@@ -1,10 +1,5 @@
 """Tests for doc_builder — end-to-end document generation."""
 
-import pytest
-from pathlib import Path
-
-from docx import Document as DocxDocument
-
 from doc_generator.doc_builder import build_document
 from doc_generator.models import (
     AnalysisData,
@@ -16,15 +11,16 @@ from doc_generator.models import (
     Screen,
     SubDto,
 )
+from PIL import Image
 
 
 def _minimal_analysis(tmp_path, **overrides) -> AnalysisData:
     """Create a minimal AnalysisData for testing."""
-    defaults = dict(
-        sectionPrefix="1.1",
-        exportDir=str(tmp_path),
-        screen=Screen(name="Test Screen", description="Test description"),
-    )
+    defaults = {
+        "sectionPrefix": "1.1",
+        "exportDir": str(tmp_path),
+        "screen": Screen(name="Test Screen", description="Test description"),
+    }
     defaults.update(overrides)
     return AnalysisData(**defaults)
 
@@ -68,7 +64,8 @@ class TestBuildDocumentWithComponents:
             tmp_path,
             components=[
                 Component(
-                    id=1, label="Header",
+                    id=1,
+                    label="Header",
                     description="Header component",
                     children=[
                         ChildElement(stt=1, label="Back", controlType="Icon"),
@@ -78,7 +75,8 @@ class TestBuildDocumentWithComponents:
                     ],
                 ),
                 Component(
-                    id=2, label="Footer",
+                    id=2,
+                    label="Footer",
                     description="Footer component",
                 ),
             ],
@@ -106,7 +104,8 @@ class TestBuildDocumentWithComponents:
             tmp_path,
             components=[
                 Component(
-                    id=1, label="Nav",
+                    id=1,
+                    label="Nav",
                     description="Nav bar",
                     children=[
                         ChildElement(stt=1, label="Back", controlType="Icon"),
@@ -141,7 +140,9 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    number=1, method="GET", title="Products",
+                    number=1,
+                    method="GET",
+                    title="Products",
                     url="/api/products",
                     requestParams=[
                         ApiParam(name="page", dataType="int"),
@@ -160,7 +161,9 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    number=1, method="GET", title="Detail",
+                    number=1,
+                    method="GET",
+                    title="Detail",
                     url="/api/detail",
                     responseType="ProductDTO",
                     responseFields=[
@@ -168,7 +171,8 @@ class TestBuildDocumentWithApis:
                     ],
                     subDtos=[
                         SubDto(
-                            name="PriceDTO", fieldRef="prices",
+                            name="PriceDTO",
+                            fieldRef="prices",
                             fields=[ApiParam(name="amount", dataType="double")],
                         ),
                     ],
@@ -198,7 +202,9 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    number=1, method="POST", title="Favorite",
+                    number=1,
+                    method="POST",
+                    title="Favorite",
                     url="/api/fav",
                     requestBodyType="FavoriteProductRequestDTO",
                     requestParams=[
@@ -217,7 +223,10 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    number=1, method="GET", title="Health", url="/api/health",
+                    number=1,
+                    method="GET",
+                    title="Health",
+                    url="/api/health",
                     requestDescription="Không có tham số",
                 ),
             ],
@@ -232,7 +241,10 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    number=1, method="GET", title="Count", url="/api/count",
+                    number=1,
+                    method="GET",
+                    title="Count",
+                    url="/api/count",
                     responseType="int",
                     responseDescription="Tổng số items trong giỏ hàng",
                 ),
@@ -250,7 +262,8 @@ class TestBuildDocumentWithImages:
             tmp_path,
             components=[
                 Component(
-                    id=1, label="Nav",
+                    id=1,
+                    label="Nav",
                     description="Nav bar",
                     imageFile="nonexistent.png",
                 ),
@@ -262,7 +275,7 @@ class TestBuildDocumentWithImages:
 
     def test_existing_image_embedded(self, tmp_path):
         # Create a minimal 1x1 PNG
-        from PIL import Image
+
         img = Image.new("RGB", (100, 100), color="red")
         img_path = tmp_path / "test.png"
         img.save(str(img_path))
@@ -271,7 +284,8 @@ class TestBuildDocumentWithImages:
             tmp_path,
             components=[
                 Component(
-                    id=1, label="Nav",
+                    id=1,
+                    label="Nav",
                     description="Nav bar",
                     imageFile="test.png",
                 ),

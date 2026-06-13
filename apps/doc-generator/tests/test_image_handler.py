@@ -1,12 +1,8 @@
 """Tests for image_handler — embedding and missing image handling."""
 
-import pytest
-from pathlib import Path
-from PIL import Image
-
-from docx import Document
-
 from doc_generator.image_handler import insert_image
+from docx import Document
+from PIL import Image
 
 
 class TestInsertImage:

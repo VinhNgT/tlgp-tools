@@ -1,5 +1,5 @@
 import copy
-from typing import List, Tuple
+
 from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
 
 
@@ -7,14 +7,14 @@ class HistoryManager:
     def __init__(self, session: ScreenSession):
         self.session = session
         # Each snapshot: (components_deepcopy, screen_name, description, cut_lines_copy)
-        self.history: List[Tuple[List[AnnotationBox], str, str, List[int]]] = []
+        self.history: list[tuple[list[AnnotationBox], str, str, list[int]]] = []
         self.pointer: int = -1
         self.save_snapshot()
 
     def save_snapshot(self):
         # Discard any redo history
         if self.pointer < len(self.history) - 1:
-            self.history = self.history[:self.pointer + 1]
+            self.history = self.history[: self.pointer + 1]
 
         components_copy = copy.deepcopy(self.session.components)
         snapshot = (

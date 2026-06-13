@@ -1,12 +1,9 @@
 """Tests for CLI argument parsing and integration."""
 
-import pytest
 import json
-import subprocess
-import sys
-from pathlib import Path
 from unittest.mock import patch
 
+import pytest
 from doc_generator.cli import main
 
 

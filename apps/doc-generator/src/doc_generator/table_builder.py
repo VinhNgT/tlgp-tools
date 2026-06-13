@@ -42,7 +42,6 @@ from doc_generator.style_constants import (
     UI_TABLE_HEADERS,
 )
 
-
 # ============================================================
 # Low-level XML helpers
 # ============================================================
@@ -60,16 +59,19 @@ def _set_cell_border(cell, top=None, bottom=None, left=None, right=None):
 
     tcBorders = tcPr.find(qn("w:tcBorders"))
     if tcBorders is None:
-        tcBorders = parse_xml(f'<w:tcBorders {nsdecls("w")} />')
+        tcBorders = parse_xml(f"<w:tcBorders {nsdecls('w')} />")
         tcPr.append(tcBorders)
 
     for edge, val in [
-        ("top", top), ("bottom", bottom), ("left", left), ("right", right),
+        ("top", top),
+        ("bottom", bottom),
+        ("left", left),
+        ("right", right),
     ]:
         if val is None:
             continue
         element = parse_xml(
-            f'<w:{edge} {nsdecls("w")} '
+            f"<w:{edge} {nsdecls('w')} "
             f'w:val="single" '
             f'w:sz="{int(val["width"] * 8)}" '
             f'w:color="{val["color"]}" '
@@ -88,18 +90,19 @@ def _set_cell_padding(cell, top_pt=0, bottom_pt=0, left_pt=0, right_pt=0):
 
     tcMar = tcPr.find(qn("w:tcMar"))
     if tcMar is None:
-        tcMar = parse_xml(f'<w:tcMar {nsdecls("w")} />')
+        tcMar = parse_xml(f"<w:tcMar {nsdecls('w')} />")
         tcPr.append(tcMar)
     else:
         tcMar.clear()
 
     for edge, pt_val in [
-        ("top", top_pt), ("bottom", bottom_pt),
-        ("start", left_pt), ("end", right_pt),
+        ("top", top_pt),
+        ("bottom", bottom_pt),
+        ("start", left_pt),
+        ("end", right_pt),
     ]:
         el = parse_xml(
-            f'<w:{edge} {nsdecls("w")} '
-            f'w:w="{int(pt_val * 20)}" w:type="dxa"/>'
+            f'<w:{edge} {nsdecls("w")} w:w="{int(pt_val * 20)}" w:type="dxa"/>'
         )
         tcMar.append(el)
 
@@ -108,9 +111,7 @@ def _set_cell_shading(cell, color_hex: str):
     """Set cell background color."""
     tc = cell._tc
     tcPr = tc.get_or_add_tcPr()
-    shading = parse_xml(
-        f'<w:shd {nsdecls("w")} w:fill="{color_hex}" w:val="clear"/>'
-    )
+    shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}" w:val="clear"/>')
     existing = tcPr.find(qn("w:shd"))
     if existing is not None:
         tcPr.remove(existing)
@@ -151,8 +152,10 @@ def _apply_default_padding(cell):
     """Apply standard cell padding."""
     _set_cell_padding(
         cell,
-        CELL_PAD_TOP_PT, CELL_PAD_BOTTOM_PT,
-        CELL_PAD_LEFT_PT, CELL_PAD_RIGHT_PT,
+        CELL_PAD_TOP_PT,
+        CELL_PAD_BOTTOM_PT,
+        CELL_PAD_LEFT_PT,
+        CELL_PAD_RIGHT_PT,
     )
 
 
@@ -190,7 +193,6 @@ def _style_table(table: Table, col_widths_pt: list[float], font_size: Pt | None 
                         run.font.size = font_size or FONT_SIZE_DEFAULT
 
 
-
 def _add_table_spacing(doc: Document):
     """Add spacing after a table using a spacer paragraph."""
     p = doc.add_paragraph()
@@ -208,12 +210,16 @@ def build_info_table(doc: Document, label: str, description: str) -> Table:
     """Build a 2×2 Info Table for a component section."""
     table = doc.add_table(rows=2, cols=2)
     _style_cell_text(
-        table.cell(0, 0), "Tên chức năng",
-        bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        table.cell(0, 0),
+        "Tên chức năng",
+        bold=True,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _style_cell_text(
-        table.cell(0, 1), f"Component {label}",
-        bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        table.cell(0, 1),
+        f"Component {label}",
+        bold=True,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _style_cell_text(table.cell(1, 0), "Mô tả")
     _style_cell_text(table.cell(1, 1), description)
@@ -223,17 +229,23 @@ def build_info_table(doc: Document, label: str, description: str) -> Table:
 
 
 def build_screen_level_info_table(
-    doc: Document, screen_name: str, description: str,
+    doc: Document,
+    screen_name: str,
+    description: str,
 ) -> Table:
     """Build a 2×2 Info Table for the screen overview section."""
     table = doc.add_table(rows=2, cols=2)
     _style_cell_text(
-        table.cell(0, 0), "Tên màn hình",
-        bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        table.cell(0, 0),
+        "Tên màn hình",
+        bold=True,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _style_cell_text(
-        table.cell(0, 1), f"Màn hình {screen_name}",
-        bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
+        table.cell(0, 1),
+        f"Màn hình {screen_name}",
+        bold=True,
+        alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _style_cell_text(table.cell(1, 0), "Mô tả")
     _style_cell_text(table.cell(1, 1), description)
@@ -243,7 +255,8 @@ def build_screen_level_info_table(
 
 
 def build_ui_elements_table(
-    doc: Document, children: list[ChildElement],
+    doc: Document,
+    children: list[ChildElement],
 ) -> Table:
     """Build a 7-column UI Elements Table."""
     table = doc.add_table(rows=1 + len(children), cols=7)
@@ -251,15 +264,21 @@ def build_ui_elements_table(
     # Header
     for c, text in enumerate(UI_TABLE_HEADERS):
         _style_cell_text(
-            table.cell(0, c), text,
-            bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
+            table.cell(0, c),
+            text,
+            bold=True,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
         )
 
     # Data
     for r, child in enumerate(children):
         row_data = [
-            str(child.stt), child.label, child.controlType,
-            child.required, child.maxLength, child.editable,
+            str(child.stt),
+            child.label,
+            child.controlType,
+            child.required,
+            child.maxLength,
+            child.editable,
             child.description,
         ]
         for c, text in enumerate(row_data):
@@ -271,15 +290,18 @@ def build_ui_elements_table(
 
 
 def build_interaction_table(
-    doc: Document, interactions: list[Interaction],
+    doc: Document,
+    interactions: list[Interaction],
 ) -> Table:
     """Build a 2-column Interaction Events Table."""
     table = doc.add_table(rows=1 + len(interactions), cols=2)
 
     for c, text in enumerate(INTERACTION_TABLE_HEADERS):
         _style_cell_text(
-            table.cell(0, c), text,
-            bold=True, alignment=WD_ALIGN_PARAGRAPH.CENTER,
+            table.cell(0, c),
+            text,
+            bold=True,
+            alignment=WD_ALIGN_PARAGRAPH.CENTER,
         )
 
     for r, interaction in enumerate(interactions):
@@ -297,15 +319,21 @@ def build_api_table(doc: Document, params: list[ApiParam]) -> Table:
 
     for c, text in enumerate(API_TABLE_HEADERS):
         _style_cell_text(
-            table.cell(0, c), text,
-            bold=True, font_size=FONT_SIZE_API,
+            table.cell(0, c),
+            text,
+            bold=True,
+            font_size=FONT_SIZE_API,
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
         )
 
     for r, param in enumerate(params):
         row_data = [
-            param.name, param.meaning, param.required,
-            param.dataType, param.limit, param.defaultValue,
+            param.name,
+            param.meaning,
+            param.required,
+            param.dataType,
+            param.limit,
+            param.defaultValue,
         ]
         for c, text in enumerate(row_data):
             _style_cell_text(table.cell(r + 1, c), text, font_size=FONT_SIZE_API)

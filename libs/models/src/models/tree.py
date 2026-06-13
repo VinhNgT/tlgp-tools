@@ -1,12 +1,14 @@
-from typing import List, Generator, Optional
+from collections.abc import Generator
 from uuid import UUID
-from .core import WorkspaceState, Component
+
+from .core import Component, WorkspaceState
+
 
 class TreeUtils:
     """Utility functions for traversing and manipulating the flat map WorkspaceState."""
 
     @staticmethod
-    def get_children(state: WorkspaceState, parent_id: Optional[UUID]) -> List[Component]:
+    def get_children(state: WorkspaceState, parent_id: UUID | None) -> list[Component]:
         """Get the direct children of a parent (or root components if parent_id is None)."""
         if parent_id is None:
             child_ids = state.rootComponents
@@ -19,7 +21,9 @@ class TreeUtils:
         return [state.components[cid] for cid in child_ids if cid in state.components]
 
     @staticmethod
-    def walk_dfs(state: WorkspaceState, start_id: Optional[UUID] = None) -> Generator[Component, None, None]:
+    def walk_dfs(
+        state: WorkspaceState, start_id: UUID | None = None
+    ) -> Generator[Component, None, None]:
         """
         Yields components in depth-first order.
         If start_id is None, walks the entire tree starting from rootComponents.

@@ -1,15 +1,19 @@
 """Tests for SessionController: navigation, selection, box operations, overlaps."""
 
-import pytest
 from unittest.mock import MagicMock
+
+from tlgp_annotation_tool.controller import NavigationContext, SessionController
 from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
-from tlgp_annotation_tool.controller import SessionController, NavigationContext
 
 
 def _box(id, x1=0, y1=0, x2=100, y2=100, children=None):
     return AnnotationBox(
-        id=id, label=f"Box {id}",
-        x1=x1, y1=y1, x2=x2, y2=y2,
+        id=id,
+        label=f"Box {id}",
+        x1=x1,
+        y1=y1,
+        x2=x2,
+        y2=y2,
         children=children or [],
     )
 

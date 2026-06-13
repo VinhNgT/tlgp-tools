@@ -6,11 +6,9 @@ committed to the controller; on Cancel, changes are discarded.
 """
 
 import tkinter as tk
-from tkinter import ttk
-import ttkbootstrap as tb
-from typing import List, Optional, Tuple
-from PIL import Image, ImageTk, ImageDraw
 
+import ttkbootstrap as tb
+from PIL import Image, ImageTk
 
 # Minimum distance (in image pixels) between two cut lines or
 # between a cut line and the image top/bottom edge.
@@ -24,7 +22,7 @@ SNAP_DISTANCE = 8
 class CutEditorDialog(tb.Toplevel):
     """Modal dialog for editing horizontal cut lines on the full screenshot."""
 
-    def __init__(self, parent, image: Image.Image, initial_cuts: List[int]):
+    def __init__(self, parent, image: Image.Image, initial_cuts: list[int]):
         super().__init__(parent)
         self.title("Edit Cut Lines")
         self.geometry("900x700")
@@ -43,8 +41,8 @@ class CutEditorDialog(tb.Toplevel):
         self.geometry(f"+{max(0, x)}+{max(0, y)}")
 
         self.source_image = image
-        self.cut_lines: List[int] = sorted(initial_cuts)
-        self.result: Optional[List[int]] = None
+        self.cut_lines: list[int] = sorted(initial_cuts)
+        self.result: list[int] | None = None
 
         # Canvas state
         self.zoom_factor: float = 1.0
@@ -84,8 +82,10 @@ class CutEditorDialog(tb.Toplevel):
         vbar.pack(side=tk.RIGHT, fill=tk.Y)
 
         self.canvas = tk.Canvas(
-            canvas_frame, bg="#1a1a1a",
-            highlightthickness=0, borderwidth=0,
+            canvas_frame,
+            bg="#1a1a1a",
+            highlightthickness=0,
+            borderwidth=0,
             yscrollcommand=vbar.set,
             yscrollincrement=1,
         )
@@ -97,16 +97,26 @@ class CutEditorDialog(tb.Toplevel):
         right.pack(side=tk.RIGHT, fill=tk.Y)
         right.pack_propagate(False)
 
-        tb.Label(right, text="CUT LINES", font=("", 10, "bold")).pack(anchor="w", pady=(0, 8))
+        tb.Label(right, text="CUT LINES", font=("", 10, "bold")).pack(
+            anchor="w", pady=(0, 8)
+        )
 
         # Listbox of cut Y-coordinates
         list_frame = tb.Frame(right)
         list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
 
-        self.listbox = tk.Listbox(list_frame, font=("", 9), selectmode=tk.SINGLE,
-                                  bg="#2b2b2b", fg="#ffffff",
-                                  selectbackground="#0c8ce9", selectforeground="#ffffff",
-                                  highlightthickness=0, borderwidth=1, relief="flat")
+        self.listbox = tk.Listbox(
+            list_frame,
+            font=("", 9),
+            selectmode=tk.SINGLE,
+            bg="#2b2b2b",
+            fg="#ffffff",
+            selectbackground="#0c8ce9",
+            selectforeground="#ffffff",
+            highlightthickness=0,
+            borderwidth=1,
+            relief="flat",
+        )
         self.listbox.pack(fill=tk.BOTH, expand=True)
         self.listbox.bind("<<ListboxSelect>>", self._on_listbox_select)
 
@@ -114,21 +124,38 @@ class CutEditorDialog(tb.Toplevel):
         btn_frame = tb.Frame(right)
         btn_frame.pack(fill=tk.X, pady=(0, 10))
 
-        self.btn_add = tb.Button(btn_frame, text="Add Cut", command=self._start_add_mode,
-                                 bootstyle="primary", width=12)
+        self.btn_add = tb.Button(
+            btn_frame,
+            text="Add Cut",
+            command=self._start_add_mode,
+            bootstyle="primary",
+            width=12,
+        )
         self.btn_add.pack(fill=tk.X, pady=2)
 
-        self.btn_remove = tb.Button(btn_frame, text="Remove", command=self._remove_selected,
-                                    bootstyle="danger-outline", width=12, state=tk.DISABLED)
+        self.btn_remove = tb.Button(
+            btn_frame,
+            text="Remove",
+            command=self._remove_selected,
+            bootstyle="danger-outline",
+            width=12,
+            state=tk.DISABLED,
+        )
         self.btn_remove.pack(fill=tk.X, pady=2)
 
-        self.btn_clear = tb.Button(btn_frame, text="Clear All", command=self._clear_all,
-                                   bootstyle="warning-outline", width=12)
+        self.btn_clear = tb.Button(
+            btn_frame,
+            text="Clear All",
+            command=self._clear_all,
+            bootstyle="warning-outline",
+            width=12,
+        )
         self.btn_clear.pack(fill=tk.X, pady=2)
 
         # Status label
-        self.status_label = tb.Label(right, text="", font=("", 8), bootstyle="secondary",
-                                     wraplength=170)
+        self.status_label = tb.Label(
+            right, text="", font=("", 8), bootstyle="secondary", wraplength=170
+        )
         self.status_label.pack(fill=tk.X, pady=(0, 10))
 
         # OK / Cancel
@@ -137,10 +164,16 @@ class CutEditorDialog(tb.Toplevel):
         action_frame = tb.Frame(right)
         action_frame.pack(fill=tk.X, side=tk.BOTTOM)
 
-        tb.Button(action_frame, text="Cancel", command=self._on_cancel,
-                  bootstyle="secondary", width=8).pack(side=tk.RIGHT, padx=(5, 0))
-        tb.Button(action_frame, text="OK", command=self._on_ok,
-                  bootstyle="primary", width=8).pack(side=tk.RIGHT)
+        tb.Button(
+            action_frame,
+            text="Cancel",
+            command=self._on_cancel,
+            bootstyle="secondary",
+            width=8,
+        ).pack(side=tk.RIGHT, padx=(5, 0))
+        tb.Button(
+            action_frame, text="OK", command=self._on_ok, bootstyle="primary", width=8
+        ).pack(side=tk.RIGHT)
 
     def _bind_events(self):
         self.canvas.bind("<ButtonPress-1>", self._on_canvas_click)
@@ -184,7 +217,6 @@ class CutEditorDialog(tb.Toplevel):
             vw, vh = 700, 650
 
         img_w = self.source_image.width
-        img_h = self.source_image.height
 
         # Fit width to canvas, allow vertical scrolling
         self.zoom_factor = max(0.05, min(1.0, (vw - 20) / img_w))
@@ -198,14 +230,20 @@ class CutEditorDialog(tb.Toplevel):
         disp_w = max(1, round(img_w * self.zoom_factor))
         disp_h = max(1, round(img_h * self.zoom_factor))
 
-        resampler = Image.Resampling.BILINEAR if self.zoom_factor > 1.0 else Image.Resampling.LANCZOS
+        resampler = (
+            Image.Resampling.BILINEAR
+            if self.zoom_factor > 1.0
+            else Image.Resampling.LANCZOS
+        )
         resized = self.source_image.resize((disp_w, disp_h), resampler)
 
         self._prev_tk_photo = self.tk_photo
         self.tk_photo = ImageTk.PhotoImage(resized)
 
         if self.image_item_id is None:
-            self.image_item_id = self.canvas.create_image(0, 0, anchor="nw", image=self.tk_photo)
+            self.image_item_id = self.canvas.create_image(
+                0, 0, anchor="nw", image=self.tk_photo
+            )
         else:
             self.canvas.itemconfig(self.image_item_id, image=self.tk_photo)
             self.canvas.coords(self.image_item_id, 0, 0)
@@ -221,23 +259,24 @@ class CutEditorDialog(tb.Toplevel):
 
         for i, y in enumerate(self.cut_lines):
             cy = self._to_canvas_y(y)
-            is_selected = (i == self._selected_index)
+            is_selected = i == self._selected_index
             color = "#0c8ce9" if is_selected else "#ff4444"
             width = 3 if is_selected else 2
 
             self.canvas.create_line(
-                0, cy, disp_w, cy,
-                fill=color, width=width, dash=(8, 4),
-                tags="cut_line"
+                0, cy, disp_w, cy, fill=color, width=width, dash=(8, 4), tags="cut_line"
             )
 
             # Label showing Y coordinate
             label_text = f"Y={y}"
             self.canvas.create_text(
-                disp_w - 5, cy - 8,
-                text=label_text, anchor="ne",
-                fill=color, font=("Arial", 8, "bold"),
-                tags="cut_line"
+                disp_w - 5,
+                cy - 8,
+                text=label_text,
+                anchor="ne",
+                fill=color,
+                font=("Arial", 8, "bold"),
+                tags="cut_line",
             )
 
         # Keep image behind cut lines
@@ -255,7 +294,9 @@ class CutEditorDialog(tb.Toplevel):
             self.listbox.see(self._selected_index)
 
         self.btn_remove.config(
-            state=tk.NORMAL if 0 <= self._selected_index < len(self.cut_lines) else tk.DISABLED
+            state=tk.NORMAL
+            if 0 <= self._selected_index < len(self.cut_lines)
+            else tk.DISABLED
         )
 
     # ── Add Mode ───────────────────────────────────────────────────────
@@ -263,7 +304,9 @@ class CutEditorDialog(tb.Toplevel):
     def _start_add_mode(self):
         self._mode = "adding"
         self.canvas.config(cursor="crosshair")
-        self.status_label.config(text="Click on the image to place a horizontal cut line. Press Escape to cancel.")
+        self.status_label.config(
+            text="Click on the image to place a horizontal cut line. Press Escape to cancel."
+        )
         self.btn_add.config(state=tk.DISABLED)
 
     def _cancel_add_mode(self):
@@ -394,7 +437,9 @@ class CutEditorDialog(tb.Toplevel):
             self._selected_index = -1
         self._draw_cut_lines()
         self.btn_remove.config(
-            state=tk.NORMAL if 0 <= self._selected_index < len(self.cut_lines) else tk.DISABLED
+            state=tk.NORMAL
+            if 0 <= self._selected_index < len(self.cut_lines)
+            else tk.DISABLED
         )
 
     # ── Button Actions ─────────────────────────────────────────────────

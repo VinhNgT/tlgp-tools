@@ -1,8 +1,8 @@
-import pytest
 from unittest.mock import MagicMock
-from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
-from tlgp_annotation_tool.controller import SessionController
+
 from tlgp_annotation_tool.annotation_renderer import get_pill_coords
+from tlgp_annotation_tool.controller import SessionController
+from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
 
 
 def test_get_pill_coords_corners():
@@ -48,13 +48,7 @@ def test_get_pill_coords_clamped_for_small_box():
 def test_serialization_and_deserialization():
     # Serialize AnnotationBox
     box = AnnotationBox(
-        id=1,
-        label="Test Box",
-        x1=10,
-        y1=20,
-        x2=110,
-        y2=70,
-        pill_corner="bottom_right"
+        id=1, label="Test Box", x1=10, y1=20, x2=110, y2=70, pill_corner="bottom_right"
     )
     serialized = box.to_dict()
     assert serialized["pill_corner"] == "bottom_right"
@@ -65,9 +59,9 @@ def test_serialization_and_deserialization():
         "id": 2,
         "label": "Loaded Box",
         "bounds": {"x": 5, "y": 5, "w": 50, "h": 30},
-        "pill_corner": "top_right"
+        "pill_corner": "top_right",
     }
-    
+
     # We parse the box using direct instantiation mimicking app.py's parse_box
     loaded_box = AnnotationBox(
         id=box_data["id"],
@@ -77,9 +71,9 @@ def test_serialization_and_deserialization():
         x2=box_data["bounds"]["x"] + box_data["bounds"]["w"],
         y2=box_data["bounds"]["y"] + box_data["bounds"]["h"],
         children=[],
-        pill_corner=box_data.get("pill_corner", "top_left")
+        pill_corner=box_data.get("pill_corner", "top_left"),
     )
-    
+
     assert loaded_box.pill_corner == "top_right"
 
 

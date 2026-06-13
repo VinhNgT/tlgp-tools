@@ -1,24 +1,31 @@
 """Tests for layout_sort — geometry-aware auto-numbering algorithm."""
 
+import random
+
 import pytest
-from tlgp_annotation_tool.models import AnnotationBox
 from tlgp_annotation_tool.layout_sort import (
     _compute_overlap_ratio,
-    sort_boxes_reading_order,
     sort_and_renumber_recursive,
+    sort_boxes_reading_order,
 )
+from tlgp_annotation_tool.models import AnnotationBox
 
 
 def _box(id: int, x1: int, y1: int, x2: int, y2: int, children=None) -> AnnotationBox:
     """Helper to create a box with minimal boilerplate."""
     return AnnotationBox(
-        id=id, label=f"Box {id}",
-        x1=x1, y1=y1, x2=x2, y2=y2,
+        id=id,
+        label=f"Box {id}",
+        x1=x1,
+        y1=y1,
+        x2=x2,
+        y2=y2,
         children=children or [],
     )
 
 
 # ── Overlap Ratio ─────────────────────────────────────────────────────
+
 
 class TestOverlapRatio:
     def test_no_overlap(self):
@@ -32,13 +39,13 @@ class TestOverlapRatio:
         assert _compute_overlap_ratio(a, b) == 1.0
 
     def test_partial_overlap(self):
-        a = _box(1, 0, 0, 100, 100)   # height=100
+        a = _box(1, 0, 0, 100, 100)  # height=100
         b = _box(2, 50, 50, 150, 150)  # height=100, overlap=50
         ratio = _compute_overlap_ratio(a, b)
         assert ratio == pytest.approx(0.5)
 
     def test_mixed_height(self):
-        tall = _box(1, 0, 0, 100, 200)   # height=200
+        tall = _box(1, 0, 0, 100, 200)  # height=200
         short = _box(2, 120, 50, 200, 100)  # height=50, overlap=50
         ratio = _compute_overlap_ratio(tall, short)
         # overlap=50, min_height=50, ratio=1.0
@@ -51,6 +58,7 @@ class TestOverlapRatio:
 
 
 # ── Edge Cases ────────────────────────────────────────────────────────
+
 
 class TestEdgeCases:
     def test_empty_list(self):
@@ -65,6 +73,7 @@ class TestEdgeCases:
 
 # ── Row Detection ──────────────────────────────────────────────────────
 
+
 class TestSingleRow:
     def test_boxes_sorted_left_to_right(self):
         """Multiple boxes at the same Y should be sorted left-to-right."""
@@ -77,7 +86,9 @@ class TestSingleRow:
     def test_slight_y_offset_same_row(self):
         """Boxes with slight Y differences but significant overlap → same row."""
         b1 = _box(1, 0, 0, 100, 80)
-        b2 = _box(2, 120, 10, 220, 90)  # 10px offset, 70px overlap, min_height=80, ratio=0.875
+        b2 = _box(
+            2, 120, 10, 220, 90
+        )  # 10px offset, 70px overlap, min_height=80, ratio=0.875
         b3 = _box(3, 240, 5, 340, 85)
         result = sort_boxes_reading_order([b3, b1, b2])
         assert [b.id for b in result] == [1, 2, 3]
@@ -113,7 +124,7 @@ class TestGridLayout:
             _box(5, 100, 80, 180, 130),
             _box(6, 200, 80, 280, 130),
         ]
-        import random
+
         shuffled = list(boxes)
         random.shuffle(shuffled)
         result = sort_boxes_reading_order(shuffled)
@@ -123,9 +134,13 @@ class TestGridLayout:
 class TestMixedHeightRow:
     def test_tall_and_short_same_row(self):
         """A tall box and short boxes at the same visual position → one row."""
-        tall = _box(1, 0, 0, 100, 200)      # height=200
-        short1 = _box(2, 120, 50, 200, 100)  # height=50, overlap with tall = 50, ratio = 50/50 = 1.0
-        short2 = _box(3, 220, 60, 300, 110)  # height=50, overlap with tall = 50, ratio = 50/50 = 1.0
+        tall = _box(1, 0, 0, 100, 200)  # height=200
+        short1 = _box(
+            2, 120, 50, 200, 100
+        )  # height=50, overlap with tall = 50, ratio = 50/50 = 1.0
+        short2 = _box(
+            3, 220, 60, 300, 110
+        )  # height=50, overlap with tall = 50, ratio = 50/50 = 1.0
         result = sort_boxes_reading_order([short2, tall, short1])
         assert [b.id for b in result] == [1, 2, 3]
 
@@ -133,9 +148,9 @@ class TestMixedHeightRow:
 class TestTransitiveOverlap:
     def test_bridged_by_tall_box(self):
         """A↔B↔C where B bridges A and C. A and C don't directly overlap."""
-        a = _box(1, 0, 0, 80, 40)      # top section, height=40
+        a = _box(1, 0, 0, 80, 40)  # top section, height=40
         b = _box(2, 100, 0, 180, 200)  # tall, spans full range, height=200
-        c = _box(3, 200, 160, 280, 200) # bottom section, height=40
+        c = _box(3, 200, 160, 280, 200)  # bottom section, height=40
 
         # A↔B: overlap = min(40,200) - max(0,0) = 40, min_height=40, ratio=1.0 ✓
         # B↔C: overlap = min(200,200) - max(0,160) = 40, min_height=40, ratio=1.0 ✓
@@ -158,11 +173,12 @@ class TestNearMissSeparateRows:
 
 # ── Recursive Numbering ───────────────────────────────────────────────
 
+
 class TestNestedChildren:
     def test_children_renumbered(self):
         """Children within a parent are sorted and renumbered recursively."""
         child_a = _box(99, 200, 10, 280, 50)  # right
-        child_b = _box(98, 10, 10, 90, 50)    # left
+        child_b = _box(98, 10, 10, 90, 50)  # left
 
         parent = _box(1, 0, 0, 300, 100, children=[child_a, child_b])
 
@@ -176,8 +192,8 @@ class TestNestedChildren:
 
     def test_deep_nesting(self):
         """Three levels of nesting: root → parent → grandchildren."""
-        gc1 = _box(99, 50, 50, 80, 70)   # right grandchild
-        gc2 = _box(98, 10, 50, 40, 70)   # left grandchild
+        gc1 = _box(99, 50, 50, 80, 70)  # right grandchild
+        gc2 = _box(98, 10, 50, 40, 70)  # left grandchild
 
         child = _box(1, 0, 0, 100, 100, children=[gc1, gc2])
         root_box = _box(1, 0, 0, 500, 500, children=[child])
@@ -190,6 +206,7 @@ class TestNestedChildren:
 
 
 # ── Scale Consistency ──────────────────────────────────────────────────
+
 
 class TestScaleConsistency:
     def test_same_layout_different_scale(self):

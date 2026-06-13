@@ -1,11 +1,10 @@
 """Tests for horizontal cut segment logic and coordinate transforms."""
 
-import pytest
-from unittest.mock import MagicMock, patch
-from PIL import Image
-from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
-from tlgp_annotation_tool.controller import SessionController
+from unittest.mock import MagicMock
+
 from tlgp_annotation_tool.canvas import CUT_GAP_PX
+from tlgp_annotation_tool.controller import SessionController
+from tlgp_annotation_tool.models import AnnotationBox, ScreenSession
 
 
 def _box(id: int, x1: int, y1: int, x2: int, y2: int) -> AnnotationBox:
@@ -22,6 +21,7 @@ def _make_controller(cut_lines=None, img_height=1000):
 
 
 # ── Segment Building ──────────────────────────────────────────────────
+
 
 class TestBuildSegments:
     """Test the segment building logic for horizontal cut lines."""
@@ -82,6 +82,7 @@ class TestBuildSegments:
 
 # ── Gap Offset ────────────────────────────────────────────────────────
 
+
 class TestGapOffset:
     """Test gap offset calculation for coordinate mapping."""
 
@@ -89,7 +90,7 @@ class TestGapOffset:
         """Simulate _gap_offset_for_y from canvas."""
         if not segments or len(segments) <= 1:
             return 0
-        for src_start, src_end, offset in segments:
+        for _src_start, src_end, offset in segments:
             if abs_y < src_end:
                 return offset
         return segments[-1][2]
@@ -99,7 +100,7 @@ class TestGapOffset:
         if not segments or len(segments) <= 1:
             return display_y
         for src_start, src_end, offset in segments:
-            disp_start = src_start + offset
+            src_start + offset
             disp_end = src_end + offset
             if display_y < disp_end:
                 return display_y - offset
@@ -141,6 +142,7 @@ class TestGapOffset:
 
 # ── Box-to-Segment Assignment ─────────────────────────────────────────
 
+
 class TestBoxSegmentAssignment:
     """Test that boxes are correctly assigned to segments by vertical center."""
 
@@ -173,13 +175,13 @@ class TestBoxSegmentAssignment:
     def test_empty_segment(self):
         """No boxes in a segment is valid."""
         boxes = [_box(1, 0, 0, 100, 100)]  # all in first segment
-        boundaries = [0, 500, 1000]
         # Segment 1 has no boxes
         seg1_boxes = [b for b in boxes if 500 <= (b.top + b.bottom) / 2 < 1000]
         assert seg1_boxes == []
 
 
 # ── Controller Cut Lines ──────────────────────────────────────────────
+
 
 class TestControllerCutLines:
     def test_set_and_get(self):
