@@ -9,8 +9,9 @@ The user may converse in Vietnamese or English. However, **all content written t
 
 ## Available Tools
 
-- `launch_annotator` — open the annotation GUI for the user
-- `generate_spec_doc` — validate analysis data and generate the .docx (supports direct `analysis` dict or path-based load via `analysis_path`)
+- `launch_annotator` — spawn the Engine and the Annotation GUI for the user
+- `get_engine_state` — fetch the current Flat Map workspace state from the Engine directly
+- `generate_spec_doc` — validate analysis data and generate the .docx
 
 ## Source Priority
 
@@ -32,30 +33,14 @@ the exported files after annotation is complete.
 
 ## Step 2: Analyze
 
-### 2a. Read annotation exports
+### 2a. Read Annotation State
 
-The annotation tool exports to `<output_dir>/<screen_name>/`:
-
-```
-<screen_name>/
-├── <screen_name>.json              # Component hierarchy
-├── <screen_name>_annotated.png     # Root annotated screenshot
-│   (or _annotated_part1.png, ...)  # If cut lines were used
-├── <screen_name>_<id>_annotated.png      # Component's cropped image
-├── <screen_name>_<id>_<id>_annotated.png # Nested component's image
-└── ...
-```
-
-The annotation JSON structure:
-```json
-{annotation_json_example}
-```
-
-Read the annotation JSON and note each component's `id`, `label`, and whether it has `children` (non-leaf) or not (leaf).
+Call `get_engine_state()`. This returns the `WorkspaceState` JSON.
+Note each component's `id` (a UUID), `label`, and whether it has children in `childrenIds` (non-leaf) or not (leaf).
 
 ### 2b. Vision analysis
 
-View each annotated image. For each non-leaf component:
+View the annotated screenshots (either provided in the prompt, or by inspecting the UI). For each non-leaf component:
 
 1. Set `description` — Vietnamese description of the component's purpose
 2. For each child, set `controlType` using the classification guide below
@@ -117,11 +102,11 @@ Every field maps to a specific location in the generated .docx document.
 
 | Field | Type | Description |
 |---|---|---|
-| `id` | `int` | Annotation box ID (from annotation export) |
+| `id` | `int` | Sequential annotation box ID |
 | `label` | `str` | Component name (from annotation label) |
 | `description` | `str` | Vietnamese description of the component's purpose |
 | `isLeaf` | `bool` | True if component has no children |
-| `imageFile` | `str?` | Filename of the cropped annotated image |
+| `componentId` | `str?` | UUID from the Engine state. `generate_spec_doc` will use this to automatically fetch crops! |
 | `children` | `list[ChildElement]` | UI elements inside this component |
 | `interactions` | `list[Interaction]` | User action / system reaction pairs |
 
@@ -249,7 +234,7 @@ discrepancies for transparency, but they do not appear in the output document.
       "label": "Header",
       "description": "Thanh tiêu đề phía trên cùng của màn hình",
       "isLeaf": false,
-      "imageFile": "Chi_tiet_san_pham_1_annotated.png",
+      "componentId": "a1b2c3d4-e5f6-7890-1234-56789abcdef0",
       "children": [
         {
           "stt": 1,
@@ -282,7 +267,7 @@ discrepancies for transparency, but they do not appear in the output document.
       "label": "Banner",
       "description": "",
       "isLeaf": true,
-      "imageFile": null,
+      "componentId": null,
       "children": [],
       "interactions": []
     }

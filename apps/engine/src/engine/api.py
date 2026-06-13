@@ -69,6 +69,11 @@ async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace))
 
     return FileResponse(output_zip, media_type="application/zip", filename="annotation_export.zip")
 
+@router.get("/state")
+async def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
+    """Returns the current WorkspaceState as JSON for the MCP agent to read directly."""
+    return workspace.state.model_dump(mode="json")
+
 
 # ── Image Endpoints ────────────────────────────────────────────────────
 

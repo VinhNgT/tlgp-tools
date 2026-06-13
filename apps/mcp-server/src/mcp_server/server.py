@@ -14,6 +14,7 @@ from mcp.server.fastmcp import FastMCP
 
 from mcp_server.tools.launch_annotator import launch_annotator_impl
 from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
+import requests
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
 
 logger = logging.getLogger(__name__)
@@ -55,10 +56,23 @@ def launch_annotator(
             Mutually exclusive with screenshot_path.
 
     Returns:
-        dict with pid.
+        dict with engine_pid and gui_pid.
     """
     return launch_annotator_impl(output_dir, screenshot_path, session_path)
 
+@mcp.tool()
+def get_engine_state() -> dict:
+    """Fetch the current flat-map JSON WorkspaceState from the running Engine.
+    
+    Use this tool to read the latest annotation hierarchy automatically,
+    instead of relying on local JSON files.
+    """
+    try:
+        res = requests.get("http://127.0.0.1:8000/state")
+        res.raise_for_status()
+        return res.json()
+    except Exception as e:
+        return {"error": str(e)}
 
 @mcp.tool()
 def generate_spec_doc(

@@ -34,16 +34,22 @@ def launch_annotator_impl(
     if not uv_bin:
         raise RuntimeError("uv is not installed or not on PATH")
 
-    cmd = [uv_bin, "run", "python", "-m", "tlgp_annotation_tool"]
-    if screenshot_path:
-        cmd.append(os.path.abspath(screenshot_path))
-    if session_path:
-        cmd.extend(["-s", os.path.abspath(session_path)])
-    cmd.extend(["-o", output_dir])
-
-    # Spawn detached — don't wait for the GUI to close
-    proc = subprocess.Popen(
-        cmd,
+    # Spawn Engine
+    engine_cmd = [uv_bin, "run", "python", "-m", "engine"]
+    engine_proc = subprocess.Popen(
+        engine_cmd,
+        cwd=os.path.abspath("apps/engine"),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    
+    # Spawn GUI
+    gui_cmd = [uv_bin, "run", "python", "-m", "gui"]
+    gui_proc = subprocess.Popen(
+        gui_cmd,
+        cwd=os.path.abspath("apps/gui"),
         stdin=subprocess.DEVNULL,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
@@ -51,5 +57,6 @@ def launch_annotator_impl(
     )
 
     return {
-        "pid": proc.pid,
+        "engine_pid": engine_proc.pid,
+        "gui_pid": gui_proc.pid,
     }
