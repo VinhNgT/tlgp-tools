@@ -82,6 +82,15 @@ class EngineClient:
         res = requests.put(f"{API_URL}/components/{comp_id}/move", json={"x": x, "y": y})
         res.raise_for_status()
 
+    def update_component(self, comp_id: str, label: Optional[str] = None, bounds: Optional[dict] = None, parent_id: Optional[str] = None):
+        payload = {}
+        if label is not None: payload["label"] = label
+        if bounds is not None: payload["bounds"] = bounds
+        if parent_id is not None: payload["parentId"] = parent_id
+        
+        res = requests.put(f"{API_URL}/components/{comp_id}", json=payload)
+        res.raise_for_status()
+
     def delete_component(self, comp_id: str):
         res = requests.delete(f"{API_URL}/components/{comp_id}")
         res.raise_for_status()

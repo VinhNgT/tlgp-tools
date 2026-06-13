@@ -1,5 +1,6 @@
 import uuid
 import jsonpatch
+import asyncio
 from typing import List, Callable
 from fastapi import WebSocket
 from models import WorkspaceState
@@ -13,6 +14,8 @@ class WorkspaceManager:
     def __init__(self):
         self._state = WorkspaceState(sessionId=uuid.uuid4())
         self._clients: List[WebSocket] = []
+        self._lock = asyncio.Lock()
+        self.raw_image_bytes: bytes = b""
 
     @property
     def state(self) -> WorkspaceState:
@@ -49,22 +52,24 @@ class WorkspaceManager:
         """
         Executes a mutation function on the state, automatically computes the
         minimal JSON patch, increments the OCC revision, and broadcasts to clients.
+        Uses an asyncio.Lock to ensure thread-safety against concurrent mutations.
         """
-        old_dict = self._state.model_dump(mode="json")
-        
-        # Execute the mutation in-place
-        mutation_fn(self._state)
-        
-        # Increment OCC revision integer
-        self._state.revision += 1
-        
-        new_dict = self._state.model_dump(mode="json")
-        
-        # Compute exact JSON patch
-        patch = jsonpatch.make_patch(old_dict, new_dict).patch
-        
-        # Broadcast the deltas
-        await self.broadcast_patch(patch)
+        async with self._lock:
+            old_dict = self._state.model_dump(mode="json")
+            
+            # Execute the mutation in-place
+            mutation_fn(self._state)
+            
+            # Increment OCC revision integer
+            self._state.revision += 1
+            
+            new_dict = self._state.model_dump(mode="json")
+            
+            # Compute exact JSON patch
+            patch = jsonpatch.make_patch(old_dict, new_dict).patch
+            
+            # Broadcast the deltas
+            await self.broadcast_patch(patch)
 
 # The global singleton instance injected via FastAPI Depends
 workspace_manager = WorkspaceManager()

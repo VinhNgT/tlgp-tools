@@ -6,6 +6,5 @@ members = [
     "apps/engine",
     "apps/gui",
     "libs/models",
-    "libs/rendering",
-    "libs/file-io"
+    "libs/rendering"
 ]
