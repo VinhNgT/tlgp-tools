@@ -1,6 +1,7 @@
 import asyncio
 import json
 import threading
+import uuid
 from collections.abc import Callable
 
 import jsonpatch
@@ -55,26 +56,73 @@ class EngineClient:
     Maintains a local copy of the WorkspaceState, which is kept in sync via JSON Patches.
     """
 
-    def __init__(self, on_state_changed: Callable[[], None]):
+    def __init__(
+        self,
+        on_state_changed: Callable[[], None],
+        on_error: Callable[[str], None] | None = None,
+        api_url: str = API_URL,
+        ws_url: str = WS_URL,
+    ):
         self.state: WorkspaceState | None = None
         self.on_state_changed = on_state_changed
+        self.on_error = on_error
+        self.api_url = api_url
+        self.ws_url = ws_url
+        self._ws = None
+        self._loop = None
+        self._thread = None
+
+    def start(self):
+        """Starts the background event loop and WebSocket connection task."""
+        if self._thread and self._thread.is_alive():
+            return
         self._loop = asyncio.new_event_loop()
         self._thread = threading.Thread(target=self._run_loop, daemon=True)
         self._thread.start()
 
+    def stop(self):
+        """Cleanly cancels all tasks, stops the background event loop, and joins the thread."""
+        if not self._loop:
+            return
+        self._loop.call_soon_threadsafe(self._cancel_all_tasks)
+        if self._thread:
+            self._thread.join(timeout=2.0)
+            self._thread = None
+        self._loop = None
+
+    def _cancel_all_tasks(self):
+        for task in asyncio.all_tasks(self._loop):
+            task.cancel()
+
     def _run_loop(self):
         asyncio.set_event_loop(self._loop)
-        self._loop.run_until_complete(self._listen_ws())
+        try:
+            self._loop.run_until_complete(self._listen_ws())
+        except asyncio.CancelledError:
+            logger.info("EngineClient event loop cancelled successfully")
+        except Exception:
+            logger.exception("EngineClient event loop encountered an exception")
+        finally:
+            self._loop.close()
 
     async def _listen_ws(self):
         while True:
             try:
-                async with websockets.connect(WS_URL) as ws:
+                async with websockets.connect(self.ws_url) as ws:
                     logger.info("Connected to Engine WebSocket")
+                    self._ws = ws
                     async for message in ws:
                         data = json.loads(message)
 
-                        if data.get("type") == "full_sync":
+                        if "error" in data:
+                            err_msg = data["error"].get("message", "Unknown error")
+                            logger.error(
+                                "JSON-RPC error response from engine", error=err_msg
+                            )
+                            if self.on_error:
+                                self.on_error(err_msg)
+
+                        elif data.get("type") == "full_sync":
                             self.state = WorkspaceState.model_validate(data["state"])
                             self._trigger_update()
 
@@ -85,14 +133,40 @@ class EngineClient:
                                 new_dict = patch.apply(old_dict)
                                 self.state = WorkspaceState.model_validate(new_dict)
                                 self._trigger_update()
+            except asyncio.CancelledError:
+                logger.info("WebSocket listener connection task cancelled")
+                raise
             except Exception as e:
                 logger.error("WS Connection lost, retrying in 2s...", error=str(e))
-                await asyncio.sleep(2)
+                self._ws = None
+                self.state = None
+                self._trigger_update()
+                try:
+                    await asyncio.sleep(2)
+                except asyncio.CancelledError:
+                    raise
 
     def _trigger_update(self):
         # Fire callback safely (GUI must handle thread safety if needed)
         if self.on_state_changed:
             self.on_state_changed()
+
+    async def _send_json_rpc(self, method: str, params: dict):
+        if not self._ws:
+            logger.warning(
+                "WS not connected, cannot send JSON-RPC message", method=method
+            )
+            return None
+        req_id = str(uuid.uuid4())
+        msg = {"jsonrpc": "2.0", "method": method, "params": params, "id": req_id}
+        try:
+            await self._ws.send(json.dumps(msg))
+        except Exception as e:
+            logger.error(
+                "Failed to send JSON-RPC message over WebSocket",
+                method=method,
+                error=str(e),
+            )
 
     def _request(self, method: str, url: str, **kwargs) -> requests.Response:
         """Centralized helper for HTTP requests to standardise error handling and exception logging."""
@@ -120,29 +194,76 @@ class EngineClient:
             )
         return res
 
-    # ── REST API Methods ───────────────────────────────────────────────
+    # ── Async REST API Methods ──────────────────────────────────────────
 
-    def import_zip(self, zip_path: str):
-        with open(zip_path, "rb") as f:
-            self._request("POST", f"{API_URL}/import", files={"file": f})
+    def import_zip(
+        self,
+        zip_path: str,
+        on_complete: Callable[[Exception | None], None] | None = None,
+    ):
+        def job():
+            try:
+                with open(zip_path, "rb") as f:
+                    self._request("POST", f"{self.api_url}/import", files={"file": f})
+                if on_complete:
+                    on_complete(None)
+            except Exception as e:
+                logger.exception("Failed to import zip in background")
+                if on_complete:
+                    on_complete(e)
 
-    def import_image(self, image_path: str):
-        with open(image_path, "rb") as f:
-            self._request("POST", f"{API_URL}/import/image", files={"file": f})
+        self._loop.call_soon_threadsafe(lambda: self._loop.run_in_executor(None, job))
+
+    def import_image(
+        self,
+        image_path: str,
+        on_complete: Callable[[Exception | None], None] | None = None,
+    ):
+        def job():
+            try:
+                with open(image_path, "rb") as f:
+                    self._request("POST", f"{self.api_url}/import/image", files={"file": f})
+                if on_complete:
+                    on_complete(None)
+            except Exception as e:
+                logger.exception("Failed to import image in background")
+                if on_complete:
+                    on_complete(e)
+
+        self._loop.call_soon_threadsafe(lambda: self._loop.run_in_executor(None, job))
+
+    def export_zip_data(
+        self, on_complete: Callable[[Exception | None, bytes | None], None]
+    ):
+        def job():
+            try:
+                res = self._request("GET", f"{self.api_url}/export")
+                on_complete(None, res.content)
+            except Exception as e:
+                logger.exception("Failed to export zip in background")
+                on_complete(e, None)
+
+        self._loop.call_soon_threadsafe(lambda: self._loop.run_in_executor(None, job))
+
+    # ── WebSocket JSON-RPC Mutations ────────────────────────────────────
 
     def add_component(
         self, label: str, bounds: dict, parent_id: str | None = None
     ) -> str:
-        payload = {"label": label, "bounds": bounds}
+        comp_id = str(uuid.uuid4())
+        payload = {"id": comp_id, "label": label, "bounds": bounds}
         if parent_id:
-            payload["parentId"] = parent_id
+            payload["parentId"] = str(parent_id)
 
-        res = self._request("POST", f"{API_URL}/components", json=payload)
-        return res.json().get("id")
+        asyncio.run_coroutine_threadsafe(
+            self._send_json_rpc("add_component", payload), self._loop
+        )
+        return comp_id
 
     def move_component(self, comp_id: str, x: int, y: int):
-        self._request(
-            "PUT", f"{API_URL}/components/{comp_id}/move", json={"x": x, "y": y}
+        payload = {"id": str(comp_id), "x": x, "y": y}
+        asyncio.run_coroutine_threadsafe(
+            self._send_json_rpc("move_component", payload), self._loop
         )
 
     def update_component(
@@ -151,31 +272,51 @@ class EngineClient:
         label: str | None = None,
         bounds: dict | None = None,
         parent_id: str | None = None,
+        style: dict | None = None,
+        visibility: dict | None = None,
     ):
-        payload = {}
+        payload = {"id": str(comp_id)}
         if label is not None:
             payload["label"] = label
         if bounds is not None:
             payload["bounds"] = bounds
         if parent_id is not None:
-            payload["parentId"] = parent_id
+            payload["parentId"] = str(parent_id)
+        if style is not None:
+            payload["style"] = style
+        if visibility is not None:
+            payload["visibility"] = visibility
 
-        self._request("PUT", f"{API_URL}/components/{comp_id}", json=payload)
+        asyncio.run_coroutine_threadsafe(
+            self._send_json_rpc("update_component", payload), self._loop
+        )
 
     def delete_component(self, comp_id: str):
-        self._request("DELETE", f"{API_URL}/components/{comp_id}")
+        payload = {"id": str(comp_id)}
+        asyncio.run_coroutine_threadsafe(
+            self._send_json_rpc("delete_component", payload), self._loop
+        )
 
     def undo(self):
-        self._request("POST", f"{API_URL}/session/undo")
+        asyncio.run_coroutine_threadsafe(self._send_json_rpc("undo", {}), self._loop)
 
     def redo(self):
-        self._request("POST", f"{API_URL}/session/redo")
+        asyncio.run_coroutine_threadsafe(self._send_json_rpc("redo", {}), self._loop)
 
-    def export_zip_data(self) -> requests.Response:
-        return self._request("GET", f"{API_URL}/export")
+    def update_cut_lines(self, lines: list[int]):
+        payload = {"lines": lines}
+        asyncio.run_coroutine_threadsafe(
+            self._send_json_rpc("update_cut_lines", payload), self._loop
+        )
+
+    def update_screen_info(self, name: str, description: str):
+        payload = {"name": name, "description": description}
+        asyncio.run_coroutine_threadsafe(
+            self._send_json_rpc("update_screen_info", payload), self._loop
+        )
 
     def get_raw_image_url(self) -> str:
-        return f"{API_URL}/image/raw"
+        return f"{self.api_url}/image/raw"
 
     def get_crop_image_url(self, comp_id: str) -> str:
-        return f"{API_URL}/image/crop/{comp_id}"
+        return f"{self.api_url}/image/crop/{comp_id}"

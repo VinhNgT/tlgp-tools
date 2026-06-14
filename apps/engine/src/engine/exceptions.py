@@ -46,3 +46,9 @@ class UndoRedoError(EngineException):
     """Raised when an undo or redo operation is not possible."""
 
     pass
+
+
+class BoundaryViolationError(EngineException):
+    """Raised when a component's bounds violate its parent-child boundary constraints."""
+
+    pass

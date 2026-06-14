@@ -7,8 +7,8 @@ from pydantic import BaseModel, Field
 class Bounds(BaseModel):
     x: int
     y: int
-    w: int
-    h: int
+    w: int = Field(..., ge=4)
+    h: int = Field(..., ge=4)
 
     @property
     def left(self) -> int:

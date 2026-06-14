@@ -18,3 +18,8 @@ build-backend = "uv_build"
 
 [tool.uv.sources]
 models = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]

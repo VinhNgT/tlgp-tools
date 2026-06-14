@@ -1,9 +1,12 @@
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from tlgp_logger import get_logger
 
 from .api import router
 from .exceptions import (
+    BoundaryViolationError,
     ComponentNotFoundError,
     InvalidArchiveError,
     InvalidImageError,
@@ -91,6 +94,20 @@ async def invalid_state_handler(request: Request, exc: InvalidStateError):
     )
 
 
+@app.exception_handler(BoundaryViolationError)
+async def boundary_violation_handler(request: Request, exc: BoundaryViolationError):
+    logger.warning(
+        "Boundary violation",
+        path=request.url.path,
+        error=exc.message,
+        details=exc.details,
+    )
+    return JSONResponse(
+        status_code=400,
+        content={"detail": exc.message, "details": exc.details},
+    )
+
+
 @app.exception_handler(UndoRedoError)
 async def undo_redo_handler(request: Request, exc: UndoRedoError):
     logger.warning(
@@ -102,6 +119,34 @@ async def undo_redo_handler(request: Request, exc: UndoRedoError):
     return JSONResponse(
         status_code=400,
         content={"detail": exc.message, "details": exc.details},
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    logger.warning(
+        "Request validation failed",
+        path=request.url.path,
+        errors=exc.errors(),
+        body=getattr(exc, "body", None),
+    )
+    return JSONResponse(
+        status_code=422,
+        content={"detail": exc.errors(), "body": getattr(exc, "body", None)},
+    )
+
+
+@app.exception_handler(StarletteHTTPException)
+async def http_exception_handler(request: Request, exc: StarletteHTTPException):
+    logger.warning(
+        "HTTP exception occurred",
+        path=request.url.path,
+        status_code=exc.status_code,
+        detail=exc.detail,
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail},
     )
 
 
