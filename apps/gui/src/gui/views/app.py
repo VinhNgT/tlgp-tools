@@ -42,6 +42,7 @@ class MainAppWindow(tk.Tk):
         self.on_open_screen_info_request = None
         self.on_enter_pressed = None
         self.on_escape_pressed = None
+        self.on_arrow_key_pressed = None
 
         self.mode_var = tk.StringVar(value="select")
 
@@ -146,8 +147,7 @@ class MainAppWindow(tk.Tk):
         )
         self.btn_cut_lines.pack(side=tk.LEFT, padx=2)
 
-        self.lbl_status = ttk.Label(self.toolbar, text="Connecting to Engine...")
-        self.lbl_status.pack(side=tk.RIGHT, padx=5)
+
 
         self.btn_screen_info = ttk.Button(
             self.toolbar,
@@ -166,15 +166,8 @@ class MainAppWindow(tk.Tk):
         self.paned.pack(fill=tk.BOTH, expand=True)
 
         # Left Sidebar (Treeview)
-        left_frame = ttk.Frame(self.paned)
-        self.paned.add(left_frame, weight=1)
-
-        tree_scroll = ttk.Scrollbar(left_frame)
-        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-
-        self.tree = SidebarTreeView(left_frame, yscrollcommand=tree_scroll.set)
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        tree_scroll.config(command=self.tree.yview)
+        self.tree = SidebarTreeView(self.paned)
+        self.paned.add(self.tree, weight=1)
 
         # Middle Area (Canvas)
         middle_frame = ttk.Frame(self.paned)
@@ -327,6 +320,17 @@ class MainAppWindow(tk.Tk):
         self.bind_shortcut("<T>", lambda e: self.canvas.toggle_labels_visibility())
         self.bind_shortcut("<c>", lambda e: self._hotkey_open_cut_editor())
         self.bind_shortcut("<C>", lambda e: self._hotkey_open_cut_editor())
+
+        self.bind_shortcut("<Up>", lambda e: self._on_arrow_key(0, -1))
+        self.bind_shortcut("<Down>", lambda e: self._on_arrow_key(0, 1))
+        self.bind_shortcut("<Left>", lambda e: self._on_arrow_key(-1, 0))
+        self.bind_shortcut("<Right>", lambda e: self._on_arrow_key(1, 0))
+
+        self.bind_shortcut("<Shift-Up>", lambda e: self._on_arrow_key(0, -10))
+        self.bind_shortcut("<Shift-Down>", lambda e: self._on_arrow_key(0, 10))
+        self.bind_shortcut("<Shift-Left>", lambda e: self._on_arrow_key(-10, 0))
+        self.bind_shortcut("<Shift-Right>", lambda e: self._on_arrow_key(10, 0))
+
         self.bind_shortcut("<Button-1>", self._on_window_click, needs_unfocused=False)
         self.bind_shortcut("<Return>", self._on_key_enter, needs_unfocused=True)
         self.bind_shortcut("<Escape>", self._on_key_escape, needs_unfocused=False)
@@ -423,6 +427,16 @@ class MainAppWindow(tk.Tk):
             return self.on_escape_pressed()
         return None
 
+    def _on_arrow_key(self, dx: int, dy: int):
+        if self.is_text_focused():
+            return None
+        if not self.canvas.full_pil_img:
+            return None
+        if self.on_arrow_key_pressed:
+            self.on_arrow_key_pressed(dx, dy)
+            return "break"
+        return None
+
     def _on_window_click(self, event):
         widget = event.widget
         if not widget:
@@ -446,7 +460,7 @@ class MainAppWindow(tk.Tk):
             self.on_open_cut_editor_request()
 
     def update_status(self, text: str):
-        self.lbl_status.config(text=text)
+        self.properties.update_status(text)
 
     def update_zoom_display(self, zoom_factor: float):
         zoom_pct = int(zoom_factor * 100)

@@ -294,7 +294,11 @@ async def handle_json_rpc(
             if req.label is not None:
                 comp.label = req.label
             if req.bounds is not None:
+                dx = req.bounds.x - comp.bounds.x
+                dy = req.bounds.y - comp.bounds.y
                 comp.bounds = req.bounds
+                if dx != 0 or dy != 0:
+                    shift_descendants(state, comp_id, dx, dy)
             if req.style is not None:
                 comp.style = req.style
             if req.visibility is not None:
@@ -623,7 +627,11 @@ async def update_component(
             comp.label = req.label
 
         if req.bounds is not None:
+            dx = req.bounds.x - comp.bounds.x
+            dy = req.bounds.y - comp.bounds.y
             comp.bounds = req.bounds
+            if dx != 0 or dy != 0:
+                shift_descendants(state, comp_id, dx, dy)
 
         if req.style is not None:
             comp.style = req.style

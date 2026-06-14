@@ -60,6 +60,7 @@ class AppController:
         self.view.on_open_screen_info_request = self._on_open_screen_info_request
         self.view.on_enter_pressed = self._on_enter_pressed
         self.view.on_escape_pressed = self._on_escape_pressed
+        self.view.on_arrow_key_pressed = self._on_arrow_key_pressed
 
         # Canvas callbacks
         self.view.canvas.on_import_zip = self._on_import_zip_request
@@ -87,8 +88,10 @@ class AppController:
         )
         self.view.canvas.on_canvas_mode_change_request = self._on_mode_change_request
 
-        # Treeview callback
+        # Sidebar callbacks
         self.view.tree.on_component_selected = self._on_tree_component_selected
+        self.view.tree.on_context_menu_request = self._on_sidebar_context_menu
+        self.view.tree.on_rename_request = self._on_sidebar_rename_request
 
         # Properties callback
         self.view.properties.on_property_changed = self._on_property_changed
@@ -112,19 +115,19 @@ class AppController:
     def _apply_state_sync(self):
         state = self.client.state
         if not state:
-            self.view.update_status("Connecting to Engine...")
+            self.view.update_status(f"Connected to engine: {self.client.api_url}\nSession: Connecting...")
             self.view.set_ui_interactive(False)
             self._loaded_session_id = None
             self.store.update_state("workspace", workspace_state=None)
             return
 
-        self.view.update_status(f"Connected to Engine | Session: {state.sessionId}")
+        self.view.update_status(f"Connected to engine: {self.client.api_url}\nSession: {state.sessionId}")
 
         if state.image:
             current_session_id = str(state.sessionId) if state.sessionId else None
             if (
                 current_session_id != self._loaded_session_id
-                or self.view.canvas.canvas_image is None
+                or self.view.canvas.full_pil_img is None
             ):
                 try:
                     image_data = self.client.get_raw_image_data()
@@ -146,7 +149,7 @@ class AppController:
 
         # Check and remove synchronized transient overrides from active_interaction
         active_interaction = self.store.state.active_interaction
-        if active_interaction and not self.view.canvas.is_canvas_dragging:
+        if active_interaction and not self.view.canvas.gestures.is_dragging:
             active_interaction = dict(active_interaction)
             to_remove = []
             for comp_id, transient_bounds in active_interaction.items():
@@ -191,12 +194,38 @@ class AppController:
             self.store.state.active_interaction,
         )
 
+    def _is_effectively_visible(self, comp_id: UUID) -> bool:
+        state = self.store.state.workspace_state
+        if not state:
+            return True
+        comp = state.components.get(comp_id)
+        if not comp:
+            return True
+        if not getattr(comp.visibility, "visible", True):
+            return False
+        if comp.parentId:
+            return self._is_effectively_visible(comp.parentId)
+        return True
+
+    def _is_effectively_locked(self, comp_id: UUID) -> bool:
+        state = self.store.state.workspace_state
+        if not state:
+            return False
+        comp = state.components.get(comp_id)
+        if not comp:
+            return False
+        if getattr(comp.visibility, "locked", False):
+            return True
+        if comp.parentId:
+            return self._is_effectively_locked(comp.parentId)
+        return False
+
     def _build_tree_nodes(self) -> list[dict]:
         state = self.store.state.workspace_state
         if not state:
             return []
 
-        def build_node(comp_uuid: UUID) -> dict | None:
+        def build_node(comp_uuid: UUID, parent_visible: bool = True, parent_locked: bool = False) -> dict | None:
             comp = state.components.get(comp_uuid)
             if not comp:
                 return None
@@ -204,23 +233,29 @@ class AppController:
             comp_id_str = str(comp.id)
             node_text = f"{comp.number} {comp.label}" if comp.number else comp.label
 
-            suffix = []
-            if not getattr(comp.visibility, "visible", True):
-                suffix.append("hidden")
-            if getattr(comp.visibility, "locked", False):
-                suffix.append("locked")
-            if suffix:
-                node_text += f" ({', '.join(suffix)})"
+            comp_visible = getattr(comp.visibility, "visible", True)
+            comp_locked = getattr(comp.visibility, "locked", False)
+            
+            is_effectively_visible = comp_visible and parent_visible
+            is_effectively_locked = comp_locked or parent_locked
+
+            tags = []
+            if not is_effectively_visible:
+                tags.append("hidden")
+            if is_effectively_locked:
+                tags.append("locked")
 
             children = []
             for child_uuid in comp.childrenIds:
-                child_node = build_node(child_uuid)
+                child_node = build_node(child_uuid, is_effectively_visible, is_effectively_locked)
                 if child_node:
                     children.append(child_node)
 
             return {
                 "id": comp_id_str,
                 "text": node_text,
+                "label": comp.label,
+                "tags": tags,
                 "children": children,
             }
 
@@ -269,28 +304,35 @@ class AppController:
     def _sync_properties(self):
         selected_ids = self.store.state.selected_component_ids
         state = self.store.state.workspace_state
+        active_interaction = self.store.state.active_interaction
+        
         if len(selected_ids) == 1 and state:
             comp_id = selected_ids[0]
             comp = state.components.get(comp_id)
             if comp:
+                bounds = comp.bounds
+                if active_interaction and comp_id in active_interaction:
+                    bounds = active_interaction[comp_id]
+                    
                 self.view.properties.update_properties_panel(
                     box_id=str(comp.id),
                     label=comp.label,
-                    x=int(comp.bounds.x),
-                    y=int(comp.bounds.y),
-                    w=int(comp.bounds.w),
-                    h=int(comp.bounds.h),
+                    x=int(bounds.x),
+                    y=int(bounds.y),
+                    w=int(bounds.w),
+                    h=int(bounds.h),
                     is_visible=getattr(comp.visibility, "visible", True),
                     is_locked=getattr(comp.visibility, "locked", False),
+                    is_effectively_locked=self._is_effectively_locked(comp.id),
                     pill_corner=getattr(comp.style, "pillCorner", "top_left"),
                 )
                 if not self.view.properties.is_field_focused("name"):
                     self.view.properties.update_field_value("name", comp.label)
                 for key in ["x", "y", "w", "h"]:
                     if not self.view.properties.is_field_focused(key):
-                        val = getattr(comp.bounds, key, 0)
+                        val = getattr(bounds, key, 0)
                         self.view.properties.update_field_value(key, str(int(val)))
-                    return
+                return
         self.view.properties.disable_properties_fields()
 
     def check_trigger_screen_info(self):
@@ -326,19 +368,19 @@ class AppController:
         self.store.update_state("viewport", current_mode=mode)
 
     def _on_undo_request(self):
-        if self.view.canvas.canvas_image:
+        if self.view.canvas.full_pil_img:
             self.store.update_state("selection", active_interaction=None)
             self.client.undo()
 
     def _on_redo_request(self):
-        if self.view.canvas.canvas_image:
+        if self.view.canvas.full_pil_img:
             self.store.update_state("selection", active_interaction=None)
             self.client.redo()
 
     def _on_delete_request(self, event=None):
         if self.store.state.text_focused:
             return
-        if not self.view.canvas.canvas_image:
+        if not self.view.canvas.full_pil_img:
             return
         self.store.update_state("selection", active_interaction=None)
         selected_ids = self.store.state.selected_component_ids
@@ -346,6 +388,37 @@ class AppController:
             for comp_id in list(selected_ids):
                 self.client.delete_component(str(comp_id))
             self.store.update_state("selection", selected_component_ids=[])
+
+    def _on_sidebar_context_menu(self, comp_id: UUID, x_root: int, y_root: int):
+        state = self.store.state.workspace_state
+        if not state:
+            return
+        comp = state.components.get(comp_id)
+        if not comp:
+            return
+
+        is_visible = getattr(comp.visibility, "visible", True)
+        is_locked = getattr(comp.visibility, "locked", False)
+
+        def toggle_visible():
+            self.client.update_component(str(comp_id), visibility={"visible": not is_visible, "locked": is_locked})
+
+        def toggle_lock():
+            self.client.update_component(str(comp_id), visibility={"visible": is_visible, "locked": not is_locked})
+
+        def delete_comp():
+            self.client.delete_component(str(comp_id))
+
+        actions = [
+            {"label": "Hide" if is_visible else "Show", "command": toggle_visible},
+            {"label": "Unlock" if is_locked else "Lock", "command": toggle_lock},
+            {"separator": True},
+            {"label": "Delete", "command": delete_comp},
+        ]
+        self.view.show_context_menu(x_root, y_root, actions)
+
+    def _on_sidebar_rename_request(self, comp_id: UUID, new_label: str):
+        self.client.update_component(str(comp_id), label=new_label)
 
     def _on_back_request(self):
         self.view.canvas.drill_out()
@@ -365,6 +438,21 @@ class AppController:
             self.view.canvas.drill_out()
             return "break"
         return None
+
+    def _on_arrow_key_pressed(self, dx: int, dy: int):
+        selected_ids = self.store.state.selected_component_ids
+        if not selected_ids:
+            return
+        state = self.store.state.workspace_state
+        if not state:
+            return
+
+        for comp_id in selected_ids:
+            comp = state.components.get(comp_id)
+            if comp and not self._is_effectively_locked(comp_id):
+                new_x = int(comp.bounds.x) + dx
+                new_y = int(comp.bounds.y) + dy
+                self.client.move_component(str(comp_id), new_x, new_y)
 
     def _on_import_zip_request(self):
         path = self.dialog_service.ask_open_filename(
@@ -411,7 +499,7 @@ class AppController:
         self.client.import_image(path, on_complete=on_complete)
 
     def _on_export_zip_request(self):
-        if not self.view.canvas.canvas_image:
+        if not self.view.canvas.full_pil_img:
             return
         path = self.dialog_service.ask_save_as_filename(
             self.view,
@@ -443,7 +531,7 @@ class AppController:
         self.client.export_zip(path, on_complete=on_complete)
 
     def _on_open_cut_editor_request(self):
-        if not self.view.canvas.canvas_image:
+        if not self.view.canvas.full_pil_img:
             self.dialog_service.show_warning(
                 self.view, "Warning", "Please open an image first!"
             )
@@ -459,7 +547,7 @@ class AppController:
 
         result = self.dialog_service.show_cut_editor(
             self.view,
-            image=self.view.canvas.canvas_image,
+            image=self.view.canvas.full_pil_img,
             initial_cuts=state.cutLines if state else [],
             components=root_comps,
         )
@@ -543,7 +631,7 @@ class AppController:
         self.view.set_mode_str("select")
 
     def _on_canvas_context_menu(self, event, clicked: Component | None):
-        if not self.view.canvas.canvas_image:
+        if not self.view.canvas.full_pil_img:
             return
 
         items = []

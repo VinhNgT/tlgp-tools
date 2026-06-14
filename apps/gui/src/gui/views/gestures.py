@@ -58,6 +58,7 @@ class GestureInterpreter:
 
     def hit_handle(
         self,
+        canvas: Any,
         cx: float,
         cy: float,
         selected_boxes: list[Component],
@@ -70,9 +71,7 @@ class GestureInterpreter:
         if len(selected_boxes) != 1:
             return None
         box = selected_boxes[0]
-        if getattr(box.visibility, "locked", False) or not getattr(
-            box.visibility, "visible", True
-        ):
+        if canvas.is_effectively_locked(box):
             return None
 
         cx1, cy1 = self.transformer.to_canvas(
@@ -112,6 +111,7 @@ class GestureInterpreter:
 
     def get_hit_boxes(
         self,
+        canvas: Any,
         cx: float,
         cy: float,
         components: list[Component],
@@ -123,8 +123,6 @@ class GestureInterpreter:
         """Calculates a list of all visible components intersected by absolute coordinates."""
         hit = []
         for box in components:
-            if not getattr(box.visibility, "visible", True):
-                continue
             bx1, by1 = self.transformer.to_canvas(
                 box.bounds.left,
                 box.bounds.top,
@@ -147,6 +145,7 @@ class GestureInterpreter:
 
     def hit_box(
         self,
+        canvas: Any,
         cx: float,
         cy: float,
         components: list[Component],
@@ -158,7 +157,7 @@ class GestureInterpreter:
     ) -> Component | None:
         """Identifies intersected component, sorting with selected box priorities for cycling."""
         boxes = self.get_hit_boxes(
-            cx, cy, components, zoom_factor, parent_stack, cut_lines, pan_offset
+            canvas, cx, cy, components, zoom_factor, parent_stack, cut_lines, pan_offset
         )
         if not boxes:
             return None
@@ -193,6 +192,7 @@ class GestureInterpreter:
         is_multi = (event.state & 0x0001) or (event.state & 0x0004)
         active_comps = canvas.get_active_boxes()
         hit_boxes_at_click = self.get_hit_boxes(
+            canvas,
             cx,
             cy,
             active_comps,
@@ -204,6 +204,7 @@ class GestureInterpreter:
         primary_sel = selected_boxes[-1] if selected_boxes else None
 
         clicked = self.hit_box(
+            canvas,
             cx,
             cy,
             active_comps,
@@ -237,6 +238,7 @@ class GestureInterpreter:
             and not is_multi
         ):
             handle = self.hit_handle(
+                canvas,
                 cx,
                 cy,
                 selected_boxes,
@@ -263,7 +265,7 @@ class GestureInterpreter:
                     new_box = self.cycle_components[self.last_cycle_index]
                     canvas.set_selection([new_box])
 
-                    if not getattr(new_box.visibility, "locked", False):
+                    if not canvas.is_effectively_locked(new_box):
                         self.is_dragging = True
                         self.drag_mouse_start_abs = self.transformer.to_abs(
                             cx,
@@ -298,6 +300,7 @@ class GestureInterpreter:
                     return
 
         handle = self.hit_handle(
+            canvas,
             cx,
             cy,
             selected_boxes,
@@ -339,7 +342,7 @@ class GestureInterpreter:
                 else:
                     canvas.set_selection([clicked])
 
-                if not getattr(clicked.visibility, "locked", False):
+                if not canvas.is_effectively_locked(clicked):
                     self.is_dragging = True
                     self.drag_mouse_start_abs = self.transformer.to_abs(
                         cx,
@@ -779,6 +782,7 @@ class GestureInterpreter:
             and not self.is_dragging
         ):
             handle = self.hit_handle(
+                canvas,
                 cx,
                 cy,
                 selected_boxes,
@@ -837,6 +841,7 @@ class GestureInterpreter:
 
         active_comps = canvas.get_active_boxes()
         clicked = self.hit_box(
+            canvas,
             cx,
             cy,
             active_comps,
@@ -866,6 +871,7 @@ class GestureInterpreter:
 
         active_comps = canvas.get_active_boxes()
         clicked = self.hit_box(
+            canvas,
             cx,
             cy,
             active_comps,

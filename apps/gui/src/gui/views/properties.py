@@ -165,12 +165,8 @@ class ComponentPropertiesView(ttk.Frame):
             ttk.Label(coords_frame, text=label, font=("", 8, "bold"), width=3).grid(
                 row=row, column=col, sticky="w", pady=2
             )
-            entry = ttk.Entry(coords_frame, font=("", 9), width=8, justify="center")
+            entry = ttk.Entry(coords_frame, font=("", 9), width=8, justify="center", state="readonly")
             entry.grid(row=row, column=col + 1, padx=(2, 8), pady=2)
-            entry.bind("<Return>", self._save_coords)
-            entry.bind("<FocusOut>", self._save_coords)
-            entry.bind("<FocusIn>", lambda e: self._on_focus_in())
-            entry.bind("<FocusOut>", lambda e: self._on_focus_out(), add="+")
             self.prop_entries[key] = entry
 
         visibility_frame = ttk.Frame(self)
@@ -200,7 +196,25 @@ class ComponentPropertiesView(ttk.Frame):
         )
         self.corner_selector.pack(side=tk.LEFT, padx=(10, 0), pady=10)
 
+        bg_color = self.tk.call("ttk::style", "lookup", "TFrame", "-background") or "#f0f0f0"
+        self.txt_status = tk.Text(
+            self, height=2, width=35, font=("", 8), foreground="#888888",
+            background=bg_color, bd=0, highlightthickness=0, relief="flat"
+        )
+        self.txt_status.pack(side=tk.BOTTOM, anchor="se", pady=(20, 5), padx=(0, 5))
+        self.txt_status.tag_configure("right", justify="right")
+        self.update_status("Connecting...")
+
         self.disable_properties_fields()
+
+    def update_status(self, text: str):
+        if not hasattr(self, "txt_status"):
+            return
+        self.txt_status.config(state=tk.NORMAL)
+        self.txt_status.delete("1.0", tk.END)
+        self.txt_status.insert("1.0", text)
+        self.txt_status.tag_add("right", "1.0", "end")
+        self.txt_status.config(state=tk.DISABLED)
 
     def update_properties_panel(
         self,
@@ -212,6 +226,7 @@ class ComponentPropertiesView(ttk.Frame):
         h: int,
         is_visible: bool,
         is_locked: bool,
+        is_effectively_locked: bool,
         pill_corner: str,
     ):
         self._selected_box_id = box_id
@@ -225,13 +240,13 @@ class ComponentPropertiesView(ttk.Frame):
         self.visible_var.set(is_visible)
         self.locked_var.set(is_locked)
 
-        entry_state = tk.DISABLED if is_locked else tk.NORMAL
+        entry_state = tk.DISABLED if is_effectively_locked else tk.NORMAL
 
         self.entry_name.config(state=entry_state)
         for entry in self.prop_entries.values():
-            entry.config(state=entry_state)
+            entry.config(state="readonly" if not is_effectively_locked else tk.DISABLED)
 
-        self.corner_selector.set_state("disabled" if is_locked else "normal")
+        self.corner_selector.set_state("disabled" if is_effectively_locked else "normal")
         self.corner_selector.set_corner(pill_corner)
 
     def is_field_focused(self, field_name: str) -> bool:
@@ -252,8 +267,10 @@ class ComponentPropertiesView(ttk.Frame):
         elif field_name in self.prop_entries:
             entry = self.prop_entries[field_name]
             if entry["state"] != tk.DISABLED:
+                entry.config(state=tk.NORMAL)
                 entry.delete(0, tk.END)
                 entry.insert(0, value)
+                entry.config(state="readonly")
 
     def disable_properties_fields(self):
         self._selected_box_id = None
@@ -264,6 +281,7 @@ class ComponentPropertiesView(ttk.Frame):
         self.entry_name.delete(0, tk.END)
         self.entry_name.config(state=tk.DISABLED)
         for entry in self.prop_entries.values():
+            entry.config(state=tk.NORMAL)
             entry.delete(0, tk.END)
             entry.config(state=tk.DISABLED)
 
@@ -298,21 +316,6 @@ class ComponentPropertiesView(ttk.Frame):
             val = self.entry_name.get().strip()
             if val and val != self._current_label:
                 self.on_property_changed(self._selected_box_id, label=val)
-        if event and event.keysym == "Return":
-            self.focus_set()
-
-    def _save_coords(self, event=None):
-        if self._selected_box_id and self.on_property_changed:
-            try:
-                bounds_dict = {
-                    "x": int(self.prop_entries["x"].get().strip()),
-                    "y": int(self.prop_entries["y"].get().strip()),
-                    "w": int(self.prop_entries["w"].get().strip()),
-                    "h": int(self.prop_entries["h"].get().strip()),
-                }
-                self.on_property_changed(self._selected_box_id, bounds=bounds_dict)
-            except ValueError:
-                pass
         if event and event.keysym == "Return":
             self.focus_set()
 

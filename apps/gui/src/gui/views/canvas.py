@@ -313,6 +313,24 @@ class AnnotationCanvasView(tk.Canvas):
         self._redraw_pending = False
         self.update_view()
 
+    def is_effectively_locked(self, box) -> bool:
+        if getattr(box.visibility, "locked", False):
+            return True
+        if self.workspace_state and box.parentId:
+            parent = self.workspace_state.components.get(box.parentId)
+            if parent:
+                return self.is_effectively_locked(parent)
+        return False
+
+    def is_effectively_visible(self, box) -> bool:
+        if not getattr(box.visibility, "visible", True):
+            return False
+        if self.workspace_state and box.parentId:
+            parent = self.workspace_state.components.get(box.parentId)
+            if parent:
+                return self.is_effectively_visible(parent)
+        return True
+
     def update_view(self):
         if not self.full_pil_img:
             return
@@ -507,7 +525,7 @@ class AnnotationCanvasView(tk.Canvas):
             return None
         parent_id = parent_stack[-1]
         parent = state.components.get(parent_id)
-        if not parent or not getattr(parent.visibility, "visible", True):
+        if not parent:
             return None
 
         img_w = self.current_pil_img.width
@@ -568,7 +586,7 @@ class AnnotationCanvasView(tk.Canvas):
             and len(selected_boxes) == 1
         ):
             active_box = selected_boxes[0]
-            union = self._get_children_bounds_union(active_box)
+            union = self.get_children_bounds_union(active_box)
             if union:
                 cx1, cy1, cx2, cy2 = union
                 gcx1, gcy1 = self.transformer.to_canvas(
@@ -613,11 +631,15 @@ class AnnotationCanvasView(tk.Canvas):
         ordered_boxes = non_selected + selected
 
         for box in ordered_boxes:
-            if not getattr(box.visibility, "visible", True):
-                continue
-
+            is_visible = self.is_effectively_visible(box)
             is_sel = box in selected_boxes
-            color = "#0c8ce9" if is_sel else "#ff4444"
+
+            if is_visible:
+                color = "#0c8ce9" if is_sel else "#ff4444"
+                pill_fill = "white"
+            else:
+                color = "#88bbee" if is_sel else "#aaaaaa"
+                pill_fill = "#f0f0f0"
 
             parent_id = parent_stack[-1] if parent_stack else None
             parent = state.components.get(parent_id) if parent_id else None
@@ -651,7 +673,7 @@ class AnnotationCanvasView(tk.Canvas):
             )
 
             rect_kwargs = {"outline": color, "width": lw, "tags": "ann"}
-            if getattr(box.visibility, "locked", False):
+            if self.is_effectively_locked(box):
                 rect_kwargs["dash"] = (4, 4)
             self.create_rectangle(cx1, cy1, cx2, cy2, **rect_kwargs)
 
@@ -675,7 +697,7 @@ class AnnotationCanvasView(tk.Canvas):
                     pill_y,
                     pill_x + pill_w,
                     pill_y + pill_h,
-                    fill="white",
+                    fill=pill_fill,
                     outline=color,
                     width=pill_outline_w,
                     tags="ann",
@@ -702,16 +724,14 @@ class AnnotationCanvasView(tk.Canvas):
 
         if len(selected) == 1:
             selected_box = selected[0]
-            if getattr(selected_box.visibility, "visible", True) and not getattr(
-                selected_box.visibility, "locked", False
-            ):
+            if not self.is_effectively_locked(selected_box):
                 self._draw_handles(selected_box)
 
         if self.image_item_id is not None:
             self.tag_lower(self.image_item_id)
 
     def _draw_handles(self, box: Component):
-        if box not in self._active_boxes():
+        if box not in self.get_active_boxes():
             return
         zoom_factor = self.zoom_factor
         pan_offset = self.pan_offset
@@ -862,8 +882,6 @@ class AnnotationCanvasView(tk.Canvas):
             pid = self.parent_stack[-1]
             if pid in state.components:
                 target_boxes = [state.components[pid]]
-        else:
-            target_boxes = self.get_active_boxes()
 
         if not target_boxes:
             self.fit_to_screen()
@@ -899,10 +917,7 @@ class AnnotationCanvasView(tk.Canvas):
         fit_w = (cw - pad) / box_w
         fit_h = (ch - pad) / box_h
 
-        if len(target_boxes) == 1:
-            zoom_factor = 2.0
-        else:
-            zoom_factor = max(0.1, min(3.0, min(fit_w, fit_h)))
+        zoom_factor = max(0.1, min(3.0, min(fit_w, fit_h)))
 
         cx = (cx1 + cx2) / 2.0
         cy = (cy1 + cy2) / 2.0
@@ -971,7 +986,7 @@ class AnnotationCanvasView(tk.Canvas):
 
         moved_any = False
         for box in selected_boxes:
-            if getattr(box.visibility, "locked", False):
+            if self.is_effectively_locked(box):
                 continue
             box.bounds.x = int(box.bounds.x + dx)
             box.bounds.y = int(box.bounds.y + dy)
