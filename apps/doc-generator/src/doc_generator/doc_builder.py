@@ -30,7 +30,9 @@ from doc_generator.table_builder import (
 def _set_run_font(run, font_name: str = FONT_FAMILY):
     """Ensure both Latin and East Asian fonts are set."""
     run.font.name = font_name
-    rPr = run._element.get_or_add_rPr()
+    # Access the underlying XML element to configure the East Asian font property,
+    # as python-docx does not provide a public high-level API for this setting.
+    rPr = run._element.get_or_add_rPr()  # noqa: SLF001
     rFonts = rPr.find(qn("w:rFonts"))
     if rFonts is None:
         rFonts = parse_xml(f"<w:rFonts {nsdecls('w')}/>")

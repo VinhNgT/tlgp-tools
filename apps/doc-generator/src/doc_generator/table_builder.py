@@ -54,7 +54,9 @@ def _pt_to_emu(pt: float) -> int:
 
 def _set_cell_border(cell, top=None, bottom=None, left=None, right=None):
     """Set cell borders via XML."""
-    tc = cell._tc
+    # Access the underlying XML table cell element to set custom borders,
+    # as cell borders are not supported by the python-docx public API.
+    tc = cell._tc  # noqa: SLF001
     tcPr = tc.get_or_add_tcPr()
 
     tcBorders = tcPr.find(qn("w:tcBorders"))
@@ -85,7 +87,9 @@ def _set_cell_border(cell, top=None, bottom=None, left=None, right=None):
 
 def _set_cell_padding(cell, top_pt=0, bottom_pt=0, left_pt=0, right_pt=0):
     """Set cell padding (margins) via XML."""
-    tc = cell._tc
+    # Access the underlying XML table cell element to configure padding,
+    # as cell padding is not supported by the python-docx public API.
+    tc = cell._tc  # noqa: SLF001
     tcPr = tc.get_or_add_tcPr()
 
     tcMar = tcPr.find(qn("w:tcMar"))
@@ -109,7 +113,9 @@ def _set_cell_padding(cell, top_pt=0, bottom_pt=0, left_pt=0, right_pt=0):
 
 def _set_cell_shading(cell, color_hex: str):
     """Set cell background color."""
-    tc = cell._tc
+    # Access the underlying XML table cell element to configure shading,
+    # as cell shading is not supported by the python-docx public API.
+    tc = cell._tc  # noqa: SLF001
     tcPr = tc.get_or_add_tcPr()
     shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}" w:val="clear"/>')
     existing = tcPr.find(qn("w:shd"))
