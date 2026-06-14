@@ -1,10 +1,26 @@
 import asyncio
 import uuid
 from collections.abc import Callable
+from typing import Annotated
 
 import jsonpatch
-from fastapi import WebSocket
-from models import WorkspaceState
+from fastapi import Depends, WebSocket
+from models import Bounds, Component, Style, Visibility, WorkspaceState
+
+from .exceptions import ComponentNotFoundError, InvalidStateError, ParentNotFoundError
+from .tree_math import recalculate_tree
+
+
+def shift_descendants(state: WorkspaceState, comp_id: uuid.UUID, dx: int, dy: int):
+    comp = state.components.get(comp_id)
+    if not comp:
+        return
+    for child_id in comp.childrenIds:
+        child = state.components.get(child_id)
+        if child:
+            child.bounds.x += dx
+            child.bounds.y += dy
+            shift_descendants(state, child_id, dx, dy)
 
 
 class WorkspaceManager:
@@ -131,10 +147,179 @@ class WorkspaceManager:
                 return True
             return False
 
+    # ── Domain Service Methods ─────────────────────────────────────────────
+
+    async def add_component(
+        self,
+        comp_id: uuid.UUID,
+        label: str,
+        bounds: Bounds,
+        parent_id: uuid.UUID | None = None,
+        style: Style | None = None,
+        visibility: Visibility | None = None,
+    ):
+        if not self.state.image:
+            raise InvalidStateError("No screenshot/image loaded in workspace")
+
+        def mutate_fn(state: WorkspaceState):
+            if parent_id and parent_id not in state.components:
+                raise ParentNotFoundError(
+                    f"Parent {parent_id} not found",
+                    parent_id=str(parent_id),
+                    component_id=str(comp_id),
+                )
+            new_comp = Component(
+                id=comp_id,
+                number="",  # Auto-assigned by tree_math
+                label=label,
+                parentId=parent_id,
+                bounds=bounds,
+                style=style or Style(),
+                visibility=visibility or Visibility(),
+            )
+            state.components[comp_id] = new_comp
+            if parent_id:
+                state.components[parent_id].childrenIds.append(comp_id)
+            else:
+                state.rootComponents.append(comp_id)
+            recalculate_tree(state, changed_id=comp_id)
+
+        await self.mutate(mutate_fn)
+
+    async def move_component(self, comp_id: uuid.UUID, x: int, y: int):
+        if not self.state.image:
+            raise InvalidStateError("No screenshot/image loaded in workspace")
+
+        def mutate_fn(state: WorkspaceState):
+            if comp_id not in state.components:
+                raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
+            comp = state.components[comp_id]
+            dx = x - comp.bounds.x
+            dy = y - comp.bounds.y
+            comp.bounds.x = x
+            comp.bounds.y = y
+            if dx != 0 or dy != 0:
+                shift_descendants(state, comp_id, dx, dy)
+            recalculate_tree(state, changed_id=comp_id)
+
+        await self.mutate(mutate_fn)
+
+    async def update_component(
+        self,
+        comp_id: uuid.UUID,
+        label: str | None = None,
+        bounds: Bounds | None = None,
+        parent_id: uuid.UUID | None = None,
+        style: Style | None = None,
+        visibility: Visibility | None = None,
+    ):
+        if not self.state.image:
+            raise InvalidStateError("No screenshot/image loaded in workspace")
+
+        def mutate_fn(state: WorkspaceState):
+            if comp_id not in state.components:
+                raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
+            
+            comp = state.components[comp_id]
+            
+            if label is not None:
+                comp.label = label
+            if bounds is not None:
+                comp.bounds = bounds
+            if style is not None:
+                comp.style = style
+            if visibility is not None:
+                comp.visibility = visibility
+            
+            if parent_id is not None and parent_id != comp.parentId:
+                # Remove from old parent/roots
+                if comp.parentId:
+                    old_parent = state.components.get(comp.parentId)
+                    if old_parent and comp_id in old_parent.childrenIds:
+                        old_parent.childrenIds.remove(comp_id)
+                else:
+                    if comp_id in state.rootComponents:
+                        state.rootComponents.remove(comp_id)
+                
+                # Add to new parent
+                comp.parentId = parent_id
+                new_parent = state.components.get(parent_id)
+                if new_parent:
+                    new_parent.childrenIds.append(comp_id)
+                else:
+                    raise ParentNotFoundError(
+                        "New parent not found",
+                        component_id=str(comp_id),
+                        parent_id=str(parent_id),
+                    )
+            recalculate_tree(state, changed_id=comp_id)
+
+        await self.mutate(mutate_fn)
+
+    async def delete_component(self, comp_id: uuid.UUID):
+        if not self.state.image:
+            raise InvalidStateError("No screenshot/image loaded in workspace")
+
+        def mutate_fn(state: WorkspaceState):
+            if comp_id not in state.components:
+                raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
+            
+            comp = state.components[comp_id]
+            parent_id = comp.parentId
+            
+            if comp.parentId:
+                parent = state.components.get(comp.parentId)
+                if parent and comp_id in parent.childrenIds:
+                    parent.childrenIds.remove(comp_id)
+            else:
+                if comp_id in state.rootComponents:
+                    state.rootComponents.remove(comp_id)
+            
+            def delete_recursive(cid: uuid.UUID):
+                c = state.components.get(cid)
+                if c:
+                    for child_id in list(c.childrenIds):
+                        delete_recursive(child_id)
+                    del state.components[cid]
+                    
+            delete_recursive(comp_id)
+            recalculate_tree(state, changed_id=parent_id if parent_id else "roots")
+
+        await self.mutate(mutate_fn)
+
+    async def update_cut_lines(self, lines: list[int]):
+        if not self.state.image:
+            raise InvalidStateError("No screenshot/image loaded in workspace")
+
+        def mutate_fn(state: WorkspaceState):
+            for cut in lines:
+                for comp in state.components.values():
+                    if comp.bounds.top <= cut <= comp.bounds.bottom:
+                        raise InvalidStateError(
+                            f"Cut line at Y={cut} intersects component '{comp.label}' bounds",
+                            component_id=str(comp.id),
+                            cut_y=cut,
+                        )
+            state.cutLines = sorted(lines)
+            recalculate_tree(state)
+
+        await self.mutate(mutate_fn)
+
+    async def update_screen_info(self, name: str, description: str):
+        if not self.state.image:
+            raise InvalidStateError("No screenshot/image loaded in workspace")
+
+        def mutate_fn(state: WorkspaceState):
+            state.screen.name = name
+            state.screen.description = description
+
+        await self.mutate(mutate_fn)
+
 
 # The global singleton instance injected via FastAPI Depends
 workspace_manager = WorkspaceManager()
 
-
 def get_workspace() -> WorkspaceManager:
     return workspace_manager
+
+WorkspaceDep = Annotated[WorkspaceManager, Depends(get_workspace)]

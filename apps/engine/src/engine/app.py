@@ -1,5 +1,8 @@
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from tlgp_logger import get_logger
@@ -17,10 +20,29 @@ from .exceptions import (
 
 logger = get_logger(__name__)
 
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Application startup: initialize resources if needed
+    logger.info("Starting up Annotation Engine API...")
+    yield
+    # Application shutdown: clean up resources if needed
+    logger.info("Shutting down Annotation Engine API...")
+
+
 app = FastAPI(
     title="Annotation Engine API",
     description="REST & WebSocket API for the TLGP Annotation Engine.",
     version="0.1.0",
+    lifespan=lifespan,
+)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],  # Adjust in production to specific frontend URLs
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
 

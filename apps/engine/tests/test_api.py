@@ -119,12 +119,12 @@ def test_operation_fails_validation_when_no_image():
             "bounds": {"x": 10, "y": 20, "w": 100, "h": 50},
         },
     )
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert "no screenshot/image" in response.json()["detail"].lower()
 
     # Try to move a component without image
     response = client.put(f"/components/{uuid.uuid4()}/move", json={"x": 100, "y": 200})
-    assert response.status_code == 422
+    assert response.status_code == 400
     assert "no screenshot/image" in response.json()["detail"].lower()
 
 

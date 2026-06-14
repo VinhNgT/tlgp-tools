@@ -26,31 +26,19 @@ from .exceptions import (
     ParentNotFoundError,
     UndoRedoError,
 )
-from .state import WorkspaceManager, get_workspace
+from .state import WorkspaceManager, WorkspaceDep
 from .tree_math import recalculate_tree
 
 logger = get_logger(__name__)
 router = APIRouter()
 
 
-def shift_descendants(state: WorkspaceState, comp_id: uuid.UUID, dx: int, dy: int):
-    comp = state.components.get(comp_id)
-    if not comp:
-        return
-    for child_id in comp.childrenIds:
-        child = state.components.get(child_id)
-        if child:
-            child.bounds.x += dx
-            child.bounds.y += dy
-            shift_descendants(state, child_id, dx, dy)
-
-
 # ── Import / Export ────────────────────────────────────────────────────
 
 
-@router.post("/import")
+@router.post("/import", tags=["Import/Export"])
 async def import_workspace(
-    file: UploadFile = File(...), workspace: WorkspaceManager = Depends(get_workspace)
+    workspace: WorkspaceDep, file: UploadFile = File(...)
 ):
     """Accepts a .zip file, unzips it entirely in RAM, and loads the WorkspaceState into memory."""
     logger.info("Importing workspace zip file", filename=file.filename)
@@ -101,9 +89,9 @@ async def import_workspace(
     return {"status": "imported", "sessionId": workspace.state.sessionId}
 
 
-@router.post("/import/image")
+@router.post("/import/image", tags=["Import/Export"])
 async def import_image(
-    file: UploadFile = File(...), workspace: WorkspaceManager = Depends(get_workspace)
+    workspace: WorkspaceDep, file: UploadFile = File(...)
 ):
     """Accepts a raw image file, clears the workspace, and sets it as the root image in RAM."""
     logger.info("Importing raw image file", filename=file.filename)
@@ -138,7 +126,7 @@ async def import_image(
 
 
 @router.get("/export")
-async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
+async def export_workspace(workspace: WorkspaceDep):
     """Packs the current WorkspaceState and image into a .zip file and returns it from RAM."""
     logger.info("Exporting workspace archive", sessionId=str(workspace.state.sessionId))
     if not workspace.state.image or not workspace.state.image.filename:
@@ -164,8 +152,8 @@ async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace))
     )
 
 
-@router.get("/state")
-async def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
+@router.get("/state", tags=["State"])
+async def get_state(workspace: WorkspaceDep):
     """Returns the current WorkspaceState as JSON for the MCP agent to read directly."""
     return workspace.state.model_dump(mode="json")
 
@@ -173,8 +161,8 @@ async def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
 # ── Image Endpoints ────────────────────────────────────────────────────
 
 
-@router.get("/image/raw")
-async def get_raw_image(workspace: WorkspaceManager = Depends(get_workspace)):
+@router.get("/image/raw", tags=["Image"])
+async def get_raw_image(workspace: WorkspaceDep):
     """Returns the raw unannotated image straight from RAM."""
     if not workspace.raw_image_bytes:
         raise ComponentNotFoundError(
@@ -184,9 +172,9 @@ async def get_raw_image(workspace: WorkspaceManager = Depends(get_workspace)):
     return Response(content=workspace.raw_image_bytes, media_type="image/png")
 
 
-@router.get("/image/crop/{comp_id}")
+@router.get("/image/crop/{comp_id}", tags=["Image"])
 async def get_image_crop(
-    comp_id: uuid.UUID, workspace: WorkspaceManager = Depends(get_workspace)
+    comp_id: uuid.UUID, workspace: WorkspaceDep
 ):
     """Returns a cropped unannotated image for a specific component straight from RAM."""
     if comp_id not in workspace.state.components:
@@ -216,196 +204,67 @@ async def handle_json_rpc(
 ) -> dict:
     if method == "add_component":
         req = AddComponentRequest.model_validate(params)
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
         comp_id = req.id or uuid.uuid4()
-
-        def mutate(state: WorkspaceState):
-            if req.parentId and req.parentId not in state.components:
-                raise ParentNotFoundError(
-                    f"Parent {req.parentId} not found",
-                    parent_id=str(req.parentId),
-                    component_id=str(comp_id),
-                )
-            new_comp = Component(
-                id=comp_id,
-                number="",  # Auto-assigned by tree_math
-                label=req.label,
-                parentId=req.parentId,
-                bounds=req.bounds,
-                style=req.style or Style(),
-                visibility=req.visibility or Visibility(),
-            )
-            state.components[comp_id] = new_comp
-            if req.parentId:
-                state.components[req.parentId].childrenIds.append(comp_id)
-            else:
-                state.rootComponents.append(comp_id)
-            recalculate_tree(state, changed_id=comp_id)
-
-        await workspace.mutate(mutate)
+        await workspace.add_component(
+            comp_id=comp_id,
+            label=req.label,
+            bounds=req.bounds,
+            parent_id=req.parentId,
+            style=req.style,
+            visibility=req.visibility,
+        )
         return {"id": str(comp_id), "status": "added"}
 
     elif method == "move_component":
         comp_id_str = params.get("comp_id") or params.get("id")
         if not comp_id_str:
             raise ValueError("Missing 'comp_id' parameter")
-        comp_id = (
-            uuid.UUID(comp_id_str) if isinstance(comp_id_str, str) else comp_id_str
-        )
+        comp_id = uuid.UUID(comp_id_str) if isinstance(comp_id_str, str) else comp_id_str
         req = MoveComponentRequest.model_validate(params)
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
-
-        def mutate(state: WorkspaceState):
-            if comp_id not in state.components:
-                raise ComponentNotFoundError(
-                    "Component not found", component_id=str(comp_id)
-                )
-            comp = state.components[comp_id]
-            dx = req.x - comp.bounds.x
-            dy = req.y - comp.bounds.y
-            comp.bounds.x = req.x
-            comp.bounds.y = req.y
-            if dx != 0 or dy != 0:
-                shift_descendants(state, comp_id, dx, dy)
-            recalculate_tree(state, changed_id=comp_id)
-
-        await workspace.mutate(mutate)
+        await workspace.move_component(comp_id=comp_id, x=req.x, y=req.y)
         return {"status": "moved"}
 
     elif method == "update_component":
         comp_id_str = params.get("comp_id") or params.get("id")
         if not comp_id_str:
             raise ValueError("Missing 'comp_id' parameter")
-        comp_id = (
-            uuid.UUID(comp_id_str) if isinstance(comp_id_str, str) else comp_id_str
-        )
+        comp_id = uuid.UUID(comp_id_str) if isinstance(comp_id_str, str) else comp_id_str
         req = UpdateComponentRequest.model_validate(params)
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
-
-        def mutate(state: WorkspaceState):
-            if comp_id not in state.components:
-                raise ComponentNotFoundError(
-                    "Component not found", component_id=str(comp_id)
-                )
-            comp = state.components[comp_id]
-            if req.label is not None:
-                comp.label = req.label
-            if req.bounds is not None:
-                dx = req.bounds.x - comp.bounds.x
-                dy = req.bounds.y - comp.bounds.y
-                comp.bounds = req.bounds
-                if dx != 0 or dy != 0:
-                    shift_descendants(state, comp_id, dx, dy)
-            if req.style is not None:
-                comp.style = req.style
-            if req.visibility is not None:
-                comp.visibility = req.visibility
-            if req.parentId is not None and req.parentId != comp.parentId:
-                # Remove from old parent/roots
-                if comp.parentId:
-                    old_parent = state.components.get(comp.parentId)
-                    if old_parent and comp_id in old_parent.childrenIds:
-                        old_parent.childrenIds.remove(comp_id)
-                else:
-                    if comp_id in state.rootComponents:
-                        state.rootComponents.remove(comp_id)
-                # Add to new parent
-                comp.parentId = req.parentId
-                new_parent = state.components.get(req.parentId)
-                if new_parent:
-                    new_parent.childrenIds.append(comp_id)
-                else:
-                    raise ParentNotFoundError(
-                        "New parent not found",
-                        component_id=str(comp_id),
-                        parent_id=str(req.parentId),
-                    )
-            recalculate_tree(state, changed_id=comp_id)
-
-        await workspace.mutate(mutate)
+        await workspace.update_component(
+            comp_id=comp_id,
+            label=req.label,
+            bounds=req.bounds,
+            parent_id=req.parentId,
+            style=req.style,
+            visibility=req.visibility,
+        )
         return {"status": "updated"}
 
     elif method == "delete_component":
         comp_id_str = params.get("comp_id") or params.get("id")
         if not comp_id_str:
             raise ValueError("Missing 'comp_id' parameter")
-        comp_id = (
-            uuid.UUID(comp_id_str) if isinstance(comp_id_str, str) else comp_id_str
-        )
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
-
-        def mutate(state: WorkspaceState):
-            if comp_id not in state.components:
-                raise ComponentNotFoundError(
-                    "Component not found", component_id=str(comp_id)
-                )
-            comp = state.components[comp_id]
-            parent_id = comp.parentId
-            if comp.parentId:
-                parent = state.components.get(comp.parentId)
-                if parent and comp_id in parent.childrenIds:
-                    parent.childrenIds.remove(comp_id)
-            else:
-                if comp_id in state.rootComponents:
-                    state.rootComponents.remove(comp_id)
-
-            def delete_recursive(cid: uuid.UUID):
-                c = state.components.get(cid)
-                if c:
-                    for child_id in list(c.childrenIds):
-                        delete_recursive(child_id)
-                    del state.components[cid]
-
-            delete_recursive(comp_id)
-            recalculate_tree(state, changed_id=parent_id if parent_id else "roots")
-
-        await workspace.mutate(mutate)
+        comp_id = uuid.UUID(comp_id_str) if isinstance(comp_id_str, str) else comp_id_str
+        await workspace.delete_component(comp_id=comp_id)
         return {"status": "deleted"}
 
     elif method == "undo":
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
         success = await workspace.undo()
         if not success:
-            raise UndoRedoError(
-                "Cannot undo", session_id=str(workspace.state.sessionId)
-            )
+            raise UndoRedoError("Cannot undo", session_id=str(workspace.state.sessionId))
         return {"status": "undone"}
 
     elif method == "redo":
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
         success = await workspace.redo()
         if not success:
-            raise UndoRedoError(
-                "Cannot redo", session_id=str(workspace.state.sessionId)
-            )
+            raise UndoRedoError("Cannot redo", session_id=str(workspace.state.sessionId))
         return {"status": "redone"}
 
     elif method == "update_cut_lines":
         lines = params.get("lines")
         if lines is None:
             raise ValueError("Missing 'lines' parameter")
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
-
-        def mutate(state: WorkspaceState):
-            for cut in lines:
-                for comp in state.components.values():
-                    if comp.bounds.top <= cut <= comp.bounds.bottom:
-                        raise InvalidStateError(
-                            f"Cut line at Y={cut} intersects component '{comp.label}' bounds",
-                            component_id=str(comp.id),
-                            cut_y=cut,
-                        )
-            state.cutLines = sorted(lines)
-            recalculate_tree(state)
-
-        await workspace.mutate(mutate)
+        await workspace.update_cut_lines(lines=lines)
         return {"status": "updated_cuts"}
 
     elif method == "update_screen_info":
@@ -413,23 +272,14 @@ async def handle_json_rpc(
         description = params.get("description")
         if name is None or description is None:
             raise ValueError("Missing 'name' or 'description' parameter")
-        if not workspace.state.image:
-            raise InvalidStateError("No screenshot/image loaded in workspace")
-
-        def mutate(state: WorkspaceState):
-            state.screen.name = name
-            state.screen.description = description
-
-        await workspace.mutate(mutate)
+        await workspace.update_screen_info(name=name, description=description)
         return {"status": "updated_screen_info"}
 
     else:
         raise ValueError(f"Method '{method}' not found")
-
-
 @router.websocket("/ws")
 async def websocket_endpoint(
-    websocket: WebSocket, workspace: WorkspaceManager = Depends(get_workspace)
+    websocket: WebSocket, workspace: WorkspaceDep
 ):
     """
     Clients connect to receive the full WorkspaceState JSON immediately,
@@ -506,50 +356,20 @@ class AddComponentRequest(BaseModel):
     visibility: Visibility | None = None
 
 
-@router.post("/components")
+@router.post("/components", tags=["Components"])
 async def add_component(
-    req: AddComponentRequest, workspace: WorkspaceManager = Depends(get_workspace)
+    req: AddComponentRequest, workspace: WorkspaceDep
 ):
-    if not workspace.state.image:
-        raise HTTPException(
-            status_code=422, detail="No screenshot/image loaded in workspace"
-        )
     comp_id = req.id or uuid.uuid4()
-    logger.info(
-        "Adding component",
-        comp_id=str(comp_id),
+    logger.info("Adding component", comp_id=str(comp_id), label=req.label, parentId=str(req.parentId) if req.parentId else None)
+    await workspace.add_component(
+        comp_id=comp_id,
         label=req.label,
-        parentId=str(req.parentId) if req.parentId else None,
+        bounds=req.bounds,
+        parent_id=req.parentId,
+        style=req.style,
+        visibility=req.visibility,
     )
-
-    def mutate(state: WorkspaceState):
-        if req.parentId and req.parentId not in state.components:
-            raise ParentNotFoundError(
-                f"Parent {req.parentId} not found",
-                parent_id=str(req.parentId),
-                component_id=str(comp_id),
-            )
-
-        new_comp = Component(
-            id=comp_id,
-            number="",  # Auto-assigned by tree_math
-            label=req.label,
-            parentId=req.parentId,
-            bounds=req.bounds,
-            style=req.style or Style(),
-            visibility=req.visibility or Visibility(),
-        )
-
-        state.components[comp_id] = new_comp
-
-        if req.parentId:
-            state.components[req.parentId].childrenIds.append(comp_id)
-        else:
-            state.rootComponents.append(comp_id)
-
-        recalculate_tree(state, changed_id=comp_id)
-
-    await workspace.mutate(mutate)
     return {"id": comp_id, "status": "added"}
 
 
@@ -558,35 +378,14 @@ class MoveComponentRequest(BaseModel):
     y: int
 
 
-@router.put("/components/{comp_id}/move")
+@router.put("/components/{comp_id}/move", tags=["Components"])
 async def move_component(
     comp_id: uuid.UUID,
     req: MoveComponentRequest,
-    workspace: WorkspaceManager = Depends(get_workspace),
+    workspace: WorkspaceDep,
 ):
-    if not workspace.state.image:
-        raise HTTPException(
-            status_code=422, detail="No screenshot/image loaded in workspace"
-        )
     logger.info("Moving component", comp_id=str(comp_id), x=req.x, y=req.y)
-
-    def mutate(state: WorkspaceState):
-        if comp_id not in state.components:
-            raise ComponentNotFoundError(
-                "Component not found", component_id=str(comp_id)
-            )
-
-        comp = state.components[comp_id]
-        dx = req.x - comp.bounds.x
-        dy = req.y - comp.bounds.y
-        comp.bounds.x = req.x
-        comp.bounds.y = req.y
-        if dx != 0 or dy != 0:
-            shift_descendants(state, comp_id, dx, dy)
-
-        recalculate_tree(state, changed_id=comp_id)
-
-    await workspace.mutate(mutate)
+    await workspace.move_component(comp_id=comp_id, x=req.x, y=req.y)
     return {"status": "moved"}
 
 
@@ -598,122 +397,35 @@ class UpdateComponentRequest(BaseModel):
     visibility: Visibility | None = None
 
 
-@router.put("/components/{comp_id}")
+@router.put("/components/{comp_id}", tags=["Components"])
 async def update_component(
     comp_id: uuid.UUID,
     req: UpdateComponentRequest,
-    workspace: WorkspaceManager = Depends(get_workspace),
+    workspace: WorkspaceDep,
 ):
-    if not workspace.state.image:
-        raise HTTPException(
-            status_code=422, detail="No screenshot/image loaded in workspace"
-        )
-    logger.info(
-        "Updating component",
-        comp_id=str(comp_id),
+    logger.info("Updating component", comp_id=str(comp_id), label=req.label, parentId=str(req.parentId) if req.parentId else None)
+    await workspace.update_component(
+        comp_id=comp_id,
         label=req.label,
-        parentId=str(req.parentId) if req.parentId else None,
+        bounds=req.bounds,
+        parent_id=req.parentId,
+        style=req.style,
+        visibility=req.visibility,
     )
-
-    def mutate(state: WorkspaceState):
-        if comp_id not in state.components:
-            raise ComponentNotFoundError(
-                "Component not found", component_id=str(comp_id)
-            )
-
-        comp = state.components[comp_id]
-
-        if req.label is not None:
-            comp.label = req.label
-
-        if req.bounds is not None:
-            dx = req.bounds.x - comp.bounds.x
-            dy = req.bounds.y - comp.bounds.y
-            comp.bounds = req.bounds
-            if dx != 0 or dy != 0:
-                shift_descendants(state, comp_id, dx, dy)
-
-        if req.style is not None:
-            comp.style = req.style
-        if req.visibility is not None:
-            comp.visibility = req.visibility
-        if req.parentId is not None and req.parentId != comp.parentId:
-            # Remove from old parent/roots
-            if comp.parentId:
-                old_parent = state.components.get(comp.parentId)
-                if old_parent and comp_id in old_parent.childrenIds:
-                    old_parent.childrenIds.remove(comp_id)
-            else:
-                if comp_id in state.rootComponents:
-                    state.rootComponents.remove(comp_id)
-
-            # Add to new parent
-            comp.parentId = req.parentId
-            new_parent = state.components.get(req.parentId)
-            if new_parent:
-                new_parent.childrenIds.append(comp_id)
-            else:
-                raise ParentNotFoundError(
-                    "New parent not found",
-                    component_id=str(comp_id),
-                    parent_id=str(req.parentId),
-                )
-
-        recalculate_tree(state, changed_id=comp_id)
-
-    await workspace.mutate(mutate)
     return {"status": "updated"}
 
 
-@router.delete("/components/{comp_id}")
+@router.delete("/components/{comp_id}", tags=["Components"])
 async def delete_component(
-    comp_id: uuid.UUID, workspace: WorkspaceManager = Depends(get_workspace)
+    comp_id: uuid.UUID, workspace: WorkspaceDep
 ):
-    if not workspace.state.image:
-        raise HTTPException(
-            status_code=422, detail="No screenshot/image loaded in workspace"
-        )
     logger.info("Deleting component", comp_id=str(comp_id))
-
-    def mutate(state: WorkspaceState):
-        if comp_id not in state.components:
-            raise ComponentNotFoundError(
-                "Component not found", component_id=str(comp_id)
-            )
-
-        comp = state.components[comp_id]
-        parent_id = comp.parentId
-
-        # Remove from parent or roots
-        if comp.parentId:
-            parent = state.components.get(comp.parentId)
-            if parent and comp_id in parent.childrenIds:
-                parent.childrenIds.remove(comp_id)
-        else:
-            if comp_id in state.rootComponents:
-                state.rootComponents.remove(comp_id)
-
-        # Cascading delete
-        def delete_recursive(cid: uuid.UUID):
-            c = state.components.get(cid)
-            if c:
-                for child_id in list(c.childrenIds):
-                    delete_recursive(child_id)
-                del state.components[cid]
-
-        delete_recursive(comp_id)
-        recalculate_tree(state, changed_id=parent_id if parent_id else "roots")
-
-    await workspace.mutate(mutate)
+    await workspace.delete_component(comp_id=comp_id)
     return {"status": "deleted"}
 
 
-@router.post("/session/undo")
-async def session_undo(workspace: WorkspaceManager = Depends(get_workspace)):
-    if not workspace.state.image:
-        raise HTTPException(
-            status_code=422, detail="No screenshot/image loaded in workspace"
-        )
+@router.post("/session/undo", tags=["Session"])
+async def session_undo(workspace: WorkspaceDep):
     logger.info("Performing undo")
     success = await workspace.undo()
     if not success:
@@ -721,12 +433,8 @@ async def session_undo(workspace: WorkspaceManager = Depends(get_workspace)):
     return {"status": "undone"}
 
 
-@router.post("/session/redo")
-async def session_redo(workspace: WorkspaceManager = Depends(get_workspace)):
-    if not workspace.state.image:
-        raise HTTPException(
-            status_code=422, detail="No screenshot/image loaded in workspace"
-        )
+@router.post("/session/redo", tags=["Session"])
+async def session_redo(workspace: WorkspaceDep):
     logger.info("Performing redo")
     success = await workspace.redo()
     if not success:
