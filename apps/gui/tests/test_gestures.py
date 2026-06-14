@@ -286,3 +286,110 @@ def test_gesture_on_release_move_and_resize():
 
     assert "<<ComponentResized>>" in events_generated
     assert canvas.last_resized_component == (comp, {"x": 150, "y": 150, "w": 150, "h": 100})
+
+
+def test_double_click_cycles_overlapping_boxes():
+    from PIL import Image
+    from uuid import uuid4
+    from models import WorkspaceState, ImageInfo, Component, Bounds, Style, Visibility
+    import time
+
+    store = UIStateStore()
+
+    # Create two overlapping components
+    # Comp 1: (50, 50) to (150, 150)
+    comp1 = Component(
+        id=uuid4(),
+        number="1",
+        label="Comp 1",
+        bounds=Bounds(x=50, y=50, w=100, h=100),
+        style=Style(),
+        visibility=Visibility(visible=True, locked=False),
+    )
+    # Comp 2: (80, 80) to (180, 180) - drawn second (top-most)
+    comp2 = Component(
+        id=uuid4(),
+        number="2",
+        label="Comp 2",
+        bounds=Bounds(x=80, y=80, w=100, h=100),
+        style=Style(),
+        visibility=Visibility(visible=True, locked=False),
+    )
+
+    ws = WorkspaceState(
+        sessionId=uuid4(),
+        image=ImageInfo(filename="test.png", width=1000, height=1000),
+        components={comp1.id: comp1, comp2.id: comp2},
+        rootComponents=[comp1.id, comp2.id],
+    )
+    store.update_state("workspace", workspace_state=ws)
+    store.update_state("viewport", selected_component_ids=[], current_mode="select", zoom_factor=1.0, pan_offset=(0.0, 0.0))
+
+    transformer = ViewportTransformer()
+    transformer.update_image_size(1000, 1000)
+    gestures = GestureInterpreter(store, transformer)
+
+    class MockCanvas:
+        def __init__(self):
+            self.full_pil_img = Image.new("RGB", (1000, 1000))
+            self._space_pan_active = False
+            self._selection = []
+        def winfo_width(self): return 800
+        def winfo_height(self): return 600
+        def delete(self, item_id): pass
+        def draw_boxes(self): pass
+        def _active_boxes(self):
+            return [comp1, comp2]
+        def set_selection(self, sel):
+            self._selection = sel
+            store.update_state("selection", selected_component_ids=[b.id for b in sel])
+
+    canvas = MockCanvas()
+
+    class MockEvent:
+        def __init__(self, x, y, state=0):
+            self.x = x
+            self.y = y
+            self.state = state
+
+    # Click in the overlap region (100, 100)
+    # 1. First Click (Selection Click)
+    gestures.on_click(canvas, MockEvent(100, 100), 100.0, 100.0)
+    # Comp 2 is top-most (last in active_boxes list), so it should be selected first.
+    assert len(canvas._selection) == 1
+    assert canvas._selection[0].id == comp2.id
+    assert store.state.selected_component_ids == [comp2.id]
+
+    # 2. Second Click (Double Click relative to click 1)
+    # No cycling should occur because click 1 was a selection click.
+    gestures.on_click(canvas, MockEvent(100, 100), 100.0, 100.0)
+    assert len(canvas._selection) == 1
+    assert canvas._selection[0].id == comp2.id
+
+    # 3. Third Click (Double Click relative to click 2)
+    # Cycling should occur because click 2 was not a selection click.
+    gestures.last_click_time = time.time() - 0.1
+    gestures.on_click(canvas, MockEvent(100, 100), 100.0, 100.0)
+    # Selection should cycle to comp1
+    assert len(canvas._selection) == 1
+    assert canvas._selection[0].id == comp1.id
+    assert store.state.selected_component_ids == [comp1.id]
+    # It should also start dragging the newly selected box
+    assert gestures.is_dragging
+    assert gestures.drag_orig_bounds == (50, 50, 150, 150)
+
+    # 4. Fourth Click (Double Click relative to click 3)
+    # No cycling should occur because click 3 was a selection click (changed from comp2 to comp1).
+    gestures.last_click_time = time.time() - 0.1
+    gestures.on_click(canvas, MockEvent(100, 100), 100.0, 100.0)
+    assert len(canvas._selection) == 1
+    assert canvas._selection[0].id == comp1.id
+
+    # 5. Fifth Click (Double Click relative to click 4)
+    # Cycling should occur because click 4 was not a selection click.
+    gestures.last_click_time = time.time() - 0.1
+    gestures.on_click(canvas, MockEvent(100, 100), 100.0, 100.0)
+    # Selection cycles back to comp2
+    assert len(canvas._selection) == 1
+    assert canvas._selection[0].id == comp2.id
+

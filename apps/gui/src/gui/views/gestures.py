@@ -33,6 +33,14 @@ class GestureInterpreter:
         self.draw_start_y = 0.0
         self.temp_rect_id = None
 
+        # Double-click interaction tracking
+        self.last_click_time = 0.0
+        self.last_click_cx = 0.0
+        self.last_click_cy = 0.0
+        self.click_sequence_count = 0
+        self.cycle_components = None
+        self.last_cycle_index = -1
+
     def hit_handle(
         self,
         cx: float,
@@ -155,6 +163,96 @@ class GestureInterpreter:
             if workspace and uid in workspace.components
         ]
 
+        now = time.time()
+        is_multi = (event.state & 0x0001) or (event.state & 0x0004)
+        active_comps = canvas._active_boxes()
+        hit_boxes_at_click = self.get_hit_boxes(
+            cx, cy, active_comps, state.zoom_factor, parent_stack, cut_lines
+        )
+        primary_sel = selected_boxes[-1] if selected_boxes else None
+
+        clicked = self.hit_box(
+            cx,
+            cy,
+            active_comps,
+            selected_boxes,
+            state.zoom_factor,
+            parent_stack,
+            cut_lines,
+        )
+        is_selection_click = clicked is not None and clicked not in selected_boxes
+
+        if (
+            now - self.last_click_time < 0.5
+            and abs(cx - self.last_click_cx) < 15
+            and abs(cy - self.last_click_cy) < 15
+            and primary_sel
+            and primary_sel in hit_boxes_at_click
+        ):
+            self.click_sequence_count += 1
+        else:
+            self.click_sequence_count = 1
+            self.cycle_components = None
+
+        self.last_click_time = 0.0 if is_selection_click else now
+        self.last_click_cx = cx
+        self.last_click_cy = cy
+
+        if (
+            self.click_sequence_count % 2 == 0
+            and state.current_mode == "select"
+            and not is_multi
+        ):
+            handle = self.hit_handle(
+                cx, cy, selected_boxes, state.zoom_factor, parent_stack, cut_lines
+            )
+            if not handle:
+                if self.cycle_components is None:
+                    hit_boxes = list(hit_boxes_at_click)
+                    hit_boxes.reverse()
+                    if len(hit_boxes) > 1:
+                        self.cycle_components = hit_boxes
+                        if primary_sel in hit_boxes:
+                            self.last_cycle_index = hit_boxes.index(primary_sel)
+                        else:
+                            self.last_cycle_index = 0
+
+                if self.cycle_components is not None:
+                    self.last_cycle_index = (self.last_cycle_index + 1) % len(
+                        self.cycle_components
+                    )
+                    new_box = self.cycle_components[self.last_cycle_index]
+                    canvas.set_selection([new_box])
+
+                    if not getattr(new_box.visibility, "locked", False):
+                        self.is_dragging = True
+                        self.drag_mouse_start_abs = self.transformer.to_abs(
+                            cx, cy, state.zoom_factor, parent_stack, cut_lines, pan_offset=state.pan_offset
+                        )
+                        self.drag_orig_bounds = (
+                            new_box.bounds.left,
+                            new_box.bounds.top,
+                            new_box.bounds.right,
+                            new_box.bounds.bottom,
+                        )
+                        self.drag_orig_descendants = {}
+
+                        def cache_descendants(c_id: UUID):
+                            comp = workspace.components.get(c_id)
+                            if comp:
+                                self.drag_orig_descendants[c_id] = (
+                                    comp.bounds.left,
+                                    comp.bounds.top,
+                                    comp.bounds.right,
+                                    comp.bounds.bottom,
+                                )
+                                for child_id in comp.childrenIds:
+                                    cache_descendants(child_id)
+
+                        for child_id in new_box.childrenIds:
+                            cache_descendants(child_id)
+                    return
+
         handle = self.hit_handle(
             cx, cy, selected_boxes, state.zoom_factor, parent_stack, cut_lines
         )
@@ -172,17 +270,6 @@ class GestureInterpreter:
                 active_box.bounds.bottom,
             )
             return
-
-        active_comps = canvas._active_boxes()
-        clicked = self.hit_box(
-            cx,
-            cy,
-            active_comps,
-            selected_boxes,
-            state.zoom_factor,
-            parent_stack,
-            cut_lines,
-        )
 
         if state.current_mode == "select":
             if clicked:

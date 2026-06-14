@@ -42,3 +42,6 @@ line-ending = "auto"
 
 [tool.ruff.lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body", "fastapi.Header", "fastapi.Cookie", "fastapi.File", "fastapi.Form", "fastapi.Security"]
+
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
