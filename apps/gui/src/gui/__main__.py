@@ -4,11 +4,11 @@ from tlgp_logger import setup_excepthook, setup_logging
 
 from .api_client import EngineClient
 from .controllers.controller import AppController
-from .dialog_service import TkinterDialogService
+from .domain.transformer import ViewportTransformer
 from .state import UIStateStore
+from .tkinter_dialog_service import TkinterDialogService
 from .views.app import MainAppWindow
 from .views.gestures import GestureInterpreter
-from .views.transformer import ViewportTransformer
 
 
 def main():
@@ -21,7 +21,7 @@ def main():
 
     # Create view state helper classes
     transformer = ViewportTransformer()
-    gestures = GestureInterpreter(store, transformer)
+    gestures = GestureInterpreter(transformer)
 
     # Create model API client
     client = EngineClient(
@@ -34,7 +34,10 @@ def main():
     dialog_service = TkinterDialogService()
 
     # Create passive main window view
-    view = MainAppWindow(store, transformer, gestures)
+    view = MainAppWindow(transformer, gestures)
+
+    # Configure client to dispatch callbacks safely to GUI main thread
+    client.dispatch = lambda f: view.after(0, f)
 
     # Instantiate controller linking model client, state store, and views
     _controller = AppController(client, store, view, dialog_service)

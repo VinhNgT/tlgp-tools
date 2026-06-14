@@ -29,10 +29,15 @@ select = [
     "C4",  # flake8-comprehensions
     "UP",  # pyupgrade
     "PLC0415", # Enforce import-outside-top-level
+    "SLF", # flake8-self (Private member access)
 ]
 ignore = [
     "E501",  # line too long (handled by formatting)
 ]
+
+[tool.ruff.lint.per-file-ignores]
+"legacy/**" = ["SLF"]
+"**/tests/**" = ["SLF"]
 
 [tool.ruff.format]
 quote-style = "double"

@@ -62,6 +62,7 @@ class EngineClient:
         on_error: Callable[[str], None] | None = None,
         api_url: str = API_URL,
         ws_url: str = WS_URL,
+        dispatch: Callable[[Callable[[], None]], None] | None = None,
     ):
         self.state: WorkspaceState | None = None
         self._state_dict: dict | None = None
@@ -69,6 +70,7 @@ class EngineClient:
         self.on_error = on_error
         self.api_url = api_url
         self.ws_url = ws_url
+        self.dispatch = dispatch or (lambda f: f())
         self._ws = None
         self._loop = None
         self._thread = None
@@ -121,7 +123,7 @@ class EngineClient:
                                 "JSON-RPC error response from engine", error=err_msg
                             )
                             if self.on_error:
-                                self.on_error(err_msg)
+                                self.dispatch(lambda msg=err_msg: self.on_error(msg))
 
                         elif data.get("type") == "full_sync":
                             self._state_dict = data["state"]
@@ -132,7 +134,9 @@ class EngineClient:
                             if self._state_dict is not None:
                                 patch = jsonpatch.JsonPatch(data["patch"])
                                 self._state_dict = patch.apply(self._state_dict)
-                                self.state = WorkspaceState.model_validate(self._state_dict)
+                                self.state = WorkspaceState.model_validate(
+                                    self._state_dict
+                                )
                                 self._trigger_update()
             except asyncio.CancelledError:
                 logger.info("WebSocket listener connection task cancelled")
@@ -149,9 +153,8 @@ class EngineClient:
                     raise
 
     def _trigger_update(self):
-        # Fire callback safely (GUI must handle thread safety if needed)
         if self.on_state_changed:
-            self.on_state_changed()
+            self.dispatch(self.on_state_changed)
 
     async def _send_json_rpc(self, method: str, params: dict):
         if not self._ws:
@@ -208,11 +211,11 @@ class EngineClient:
                 with open(zip_path, "rb") as f:
                     self._request("POST", f"{self.api_url}/import", files={"file": f})
                 if on_complete:
-                    on_complete(None)
-            except Exception as e:
+                    self.dispatch(lambda: on_complete(None))
+            except Exception as ex:
                 logger.exception("Failed to import zip in background")
                 if on_complete:
-                    on_complete(e)
+                    self.dispatch(lambda exc=ex: on_complete(exc))
 
         self._loop.call_soon_threadsafe(lambda: self._loop.run_in_executor(None, job))
 
@@ -224,26 +227,34 @@ class EngineClient:
         def job():
             try:
                 with open(image_path, "rb") as f:
-                    self._request("POST", f"{self.api_url}/import/image", files={"file": f})
+                    self._request(
+                        "POST", f"{self.api_url}/import/image", files={"file": f}
+                    )
                 if on_complete:
-                    on_complete(None)
-            except Exception as e:
+                    self.dispatch(lambda: on_complete(None))
+            except Exception as ex:
                 logger.exception("Failed to import image in background")
                 if on_complete:
-                    on_complete(e)
+                    self.dispatch(lambda exc=ex: on_complete(exc))
 
         self._loop.call_soon_threadsafe(lambda: self._loop.run_in_executor(None, job))
 
-    def export_zip_data(
-        self, on_complete: Callable[[Exception | None, bytes | None], None]
+    def export_zip(
+        self,
+        zip_path: str,
+        on_complete: Callable[[Exception | None], None] | None = None,
     ):
         def job():
             try:
                 res = self._request("GET", f"{self.api_url}/export")
-                on_complete(None, res.content)
-            except Exception as e:
+                with open(zip_path, "wb") as f:
+                    f.write(res.content)
+                if on_complete:
+                    self.dispatch(lambda: on_complete(None))
+            except Exception as ex:
                 logger.exception("Failed to export zip in background")
-                on_complete(e, None)
+                if on_complete:
+                    self.dispatch(lambda exc=ex: on_complete(exc))
 
         self._loop.call_soon_threadsafe(lambda: self._loop.run_in_executor(None, job))
 
@@ -316,6 +327,10 @@ class EngineClient:
         asyncio.run_coroutine_threadsafe(
             self._send_json_rpc("update_screen_info", payload), self._loop
         )
+
+    def get_raw_image_data(self) -> bytes:
+        res = self._request("GET", self.get_raw_image_url())
+        return res.content
 
     def get_raw_image_url(self) -> str:
         return f"{self.api_url}/image/raw"

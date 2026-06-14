@@ -5,6 +5,8 @@ from tkinter import ttk
 from models import Component
 from PIL import Image, ImageDraw, ImageTk
 
+from .domain.validation import CutValidator
+
 MIN_CUT_GAP = 50
 SNAP_DISTANCE = 8
 
@@ -332,14 +334,18 @@ class CutEditorDialog(tk.Toplevel):
         img_y = self._to_img_y(cy)
 
         if self._mode == "adding":
-            intersecting_comp = self._get_intersecting_component(img_y)
+            intersecting_comp = CutValidator.get_intersecting_component(
+                img_y, self.existing_components
+            )
             if intersecting_comp:
                 self.status_label.config(
                     text=f"Blocked: intersects component '{intersecting_comp.label}'"
                 )
                 return
 
-            if self._is_valid_cut_position(img_y):
+            if CutValidator.is_valid_position(
+                img_y, self.source_image.height, self.cut_lines, MIN_CUT_GAP
+            ):
                 self.cut_lines.append(img_y)
                 self.cut_lines.sort()
                 self._selected_index = self.cut_lines.index(img_y)
@@ -372,7 +378,9 @@ class CutEditorDialog(tk.Toplevel):
         new_y = self._to_img_y(cy)
         new_y = max(MIN_CUT_GAP, min(self.source_image.height - MIN_CUT_GAP, new_y))
 
-        intersecting_comp = self._get_intersecting_component(new_y)
+        intersecting_comp = CutValidator.get_intersecting_component(
+            new_y, self.existing_components
+        )
         if intersecting_comp:
             self.status_label.config(
                 text=f"Blocked: intersects component '{intersecting_comp.label}'"
@@ -381,7 +389,13 @@ class CutEditorDialog(tk.Toplevel):
         else:
             self.status_label.config(text="")
 
-        if self._is_valid_cut_position_for_drag(new_y, self._drag_index):
+        if CutValidator.is_valid_position_for_drag(
+            new_y,
+            self.source_image.height,
+            self.cut_lines,
+            self._drag_index,
+            MIN_CUT_GAP,
+        ):
             self.cut_lines[self._drag_index] = new_y
             self.cut_lines.sort()
             self._drag_index = self.cut_lines.index(new_y)
@@ -427,30 +441,6 @@ class CutEditorDialog(tk.Toplevel):
             if abs(canvas_y - cy) <= SNAP_DISTANCE:
                 return i
         return -1
-
-    def _get_intersecting_component(self, img_y: int) -> Component | None:
-        for comp in self.existing_components:
-            if comp.bounds.top <= img_y <= comp.bounds.bottom:
-                return comp
-        return None
-
-    def _is_valid_cut_position(self, img_y: int) -> bool:
-        if img_y < MIN_CUT_GAP or img_y > self.source_image.height - MIN_CUT_GAP:
-            return False
-        for existing_y in self.cut_lines:
-            if abs(img_y - existing_y) < MIN_CUT_GAP:
-                return False
-        return True
-
-    def _is_valid_cut_position_for_drag(self, img_y: int, exclude_index: int) -> bool:
-        if img_y < MIN_CUT_GAP or img_y > self.source_image.height - MIN_CUT_GAP:
-            return False
-        for i, existing_y in enumerate(self.cut_lines):
-            if i == exclude_index:
-                continue
-            if abs(img_y - existing_y) < MIN_CUT_GAP:
-                return False
-        return True
 
     def _on_listbox_select(self, event):
         sel = self.listbox.curselection()

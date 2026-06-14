@@ -26,6 +26,10 @@ class ImportingDialog(tk.Toplevel):
         lbl.pack(expand=True, fill=tk.BOTH, padx=20, pady=20)
         self.update()
 
+    def dismiss(self) -> None:
+        """Dismisses the importing progress dialog cleanly."""
+        self.destroy()
+
 
 class ScreenInfoDialog(tk.Toplevel):
     """Modal form dialog for editing screen name and functional description."""

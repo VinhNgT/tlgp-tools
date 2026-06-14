@@ -1,5 +1,4 @@
 import io
-import tkinter as tk
 from uuid import UUID
 
 from models import Component
@@ -29,7 +28,6 @@ class AppController:
         self.view = view
         self.dialog_service = dialog_service
         self._loaded_session_id = None
-        self.context_menu = tk.Menu(self.view, tearoff=0)
 
         self.view.report_callback_exception = self._global_error_handler
 
@@ -60,6 +58,8 @@ class AppController:
         self.view.on_export_zip_request = self._on_export_zip_request
         self.view.on_open_cut_editor_request = self._on_open_cut_editor_request
         self.view.on_open_screen_info_request = self._on_open_screen_info_request
+        self.view.on_enter_pressed = self._on_enter_pressed
+        self.view.on_escape_pressed = self._on_escape_pressed
 
         # Canvas callbacks
         self.view.canvas.on_import_zip = self._on_import_zip_request
@@ -67,16 +67,32 @@ class AppController:
         self.view.canvas.on_selection_changed = self._on_canvas_selection_changed
         self.view.canvas.on_drill_into = self._on_canvas_drill_into
         self.view.canvas.on_drill_out = self._on_canvas_drill_out
-        self.view.canvas.bind("<<ComponentMoved>>", self._handle_component_moved)
-        self.view.canvas.bind("<<ComponentResized>>", self._handle_component_resized)
-        self.view.canvas.bind("<<ComponentCreated>>", self._handle_component_created)
+        self.view.canvas.on_component_moved = self._on_component_moved
+        self.view.canvas.on_component_resized = self._on_component_resized
+        self.view.canvas.on_component_created = self._on_component_created
         self.view.canvas.on_request_context_menu = self._on_canvas_context_menu
+
+        # Canvas decoupled store request callbacks
+        self.view.canvas.on_viewport_change_request = (
+            self._on_canvas_viewport_change_request
+        )
+        self.view.canvas.on_active_interaction_changed = (
+            self._on_canvas_active_interaction_changed
+        )
+        self.view.canvas.on_selection_ids_changed = (
+            self._on_canvas_selection_ids_changed
+        )
+        self.view.canvas.on_viewport_size_changed = (
+            self._on_canvas_viewport_size_changed
+        )
+        self.view.canvas.on_canvas_mode_change_request = self._on_mode_change_request
 
         # Treeview callback
         self.view.tree.on_component_selected = self._on_tree_component_selected
 
         # Properties callback
         self.view.properties.on_property_changed = self._on_property_changed
+        self.view.properties.on_focus_changed = self._on_properties_focus_changed
 
     def _global_error_handler(self, exc, val, tb):
         logger.exception("Unhandled GUI exception", exc_info=(exc, val, tb))
@@ -88,38 +104,32 @@ class AppController:
 
     def _show_async_error(self, message: str):
         self.store.update_state("selection", active_interaction=None)
-        def show():
-            self.dialog_service.show_error(self.view, "Error", message)
-
-        self.view.after(0, show)
+        self.dialog_service.show_error(self.view, "Error", message)
 
     def _on_state_sync_received(self):
-        self.view.after(0, self._apply_state_sync)
+        self._apply_state_sync()
 
     def _apply_state_sync(self):
         state = self.client.state
         if not state:
-            self.view.lbl_status.config(text="Connecting to Engine...")
+            self.view.update_status("Connecting to Engine...")
             self.view.set_ui_interactive(False)
             self._loaded_session_id = None
             self.store.update_state("workspace", workspace_state=None)
             return
 
-        self.view.lbl_status.config(
-            text=f"Connected to Engine | Session: {state.sessionId}"
-        )
+        self.view.update_status(f"Connected to Engine | Session: {state.sessionId}")
 
         if state.image:
-            self.view.set_ui_interactive(True)
             current_session_id = str(state.sessionId) if state.sessionId else None
             if (
                 current_session_id != self._loaded_session_id
-                or self.view.canvas.full_pil_img is None
+                or self.view.canvas.canvas_image is None
             ):
                 try:
-                    res = self.client._request("GET", self.client.get_raw_image_url())
-                    img = Image.open(io.BytesIO(res.content))
-                    self.view.canvas.set_background_image(img)
+                    image_data = self.client.get_raw_image_data()
+                    img = Image.open(io.BytesIO(image_data))
+                    self.view.set_canvas_image(img)
                     self._loaded_session_id = current_session_id
                     self.view.canvas.fit_to_screen()
                     self.view.after(100, self.check_trigger_screen_info)
@@ -131,18 +141,12 @@ class AppController:
                         f"Failed to load background image: {e}",
                     )
         else:
-            self.view.set_ui_interactive(False)
-            self.view.canvas.full_pil_img = None
-            self.view.canvas.current_pil_img = None
-            if self.view.canvas.image_item_id is not None:
-                self.view.canvas.delete(self.view.canvas.image_item_id)
-                self.view.canvas.image_item_id = None
+            self.view.set_canvas_image(None)
             self._loaded_session_id = None
-            self.view.canvas.show_welcome_screen()
 
         # Check and remove synchronized transient overrides from active_interaction
         active_interaction = self.store.state.active_interaction
-        if active_interaction and not self.view.canvas.gestures.is_dragging:
+        if active_interaction and not self.view.canvas.is_canvas_dragging:
             active_interaction = dict(active_interaction)
             to_remove = []
             for comp_id, transient_bounds in active_interaction.items():
@@ -151,15 +155,17 @@ class AppController:
                     to_remove.append(comp_id)
                     continue
                 cb = comp.bounds
-                if (cb.x == transient_bounds.x and 
-                    cb.y == transient_bounds.y and 
-                    cb.w == transient_bounds.w and 
-                    cb.h == transient_bounds.h):
+                if (
+                    cb.x == transient_bounds.x
+                    and cb.y == transient_bounds.y
+                    and cb.w == transient_bounds.w
+                    and cb.h == transient_bounds.h
+                ):
                     to_remove.append(comp_id)
-            
+
             for comp_id in to_remove:
                 active_interaction.pop(comp_id, None)
-            
+
             if not active_interaction:
                 active_interaction = None
 
@@ -169,73 +175,123 @@ class AppController:
         self.store.update_state("selection", selected_component_ids=updated_sel)
 
         # Notify workspace state observers
-        self.store.update_state("workspace", workspace_state=state, active_interaction=active_interaction)
+        self.store.update_state(
+            "workspace", workspace_state=state, active_interaction=active_interaction
+        )
 
         # Sync visual navigation controls
-        self._update_navigation_ui()
+        self._sync_breadcrumbs()
 
     def _on_workspace_updated(self):
+        nodes = self._build_tree_nodes()
+        self.view.tree.rebuild_tree(nodes)
+        self._sync_properties()
+        self.view.canvas.set_workspace_state(
+            self.store.state.workspace_state,
+            self.store.state.active_interaction,
+        )
+
+    def _build_tree_nodes(self) -> list[dict]:
         state = self.store.state.workspace_state
-        self.view.tree.rebuild_tree(state)
-        self._sync_properties_panel()
+        if not state:
+            return []
+
+        def build_node(comp_uuid: UUID) -> dict | None:
+            comp = state.components.get(comp_uuid)
+            if not comp:
+                return None
+
+            comp_id_str = str(comp.id)
+            node_text = f"{comp.number} {comp.label}" if comp.number else comp.label
+
+            suffix = []
+            if not getattr(comp.visibility, "visible", True):
+                suffix.append("hidden")
+            if getattr(comp.visibility, "locked", False):
+                suffix.append("locked")
+            if suffix:
+                node_text += f" ({', '.join(suffix)})"
+
+            children = []
+            for child_uuid in comp.childrenIds:
+                child_node = build_node(child_uuid)
+                if child_node:
+                    children.append(child_node)
+
+            return {
+                "id": comp_id_str,
+                "text": node_text,
+                "children": children,
+            }
+
+        root_nodes = []
+        for root_uuid in state.rootComponents:
+            node = build_node(root_uuid)
+            if node:
+                root_nodes.append(node)
+        return root_nodes
 
     def _on_selection_updated(self):
-        self._sync_properties_panel()
-        self._sync_tree_selection()
+        self._sync_properties()
+        selected_ids = self.store.state.selected_component_ids
+        if selected_ids:
+            self.view.tree.select_component(selected_ids[-1])
+        else:
+            self.view.tree.clear_selection()
+        self.view.canvas.set_selection_state(
+            self.store.state.selected_component_ids,
+            self.store.state.active_interaction,
+        )
 
     def _on_viewport_updated(self):
-        self.view.canvas._mask_cached_img = None
-        self.view.canvas._mask_cached_key = None
-        self.view.canvas._last_pil_img = None
+        st = self.store.state
+        self._sync_breadcrumbs()
+        self.view.update_zoom_display(st.zoom_factor)
+        self.view.canvas.set_viewport_state(
+            zoom_factor=st.zoom_factor,
+            pan_offset=st.pan_offset,
+            parent_stack=st.parent_stack,
+            current_mode=st.current_mode,
+            active_interaction=st.active_interaction,
+        )
 
-        self._update_navigation_ui()
-        self._update_zoom_ui()
+    def _sync_breadcrumbs(self):
+        parent_stack = self.store.state.parent_stack
+        state = self.store.state.workspace_state
+        breadcrumbs = []
+        if parent_stack and state:
+            for comp_id in parent_stack:
+                comp = state.components.get(comp_id)
+                if comp:
+                    breadcrumbs.append(str(comp.number) if comp.number else comp.label)
+        self.view.update_breadcrumbs(breadcrumbs)
 
-    def _sync_properties_panel(self):
+    def _sync_properties(self):
         selected_ids = self.store.state.selected_component_ids
         state = self.store.state.workspace_state
         if len(selected_ids) == 1 and state:
             comp_id = selected_ids[0]
             comp = state.components.get(comp_id)
             if comp:
-                self.view.properties.update_properties_panel(comp)
+                self.view.properties.update_properties_panel(
+                    box_id=str(comp.id),
+                    label=comp.label,
+                    x=int(comp.bounds.x),
+                    y=int(comp.bounds.y),
+                    w=int(comp.bounds.w),
+                    h=int(comp.bounds.h),
+                    is_visible=getattr(comp.visibility, "visible", True),
+                    is_locked=getattr(comp.visibility, "locked", False),
+                    pill_corner=getattr(comp.style, "pillCorner", "top_left"),
+                )
                 if not self.view.properties.is_field_focused("name"):
                     self.view.properties.update_field_value("name", comp.label)
                 for key in ["x", "y", "w", "h"]:
                     if not self.view.properties.is_field_focused(key):
                         val = getattr(comp.bounds, key, 0)
                         self.view.properties.update_field_value(key, str(int(val)))
-                return
+                    return
         self.view.properties.disable_properties_fields()
-
-    def _sync_tree_selection(self):
-        selected_ids = self.store.state.selected_component_ids
-        if selected_ids:
-            self.view.tree.select_component(selected_ids[-1])
-        else:
-            self.view.tree.clear_selection()
-
-    def _update_navigation_ui(self):
-        nav_stack = self.store.state.parent_stack
-        state = self.store.state.workspace_state
-        if nav_stack:
-            self.view.btn_back.config(state=tk.NORMAL)
-            breadcrumbs = []
-            if state:
-                for comp_id in nav_stack:
-                    comp = state.components.get(comp_id)
-                    if comp:
-                        breadcrumbs.append(
-                            str(comp.number) if comp.number else comp.label
-                        )
-            self.view.lbl_breadcrumb.config(text=" / ".join(["Root"] + breadcrumbs))
-        else:
-            self.view.btn_back.config(state=tk.DISABLED)
-            self.view.lbl_breadcrumb.config(text="Root")
-
-    def _update_zoom_ui(self):
-        zoom_pct = int(self.store.state.zoom_factor * 100)
-        self.view.lbl_zoom.config(text=f"{zoom_pct}%")
 
     def check_trigger_screen_info(self):
         state = self.store.state.workspace_state
@@ -270,19 +326,19 @@ class AppController:
         self.store.update_state("viewport", current_mode=mode)
 
     def _on_undo_request(self):
-        if self.view.canvas.full_pil_img:
+        if self.view.canvas.canvas_image:
             self.store.update_state("selection", active_interaction=None)
             self.client.undo()
 
     def _on_redo_request(self):
-        if self.view.canvas.full_pil_img:
+        if self.view.canvas.canvas_image:
             self.store.update_state("selection", active_interaction=None)
             self.client.redo()
 
     def _on_delete_request(self, event=None):
         if self.store.state.text_focused:
             return
-        if not self.view.canvas.full_pil_img:
+        if not self.view.canvas.canvas_image:
             return
         self.store.update_state("selection", active_interaction=None)
         selected_ids = self.store.state.selected_component_ids
@@ -293,6 +349,22 @@ class AppController:
 
     def _on_back_request(self):
         self.view.canvas.drill_out()
+
+    def _on_enter_pressed(self):
+        state = self.store.state.workspace_state
+        selected_ids = self.store.state.selected_component_ids
+        if len(selected_ids) == 1 and state:
+            comp_id = selected_ids[0]
+            if comp_id in state.components:
+                self.view.canvas.drill_into(comp_id)
+                return "break"
+        return None
+
+    def _on_escape_pressed(self):
+        if self.store.state.parent_stack:
+            self.view.canvas.drill_out()
+            return "break"
+        return None
 
     def _on_import_zip_request(self):
         path = self.dialog_service.ask_open_filename(
@@ -305,16 +377,13 @@ class AppController:
         )
 
         def on_complete(err):
-            def gui_callback():
-                dialog.destroy()
-                if err:
-                    self.dialog_service.show_error(
-                        self.view,
-                        "Import Failed",
-                        f"Failed to import workspace session:\n{err}",
-                    )
-
-            self.view.after(0, gui_callback)
+            dialog.dismiss()
+            if err:
+                self.dialog_service.show_error(
+                    self.view,
+                    "Import Failed",
+                    f"Failed to import workspace session:\n{err}",
+                )
 
         self.client.import_zip(path, on_complete=on_complete)
 
@@ -331,21 +400,18 @@ class AppController:
         )
 
         def on_complete(err):
-            def gui_callback():
-                dialog.destroy()
-                if err:
-                    self.dialog_service.show_error(
-                        self.view,
-                        "Import Failed",
-                        f"Failed to import raw image:\n{err}",
-                    )
-
-            self.view.after(0, gui_callback)
+            dialog.dismiss()
+            if err:
+                self.dialog_service.show_error(
+                    self.view,
+                    "Import Failed",
+                    f"Failed to import raw image:\n{err}",
+                )
 
         self.client.import_image(path, on_complete=on_complete)
 
     def _on_export_zip_request(self):
-        if not self.view.canvas.full_pil_img:
+        if not self.view.canvas.canvas_image:
             return
         path = self.dialog_service.ask_save_as_filename(
             self.view,
@@ -359,37 +425,25 @@ class AppController:
             self.view, message="Exporting workspace session..."
         )
 
-        def on_complete(err, content):
-            def gui_callback():
-                dialog.destroy()
-                if err:
-                    self.dialog_service.show_error(
-                        self.view,
-                        "Export Failed",
-                        f"Failed to export workspace session:\n{err}",
-                    )
-                else:
-                    try:
-                        with open(path, "wb") as f:
-                            f.write(content)
-                        self.dialog_service.show_info(
-                            self.view,
-                            "Success",
-                            "Workspace exported successfully!",
-                        )
-                    except Exception as e:
-                        self.dialog_service.show_error(
-                            self.view,
-                            "Save Failed",
-                            f"Failed to save zip to disk:\n{e}",
-                        )
+        def on_complete(err):
+            dialog.dismiss()
+            if err:
+                self.dialog_service.show_error(
+                    self.view,
+                    "Export Failed",
+                    f"Failed to export workspace session:\n{err}",
+                )
+            else:
+                self.dialog_service.show_info(
+                    self.view,
+                    "Export Successful",
+                    "Session zip exported successfully.",
+                )
 
-            self.view.after(0, gui_callback)
-
-        self.client.export_zip_data(on_complete=on_complete)
+        self.client.export_zip(path, on_complete=on_complete)
 
     def _on_open_cut_editor_request(self):
-        if not self.view.canvas.full_pil_img:
+        if not self.view.canvas.canvas_image:
             self.dialog_service.show_warning(
                 self.view, "Warning", "Please open an image first!"
             )
@@ -405,7 +459,7 @@ class AppController:
 
         result = self.dialog_service.show_cut_editor(
             self.view,
-            image=self.view.canvas.full_pil_img,
+            image=self.view.canvas.canvas_image,
             initial_cuts=state.cutLines if state else [],
             components=root_comps,
         )
@@ -427,94 +481,131 @@ class AppController:
             self.view, screen_name=screen_name, description=description
         )
         if result is not None:
-            self.client.update_screen_info(
-                result["screen_name"], result["description"]
-            )
+            self.client.update_screen_info(result["screen_name"], result["description"])
 
     def _on_canvas_selection_changed(self, boxes: list[Component]):
         pass
 
     def _on_canvas_drill_into(self, comp_id: UUID):
-        pass
+        stack = list(self.store.state.parent_stack)
+        stack.append(comp_id)
+        self.store.update_state(
+            "selection",
+            selected_component_ids=[],
+            active_interaction=None,
+        )
+        self.store.update_state(
+            "viewport",
+            parent_stack=stack,
+        )
 
     def _on_canvas_drill_out(self):
-        pass
-
-    def _handle_component_moved(self, event):
-        canvas = event.widget
-        if getattr(canvas, "last_moved_component", None) is not None:
-            box, x, y = canvas.last_moved_component
-            canvas.last_moved_component = None
-            self.client.move_component(str(box.id), x, y)
-
-    def _handle_component_resized(self, event):
-        canvas = event.widget
-        if getattr(canvas, "last_resized_component", None) is not None:
-            box, bounds = canvas.last_resized_component
-            canvas.last_resized_component = None
-            self.client.update_component(str(box.id), bounds=bounds)
-
-    def _handle_component_created(self, event):
-        canvas = event.widget
-        if getattr(canvas, "last_created_component", None) is not None:
-            bounds = canvas.last_created_component
-            canvas.last_created_component = None
-            parent_id = (
-                self.store.state.parent_stack[-1] if self.store.state.parent_stack else None
+        stack = list(self.store.state.parent_stack)
+        if stack:
+            popped = stack.pop()
+            self.store.update_state(
+                "selection",
+                selected_component_ids=[popped],
+                active_interaction=None,
             )
-            self.client.add_component(label="Component", bounds=bounds, parent_id=parent_id)
-            self.view._set_mode_str("select")
+            self.store.update_state(
+                "viewport",
+                parent_stack=stack,
+            )
+
+    def _on_canvas_viewport_change_request(
+        self, zoom_factor: float, pan_offset: tuple[float, float]
+    ):
+        self.store.update_state(
+            "viewport", zoom_factor=zoom_factor, pan_offset=pan_offset
+        )
+
+    def _on_canvas_active_interaction_changed(self, active_interaction: dict | None):
+        self.store.update_state("selection", active_interaction=active_interaction)
+
+    def _on_canvas_selection_ids_changed(self, selected_ids: list[UUID]):
+        self.store.update_state("selection", selected_component_ids=selected_ids)
+
+    def _on_canvas_viewport_size_changed(self, cw: int, ch: int):
+        self.store.update_state("viewport", viewport_size=(cw, ch))
+
+    def _on_component_moved(self, comp_id: str, x: int, y: int):
+        self.client.move_component(comp_id, x, y)
+
+    def _on_component_resized(self, comp_id: str, bounds: dict):
+        self.client.update_component(comp_id, bounds=bounds)
+
+    def _on_component_created(self, bounds: dict):
+        parent_id = (
+            self.store.state.parent_stack[-1] if self.store.state.parent_stack else None
+        )
+        self.client.add_component(label="Component", bounds=bounds, parent_id=parent_id)
+        self.view.set_mode_str("select")
 
     def _on_canvas_context_menu(self, event, clicked: Component | None):
-        if not self.view.canvas.full_pil_img:
+        if not self.view.canvas.canvas_image:
             return
 
-        self.context_menu.delete(0, tk.END)
+        items = []
 
         if clicked:
             self.view.canvas.set_selection([clicked])
             num_str = str(clicked.number) if clicked.number else clicked.label
-            self.context_menu.add_command(
-                label=f"Drill into Component {num_str}",
-                command=lambda: self.view.canvas.drill_into(clicked.id),
+            items.append(
+                {
+                    "label": f"Drill into Component {num_str}",
+                    "command": lambda: self.view.canvas.drill_into(clicked.id),
+                }
             )
             is_visible = getattr(clicked.visibility, "visible", True)
             vis_label = "Hide Component" if is_visible else "Show Component"
-            self.context_menu.add_command(
-                label=vis_label,
-                command=lambda: self.client.update_component(
-                    str(clicked.id),
-                    visibility={
-                        "visible": not is_visible,
-                        "locked": getattr(clicked.visibility, "locked", False),
-                    },
-                ),
+            items.append(
+                {
+                    "label": vis_label,
+                    "command": lambda: self.client.update_component(
+                        str(clicked.id),
+                        visibility={
+                            "visible": not is_visible,
+                            "locked": getattr(clicked.visibility, "locked", False),
+                        },
+                    ),
+                }
             )
             is_locked = getattr(clicked.visibility, "locked", False)
             lock_label = "Unlock Component" if is_locked else "Lock Component"
-            self.context_menu.add_command(
-                label=lock_label,
-                command=lambda: self.client.update_component(
-                    str(clicked.id),
-                    visibility={
-                        "visible": getattr(clicked.visibility, "visible", True),
-                        "locked": not is_locked,
-                    },
-                ),
+            items.append(
+                {
+                    "label": lock_label,
+                    "command": lambda: self.client.update_component(
+                        str(clicked.id),
+                        visibility={
+                            "visible": getattr(clicked.visibility, "visible", True),
+                            "locked": not is_locked,
+                        },
+                    ),
+                }
             )
-            self.context_menu.add_command(
-                label="Delete (Delete)",
-                command=self._on_delete_request,
+            items.append(
+                {
+                    "label": "Delete (Delete)",
+                    "command": self._on_delete_request,
+                }
             )
-            self.context_menu.add_separator()
+            items.append({"separator": True})
 
-        self.context_menu.add_command(
-            label="Focus Target", command=self.view.canvas.zoom_focus_target
+        items.append(
+            {
+                "label": "Focus Target",
+                "command": self.view.canvas.zoom_focus_target,
+            }
         )
-        self.context_menu.add_command(
-            label="Toggle Labels (T)", command=self.view.canvas.toggle_labels_visibility
+        items.append(
+            {
+                "label": "Toggle Labels (T)",
+                "command": self.view.canvas.toggle_labels_visibility,
+            }
         )
-        self.context_menu.post(event.x_root, event.y_root)
+        self.view.show_context_menu(event.x_root, event.y_root, items)
 
     def _on_tree_component_selected(self, comp_id: UUID):
         state = self.store.state.workspace_state
@@ -526,5 +617,8 @@ class AppController:
             self.store.update_state("viewport", parent_stack=ancestors)
             self.store.update_state("selection", selected_component_ids=[comp_id])
 
-    def _on_property_changed(self, box: Component, **kwargs):
-        self.client.update_component(str(box.id), **kwargs)
+    def _on_property_changed(self, comp_id: str, **kwargs):
+        self.client.update_component(comp_id, **kwargs)
+
+    def _on_properties_focus_changed(self, focused: bool):
+        self.store.update_state("viewport", text_focused=focused)

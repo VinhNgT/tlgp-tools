@@ -1,8 +1,6 @@
 import tkinter as tk
 from tkinter import ttk
 
-from models import Component
-
 
 class CornerSelector(tk.Canvas):
     def __init__(self, parent, on_corner_selected_callback, **kwargs):
@@ -125,14 +123,19 @@ class CornerSelector(tk.Canvas):
 class ComponentPropertiesView(ttk.Frame):
     """Passive metadata editor properties panel. Fires changes to the controller via callbacks."""
 
-    def __init__(self, parent, store, **kwargs):
+    def __init__(self, parent, **kwargs):
         super().__init__(parent, padding=10, **kwargs)
-        self.store = store
         self.on_property_changed = None
+        self.on_focus_changed = None
+        self._text_focused = False
 
         self.visible_var = tk.BooleanVar(value=True)
         self.locked_var = tk.BooleanVar(value=False)
-        self._selected_box = None
+        self._selected_box_id = None
+        self._current_label = ""
+        self._current_is_visible = True
+        self._current_is_locked = False
+        self._current_pill_corner = "top_left"
 
         ttk.Label(self, text="PROPERTIES", font=("", 9, "bold")).pack(
             anchor="w", pady=(0, 8)
@@ -199,10 +202,23 @@ class ComponentPropertiesView(ttk.Frame):
 
         self.disable_properties_fields()
 
-    def update_properties_panel(self, box: Component):
-        self._selected_box = box
-        is_locked = getattr(box.visibility, "locked", False)
-        is_visible = getattr(box.visibility, "visible", True)
+    def update_properties_panel(
+        self,
+        box_id: str,
+        label: str,
+        x: int,
+        y: int,
+        w: int,
+        h: int,
+        is_visible: bool,
+        is_locked: bool,
+        pill_corner: str,
+    ):
+        self._selected_box_id = box_id
+        self._current_label = label
+        self._current_is_visible = is_visible
+        self._current_is_locked = is_locked
+        self._current_pill_corner = pill_corner
 
         self.chk_visible.config(state=tk.NORMAL)
         self.chk_locked.config(state=tk.NORMAL)
@@ -216,8 +232,7 @@ class ComponentPropertiesView(ttk.Frame):
             entry.config(state=entry_state)
 
         self.corner_selector.set_state("disabled" if is_locked else "normal")
-        corner = getattr(box.style, "pillCorner", "top_left")
-        self.corner_selector.set_corner(corner)
+        self.corner_selector.set_corner(pill_corner)
 
     def is_field_focused(self, field_name: str) -> bool:
         """Returns True if the specified field currently has keyboard focus."""
@@ -241,7 +256,11 @@ class ComponentPropertiesView(ttk.Frame):
                 entry.insert(0, value)
 
     def disable_properties_fields(self):
-        self._selected_box = None
+        self._selected_box_id = None
+        self._current_label = ""
+        self._current_is_visible = True
+        self._current_is_locked = False
+        self._current_pill_corner = "top_left"
         self.entry_name.delete(0, tk.END)
         self.entry_name.config(state=tk.DISABLED)
         for entry in self.prop_entries.values():
@@ -253,29 +272,37 @@ class ComponentPropertiesView(ttk.Frame):
         self.chk_locked.config(state=tk.DISABLED)
 
     def _on_focus_in(self):
-        self.store.update_state("viewport", text_focused=True)
+        if not self._text_focused:
+            self._text_focused = True
+            if self.on_focus_changed:
+                self.on_focus_changed(True)
 
     def _on_focus_out(self):
         self.after(50, self._check_focus_still_on_text)
 
     def _check_focus_still_on_text(self):
         focused = self.focus_get()
-        still_focused = isinstance(focused, (tk.Entry, tk.Text, ttk.Entry, ttk.Combobox))
-        self.store.update_state("viewport", text_focused=still_focused)
+        still_focused = isinstance(
+            focused, (tk.Entry, tk.Text, ttk.Entry, ttk.Combobox)
+        )
+        if self._text_focused != still_focused:
+            self._text_focused = still_focused
+            if self.on_focus_changed:
+                self.on_focus_changed(still_focused)
 
     def is_text_focused(self) -> bool:
-        return self.store.state.text_focused
+        return self._text_focused
 
     def _save_name(self, event=None):
-        if self._selected_box and self.on_property_changed:
+        if self._selected_box_id and self.on_property_changed:
             val = self.entry_name.get().strip()
-            if val and val != self._selected_box.label:
-                self.on_property_changed(self._selected_box, label=val)
+            if val and val != self._current_label:
+                self.on_property_changed(self._selected_box_id, label=val)
         if event and event.keysym == "Return":
             self.focus_set()
 
     def _save_coords(self, event=None):
-        if self._selected_box and self.on_property_changed:
+        if self._selected_box_id and self.on_property_changed:
             try:
                 bounds_dict = {
                     "x": int(self.prop_entries["x"].get().strip()),
@@ -283,27 +310,25 @@ class ComponentPropertiesView(ttk.Frame):
                     "w": int(self.prop_entries["w"].get().strip()),
                     "h": int(self.prop_entries["h"].get().strip()),
                 }
-                self.on_property_changed(self._selected_box, bounds=bounds_dict)
+                self.on_property_changed(self._selected_box_id, bounds=bounds_dict)
             except ValueError:
                 pass
         if event and event.keysym == "Return":
             self.focus_set()
 
     def _save_visibility(self):
-        if self._selected_box and self.on_property_changed:
+        if self._selected_box_id and self.on_property_changed:
             visible = self.visible_var.get()
             locked = self.locked_var.get()
-            current_visible = getattr(self._selected_box.visibility, "visible", True)
-            current_locked = getattr(self._selected_box.visibility, "locked", False)
-            if visible != current_visible or locked != current_locked:
+            if visible != self._current_is_visible or locked != self._current_is_locked:
                 self.on_property_changed(
-                    self._selected_box,
+                    self._selected_box_id,
                     visibility={"visible": visible, "locked": locked},
                 )
 
     def _save_corner(self, corner: str):
-        if self._selected_box and self.on_property_changed:
-            if getattr(self._selected_box.style, "pillCorner", "top_left") != corner:
+        if self._selected_box_id and self.on_property_changed:
+            if corner != self._current_pill_corner:
                 self.on_property_changed(
-                    self._selected_box, style={"pillCorner": corner}
+                    self._selected_box_id, style={"pillCorner": corner}
                 )

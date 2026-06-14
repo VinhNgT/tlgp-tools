@@ -1,64 +1,224 @@
-import tkinter as tk
+import io
 from uuid import uuid4
-from unittest.mock import patch
-import pytest
+
+from gui.controllers.controller import AppController
+from gui.dialog_service import DialogService
+from gui.state import UIStateStore
+from models import Bounds, Component, ImageInfo, Style, Visibility, WorkspaceState
 from PIL import Image
 
-from gui.state import UIStateStore
-from gui.dialog_service import DialogService
-from gui.controllers.controller import AppController
-from models import WorkspaceState, ImageInfo
 
+class MockCanvasView:
+    def __init__(self):
+        self.on_import_zip = None
+        self.on_import_image = None
+        self.on_selection_changed = None
+        self.on_drill_into = None
+        self.on_drill_out = None
+        self.on_component_moved = None
+        self.on_component_resized = None
+        self.on_component_created = None
+        self.on_request_context_menu = None
+        self.on_viewport_change_request = None
+        self.on_active_interaction_changed = None
+        self.on_selection_ids_changed = None
+        self.on_viewport_size_changed = None
+        self.on_canvas_mode_change_request = None
 
-@pytest.fixture(autouse=True)
-def mock_tkinter_menu():
-    with patch("tkinter.Menu") as mock:
-        yield mock
+        self._canvas_image = None
+        self._is_canvas_dragging = False
+        self.canvas_workspace_state = None
+        self.canvas_active_interaction = None
+        self.canvas_selected_ids = None
+        self.canvas_zoom_factor = 1.0
+        self.canvas_pan_offset = (0.0, 0.0)
+        self.canvas_parent_stack = []
+        self.canvas_current_mode = "select"
+        self.canvas_selection = []
+        self.drill_into_id = None
+        self.drill_out_called = False
+        self.zoom_focus_target_called = False
+        self.toggle_labels_visibility_called = False
 
+    @property
+    def canvas_image(self):
+        return self._canvas_image
 
-class MockWidget:
-    def config(self, **kwargs):
+    @canvas_image.setter
+    def canvas_image(self, img):
+        self._canvas_image = img
+
+    def set_background_image(self, img):
+        self._canvas_image = img
+
+    @property
+    def is_canvas_dragging(self) -> bool:
+        return self._is_canvas_dragging
+
+    @is_canvas_dragging.setter
+    def is_canvas_dragging(self, val: bool):
+        self._is_canvas_dragging = val
+
+    def fit_to_screen(self):
         pass
 
-    def entryconfig(self, *args, **kwargs):
-        pass
+    def set_workspace_state(self, state, active_interaction=None):
+        self.canvas_workspace_state = state
+        self.canvas_active_interaction = active_interaction
 
-    def bind(self, event, callback):
-        pass
+    def set_selection_state(self, selected_ids, active_interaction=None):
+        self.canvas_selected_ids = selected_ids
+        self.canvas_active_interaction = active_interaction
 
-    def show_welcome_screen(self):
-        pass
+    def set_viewport_state(
+        self,
+        zoom_factor,
+        pan_offset,
+        parent_stack,
+        current_mode,
+        active_interaction=None,
+    ):
+        self.canvas_zoom_factor = zoom_factor
+        self.canvas_pan_offset = pan_offset
+        self.canvas_parent_stack = parent_stack
+        self.canvas_current_mode = current_mode
+        self.canvas_active_interaction = active_interaction
+
+    def set_selection(self, boxes):
+        self.canvas_selection = boxes
+
+    def zoom_focus_target(self):
+        self.zoom_focus_target_called = True
+
+    def toggle_labels_visibility(self):
+        self.toggle_labels_visibility_called = True
+
+    def drill_out(self):
+        self.drill_out_called = True
+
+    def drill_into(self, comp_id):
+        self.drill_into_id = comp_id
+
+
+class MockTreeView:
+    def __init__(self):
+        self.on_component_selected = None
+        self.tree_nodes = []
+        self.tree_selection = None
+
+    def rebuild_tree(self, nodes):
+        self.tree_nodes = nodes
+
+    def select_component(self, comp_id):
+        self.tree_selection = comp_id
+
+    def clear_selection(self):
+        self.tree_selection = None
+
+
+class MockPropertiesView:
+    def __init__(self):
+        self.on_property_changed = None
+        self.on_focus_changed = None
+        self.properties_box_id = None
+        self.properties_label = None
+        self.properties_x = None
+        self.properties_y = None
+        self.properties_w = None
+        self.properties_h = None
+        self.properties_is_visible = None
+        self.properties_is_locked = None
+        self.properties_pill_corner = None
+        self.properties_disabled = False
+        self.properties_focused_fields = set()
+        self.properties_values = {}
+
+    def update_properties_panel(
+        self,
+        box_id,
+        label,
+        x,
+        y,
+        w,
+        h,
+        is_visible,
+        is_locked,
+        pill_corner,
+    ):
+        self.properties_box_id = box_id
+        self.properties_label = label
+        self.properties_x = x
+        self.properties_y = y
+        self.properties_w = w
+        self.properties_h = h
+        self.properties_is_visible = is_visible
+        self.properties_is_locked = is_locked
+        self.properties_pill_corner = pill_corner
+
+    def is_field_focused(self, field_name):
+        return field_name in self.properties_focused_fields
+
+    def update_field_value(self, field_name, value):
+        self.properties_values[field_name] = value
+
+    def disable_properties_fields(self):
+        self.properties_disabled = True
 
 
 class MockAppWindow:
     def __init__(self):
-        self.canvas = MockWidget()
-        self.tree = MockWidget()
-        self.properties = MockWidget()
-        self.lbl_status = MockWidget()
-        self.lbl_zoom = MockWidget()
-        self.btn_back = MockWidget()
-        self.btn_mode_select = MockWidget()
-        self.btn_mode_draw = MockWidget()
-        self.btn_mode_pan = MockWidget()
-        self.btn_zoom_out = MockWidget()
-        self.btn_zoom_in = MockWidget()
-        self.btn_zoom_focus = MockWidget()
-        self.btn_cut_lines = MockWidget()
-        self.btn_screen_info = MockWidget()
-        self.file_menu = MockWidget()
-        self.edit_menu = MockWidget()
-        self.lbl_breadcrumb = MockWidget()
-        self.report_callback_exception = None
+        self.canvas = MockCanvasView()
+        self.tree = MockTreeView()
+        self.properties = MockPropertiesView()
 
-    def config(self, **kwargs):
+        self.report_callback_exception = None
+        self.status_text = ""
+        self.zoom_pct_str = ""
+        self.breadcrumbs_text = ""
+        self.mode_str = "select"
+        self.on_mode_change_request = None
+        self.on_undo_request = None
+        self.on_redo_request = None
+        self.on_delete_request = None
+        self.on_back_request = None
+        self.on_import_zip_request = None
+        self.on_import_image_request = None
+        self.on_export_zip_request = None
+        self.on_open_cut_editor_request = None
+        self.on_open_screen_info_request = None
+        self.on_enter_pressed = None
+        self.on_escape_pressed = None
+        self.context_menu_pos = None
+        self.context_menu_items = None
+
+    def update_status(self, text: str):
+        self.status_text = text
+
+    def update_zoom_display(self, zoom_factor: float):
+        zoom_pct = int(zoom_factor * 100)
+        self.zoom_pct_str = f"{zoom_pct}%"
+
+    def update_breadcrumbs(self, breadcrumbs: list[str]):
+        if breadcrumbs:
+            self.breadcrumbs_text = " / ".join(["Root"] + breadcrumbs)
+        else:
+            self.breadcrumbs_text = "Root"
+
+    def set_canvas_image(self, img):
         pass
 
-    def set_ui_interactive(self, enabled):
+    def set_ui_interactive(self, enabled: bool):
         pass
 
     def after(self, ms, func):
         func()
+
+    def show_context_menu(self, x_root: int, y_root: int, items: list[dict]):
+        self.context_menu_pos = (x_root, y_root)
+        self.context_menu_items = items
+
+    def set_mode_str(self, mode: str):
+        self.mode_str = mode
 
 
 class MockDialogService(DialogService):
@@ -91,10 +251,12 @@ class MockDialogService(DialogService):
 
     def show_importing_dialog(self, parent, message):
         self.importing_dialog_shown = True
-        class MockDialog:
-            def destroy(self):
+
+        class MockProgressIndicator:
+            def dismiss(self):
                 pass
-        return MockDialog()
+
+        return MockProgressIndicator()
 
     def show_cut_editor(self, parent, image, initial_cuts, components):
         self.cut_editor_shown = True
@@ -124,9 +286,11 @@ class MockEngineClient:
         self.imported_image = path
         on_complete(None)
 
-    def export_zip_data(self, on_complete):
+    def export_zip(self, path, on_complete):
         self.exported = True
-        on_complete(None, b"mock zip bytes")
+        with open(path, "wb") as f:
+            f.write(b"mock zip bytes")
+        on_complete(None)
 
     def update_cut_lines(self, lines):
         self.updated_cut_lines = lines
@@ -142,6 +306,12 @@ class MockEngineClient:
 
     def delete_component(self, comp_id):
         pass
+
+    def get_raw_image_data(self) -> bytes:
+        img = Image.new("RGB", (10, 10))
+        buf = io.BytesIO()
+        img.save(buf, format="PNG")
+        return buf.getvalue()
 
 
 def test_controller_import_zip():
@@ -163,7 +333,7 @@ def test_controller_export_zip(tmp_path):
     client = MockEngineClient()
     view = MockAppWindow()
     # Mock loaded image on canvas
-    view.canvas.full_pil_img = Image.new("RGB", (100, 100))
+    view.canvas.canvas_image = Image.new("RGB", (100, 100))
     dialogs = MockDialogService()
     dialogs.mock_save_path = str(tmp_path / "mock_output.zip")
 
@@ -173,7 +343,7 @@ def test_controller_export_zip(tmp_path):
     assert client.exported is True
     assert dialogs.importing_dialog_shown is True
     assert len(dialogs.infos) == 1
-    assert dialogs.infos[0][0] == "Success"
+    assert dialogs.infos[0][0] == "Export Successful"
 
 
 def test_controller_open_cut_editor():
@@ -182,11 +352,10 @@ def test_controller_open_cut_editor():
     view = MockAppWindow()
     # Mock image info in workspace state
     ws = WorkspaceState(
-        sessionId=uuid4(),
-        image=ImageInfo(filename="test.png", width=1000, height=1000)
+        sessionId=uuid4(), image=ImageInfo(filename="test.png", width=1000, height=1000)
     )
     store.update_state("workspace", workspace_state=ws)
-    view.canvas.full_pil_img = Image.new("RGB", (1000, 1000))
+    view.canvas.canvas_image = Image.new("RGB", (1000, 1000))
 
     dialogs = MockDialogService()
 
@@ -198,20 +367,13 @@ def test_controller_open_cut_editor():
 
 
 def test_controller_active_interaction_bounds_matching():
-    from uuid import uuid4
-    from models import Component, Bounds, Style, Visibility
 
     store = UIStateStore()
     client = MockEngineClient()
     view = MockAppWindow()
 
-    class MockGestures:
-        def __init__(self):
-            self.is_dragging = False
-
-    view.canvas.gestures = MockGestures()
-    view.canvas.image_item_id = None
-    view.canvas.full_pil_img = None
+    view.canvas.is_canvas_dragging = False
+    view.canvas.canvas_image = None
     dialogs = MockDialogService()
 
     controller = AppController(client, store, view, dialogs)
@@ -226,55 +388,27 @@ def test_controller_active_interaction_bounds_matching():
         label="Comp",
         bounds=Bounds(x=200, y=200, w=100, h=100),
         style=Style(),
-        visibility=Visibility()
+        visibility=Visibility(),
     )
-    ws_match = WorkspaceState(
-        sessionId=uuid4(),
-        components={comp_id: comp_match}
-    )
+    ws_match = WorkspaceState(sessionId=uuid4(), components={comp_id: comp_match})
     client.state = ws_match
 
     # Scenario 1: Dragging is active. active_interaction should be preserved even if bounds match.
-    view.canvas.gestures.is_dragging = True
+    view.canvas.is_canvas_dragging = True
     controller._apply_state_sync()
     assert store.state.active_interaction == {comp_id: transient_bounds}
 
     # Scenario 2: Dragging is inactive. Bounds match. active_interaction should be cleared.
-    view.canvas.gestures.is_dragging = False
+    view.canvas.is_canvas_dragging = False
     controller._apply_state_sync()
     assert store.state.active_interaction is None
 
 
 def test_controller_properties_input_preservation():
-    from models import Component, Bounds, Style, Visibility
-    from uuid import uuid4
 
     store = UIStateStore()
     client = MockEngineClient()
     view = MockAppWindow()
-
-    # Mock the passive view interface of the properties panel
-    class MockPropertiesPanel:
-        def __init__(self):
-            self.focused_fields = set()
-            self.values = {}
-            self.panel_updated = False
-            self.disabled = False
-
-        def update_properties_panel(self, box):
-            self.panel_updated = True
-
-        def disable_properties_fields(self):
-            self.disabled = True
-
-        def is_field_focused(self, field_name):
-            return field_name in self.focused_fields
-
-        def update_field_value(self, field_name, value):
-            self.values[field_name] = value
-
-    mock_properties = MockPropertiesPanel()
-    view.properties = mock_properties
 
     controller = AppController(client, store, view, MockDialogService())
 
@@ -285,25 +419,32 @@ def test_controller_properties_input_preservation():
         label="Initial Label",
         bounds=Bounds(x=10, y=20, w=100, h=200),
         style=Style(),
-        visibility=Visibility()
+        visibility=Visibility(),
     )
-    ws = WorkspaceState(
-        sessionId=uuid4(),
-        components={comp_id: comp}
-    )
+    ws = WorkspaceState(sessionId=uuid4(), components={comp_id: comp})
     client.state = ws
     store.update_state("workspace", workspace_state=ws)
     store.update_state("selection", selected_component_ids=[comp_id])
 
     # Scenario 1: Focus is not on any field. All fields should be updated.
-    controller._sync_properties_panel()
-    assert mock_properties.panel_updated is True
-    assert mock_properties.values["name"] == "Initial Label"
-    assert mock_properties.values["x"] == "10"
+    controller._on_selection_updated()
+    assert view.properties.properties_box_id == str(comp_id)
+    assert view.properties.properties_label == "Initial Label"
+    assert view.properties.properties_x == 10
+    assert view.properties.properties_y == 20
+    assert view.properties.properties_w == 100
+    assert view.properties.properties_h == 200
+    assert view.properties.properties_is_visible is True
+    assert view.properties.properties_is_locked is False
+    assert view.properties.properties_pill_corner == "top_left"
+    assert view.properties.properties_values["name"] == "Initial Label"
+    assert view.properties.properties_values["x"] == "10"
 
     # Scenario 2: Focus is on 'name'. Only name field should be preserved (not updated).
-    mock_properties.focused_fields.add("name")
-    mock_properties.values["name"] = "User Typed Name"  # simulate what user typed
+    view.properties.properties_focused_fields.add("name")
+    view.properties.properties_values["name"] = (
+        "User Typed Name"  # simulate what user typed
+    )
 
     # Update workspace state with new server bounds/label
     comp_updated = Component(
@@ -312,15 +453,211 @@ def test_controller_properties_input_preservation():
         label="New Server Label",
         bounds=Bounds(x=15, y=20, w=100, h=200),
         style=Style(),
-        visibility=Visibility()
+        visibility=Visibility(),
     )
-    ws_updated = WorkspaceState(
-         sessionId=uuid4(),
-         components={comp_id: comp_updated}
-    )
+    ws_updated = WorkspaceState(sessionId=uuid4(), components={comp_id: comp_updated})
     client.state = ws_updated
     store.update_state("workspace", workspace_state=ws_updated)
 
-    controller._sync_properties_panel()
-    assert mock_properties.values["name"] == "User Typed Name"  # preserved!
-    assert mock_properties.values["x"] == "15"  # updated!
+    controller._on_workspace_updated()
+    assert view.properties.properties_values["name"] == "User Typed Name"  # preserved!
+    assert view.properties.properties_values["x"] == "15"  # updated!
+
+
+def test_controller_sidebar_tree_structure():
+
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+    controller = AppController(client, store, view, MockDialogService())
+
+    # Create root component and child component
+    root_id = uuid4()
+    child_id = uuid4()
+
+    root_comp = Component(
+        id=root_id,
+        number="1",
+        label="Root Comp",
+        bounds=Bounds(x=0, y=0, w=100, h=100),
+        style=Style(),
+        visibility=Visibility(visible=True, locked=False),
+        childrenIds=[child_id],
+    )
+
+    child_comp = Component(
+        id=child_id,
+        number="",
+        label="Child Comp",
+        bounds=Bounds(x=10, y=10, w=50, h=50),
+        style=Style(),
+        visibility=Visibility(visible=False, locked=True),
+        parentId=root_id,
+    )
+
+    ws = WorkspaceState(
+        sessionId=uuid4(),
+        components={root_id: root_comp, child_id: child_comp},
+        rootComponents=[root_id],
+    )
+
+    client.state = ws
+    store.update_state("workspace", workspace_state=ws)
+
+    # Trigger workspace sync, which builds tree nodes
+    controller._on_workspace_updated()
+
+    # Check constructed node tree structure passed to the view
+    assert view.tree.tree_nodes is not None
+    assert len(view.tree.tree_nodes) == 1
+
+    root_node = view.tree.tree_nodes[0]
+    assert root_node["id"] == str(root_id)
+    assert root_node["text"] == "1 Root Comp"
+    assert len(root_node["children"]) == 1
+
+    child_node = root_node["children"][0]
+    assert child_node["id"] == str(child_id)
+    assert child_node["text"] == "Child Comp (hidden, locked)"
+    assert len(child_node["children"]) == 0
+
+
+def test_controller_properties_focus_decoupling():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+
+    # Instantiate controller to bind callback
+    _controller = AppController(client, store, view, MockDialogService())
+
+    # Verify initial state of viewport.text_focused is False
+    assert store.state.text_focused is False
+
+    # Simulate properties focus event triggering callback
+    assert view.properties.on_focus_changed is not None
+    view.properties.on_focus_changed(True)
+    assert store.state.text_focused is True
+
+    # Simulate properties focus lost
+    view.properties.on_focus_changed(False)
+    assert store.state.text_focused is False
+
+
+def test_controller_keyboard_shortcuts_decoupling():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+
+    # Instantiate controller
+    _controller = AppController(client, store, view, MockDialogService())
+
+    # Set up some state
+    comp_id = uuid4()
+    comp = Component(
+        id=comp_id,
+        number="1",
+        label="Test Comp",
+        bounds=Bounds(x=10, y=20, w=100, h=200),
+        style=Style(),
+        visibility=Visibility(),
+    )
+    ws = WorkspaceState(sessionId=uuid4(), components={comp_id: comp})
+    store.update_state("workspace", workspace_state=ws)
+    store.update_state("selection", selected_component_ids=[comp_id])
+
+    # Trigger enter shortcut callback
+    res = view.on_enter_pressed()
+    assert res == "break"
+    assert view.canvas.drill_into_id == comp_id
+
+    # Verify escape shortcut when parent stack is empty
+    assert store.state.parent_stack == []
+    res_esc = view.on_escape_pressed()
+    assert res_esc is None
+    assert view.canvas.drill_out_called is False
+
+    # Verify escape shortcut when parent stack has items
+    store.update_state("viewport", parent_stack=[uuid4()])
+    res_esc2 = view.on_escape_pressed()
+    assert res_esc2 == "break"
+    assert view.canvas.drill_out_called is True
+
+
+def test_controller_active_interaction_decoupling():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+
+    # Instantiate controller to bind callbacks
+    _controller = AppController(client, store, view, MockDialogService())
+
+    # 1. Verify active interaction changed callback updates store and triggers update_canvas_selection
+    comp_id = uuid4()
+    bounds = Bounds(x=10, y=20, w=100, h=150)
+    active_int = {comp_id: bounds}
+
+    assert view.canvas.on_active_interaction_changed is not None
+    view.canvas.on_active_interaction_changed(active_int)
+
+    # The store's active_interaction should be updated
+    assert store.state.active_interaction == active_int
+
+    # The update_canvas_selection should have been called with the updated active_interaction
+    assert view.canvas.canvas_selected_ids == []
+    assert view.canvas.canvas_active_interaction == active_int
+
+    # 2. Verify state sync workspace update triggers update_canvas_workspace with active_interaction
+    ws = WorkspaceState(
+        sessionId=uuid4(),
+        image=ImageInfo(filename="test.png", width=1000, height=1000),
+    )
+    store.update_state("workspace", workspace_state=ws)
+
+    assert view.canvas.canvas_workspace_state == ws
+    assert view.canvas.canvas_active_interaction == active_int
+
+
+def test_controller_context_menu_generation():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+    dialogs = MockDialogService()
+    controller = AppController(client, store, view, dialogs)
+
+    # Mock canvas image presence
+    view.canvas.canvas_image = Image.new("RGB", (100, 100))
+
+    comp_id = uuid4()
+    clicked = Component(
+        id=comp_id,
+        number="5",
+        label="Test Button",
+        bounds=Bounds(x=10, y=10, w=50, h=50),
+        style=Style(),
+        visibility=Visibility(visible=True, locked=False),
+    )
+
+    # Simulate a canvas right click event
+    class MockEvent:
+        def __init__(self, x, y):
+            self.x_root = x
+            self.y_root = y
+
+    event = MockEvent(100, 200)
+    controller._on_canvas_context_menu(event, clicked)
+
+    assert view.context_menu_pos == (100, 200)
+    assert view.context_menu_items is not None
+
+    # Check that expected items are generated
+    labels = [
+        item.get("label")
+        for item in view.context_menu_items
+        if not item.get("separator")
+    ]
+    assert "Drill into Component 5" in labels
+    assert "Hide Component" in labels
+    assert "Lock Component" in labels
+    assert "Delete (Delete)" in labels
+    assert "Focus Target" in labels
+    assert "Toggle Labels (T)" in labels

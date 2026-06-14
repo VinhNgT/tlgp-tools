@@ -2,8 +2,6 @@ import tkinter as tk
 from tkinter import ttk
 from uuid import UUID
 
-from models import WorkspaceState
-
 
 class SidebarTreeView(ttk.Treeview):
     """Passive Treeview layer view component displaying component hierarchies with incremental syncs."""
@@ -17,57 +15,38 @@ class SidebarTreeView(ttk.Treeview):
         self._is_programmatic = False
         self._tree_nodes = {}
 
-    def rebuild_tree(self, state: WorkspaceState | None):
-        """Diffs and rebuilds Treeview nodes incrementally based on new state updates."""
-        if not state:
-            self.delete(*self.get_children())
-            self._tree_nodes.clear()
-            return
-
+    def rebuild_tree(self, nodes: list[dict]):
+        """Diffs and rebuilds Treeview nodes incrementally based on updated layout tree data."""
         synced_ids = set()
 
-        def sync_node(parent_id: str, comp_uuid: UUID, index: int):
-            comp = state.components.get(comp_uuid)
-            if not comp:
-                return
+        def sync_node(parent_id: str, node_data: dict, index: int):
+            node_id = node_data["id"]
+            node_text = node_data["text"]
+            synced_ids.add(node_id)
 
-            comp_id_str = str(comp.id)
-            synced_ids.add(comp_id_str)
-            node_text = f"{comp.number} {comp.label}" if comp.number else comp.label
-
-            suffix = []
-            if not getattr(comp.visibility, "visible", True):
-                suffix.append("hidden")
-            if getattr(comp.visibility, "locked", False):
-                suffix.append("locked")
-            if suffix:
-                node_text += f" ({', '.join(suffix)})"
-
-            cached = self._tree_nodes.get(comp_id_str)
+            cached = self._tree_nodes.get(node_id)
             if cached is None:
-                self.insert(
-                    parent_id, index, iid=comp_id_str, text=node_text, open=True
-                )
-                self._tree_nodes[comp_id_str] = {
+                self.insert(parent_id, index, iid=node_id, text=node_text, open=True)
+                self._tree_nodes[node_id] = {
                     "text": node_text,
                     "parent": parent_id,
                     "index": index,
                 }
             else:
                 if cached["text"] != node_text:
-                    self.item(comp_id_str, text=node_text)
+                    self.item(node_id, text=node_text)
                     cached["text"] = node_text
 
                 if cached["parent"] != parent_id or cached["index"] != index:
-                    self.move(comp_id_str, parent_id, index)
+                    self.move(node_id, parent_id, index)
                     cached["parent"] = parent_id
                     cached["index"] = index
 
-            for i, child_uuid in enumerate(comp.childrenIds):
-                sync_node(comp_id_str, child_uuid, i)
+            for i, child_node in enumerate(node_data.get("children", [])):
+                sync_node(node_id, child_node, i)
 
-        for i, root_uuid in enumerate(state.rootComponents):
-            sync_node("", root_uuid, i)
+        for i, root_node in enumerate(nodes):
+            sync_node("", root_node, i)
 
         to_delete = set(self._tree_nodes.keys()) - synced_ids
         for item_id in to_delete:
@@ -96,7 +75,6 @@ class SidebarTreeView(ttk.Treeview):
             pass
         finally:
             self._is_programmatic = False
-
 
     def _on_tree_select(self, event):
         if self._is_programmatic:

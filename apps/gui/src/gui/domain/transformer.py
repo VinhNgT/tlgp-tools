@@ -1,13 +1,10 @@
 from uuid import UUID
 
-from models import WorkspaceState
-from PIL import Image, ImageDraw
-
 CUT_GAP_PX = 20
 
 
 class ViewportTransformer:
-    """Manages display coordinate mapping (including zoom and gap offsets) and segment image composition."""
+    """Manages display coordinate mapping (including zoom and gap offsets)."""
 
     def __init__(self, cut_gap_px: int = CUT_GAP_PX):
         self.cut_gap_px = cut_gap_px
@@ -71,11 +68,11 @@ class ViewportTransformer:
         abs_y: int,
         parent_stack: list[UUID],
         cut_lines: list[int],
-        state: WorkspaceState | None,
+        boundary: tuple[int, int, int, int],
     ) -> tuple[int, int]:
         """Returns visual bounding box limits of the active horizontal segment strip containing y coordinate."""
         if not self.has_active_cuts(parent_stack, cut_lines) or not self._segments:
-            bx1, by1, bx2, by2 = self.get_boundary(parent_stack, state)
+            _, by1, _, by2 = boundary
             return by1, by2
 
         last_idx = len(self._segments) - 1
@@ -87,16 +84,15 @@ class ViewportTransformer:
         return last[0], last[1]
 
     def get_boundary(
-        self, parent_stack: list[UUID], state: WorkspaceState | None
+        self,
+        parent_bounds: tuple[int, int, int, int] | None,
+        image_size: tuple[int, int] | None,
     ) -> tuple[int, int, int, int]:
         """Calculates active coordinate bounds constraint corresponding to drill down layers."""
-        if state and state.image:
-            parent_id = parent_stack[-1] if parent_stack else None
-            parent = state.components.get(parent_id) if parent_id else None
-            if parent:
-                b = parent.bounds
-                return b.left, b.top, b.right, b.bottom
-            return 0, 0, state.image.width, state.image.height
+        if parent_bounds:
+            return parent_bounds
+        if image_size:
+            return 0, 0, image_size[0], image_size[1]
         return 0, 0, 99999, 99999
 
     def to_canvas(
@@ -137,41 +133,7 @@ class ViewportTransformer:
             raw_y = self.gap_offset_inverse(raw_y)
         return raw_x, raw_y
 
-    def composite_gapped_image(self, src_img: Image.Image) -> Image.Image:
-        """Composes segment strips paste separated by visual gap fills."""
-        if not self._segments:
-            return src_img
-
-        img_w = src_img.width
-        total_gap = self._segments[-1][2]
-        total_h = src_img.height + total_gap
-
-        composite = Image.new("RGB", (img_w, total_h), (30, 30, 30))
-
-        for src_start, src_end, display_offset in self._segments:
-            seg_h = src_end - src_start
-            if seg_h <= 0:
-                continue
-            seg_strip = src_img.crop((0, src_start, img_w, src_end))
-            dest_y = src_start + display_offset
-            composite.paste(seg_strip, (0, dest_y))
-
-        draw = ImageDraw.Draw(composite)
-        for i in range(1, len(self._segments)):
-            _, prev_end, _ = self._segments[i - 1]
-            gap_start_y = prev_end + self._segments[i - 1][2]
-            gap_mid_y = gap_start_y + self.cut_gap_px // 2
-
-            dash_len = 12
-            gap_len = 8
-            x = 0
-            while x < img_w:
-                x_end = min(x + dash_len, img_w)
-                draw.line(
-                    [(x, gap_mid_y), (x_end, gap_mid_y)],
-                    fill=(100, 100, 100),
-                    width=2,
-                )
-                x += dash_len + gap_len
-
-        return composite
+    @property
+    def segments(self) -> list[tuple[int, int, int]]:
+        """Gets the active list of gap-shifted display segments."""
+        return self._segments

@@ -1,6 +1,7 @@
 import tkinter as tk
 from tkinter import ttk
 
+from PIL import Image
 from tlgp_logger import get_logger
 
 from .canvas import AnnotationCanvasView
@@ -13,7 +14,7 @@ logger = get_logger(__name__)
 class MainAppWindow(tk.Tk):
     """Passive main application window container. Delegates menus, shortcuts, and layout actions to controller."""
 
-    def __init__(self, store, transformer, gestures):
+    def __init__(self, transformer, gestures):
         super().__init__()
         self.title("TLGP Annotation Client")
         self.geometry("1200x800")
@@ -22,7 +23,6 @@ class MainAppWindow(tk.Tk):
         except Exception:
             pass
 
-        self.store = store
         self.transformer = transformer
         self.gestures = gestures
 
@@ -39,6 +39,8 @@ class MainAppWindow(tk.Tk):
         self.on_export_zip_request = None
         self.on_open_cut_editor_request = None
         self.on_open_screen_info_request = None
+        self.on_enter_pressed = None
+        self.on_escape_pressed = None
 
         self.mode_var = tk.StringVar(value="select")
 
@@ -178,13 +180,15 @@ class MainAppWindow(tk.Tk):
         self.paned.add(middle_frame, weight=3)
 
         self.canvas = AnnotationCanvasView(
-            middle_frame, self.store, self.transformer, self.gestures
+            middle_frame, self.transformer, self.gestures
         )
         self.canvas.pack(fill=tk.BOTH, expand=True)
 
         # Right Sidebar (Properties Panel)
-        self.properties = ComponentPropertiesView(self.paned, self.store)
+        self.properties = ComponentPropertiesView(self.paned)
         self.paned.add(self.properties, weight=0)
+
+        # Callbacks are bound directly on components by the controller
 
     def create_menu_bar(self):
         menu_bar = tk.Menu(self)
@@ -254,10 +258,12 @@ class MainAppWindow(tk.Tk):
         """Binds a keyboard shortcut to the main window. If needs_unfocused is True,
         the callback will be ignored if any text input widget has focus, allowing native entry behavior.
         """
+
         def wrapper(event):
             if needs_unfocused and self.is_text_focused():
                 return None
             return func(event)
+
         self.bind(sequence, wrapper)
 
     def bind_shortcuts(self):
@@ -298,12 +304,12 @@ class MainAppWindow(tk.Tk):
         self.bind_shortcut("<KeyPress-space>", self._on_space_press)
         self.bind_shortcut("<KeyRelease-space>", self._on_space_release)
 
-        self.bind_shortcut("<v>", lambda e: self._set_mode_str("select"))
-        self.bind_shortcut("<V>", lambda e: self._set_mode_str("select"))
-        self.bind_shortcut("<r>", lambda e: self._set_mode_str("draw"))
-        self.bind_shortcut("<R>", lambda e: self._set_mode_str("draw"))
-        self.bind_shortcut("<h>", lambda e: self._set_mode_str("pan"))
-        self.bind_shortcut("<H>", lambda e: self._set_mode_str("pan"))
+        self.bind_shortcut("<v>", lambda e: self.set_mode_str("select"))
+        self.bind_shortcut("<V>", lambda e: self.set_mode_str("select"))
+        self.bind_shortcut("<r>", lambda e: self.set_mode_str("draw"))
+        self.bind_shortcut("<R>", lambda e: self.set_mode_str("draw"))
+        self.bind_shortcut("<h>", lambda e: self.set_mode_str("pan"))
+        self.bind_shortcut("<H>", lambda e: self.set_mode_str("pan"))
         self.bind_shortcut("<f>", lambda e: self.canvas.zoom_focus_target())
         self.bind_shortcut("<F>", lambda e: self.canvas.zoom_focus_target())
         self.bind_shortcut("<t>", lambda e: self.canvas.toggle_labels_visibility())
@@ -315,7 +321,7 @@ class MainAppWindow(tk.Tk):
         self.bind_shortcut("<Escape>", self._on_key_escape, needs_unfocused=False)
 
     def is_text_focused(self) -> bool:
-        return self.store.state.text_focused
+        return self.properties.is_text_focused()
 
     def set_ui_interactive(self, enabled: bool):
         state = tk.NORMAL if enabled else tk.DISABLED
@@ -354,7 +360,7 @@ class MainAppWindow(tk.Tk):
         if self.on_mode_change_request:
             self.on_mode_change_request(mode)
 
-    def _set_mode_str(self, mode: str):
+    def set_mode_str(self, mode: str):
         if not self.canvas.full_pil_img:
             return
         self.mode_var.set(mode)
@@ -394,24 +400,16 @@ class MainAppWindow(tk.Tk):
             return None
         if not self.canvas.full_pil_img:
             return None
-        state = self.store.state.workspace_state
-        selected_boxes = [
-            state.components[uid]
-            for uid in self.store.state.selected_component_ids
-            if state and uid in state.components
-        ]
-        if len(selected_boxes) == 1:
-            self.canvas.drill_into(selected_boxes[0].id)
-            return "break"
+        if self.on_enter_pressed:
+            return self.on_enter_pressed()
         return None
 
     def _on_key_escape(self, event):
         if self.is_text_focused():
             self.focus_set()
             return "break"
-        if self.store.state.parent_stack:
-            self.canvas.drill_out()
-            return "break"
+        if self.on_escape_pressed:
+            return self.on_escape_pressed()
         return None
 
     def _on_window_click(self, event):
@@ -435,3 +433,36 @@ class MainAppWindow(tk.Tk):
             return
         if self.on_open_cut_editor_request:
             self.on_open_cut_editor_request()
+
+    def update_status(self, text: str):
+        self.lbl_status.config(text=text)
+
+    def update_zoom_display(self, zoom_factor: float):
+        zoom_pct = int(zoom_factor * 100)
+        self.lbl_zoom.config(text=f"{zoom_pct}%")
+
+    def update_breadcrumbs(self, breadcrumbs: list[str]):
+        if breadcrumbs:
+            self.btn_back.config(state=tk.NORMAL)
+            self.lbl_breadcrumb.config(text=" / ".join(["Root"] + breadcrumbs))
+        else:
+            self.btn_back.config(state=tk.DISABLED)
+            self.lbl_breadcrumb.config(text="Root")
+
+    def set_canvas_image(self, img: Image.Image | None):
+        self.set_ui_interactive(img is not None)
+        self.canvas.set_background_image(img)
+
+    def show_context_menu(self, x_root: int, y_root: int, items: list[dict]):
+        """Builds and displays a context menu at the specified screen coordinates."""
+        if not hasattr(self, "_context_menu"):
+            self._context_menu = tk.Menu(self, tearoff=0)
+        self._context_menu.delete(0, tk.END)
+        for item in items:
+            if item.get("separator"):
+                self._context_menu.add_separator()
+            else:
+                self._context_menu.add_command(
+                    label=item["label"], command=item["command"]
+                )
+        self._context_menu.post(x_root, y_root)

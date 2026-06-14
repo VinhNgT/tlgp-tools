@@ -1,3 +1,6 @@
+from models import Component
+
+
 class BoundsValidator:
     """Pure domain service encapsulating component coordinate boundary validation and clamping math."""
 
@@ -77,3 +80,47 @@ class BoundsValidator:
                 ry2 = cy2
 
         return rx1, ry1, rx2, ry2
+
+
+class CutValidator:
+    """Pure domain service encapsulating cut line coordinate constraints and collision checks."""
+
+    @staticmethod
+    def get_intersecting_component(
+        img_y: int, components: list[Component]
+    ) -> Component | None:
+        """Determines if a horizontal coordinate intersects with any component bounds."""
+        for comp in components:
+            if comp.bounds.top <= img_y <= comp.bounds.bottom:
+                return comp
+        return None
+
+    @staticmethod
+    def is_valid_position(
+        img_y: int, image_height: int, cut_lines: list[int], min_gap: int
+    ) -> bool:
+        """Verifies if a coordinate satisfies top/bottom margins and gap constraints."""
+        if img_y < min_gap or img_y > image_height - min_gap:
+            return False
+        for existing_y in cut_lines:
+            if abs(img_y - existing_y) < min_gap:
+                return False
+        return True
+
+    @staticmethod
+    def is_valid_position_for_drag(
+        img_y: int,
+        image_height: int,
+        cut_lines: list[int],
+        exclude_index: int,
+        min_gap: int,
+    ) -> bool:
+        """Verifies if a coordinate satisfies gap constraints excluding a specific cut line index."""
+        if img_y < min_gap or img_y > image_height - min_gap:
+            return False
+        for i, existing_y in enumerate(cut_lines):
+            if i == exclude_index:
+                continue
+            if abs(img_y - existing_y) < min_gap:
+                return False
+        return True

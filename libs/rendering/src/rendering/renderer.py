@@ -271,3 +271,47 @@ def draw_annotations_on_image(
         )
 
     return img
+
+
+def composite_gapped_image(
+    src_img: Image.Image,
+    segments: list[tuple[int, int, int]],
+    cut_gap_px: int,
+) -> Image.Image:
+    """Composes segment strips from a source image separated by visual gap fills."""
+    if not segments:
+        return src_img
+
+    img_w = src_img.width
+    total_gap = segments[-1][2]
+    total_h = src_img.height + total_gap
+
+    composite = Image.new("RGB", (img_w, total_h), (30, 30, 30))
+
+    for src_start, src_end, display_offset in segments:
+        seg_h = src_end - src_start
+        if seg_h <= 0:
+            continue
+        seg_strip = src_img.crop((0, src_start, img_w, src_end))
+        dest_y = src_start + display_offset
+        composite.paste(seg_strip, (0, dest_y))
+
+    draw = ImageDraw.Draw(composite)
+    for i in range(1, len(segments)):
+        _, prev_end, _ = segments[i - 1]
+        gap_start_y = prev_end + segments[i - 1][2]
+        gap_mid_y = gap_start_y + cut_gap_px // 2
+
+        dash_len = 12
+        gap_len = 8
+        x = 0
+        while x < img_w:
+            x_end = min(x + dash_len, img_w)
+            draw.line(
+                [(x, gap_mid_y), (x_end, gap_mid_y)],
+                fill=(100, 100, 100),
+                width=2,
+            )
+            x += dash_len + gap_len
+
+    return composite
