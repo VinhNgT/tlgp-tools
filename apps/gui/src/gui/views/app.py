@@ -43,6 +43,7 @@ class MainAppWindow(tk.Tk):
         self.on_enter_pressed = None
         self.on_escape_pressed = None
         self.on_arrow_key_pressed = None
+        self.on_soft_restart_request = None
 
         self.mode_var = tk.StringVar(value="select")
 
@@ -253,6 +254,13 @@ class MainAppWindow(tk.Tk):
         self.developer_menu.add_command(
             label="Backend Logs...",
             command=self.debug.show_window,
+        )
+        self.developer_menu.add_separator()
+        self.developer_menu.add_command(
+            label="Soft Restart",
+            command=lambda: (
+                self.on_soft_restart_request() if self.on_soft_restart_request else None
+            ),
         )
         menu_bar.add_cascade(label="Developer", menu=self.developer_menu)
 

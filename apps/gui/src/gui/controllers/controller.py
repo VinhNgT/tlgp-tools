@@ -61,6 +61,7 @@ class AppController:
         self.view.on_enter_pressed = self._on_enter_pressed
         self.view.on_escape_pressed = self._on_escape_pressed
         self.view.on_arrow_key_pressed = self._on_arrow_key_pressed
+        self.view.on_soft_restart_request = self._on_soft_restart_request
 
         # Canvas callbacks
         self.view.canvas.on_import_zip = self._on_import_zip_request
@@ -366,6 +367,26 @@ class AppController:
     def _on_mode_change_request(self, mode: str):
         self.store.update_state("selection", active_interaction=None)
         self.store.update_state("viewport", current_mode=mode)
+
+    def _on_soft_restart_request(self):
+        self._loaded_session_id = None
+        self.view.set_canvas_image(None)
+        self.view.update_status("Reconnecting to engine...")
+        self.view.set_ui_interactive(False)
+        self.store.update_state("workspace", workspace_state=None)
+        self.store.update_state("selection", selected_component_ids=[], active_interaction=None)
+        self.store.update_state(
+            "viewport",
+            zoom_factor=1.0,
+            pan_offset=(0.0, 0.0),
+            parent_stack=[],
+            current_mode="select",
+            text_focused=False,
+        )
+        self.view.set_mode_str("select")
+        
+        self.client.stop()
+        self.client.start()
 
     def _on_undo_request(self):
         if self.view.canvas.full_pil_img:
