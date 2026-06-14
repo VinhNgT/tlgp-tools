@@ -5,6 +5,7 @@ from PIL import Image
 from tlgp_logger import get_logger
 
 from .canvas import AnnotationCanvasView
+from .debug import BackendDebugWindow
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
 
@@ -188,6 +189,9 @@ class MainAppWindow(tk.Tk):
         self.properties = ComponentPropertiesView(self.paned)
         self.paned.add(self.properties, weight=0)
 
+        # Developer hidden debug window
+        self.debug = BackendDebugWindow(self)
+
         # Callbacks are bound directly on components by the controller
 
     def create_menu_bar(self):
@@ -251,6 +255,13 @@ class MainAppWindow(tk.Tk):
             ),
         )
         menu_bar.add_cascade(label="Edit", menu=self.edit_menu)
+
+        self.developer_menu = tk.Menu(menu_bar, tearoff=0)
+        self.developer_menu.add_command(
+            label="Backend Logs...",
+            command=self.debug.show_window,
+        )
+        menu_bar.add_cascade(label="Developer", menu=self.developer_menu)
 
         self.config(menu=menu_bar)
 

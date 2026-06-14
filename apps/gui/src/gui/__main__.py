@@ -39,6 +39,9 @@ def main():
     # Configure client to dispatch callbacks safely to GUI main thread
     client.dispatch = lambda f: view.after(0, f)
 
+    # Wire debug logs to debug view
+    client.on_log_message = view.debug.log_message
+
     # Instantiate controller linking model client, state store, and views
     _controller = AppController(client, store, view, dialog_service)
 

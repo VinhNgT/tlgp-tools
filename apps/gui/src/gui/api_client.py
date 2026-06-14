@@ -60,6 +60,7 @@ class EngineClient:
         self,
         on_state_changed: Callable[[], None],
         on_error: Callable[[str], None] | None = None,
+        on_log_message: Callable[[str, dict | str], None] | None = None,
         api_url: str = API_URL,
         ws_url: str = WS_URL,
         dispatch: Callable[[Callable[[], None]], None] | None = None,
@@ -68,6 +69,7 @@ class EngineClient:
         self._state_dict: dict | None = None
         self.on_state_changed = on_state_changed
         self.on_error = on_error
+        self.on_log_message = on_log_message
         self.api_url = api_url
         self.ws_url = ws_url
         self.dispatch = dispatch or (lambda f: f())
@@ -115,6 +117,8 @@ class EngineClient:
                     logger.info("Connected to Engine WebSocket")
                     self._ws = ws
                     async for message in ws:
+                        if self.on_log_message:
+                            self.dispatch(lambda msg=message: self.on_log_message("Incoming WS", msg))
                         data = json.loads(message)
 
                         if "error" in data:
@@ -164,6 +168,8 @@ class EngineClient:
             return None
         req_id = str(uuid.uuid4())
         msg = {"jsonrpc": "2.0", "method": method, "params": params, "id": req_id}
+        if self.on_log_message:
+            self.dispatch(lambda m=msg: self.on_log_message("Outgoing WS", m))
         try:
             await self._ws.send(json.dumps(msg))
         except Exception as e:
@@ -175,10 +181,16 @@ class EngineClient:
 
     def _request(self, method: str, url: str, **kwargs) -> requests.Response:
         """Centralized helper for HTTP requests to standardise error handling and exception logging."""
+        if self.on_log_message:
+            self.dispatch(lambda m={"method": method, "url": url, "kwargs": str(kwargs)}: self.on_log_message("Outgoing HTTP", m))
+        
         try:
             res = requests.request(method, url, **kwargs)
         except requests.RequestException as e:
             raise ApiClientError(f"Connection failed: {e}", url=url) from e
+
+        if self.on_log_message:
+            self.dispatch(lambda m={"status_code": res.status_code, "url": url}: self.on_log_message("Incoming HTTP", m))
 
         if not (200 <= res.status_code < 300):
             detail = None
