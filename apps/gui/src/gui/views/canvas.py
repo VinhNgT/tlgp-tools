@@ -107,6 +107,10 @@ class AnnotationCanvasView(tk.Canvas):
         self._mask_cached_key = None
         self._last_pil_img = None
         self._last_crop_box = None
+        self._zoom_cached_photo = None
+        self._zoom_cached_key = None
+        self._last_pan_offset = (0.0, 0.0)
+        self._last_workspace_revision = None
         self._redraw_pending = False
 
         self.on_import_zip = None
@@ -151,6 +155,10 @@ class AnnotationCanvasView(tk.Canvas):
         self._mask_cached_key = None
         self._last_pil_img = None
         self._last_crop_box = None
+        self._zoom_cached_photo = None
+        self._zoom_cached_key = None
+        self._last_pan_offset = (0.0, 0.0)
+        self._last_workspace_revision = None
 
     def show_welcome_screen(self):
         self.delete("all")
@@ -230,81 +238,81 @@ class AnnotationCanvasView(tk.Canvas):
             else []
         )
         parent_stack = self.store.state.parent_stack
+        cut_lines_tuple = tuple(cut_lines) if cut_lines else ()
 
         if self.transformer.has_active_cuts(parent_stack, cut_lines):
             self.transformer.rebuild_segments(cut_lines)
-            if self._last_pil_img is not self.full_pil_img:
+            if (self._last_pil_img is not self.full_pil_img 
+                    or getattr(self, "_last_cut_lines", None) != cut_lines_tuple):
                 self.current_pil_img = self.transformer.composite_gapped_image(
                     self.full_pil_img
                 )
                 self._last_pil_img = self.full_pil_img
+                self._last_cut_lines = cut_lines_tuple
         else:
             self.current_pil_img = self.full_pil_img
             self._last_pil_img = self.full_pil_img
+            self._last_cut_lines = ()
 
         zoom_factor = self.store.state.zoom_factor
         pan_x, pan_y = self.store.state.pan_offset
 
-        left_abs = -pan_x / zoom_factor
-        top_abs = -pan_y / zoom_factor
-        right_abs = (cw - pan_x) / zoom_factor
-        bottom_abs = (ch - pan_y) / zoom_factor
-
-        left = int(max(0, left_abs))
-        top = int(max(0, top_abs))
-        right = int(min(self.current_pil_img.width, right_abs))
-        bottom = int(min(self.current_pil_img.height, bottom_abs))
-
-        if right <= left or bottom <= top:
-            return
-
-        crop_box = (left, top, right, bottom)
-        disp_x = left * zoom_factor + pan_x
-        disp_y = top * zoom_factor + pan_y
+        workspace_state = self.store.state.workspace_state
+        state_revision = workspace_state.revision if workspace_state else 0
+        workspace_changed = (state_revision != getattr(self, "_last_workspace_revision", None))
+        self._last_workspace_revision = state_revision
 
         parent_stack_tuple = tuple(parent_stack) if parent_stack else ()
-        state_key = (crop_box, zoom_factor, id(self.current_pil_img), parent_stack_tuple)
+        state_key = (zoom_factor, id(self.current_pil_img), parent_stack_tuple, cut_lines_tuple)
 
-        if state_key != getattr(self, "_last_state_key", None) or self.image_item_id is None:
-            self._last_state_key = state_key
-            self._last_crop_box = crop_box
-            cropped = self.current_pil_img.crop(crop_box)
+        image_rebuilt = False
+        if state_key != getattr(self, "_zoom_cached_key", None) or self.image_item_id is None:
+            self._zoom_cached_key = state_key
+            image_rebuilt = True
 
-            if parent_stack and self.store.state.workspace_state:
-                cropped = self._apply_parent_masks(cropped, left, top, right, bottom)
+            masked = self._apply_full_parent_mask(self.current_pil_img)
 
-            scaled_w = round((right - left) * zoom_factor)
-            scaled_h = round((bottom - top) * zoom_factor)
+            scaled_w = round(masked.width * zoom_factor)
+            scaled_h = round(masked.height * zoom_factor)
             if scaled_w > 0 and scaled_h > 0:
-                resized = cropped.resize(
+                resized = masked.resize(
                     (scaled_w, scaled_h), Image.Resampling.BILINEAR
                 )
-                self.photo = ImageTk.PhotoImage(resized)
+                self._zoom_cached_photo = ImageTk.PhotoImage(resized)
 
                 if self.image_item_id is not None:
                     self.delete(self.image_item_id)
 
                 self.image_item_id = self.create_image(
-                    disp_x, disp_y, image=self.photo, anchor="nw"
+                    pan_x, pan_y, image=self._zoom_cached_photo, anchor="nw"
                 )
+                self.tag_lower(self.image_item_id)
+
+            self._last_pan_offset = (pan_x, pan_y)
+
+        if image_rebuilt or workspace_changed:
+            self.draw_boxes()
         else:
-            if self.image_item_id is not None:
-                self.coords(self.image_item_id, disp_x, disp_y)
+            dx = pan_x - self._last_pan_offset[0]
+            dy = pan_y - self._last_pan_offset[1]
+            if dx != 0 or dy != 0:
+                if self.image_item_id is not None:
+                    self.coords(self.image_item_id, pan_x, pan_y)
+                self.move("ann", dx, dy)
+                self._last_pan_offset = (pan_x, pan_y)
 
-        self.draw_boxes()
-
-    def _apply_parent_masks(
-        self, cropped: Image.Image, left: int, top: int, right: int, bottom: int
-    ) -> Image.Image:
+    def _apply_full_parent_mask(self, base_img: Image.Image) -> Image.Image:
         state = self.store.state.workspace_state
         parent_stack = self.store.state.parent_stack
+        if not parent_stack or not state:
+            return base_img
         parent_id = parent_stack[-1]
         parent = state.components.get(parent_id)
         if not parent:
-            return cropped
+            return base_img
 
-        img_w = self.current_pil_img.width
-        img_h = self.current_pil_img.height
+        img_w = base_img.width
+        img_h = base_img.height
         mask_key = (parent_id, img_w, img_h)
 
         if self._mask_cached_key != mask_key or self._mask_cached_img is None:
@@ -315,9 +323,8 @@ class AnnotationCanvasView(tk.Canvas):
             self._mask_cached_img = mask
             self._mask_cached_key = mask_key
 
-        crop_mask = self._mask_cached_img.crop((left, top, right, bottom))
-        bg = Image.new("RGB", cropped.size, (18, 18, 18))
-        return Image.composite(cropped, bg, crop_mask)
+        bg = Image.new("RGB", base_img.size, (18, 18, 18))
+        return Image.composite(base_img, bg, self._mask_cached_img)
 
     def draw_boxes(self):
         self.delete("ann")
@@ -334,6 +341,8 @@ class AnnotationCanvasView(tk.Canvas):
             for uid in self.store.state.selected_component_ids
             if uid in state.components
         ]
+
+        active_int = self.store.state.active_interaction
 
         if (
             self.gestures.resize_handle
@@ -392,17 +401,21 @@ class AnnotationCanvasView(tk.Canvas):
             base_lw = max(1, round(abs_box_border * zoom_factor))
             lw = base_lw + 1 if is_sel else base_lw
 
+            bounds = active_int.get(box.id) if active_int else None
+            if bounds is None:
+                bounds = box.bounds
+
             cx1, cy1 = self.transformer.to_canvas(
-                box.bounds.left,
-                box.bounds.top,
+                bounds.left,
+                bounds.top,
                 zoom_factor,
                 parent_stack,
                 cut_lines,
                 pan_offset=pan_offset,
             )
             cx2, cy2 = self.transformer.to_canvas(
-                box.bounds.right,
-                box.bounds.bottom,
+                bounds.right,
+                bounds.bottom,
                 zoom_factor,
                 parent_stack,
                 cut_lines,
@@ -480,12 +493,17 @@ class AnnotationCanvasView(tk.Canvas):
             if self.store.state.workspace_state
             else []
         )
+        active_int = self.store.state.active_interaction
+        bounds = active_int.get(box.id) if active_int else None
+        if bounds is None:
+            bounds = box.bounds
+
         cx1, cy1 = self.transformer.to_canvas(
-            box.bounds.left, box.bounds.top, zoom_factor, parent_stack, cut_lines, pan_offset=pan_offset
+            bounds.left, bounds.top, zoom_factor, parent_stack, cut_lines, pan_offset=pan_offset
         )
         cx2, cy2 = self.transformer.to_canvas(
-            box.bounds.right,
-            box.bounds.bottom,
+            bounds.right,
+            bounds.bottom,
             zoom_factor,
             parent_stack,
             cut_lines,
@@ -658,7 +676,7 @@ class AnnotationCanvasView(tk.Canvas):
         stack = list(self.store.state.parent_stack)
         stack.append(comp_id)
         self.store.update_state(
-            "viewport", parent_stack=stack, selected_component_ids=[]
+            "viewport", parent_stack=stack, selected_component_ids=[], active_interaction=None
         )
         self._mask_cached_img = None
         self._mask_cached_key = None
@@ -671,7 +689,7 @@ class AnnotationCanvasView(tk.Canvas):
         if stack:
             popped = stack.pop()
             self.store.update_state(
-                "viewport", parent_stack=stack, selected_component_ids=[popped]
+                "viewport", parent_stack=stack, selected_component_ids=[popped], active_interaction=None
             )
             self._mask_cached_img = None
             self._mask_cached_key = None

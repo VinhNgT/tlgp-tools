@@ -3,7 +3,7 @@ import time
 import tkinter as tk
 from uuid import UUID
 
-from models import Component
+from models import Bounds, Component
 from ..domain.validation import BoundsValidator
 from ..state import UIStateStore
 from .transformer import ViewportTransformer
@@ -455,10 +455,10 @@ class GestureInterpreter:
                 min_size=4,
                 children_union=union,
             )
-            box.bounds.x = rx1
-            box.bounds.y = ry1
-            box.bounds.w = rx2 - rx1
-            box.bounds.h = ry2 - ry1
+            bounds = Bounds(x=rx1, y=ry1, w=rx2 - rx1, h=ry2 - ry1)
+            active_int = dict(self.store.state.active_interaction) if self.store.state.active_interaction else {}
+            active_int[box.id] = bounds
+            self.store.update_state("selection", active_interaction=active_int)
 
         else:
             ox1, oy1, ox2, oy2 = self.drag_orig_bounds
@@ -466,23 +466,26 @@ class GestureInterpreter:
             rx1, ry1 = BoundsValidator.clamp_box_position(
                 ox1, oy1, w, h, dx, dy, bx1, by1, bx2, by2
             )
-            box.bounds.x = rx1
-            box.bounds.y = ry1
-
             ddx = rx1 - ox1
-            ddy = ry1 - oy1
+            ddy = ry1 - doy1 if 'doy1' in locals() else ry1 - oy1
 
-            def shift_descendants_visual(c_id: UUID):
+            active_int = dict(self.store.state.active_interaction) if self.store.state.active_interaction else {}
+            active_int[box.id] = Bounds(x=rx1, y=ry1, w=w, h=h)
+
+            def shift_descendants_transient(c_id: UUID):
                 comp = workspace.components.get(c_id)
                 if comp and c_id in self.drag_orig_descendants:
                     d_ox1, d_oy1, d_ox2, d_oy2 = self.drag_orig_descendants[c_id]
-                    comp.bounds.x = d_ox1 + ddx
-                    comp.bounds.y = d_oy1 + ddy
+                    d_w = d_ox2 - d_ox1
+                    d_h = d_oy2 - d_oy1
+                    active_int[c_id] = Bounds(x=d_ox1 + ddx, y=d_oy1 + ddy, w=d_w, h=d_h)
                     for child_id in comp.childrenIds:
-                        shift_descendants_visual(child_id)
+                        shift_descendants_transient(child_id)
 
             for child_id in box.childrenIds:
-                shift_descendants_visual(child_id)
+                shift_descendants_transient(child_id)
+
+            self.store.update_state("selection", active_interaction=active_int)
 
         canvas.draw_boxes()
 
@@ -505,6 +508,8 @@ class GestureInterpreter:
             for uid in state.selected_component_ids
             if workspace and uid in workspace.components
         ]
+
+        event_generated = False
 
         if state.current_mode == "select":
             if self.temp_rect_id:
@@ -561,27 +566,32 @@ class GestureInterpreter:
                 box = selected_boxes[0]
                 is_resize = self.resize_handle is not None
 
+                active_int = self.store.state.active_interaction
+                transient_bounds = active_int.get(box.id) if active_int else None
+
                 ox1, oy1, ox2, oy2 = self.drag_orig_bounds
-                if (
-                    box.bounds.left != ox1
-                    or box.bounds.top != oy1
-                    or box.bounds.right != ox2
-                    or box.bounds.bottom != oy2
+                if transient_bounds and (
+                    transient_bounds.left != ox1
+                    or transient_bounds.top != oy1
+                    or transient_bounds.right != ox2
+                    or transient_bounds.bottom != oy2
                 ):
                     if is_resize:
                         canvas.last_resized_component = (
                             box,
                             {
-                                "x": int(box.bounds.x),
-                                "y": int(box.bounds.y),
-                                "w": int(box.bounds.w),
-                                "h": int(box.bounds.h),
+                                "x": int(transient_bounds.x),
+                                "y": int(transient_bounds.y),
+                                "w": int(transient_bounds.w),
+                                "h": int(transient_bounds.h),
                             },
                         )
                         canvas.event_generate("<<ComponentResized>>")
+                        event_generated = True
                     else:
-                        canvas.last_moved_component = (box, int(box.bounds.x), int(box.bounds.y))
+                        canvas.last_moved_component = (box, int(transient_bounds.x), int(transient_bounds.y))
                         canvas.event_generate("<<ComponentMoved>>")
+                        event_generated = True
 
         elif state.current_mode == "draw" and self.temp_rect_id:
             canvas.delete(self.temp_rect_id)
@@ -621,10 +631,30 @@ class GestureInterpreter:
                         "h": int(bot - top),
                     }
                     canvas.event_generate("<<ComponentCreated>>")
+                    event_generated = True
 
         self.is_dragging = False
         self.resize_handle = None
-        canvas.draw_boxes()
+
+        if not event_generated:
+            active_int = self.store.state.active_interaction
+            if active_int:
+                active_int = dict(active_int)
+                if selected_boxes:
+                    box = selected_boxes[0]
+                    active_int.pop(box.id, None)
+                    def remove_descendants(c_id: UUID):
+                        comp = workspace.components.get(c_id)
+                        if comp:
+                            active_int.pop(c_id, None)
+                            for child_id in comp.childrenIds:
+                                remove_descendants(child_id)
+                    for child_id in box.childrenIds:
+                        remove_descendants(child_id)
+                if not active_int:
+                    active_int = None
+                self.store.update_state("selection", active_interaction=active_int)
+            canvas.draw_boxes()
 
     def on_mouse_move(self, canvas, event, cx: float, cy: float):
         """Adjusts visual cursors depending on mouse hover positions over resize handles."""

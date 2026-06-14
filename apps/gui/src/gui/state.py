@@ -3,7 +3,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from uuid import UUID
 
-from models import WorkspaceState
+from models import Bounds, WorkspaceState
 
 
 @dataclass
@@ -16,6 +16,7 @@ class UIState:
     parent_stack: list[UUID] = field(default_factory=list)
     workspace_state: WorkspaceState | None = None
     text_focused: bool = False
+    active_interaction: dict[UUID, Bounds] | None = None
 
 
 class UIStateStore:

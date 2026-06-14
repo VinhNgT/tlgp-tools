@@ -87,6 +87,7 @@ class AppController:
         )
 
     def _show_async_error(self, message: str):
+        self.store.update_state("selection", active_interaction=None)
         def show():
             self.dialog_service.show_error(self.view, "Error", message)
 
@@ -139,13 +140,36 @@ class AppController:
             self._loaded_session_id = None
             self.view.canvas.show_welcome_screen()
 
+        # Check and remove synchronized transient overrides from active_interaction
+        active_interaction = self.store.state.active_interaction
+        if active_interaction and not self.view.canvas.gestures.is_dragging:
+            active_interaction = dict(active_interaction)
+            to_remove = []
+            for comp_id, transient_bounds in active_interaction.items():
+                comp = state.components.get(comp_id)
+                if not comp:
+                    to_remove.append(comp_id)
+                    continue
+                cb = comp.bounds
+                if (cb.x == transient_bounds.x and 
+                    cb.y == transient_bounds.y and 
+                    cb.w == transient_bounds.w and 
+                    cb.h == transient_bounds.h):
+                    to_remove.append(comp_id)
+            
+            for comp_id in to_remove:
+                active_interaction.pop(comp_id, None)
+            
+            if not active_interaction:
+                active_interaction = None
+
         # Re-resolve selection bounds with updated components list
         canvas_sel = self.store.state.selected_component_ids
         updated_sel = [uid for uid in canvas_sel if uid in state.components]
         self.store.update_state("selection", selected_component_ids=updated_sel)
 
         # Notify workspace state observers
-        self.store.update_state("workspace", workspace_state=state)
+        self.store.update_state("workspace", workspace_state=state, active_interaction=active_interaction)
 
         # Sync visual navigation controls
         self._update_navigation_ui()
@@ -175,6 +199,12 @@ class AppController:
             comp = state.components.get(comp_id)
             if comp:
                 self.view.properties.update_properties_panel(comp)
+                if not self.view.properties.is_field_focused("name"):
+                    self.view.properties.update_field_value("name", comp.label)
+                for key in ["x", "y", "w", "h"]:
+                    if not self.view.properties.is_field_focused(key):
+                        val = getattr(comp.bounds, key, 0)
+                        self.view.properties.update_field_value(key, str(int(val)))
                 return
         self.view.properties.disable_properties_fields()
 
@@ -236,14 +266,17 @@ class AppController:
     # ── View Callback Handlers ──────────────────────────────────────────
 
     def _on_mode_change_request(self, mode: str):
+        self.store.update_state("selection", active_interaction=None)
         self.store.update_state("viewport", current_mode=mode)
 
     def _on_undo_request(self):
         if self.view.canvas.full_pil_img:
+            self.store.update_state("selection", active_interaction=None)
             self.client.undo()
 
     def _on_redo_request(self):
         if self.view.canvas.full_pil_img:
+            self.store.update_state("selection", active_interaction=None)
             self.client.redo()
 
     def _on_delete_request(self, event=None):
@@ -251,6 +284,7 @@ class AppController:
             return
         if not self.view.canvas.full_pil_img:
             return
+        self.store.update_state("selection", active_interaction=None)
         selected_ids = self.store.state.selected_component_ids
         if selected_ids:
             for comp_id in list(selected_ids):

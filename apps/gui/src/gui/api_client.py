@@ -64,6 +64,7 @@ class EngineClient:
         ws_url: str = WS_URL,
     ):
         self.state: WorkspaceState | None = None
+        self._state_dict: dict | None = None
         self.on_state_changed = on_state_changed
         self.on_error = on_error
         self.api_url = api_url
@@ -123,15 +124,15 @@ class EngineClient:
                                 self.on_error(err_msg)
 
                         elif data.get("type") == "full_sync":
-                            self.state = WorkspaceState.model_validate(data["state"])
+                            self._state_dict = data["state"]
+                            self.state = WorkspaceState.model_validate(self._state_dict)
                             self._trigger_update()
 
                         elif data.get("type") == "patch":
-                            if self.state:
-                                old_dict = self.state.model_dump(mode="json")
+                            if self._state_dict is not None:
                                 patch = jsonpatch.JsonPatch(data["patch"])
-                                new_dict = patch.apply(old_dict)
-                                self.state = WorkspaceState.model_validate(new_dict)
+                                self._state_dict = patch.apply(self._state_dict)
+                                self.state = WorkspaceState.model_validate(self._state_dict)
                                 self._trigger_update()
             except asyncio.CancelledError:
                 logger.info("WebSocket listener connection task cancelled")
@@ -140,6 +141,7 @@ class EngineClient:
                 logger.error("WS Connection lost, retrying in 2s...", error=str(e))
                 self._ws = None
                 self.state = None
+                self._state_dict = None
                 self._trigger_update()
                 try:
                     await asyncio.sleep(2)

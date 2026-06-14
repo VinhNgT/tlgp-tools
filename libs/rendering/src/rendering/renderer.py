@@ -33,11 +33,15 @@ BOX_BORDER_WIDTH = 5
 PILL_OUTLINE_WIDTH = 3
 
 
-# ── Font Loading ───────────────────────────────────────────────────────
+# Font cache mapping size to ImageFont instances.
+_font_cache: dict[int, ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
 
 
 def get_font(size: int):
     """Load a TrueType font with the given size, trying common Windows and macOS system paths."""
+    if size in _font_cache:
+        return _font_cache[size]
+
     font_candidates = [
         "arialbd.ttf",  # Windows Arial Bold
         "arial.ttf",  # Windows Arial Regular
@@ -51,10 +55,14 @@ def get_font(size: int):
     ]
     for font_name in font_candidates:
         try:
-            return ImageFont.truetype(font_name, size)
+            font = ImageFont.truetype(font_name, size)
+            _font_cache[size] = font
+            return font
         except OSError:
             continue
-    return ImageFont.load_default()
+    default_font = ImageFont.load_default()
+    _font_cache[size] = default_font
+    return default_font
 
 
 # ── Text Measurement ───────────────────────────────────────────────────

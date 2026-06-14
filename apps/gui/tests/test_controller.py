@@ -26,6 +26,9 @@ class MockWidget:
     def bind(self, event, callback):
         pass
 
+    def show_welcome_screen(self):
+        pass
+
 
 class MockAppWindow:
     def __init__(self):
@@ -131,6 +134,15 @@ class MockEngineClient:
     def update_screen_info(self, name, description):
         self.updated_screen_info = (name, description)
 
+    def move_component(self, comp_id, x, y):
+        pass
+
+    def update_component(self, comp_id, **kwargs):
+        pass
+
+    def delete_component(self, comp_id):
+        pass
+
 
 def test_controller_import_zip():
     store = UIStateStore()
@@ -183,3 +195,132 @@ def test_controller_open_cut_editor():
 
     assert dialogs.cut_editor_shown is True
     assert client.updated_cut_lines == [100, 200]
+
+
+def test_controller_active_interaction_bounds_matching():
+    from uuid import uuid4
+    from models import Component, Bounds, Style, Visibility
+
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+
+    class MockGestures:
+        def __init__(self):
+            self.is_dragging = False
+
+    view.canvas.gestures = MockGestures()
+    view.canvas.image_item_id = None
+    view.canvas.full_pil_img = None
+    dialogs = MockDialogService()
+
+    controller = AppController(client, store, view, dialogs)
+
+    comp_id = uuid4()
+    transient_bounds = Bounds(x=200, y=200, w=100, h=100)
+    store.update_state("selection", active_interaction={comp_id: transient_bounds})
+
+    comp_match = Component(
+        id=comp_id,
+        number="1",
+        label="Comp",
+        bounds=Bounds(x=200, y=200, w=100, h=100),
+        style=Style(),
+        visibility=Visibility()
+    )
+    ws_match = WorkspaceState(
+        sessionId=uuid4(),
+        components={comp_id: comp_match}
+    )
+    client.state = ws_match
+
+    # Scenario 1: Dragging is active. active_interaction should be preserved even if bounds match.
+    view.canvas.gestures.is_dragging = True
+    controller._apply_state_sync()
+    assert store.state.active_interaction == {comp_id: transient_bounds}
+
+    # Scenario 2: Dragging is inactive. Bounds match. active_interaction should be cleared.
+    view.canvas.gestures.is_dragging = False
+    controller._apply_state_sync()
+    assert store.state.active_interaction is None
+
+
+def test_controller_properties_input_preservation():
+    from models import Component, Bounds, Style, Visibility
+    from uuid import uuid4
+
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+
+    # Mock the passive view interface of the properties panel
+    class MockPropertiesPanel:
+        def __init__(self):
+            self.focused_fields = set()
+            self.values = {}
+            self.panel_updated = False
+            self.disabled = False
+
+        def update_properties_panel(self, box):
+            self.panel_updated = True
+
+        def disable_properties_fields(self):
+            self.disabled = True
+
+        def is_field_focused(self, field_name):
+            return field_name in self.focused_fields
+
+        def update_field_value(self, field_name, value):
+            self.values[field_name] = value
+
+    mock_properties = MockPropertiesPanel()
+    view.properties = mock_properties
+
+    controller = AppController(client, store, view, MockDialogService())
+
+    comp_id = uuid4()
+    comp = Component(
+        id=comp_id,
+        number="1",
+        label="Initial Label",
+        bounds=Bounds(x=10, y=20, w=100, h=200),
+        style=Style(),
+        visibility=Visibility()
+    )
+    ws = WorkspaceState(
+        sessionId=uuid4(),
+        components={comp_id: comp}
+    )
+    client.state = ws
+    store.update_state("workspace", workspace_state=ws)
+    store.update_state("selection", selected_component_ids=[comp_id])
+
+    # Scenario 1: Focus is not on any field. All fields should be updated.
+    controller._sync_properties_panel()
+    assert mock_properties.panel_updated is True
+    assert mock_properties.values["name"] == "Initial Label"
+    assert mock_properties.values["x"] == "10"
+
+    # Scenario 2: Focus is on 'name'. Only name field should be preserved (not updated).
+    mock_properties.focused_fields.add("name")
+    mock_properties.values["name"] = "User Typed Name"  # simulate what user typed
+
+    # Update workspace state with new server bounds/label
+    comp_updated = Component(
+        id=comp_id,
+        number="1",
+        label="New Server Label",
+        bounds=Bounds(x=15, y=20, w=100, h=200),
+        style=Style(),
+        visibility=Visibility()
+    )
+    ws_updated = WorkspaceState(
+         sessionId=uuid4(),
+         components={comp_id: comp_updated}
+    )
+    client.state = ws_updated
+    store.update_state("workspace", workspace_state=ws_updated)
+
+    controller._sync_properties_panel()
+    assert mock_properties.values["name"] == "User Typed Name"  # preserved!
+    assert mock_properties.values["x"] == "15"  # updated!

@@ -275,6 +275,10 @@ def test_gesture_on_release_move_and_resize():
     assert "<<ComponentMoved>>" in events_generated
     assert canvas.last_moved_component == (comp, 150, 150)
 
+    # Update component bounds to simulate the controller/backend applying the move
+    comp.bounds.x = 150
+    comp.bounds.y = 150
+
     # Resize simulation
     events_generated.clear()
     gestures.on_click(canvas, MockEvent(250, 200), 250.0, 200.0)

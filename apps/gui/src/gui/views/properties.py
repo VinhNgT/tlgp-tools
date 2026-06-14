@@ -212,18 +212,33 @@ class ComponentPropertiesView(ttk.Frame):
         entry_state = tk.DISABLED if is_locked else tk.NORMAL
 
         self.entry_name.config(state=entry_state)
-        self.entry_name.delete(0, tk.END)
-        self.entry_name.insert(0, box.label)
-
-        for key, entry in self.prop_entries.items():
+        for entry in self.prop_entries.values():
             entry.config(state=entry_state)
-            entry.delete(0, tk.END)
-            val = getattr(box.bounds, key, 0)
-            entry.insert(0, str(int(val)))
 
         self.corner_selector.set_state("disabled" if is_locked else "normal")
         corner = getattr(box.style, "pillCorner", "top_left")
         self.corner_selector.set_corner(corner)
+
+    def is_field_focused(self, field_name: str) -> bool:
+        """Returns True if the specified field currently has keyboard focus."""
+        focused = self.focus_get()
+        if field_name == "name":
+            return focused == self.entry_name
+        elif field_name in self.prop_entries:
+            return focused == self.prop_entries[field_name]
+        return False
+
+    def update_field_value(self, field_name: str, value: str):
+        """Updates the text content of a properties field if it is not disabled."""
+        if field_name == "name":
+            if self.entry_name["state"] != tk.DISABLED:
+                self.entry_name.delete(0, tk.END)
+                self.entry_name.insert(0, value)
+        elif field_name in self.prop_entries:
+            entry = self.prop_entries[field_name]
+            if entry["state"] != tk.DISABLED:
+                entry.delete(0, tk.END)
+                entry.insert(0, value)
 
     def disable_properties_fields(self):
         self._selected_box = None
