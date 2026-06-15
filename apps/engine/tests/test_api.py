@@ -1,11 +1,23 @@
+import io
 import uuid
+import zipfile
+
+import pytest
 
 from engine.app import app
 from engine.state import get_workspace
 from fastapi.testclient import TestClient
-from models import ImageInfo
+from models import Bounds, Component, ImageInfo
+from PIL import Image
 
-client = TestClient(app)
+client = None
+
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_client():
+    global client
+    if client is None:
+        client = TestClient(app)
 
 
 def test_global_exception_handler_component_not_found():
@@ -171,10 +183,6 @@ def test_websocket_json_rpc():
 
 
 def test_image_endpoint_hierarchy():
-    import io
-
-    from models import Bounds, Component
-    from PIL import Image
 
     # Create a dummy 100x100 transparent image
     img = Image.new("RGBA", (100, 100), (255, 255, 255, 0))
@@ -243,10 +251,6 @@ def test_image_endpoint_hierarchy():
     assert "Invalid component ID format" in response.json()["detail"]
 
 def test_image_endpoint_components():
-    import io
-
-    from models import Bounds, Component
-    from PIL import Image
 
     # Create a 100x100 dummy image
     img = Image.new("RGBA", (100, 100), (255, 255, 255, 0))
@@ -317,11 +321,6 @@ def test_image_endpoint_components():
 
 
 def test_export_batch():
-    import io
-    import zipfile
-
-    from models import Bounds, Component, ImageInfo
-    from PIL import Image
 
     # Create a 100x100 dummy image
     img = Image.new("RGBA", (100, 100), (255, 255, 255, 0))

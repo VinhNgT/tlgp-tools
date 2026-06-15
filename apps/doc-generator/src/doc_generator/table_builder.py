@@ -19,28 +19,7 @@ from doc_generator.models import (
     ChildElement,
     Interaction,
 )
-from doc_generator.style_constants import (
-    API_COLS_PT,
-    API_TABLE_HEADERS,
-    BORDER_COLOR_HEX,
-    BORDER_WIDTH_PT,
-    CELL_PAD_BOTTOM_PT,
-    CELL_PAD_LEFT_PT,
-    CELL_PAD_RIGHT_PT,
-    CELL_PAD_TOP_PT,
-    CELL_SPACE_ABOVE_PT,
-    CELL_SPACE_BELOW_PT,
-    FONT_FAMILY,
-    FONT_SIZE_API,
-    FONT_SIZE_DEFAULT,
-    HEADER_BG_HEX,
-    INFO_COLS_PT,
-    INTERACTION_COLS_PT,
-    INTERACTION_TABLE_HEADERS,
-    SPACE_AFTER_TABLE_PT,
-    UI_COLS_PT,
-    UI_TABLE_HEADERS,
-)
+from doc_generator.style_constants import StyleConfig
 
 # ============================================================
 # Low-level XML helpers
@@ -54,8 +33,6 @@ def _pt_to_emu(pt: float) -> int:
 
 def _set_cell_border(cell, top=None, bottom=None, left=None, right=None):
     """Set cell borders via XML."""
-    # Access the underlying XML table cell element to set custom borders,
-    # as cell borders are not supported by the python-docx public API.
     tc = cell._tc  # noqa: SLF001
     tcPr = tc.get_or_add_tcPr()
 
@@ -87,8 +64,6 @@ def _set_cell_border(cell, top=None, bottom=None, left=None, right=None):
 
 def _set_cell_padding(cell, top_pt=0, bottom_pt=0, left_pt=0, right_pt=0):
     """Set cell padding (margins) via XML."""
-    # Access the underlying XML table cell element to configure padding,
-    # as cell padding is not supported by the python-docx public API.
     tc = cell._tc  # noqa: SLF001
     tcPr = tc.get_or_add_tcPr()
 
@@ -113,8 +88,6 @@ def _set_cell_padding(cell, top_pt=0, bottom_pt=0, left_pt=0, right_pt=0):
 
 def _set_cell_shading(cell, color_hex: str):
     """Set cell background color."""
-    # Access the underlying XML table cell element to configure shading,
-    # as cell shading is not supported by the python-docx public API.
     tc = cell._tc  # noqa: SLF001
     tcPr = tc.get_or_add_tcPr()
     shading = parse_xml(f'<w:shd {nsdecls("w")} w:fill="{color_hex}" w:val="clear"/>')
@@ -132,6 +105,7 @@ def _set_cell_shading(cell, color_hex: str):
 def _style_cell_text(
     cell,
     text: str,
+    style: StyleConfig,
     bold: bool = False,
     font_size: Pt | None = None,
     alignment: WD_ALIGN_PARAGRAPH | None = None,
@@ -142,68 +116,68 @@ def _style_cell_text(
     if alignment:
         para.alignment = alignment
     run = para.add_run(text)
-    run.font.name = FONT_FAMILY
-    run.font.size = font_size or FONT_SIZE_DEFAULT
+    run.font.name = style.FONT_FAMILY
+    run.font.size = font_size or style.FONT_SIZE_DEFAULT
     if bold:
         run.font.bold = True
 
 
-def _apply_default_borders(cell):
+def _apply_default_borders(cell, style: StyleConfig):
     """Apply standard border styling to a cell."""
-    spec = {"width": BORDER_WIDTH_PT, "color": BORDER_COLOR_HEX}
+    spec = {"width": style.BORDER_WIDTH_PT, "color": style.BORDER_COLOR_HEX}
     _set_cell_border(cell, top=spec, bottom=spec, left=spec, right=spec)
 
 
-def _apply_default_padding(cell):
+def _apply_default_padding(cell, style: StyleConfig):
     """Apply standard cell padding."""
     _set_cell_padding(
         cell,
-        CELL_PAD_TOP_PT,
-        CELL_PAD_BOTTOM_PT,
-        CELL_PAD_LEFT_PT,
-        CELL_PAD_RIGHT_PT,
+        style.CELL_PAD_TOP_PT,
+        style.CELL_PAD_BOTTOM_PT,
+        style.CELL_PAD_LEFT_PT,
+        style.CELL_PAD_RIGHT_PT,
     )
 
 
-def _set_paragraph_spacing(cell):
+def _set_paragraph_spacing(cell, style: StyleConfig):
     """Set paragraph spacing within a cell."""
     for para in cell.paragraphs:
         pf = para.paragraph_format
-        pf.space_before = Pt(CELL_SPACE_ABOVE_PT)
-        pf.space_after = Pt(CELL_SPACE_BELOW_PT)
+        pf.space_before = Pt(style.CELL_SPACE_ABOVE_PT)
+        pf.space_after = Pt(style.CELL_SPACE_BELOW_PT)
 
 
-def _style_table(table: Table, col_widths_pt: list[float], font_size: Pt | None = None):
+def _style_table(table: Table, col_widths_pt: list[float], style: StyleConfig, font_size: Pt | None = None):
     """Apply full styling to a table: borders, padding, widths, header row."""
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
     for row_idx, row in enumerate(table.rows):
         for col_idx, cell in enumerate(row.cells):
             cell.width = _pt_to_emu(col_widths_pt[col_idx])
-            _apply_default_borders(cell)
-            _apply_default_padding(cell)
-            _set_paragraph_spacing(cell)
+            _apply_default_borders(cell, style)
+            _apply_default_padding(cell, style)
+            _set_paragraph_spacing(cell, style)
 
             if row_idx == 0:
-                _set_cell_shading(cell, HEADER_BG_HEX)
+                _set_cell_shading(cell, style.HEADER_BG_HEX)
                 for para in cell.paragraphs:
                     para.alignment = WD_ALIGN_PARAGRAPH.CENTER
                     for run in para.runs:
                         run.font.bold = True
-                        run.font.name = FONT_FAMILY
-                        run.font.size = font_size or FONT_SIZE_DEFAULT
+                        run.font.name = style.FONT_FAMILY
+                        run.font.size = font_size or style.FONT_SIZE_DEFAULT
             else:
                 for para in cell.paragraphs:
                     for run in para.runs:
-                        run.font.name = FONT_FAMILY
-                        run.font.size = font_size or FONT_SIZE_DEFAULT
+                        run.font.name = style.FONT_FAMILY
+                        run.font.size = font_size or style.FONT_SIZE_DEFAULT
 
 
-def _add_table_spacing(doc: Document):
+def _add_table_spacing(doc: Document, style: StyleConfig):
     """Add spacing after a table using a spacer paragraph."""
     p = doc.add_paragraph()
     p.paragraph_format.space_before = Pt(0)
-    p.paragraph_format.space_after = Pt(SPACE_AFTER_TABLE_PT)
+    p.paragraph_format.space_after = Pt(style.SPACE_AFTER_TABLE_PT)
     p.paragraph_format.line_spacing = Pt(1)
 
 
@@ -212,25 +186,27 @@ def _add_table_spacing(doc: Document):
 # ============================================================
 
 
-def build_info_table(doc: Document, label: str, description: str) -> Table:
+def build_info_table(doc: Document, label: str, description: str, style: StyleConfig) -> Table:
     """Build a 2×2 Info Table for a component section."""
     table = doc.add_table(rows=2, cols=2)
     _style_cell_text(
         table.cell(0, 0),
         "Tên chức năng",
+        style,
         bold=True,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _style_cell_text(
         table.cell(0, 1),
         f"Component {label}",
+        style,
         bold=True,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
-    _style_cell_text(table.cell(1, 0), "Mô tả")
-    _style_cell_text(table.cell(1, 1), description)
-    _style_table(table, INFO_COLS_PT)
-    _add_table_spacing(doc)
+    _style_cell_text(table.cell(1, 0), "Mô tả", style)
+    _style_cell_text(table.cell(1, 1), description, style)
+    _style_table(table, style.INFO_COLS_PT, style)
+    _add_table_spacing(doc, style)
     return table
 
 
@@ -238,40 +214,45 @@ def build_screen_level_info_table(
     doc: Document,
     screen_name: str,
     description: str,
+    style: StyleConfig,
 ) -> Table:
     """Build a 2×2 Info Table for the screen overview section."""
     table = doc.add_table(rows=2, cols=2)
     _style_cell_text(
         table.cell(0, 0),
         "Tên màn hình",
+        style,
         bold=True,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _style_cell_text(
         table.cell(0, 1),
         f"Màn hình {screen_name}",
+        style,
         bold=True,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
-    _style_cell_text(table.cell(1, 0), "Mô tả")
-    _style_cell_text(table.cell(1, 1), description)
-    _style_table(table, INFO_COLS_PT)
-    _add_table_spacing(doc)
+    _style_cell_text(table.cell(1, 0), "Mô tả", style)
+    _style_cell_text(table.cell(1, 1), description, style)
+    _style_table(table, style.INFO_COLS_PT, style)
+    _add_table_spacing(doc, style)
     return table
 
 
 def build_ui_elements_table(
     doc: Document,
     children: list[ChildElement],
+    style: StyleConfig,
 ) -> Table:
     """Build a 7-column UI Elements Table."""
     table = doc.add_table(rows=1 + len(children), cols=7)
 
     # Header
-    for c, text in enumerate(UI_TABLE_HEADERS):
+    for c, text in enumerate(style.UI_TABLE_HEADERS):
         _style_cell_text(
             table.cell(0, c),
             text,
+            style,
             bold=True,
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
         )
@@ -288,47 +269,50 @@ def build_ui_elements_table(
             child.description,
         ]
         for c, text in enumerate(row_data):
-            _style_cell_text(table.cell(r + 1, c), text)
+            _style_cell_text(table.cell(r + 1, c), text, style)
 
-    _style_table(table, UI_COLS_PT)
-    _add_table_spacing(doc)
+    _style_table(table, style.UI_COLS_PT, style)
+    _add_table_spacing(doc, style)
     return table
 
 
 def build_interaction_table(
     doc: Document,
     interactions: list[Interaction],
+    style: StyleConfig,
 ) -> Table:
     """Build a 2-column Interaction Events Table."""
     table = doc.add_table(rows=1 + len(interactions), cols=2)
 
-    for c, text in enumerate(INTERACTION_TABLE_HEADERS):
+    for c, text in enumerate(style.INTERACTION_TABLE_HEADERS):
         _style_cell_text(
             table.cell(0, c),
             text,
+            style,
             bold=True,
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
         )
 
     for r, interaction in enumerate(interactions):
-        _style_cell_text(table.cell(r + 1, 0), interaction.action)
-        _style_cell_text(table.cell(r + 1, 1), interaction.reaction)
+        _style_cell_text(table.cell(r + 1, 0), interaction.action, style)
+        _style_cell_text(table.cell(r + 1, 1), interaction.reaction, style)
 
-    _style_table(table, INTERACTION_COLS_PT)
-    _add_table_spacing(doc)
+    _style_table(table, style.INTERACTION_COLS_PT, style)
+    _add_table_spacing(doc, style)
     return table
 
 
-def build_api_table(doc: Document, params: list[ApiParam]) -> Table:
+def build_api_table(doc: Document, params: list[ApiParam], style: StyleConfig) -> Table:
     """Build a 6-column API Parameter Table (for request or response)."""
     table = doc.add_table(rows=1 + len(params), cols=6)
 
-    for c, text in enumerate(API_TABLE_HEADERS):
+    for c, text in enumerate(style.API_TABLE_HEADERS):
         _style_cell_text(
             table.cell(0, c),
             text,
+            style,
             bold=True,
-            font_size=FONT_SIZE_API,
+            font_size=style.FONT_SIZE_API,
             alignment=WD_ALIGN_PARAGRAPH.CENTER,
         )
 
@@ -342,8 +326,8 @@ def build_api_table(doc: Document, params: list[ApiParam]) -> Table:
             param.defaultValue,
         ]
         for c, text in enumerate(row_data):
-            _style_cell_text(table.cell(r + 1, c), text, font_size=FONT_SIZE_API)
+            _style_cell_text(table.cell(r + 1, c), text, style, font_size=style.FONT_SIZE_API)
 
-    _style_table(table, API_COLS_PT, font_size=FONT_SIZE_API)
-    _add_table_spacing(doc)
+    _style_table(table, style.API_COLS_PT, style, font_size=style.FONT_SIZE_API)
+    _add_table_spacing(doc, style)
     return table

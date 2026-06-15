@@ -67,7 +67,9 @@ def _build_prompt() -> str:
     return prompt.replace("{annotation_json_example}", _ANNOTATION_JSON_EXAMPLE)
 
 
-SPEC_WORKFLOW_PROMPT = _build_prompt()
+def get_spec_workflow_prompt() -> str:
+    """Lazy builder to load and assemble the spec workflow prompt template."""
+    return _build_prompt()
 
 
 def get_prompt_section(section_title: str) -> str:

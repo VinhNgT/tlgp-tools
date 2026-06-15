@@ -1,6 +1,7 @@
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
+import logging
 from uuid import UUID
 
 from models import Bounds, WorkspaceState
@@ -38,7 +39,6 @@ class UIStateStore:
             try:
                 callback()
             except Exception:
-                import logging
                 logging.getLogger(__name__).exception("Error in state change subscriber")
 
     def update_state(self, event_type: str, **kwargs):

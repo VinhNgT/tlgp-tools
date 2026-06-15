@@ -3,7 +3,7 @@ import json
 import threading
 import time
 import uuid
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock, mock_open, patch
 
 import pytest
 from gui.api_client import EngineClient
@@ -118,7 +118,6 @@ def test_async_rest_call_does_not_block(mock_request, dispatcher):
     def on_complete(err):
         callback_executed.set()
 
-    from unittest.mock import mock_open
     patcher = patch("gui.api_client.open", mock_open(read_data=b""), create=True)
     patcher.start()
 

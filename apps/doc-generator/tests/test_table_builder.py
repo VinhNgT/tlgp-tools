@@ -1,15 +1,13 @@
 """Tests for table_builder — verifies table structure and styling."""
 
+import pytest
+
 from doc_generator.models import (
     ApiParam,
     ChildElement,
     Interaction,
 )
-from doc_generator.style_constants import (
-    BORDER_COLOR_HEX,
-    HEADER_BG_HEX,
-    SPACE_AFTER_TABLE_PT,
-)
+from doc_generator.style_constants import load_default_style
 from doc_generator.table_builder import (
     build_api_table,
     build_info_table,
@@ -20,6 +18,15 @@ from doc_generator.table_builder import (
 from docx import Document
 from docx.oxml.ns import qn
 from docx.shared import Pt
+
+style = None
+
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_style():
+    global style
+    if style is None:
+        style = load_default_style()
 
 
 def _get_cell_shading(cell) -> str | None:
@@ -55,36 +62,36 @@ def _get_cell_border_color(cell, edge: str) -> str | None:
 class TestInfoTable:
     def test_dimensions(self):
         doc = Document()
-        table = build_info_table(doc, "Header", "Description text")
+        table = build_info_table(doc, "Header", "Description text", style)
         assert len(table.rows) == 2
         assert len(table.columns) == 2
 
     def test_header_content(self):
         doc = Document()
-        table = build_info_table(doc, "Tiêu đề", "Mô tả...")
+        table = build_info_table(doc, "Tiêu đề", "Mô tả...", style)
         assert table.cell(0, 0).text == "Tên chức năng"
         assert "Tiêu đề" in table.cell(0, 1).text
 
     def test_data_content(self):
         doc = Document()
-        table = build_info_table(doc, "X", "Detailed description")
+        table = build_info_table(doc, "X", "Detailed description", style)
         assert table.cell(1, 0).text == "Mô tả"
         assert table.cell(1, 1).text == "Detailed description"
 
     def test_header_row_has_background(self):
         doc = Document()
-        table = build_info_table(doc, "A", "B")
-        # Both header cells should have F2F2F2 background
-        assert _get_cell_shading(table.cell(0, 0)) == HEADER_BG_HEX
-        assert _get_cell_shading(table.cell(0, 1)) == HEADER_BG_HEX
+        table = build_info_table(doc, "A", "B", style)
+        # Both header cells should have background
+        assert _get_cell_shading(table.cell(0, 0)) == style.HEADER_BG_HEX
+        assert _get_cell_shading(table.cell(0, 1)) == style.HEADER_BG_HEX
 
     def test_borders_applied(self):
         doc = Document()
-        table = build_info_table(doc, "A", "B")
+        table = build_info_table(doc, "A", "B", style)
         for row in table.rows:
             for cell in row.cells:
-                assert _get_cell_border_color(cell, "top") == BORDER_COLOR_HEX
-                assert _get_cell_border_color(cell, "bottom") == BORDER_COLOR_HEX
+                assert _get_cell_border_color(cell, "top") == style.BORDER_COLOR_HEX
+                assert _get_cell_border_color(cell, "bottom") == style.BORDER_COLOR_HEX
 
 
 # ── Screen Level Info Table ───────────────────────────────────────────
@@ -93,12 +100,12 @@ class TestInfoTable:
 class TestScreenLevelInfoTable:
     def test_screen_name_in_header(self):
         doc = Document()
-        table = build_screen_level_info_table(doc, "Chi tiết SP", "Desc")
+        table = build_screen_level_info_table(doc, "Chi tiết SP", "Desc", style)
         assert "Chi tiết SP" in table.cell(0, 1).text
 
     def test_first_col_header(self):
         doc = Document()
-        table = build_screen_level_info_table(doc, "X", "Y")
+        table = build_screen_level_info_table(doc, "X", "Y", style)
         assert table.cell(0, 0).text == "Tên màn hình"
 
 
@@ -112,14 +119,14 @@ class TestUiElementsTable:
             ChildElement(stt=1, label="Back", controlType="Icon"),
             ChildElement(stt=2, label="Title", controlType="Text"),
         ]
-        table = build_ui_elements_table(doc, children)
+        table = build_ui_elements_table(doc, children, style)
         assert len(table.rows) == 3  # 1 header + 2 data
         assert len(table.columns) == 7
 
     def test_header_labels(self):
         doc = Document()
         children = [ChildElement(stt=1, label="A", controlType="B")]
-        table = build_ui_elements_table(doc, children)
+        table = build_ui_elements_table(doc, children, style)
         headers = [table.cell(0, c).text for c in range(7)]
         assert headers[0] == "STT"
         assert headers[1] == "Tên"
@@ -135,7 +142,7 @@ class TestUiElementsTable:
                 description="Share product",
             ),
         ]
-        table = build_ui_elements_table(doc, children)
+        table = build_ui_elements_table(doc, children, style)
         assert table.cell(1, 0).text == "1"
         assert table.cell(1, 1).text == "Share"
         assert table.cell(1, 2).text == "Icon"
@@ -143,7 +150,7 @@ class TestUiElementsTable:
 
     def test_empty_children_produces_header_only(self):
         doc = Document()
-        table = build_ui_elements_table(doc, [])
+        table = build_ui_elements_table(doc, [], style)
         assert len(table.rows) == 1  # header only
 
 
@@ -156,14 +163,14 @@ class TestInteractionTable:
         interactions = [
             Interaction(action="Click Back", reaction="Go back"),
         ]
-        table = build_interaction_table(doc, interactions)
+        table = build_interaction_table(doc, interactions, style)
         assert len(table.rows) == 2  # 1 header + 1 data
         assert len(table.columns) == 2
 
     def test_header_labels(self):
         doc = Document()
         interactions = [Interaction(action="A", reaction="B")]
-        table = build_interaction_table(doc, interactions)
+        table = build_interaction_table(doc, interactions, style)
         assert table.cell(0, 0).text == "Hành động của tác nhân"
         assert table.cell(0, 1).text == "Phản ứng của hệ thống"
 
@@ -172,7 +179,7 @@ class TestInteractionTable:
         interactions = [
             Interaction(action="Tap share", reaction="Open share sheet"),
         ]
-        table = build_interaction_table(doc, interactions)
+        table = build_interaction_table(doc, interactions, style)
         assert table.cell(1, 0).text == "Tap share"
         assert table.cell(1, 1).text == "Open share sheet"
 
@@ -186,14 +193,14 @@ class TestApiTable:
         params = [
             ApiParam(name="id", meaning="ID", dataType="String"),
         ]
-        table = build_api_table(doc, params)
+        table = build_api_table(doc, params, style)
         assert len(table.rows) == 2
         assert len(table.columns) == 6
 
     def test_header_labels(self):
         doc = Document()
         params = [ApiParam(name="x")]
-        table = build_api_table(doc, params)
+        table = build_api_table(doc, params, style)
         headers = [table.cell(0, c).text for c in range(6)]
         assert headers[0] == "Tên tham số"
         assert headers[3] == "Kiểu dữ liệu"
@@ -208,7 +215,7 @@ class TestApiTable:
                 dataType="String",
             ),
         ]
-        table = build_api_table(doc, params)
+        table = build_api_table(doc, params, style)
         assert table.cell(1, 0).text == "merchant_id"
         assert table.cell(1, 1).text == "Mã đối tác"
         assert table.cell(1, 2).text == "Có"
@@ -221,15 +228,15 @@ class TestApiTable:
             ApiParam(name="b"),
             ApiParam(name="c"),
         ]
-        table = build_api_table(doc, params)
+        table = build_api_table(doc, params, style)
         assert len(table.rows) == 4  # 1 header + 3 data
 
     def test_header_has_shading(self):
         doc = Document()
         params = [ApiParam(name="x")]
-        table = build_api_table(doc, params)
+        table = build_api_table(doc, params, style)
         for c in range(6):
-            assert _get_cell_shading(table.cell(0, c)) == HEADER_BG_HEX
+            assert _get_cell_shading(table.cell(0, c)) == style.HEADER_BG_HEX
 
 
 # ── Table Spacing ─────────────────────────────────────────────────────
@@ -238,17 +245,17 @@ class TestApiTable:
 class TestTableSpacing:
     def test_spacing_added_after_info_table(self):
         doc = Document()
-        build_info_table(doc, "Header", "Description")
+        build_info_table(doc, "Header", "Description", style)
         # There should be at least one paragraph added for spacing
         spacer_para = doc.paragraphs[-1]
         assert spacer_para.paragraph_format.space_before == Pt(0)
-        assert spacer_para.paragraph_format.space_after == Pt(SPACE_AFTER_TABLE_PT)
+        assert spacer_para.paragraph_format.space_after == Pt(style.SPACE_AFTER_TABLE_PT)
         assert spacer_para.paragraph_format.line_spacing == Pt(1)
 
     def test_spacing_added_after_ui_table(self):
         doc = Document()
-        build_ui_elements_table(doc, [])
+        build_ui_elements_table(doc, [], style)
         spacer_para = doc.paragraphs[-1]
         assert spacer_para.paragraph_format.space_before == Pt(0)
-        assert spacer_para.paragraph_format.space_after == Pt(SPACE_AFTER_TABLE_PT)
+        assert spacer_para.paragraph_format.space_after == Pt(style.SPACE_AFTER_TABLE_PT)
         assert spacer_para.paragraph_format.line_spacing == Pt(1)

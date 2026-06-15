@@ -327,9 +327,14 @@ class WorkspaceManager:
 
 
 # The global singleton instance injected via FastAPI Depends
-workspace_manager = WorkspaceManager()
+_workspace_manager: WorkspaceManager | None = None
+
 
 def get_workspace() -> WorkspaceManager:
-    return workspace_manager
+    global _workspace_manager
+    if _workspace_manager is None:
+        _workspace_manager = WorkspaceManager()
+    return _workspace_manager
+
 
 WorkspaceDep = Annotated[WorkspaceManager, Depends(get_workspace)]

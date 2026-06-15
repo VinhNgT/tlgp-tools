@@ -2,11 +2,19 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
+from mcp_server.prompts import get_spec_workflow_prompt
 from mcp_server.server import spec_doc_workflow
+
+SPEC_WORKFLOW_PROMPT = ""
+
+
+@pytest.fixture(autouse=True, scope="module")
+def setup_spec_workflow_prompt():
+    global SPEC_WORKFLOW_PROMPT
+    SPEC_WORKFLOW_PROMPT = get_spec_workflow_prompt()
 
 
 class TestSpecWorkflowPrompt:
@@ -94,9 +102,11 @@ class TestSpecWorkflowPrompt:
         assert "insertTable" not in SPEC_WORKFLOW_PROMPT
 
     @pytest.mark.anyio
-    @patch("mcp_server.server.client.get_workspace_state", new_callable=AsyncMock)
-    async def test_spec_doc_workflow_renders(self, mock_get_state):
-        mock_get_state.return_value = {"components": {}, "screen": {}}
+    @patch("mcp_server.server.get_client")
+    async def test_spec_doc_workflow_renders(self, mock_get_client):
+        mock_client = MagicMock()
+        mock_client.get_workspace_state = AsyncMock(return_value={"components": {}, "screen": {}})
+        mock_get_client.return_value = mock_client
         res = await spec_doc_workflow("3.2")
         assert isinstance(res, list)
         assert len(res) == 2
@@ -104,4 +114,4 @@ class TestSpecWorkflowPrompt:
         assert res[1]["role"] == "user"
         assert res[1]["content"]["type"] == "resource"
         assert res[1]["content"]["resource"]["uri"] == "tlgp://workspace/state"
-        mock_get_state.assert_called_once()
+        mock_client.get_workspace_state.assert_called_once()
