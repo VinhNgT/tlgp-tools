@@ -4,7 +4,7 @@ from collections.abc import Callable
 from typing import Annotated
 
 import jsonpatch
-from fastapi import Depends, WebSocket
+from fastapi import Depends
 from models import Bounds, Component, Style, Visibility, WorkspaceState
 
 from .exceptions import ComponentNotFoundError, InvalidStateError, ParentNotFoundError
@@ -23,44 +23,16 @@ def shift_descendants(state: WorkspaceState, comp_id: uuid.UUID, dx: int, dy: in
             shift_descendants(state, child_id, dx, dy)
 
 
-class ClientConnection:
-    """Wraps a WebSocket to decouple network I/O from state mutation locks via an asyncio.Queue."""
-    def __init__(self, websocket: WebSocket):
-        self.websocket = websocket
-        self.queue = asyncio.Queue(maxsize=10000)
-        self.task = asyncio.create_task(self._worker())
-        
-    async def _worker(self):
-        while True:
-            try:
-                msg = await self.queue.get()
-                await self.websocket.send_json(msg)
-                self.queue.task_done()
-            except Exception:
-                # If network fails, the API layer will handle the WebSocketDisconnect exception
-                # on the receive loop and call workspace.disconnect(), which will cancel this task.
-                break
-                
-    def send_msg(self, msg: dict):
-        try:
-            self.queue.put_nowait(msg)
-        except asyncio.QueueFull:
-            pass # Drop message if client is too slow to avoid OOM
-            
-    def cancel(self):
-        self.task.cancel()
-
-
 class WorkspaceManager:
     """
     In-memory state manager for the annotation engine.
     Holds the single source of truth WorkspaceState, computes JSON Patches
-    upon mutation, and broadcasts them to all connected WebSocket clients via queues.
+    upon mutation, and broadcasts them to all connected listeners via queues.
     """
 
     def __init__(self):
         self._state = WorkspaceState(sessionId=uuid.uuid4())
-        self._clients: list[ClientConnection] = []
+        self._listeners: list[asyncio.Queue[dict]] = []
         self._lock = asyncio.Lock()
         self.raw_image_bytes: bytes = b""
         self._history: list[dict] = []
@@ -78,28 +50,32 @@ class WorkspaceManager:
         self._history.append(self._state.model_dump(mode="json"))
         self._pointer += 1
 
-    async def connect(self, websocket: WebSocket) -> ClientConnection:
-        await websocket.accept()
-        conn = ClientConnection(websocket)
-        self._clients.append(conn)
+    def connect(self) -> asyncio.Queue[dict]:
+        """Registers a new listener and returns an asyncio.Queue for broadcasting updates."""
+        queue: asyncio.Queue[dict] = asyncio.Queue(maxsize=10000)
+        self._listeners.append(queue)
         # Send the full state immediately upon connection
-        conn.send_msg(
-            {"type": "full_sync", "state": self._state.model_dump(mode="json")}
-        )
-        return conn
+        try:
+            queue.put_nowait(
+                {"type": "full_sync", "state": self._state.model_dump(mode="json")}
+            )
+        except asyncio.QueueFull:
+            pass
+        return queue
 
-    def disconnect(self, websocket: WebSocket):
-        for conn in list(self._clients):
-            if conn.websocket == websocket:
-                conn.cancel()
-                self._clients.remove(conn)
+    def disconnect(self, queue: asyncio.Queue[dict]):
+        if queue in self._listeners:
+            self._listeners.remove(queue)
 
     def broadcast_patch(self, patch: list):
         if not patch:
             return
         msg = {"type": "patch", "revision": self._state.revision, "patch": patch}
-        for client in self._clients:
-            client.send_msg(msg)
+        for listener_queue in self._listeners:
+            try:
+                listener_queue.put_nowait(msg)
+            except asyncio.QueueFull:
+                pass
 
     async def mutate(self, mutation_fn: Callable[[WorkspaceState], None]):
         """
@@ -122,13 +98,15 @@ class WorkspaceManager:
                 self._save_history_snapshot()
 
                 # Broadcast full sync since sessionId changed
-                for client in list(self._clients):
-                    client.send_msg(
-                        {
-                            "type": "full_sync",
-                            "state": self._state.model_dump(mode="json"),
-                        }
-                    )
+                msg = {
+                    "type": "full_sync",
+                    "state": self._state.model_dump(mode="json"),
+                }
+                for listener_queue in list(self._listeners):
+                    try:
+                        listener_queue.put_nowait(msg)
+                    except asyncio.QueueFull:
+                        pass
                 return
 
             # Increment OCC revision integer

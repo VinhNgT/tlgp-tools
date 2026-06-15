@@ -3,6 +3,7 @@ import json
 import uuid
 import zipfile
 
+import asyncio
 from fastapi import (
     APIRouter,
     Depends,
@@ -27,10 +28,34 @@ from .exceptions import (
     UndoRedoError,
 )
 from .state import WorkspaceManager, WorkspaceDep
-from .tree_math import recalculate_tree
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+class ClientConnection:
+    """Wraps a WebSocket to decouple network I/O from state mutation locks via an asyncio.Queue."""
+    def __init__(self, websocket: WebSocket, queue: asyncio.Queue[dict]):
+        self.websocket = websocket
+        self.queue = queue
+        self.task = asyncio.create_task(self._worker())
+        
+    async def _worker(self):
+        while True:
+            try:
+                msg = await self.queue.get()
+                await self.websocket.send_json(msg)
+                self.queue.task_done()
+            except Exception:
+                break
+                
+    def send_msg(self, msg: dict):
+        try:
+            self.queue.put_nowait(msg)
+        except asyncio.QueueFull:
+            pass # Drop message if client is too slow to avoid OOM
+            
+    def cancel(self):
+        self.task.cancel()
 
 
 # ── Import / Export ────────────────────────────────────────────────────
@@ -74,6 +99,7 @@ async def import_workspace(
 
     # Replace the global state entirely
     def mutate(state: WorkspaceState):
+        from .tree_math import recalculate_tree
         state.sessionId = uuid.uuid4()  # New session ID forces clients to hard-refresh
         state.screen = new_state.screen
         state.image = new_state.image
@@ -287,7 +313,9 @@ async def websocket_endpoint(
     Allows executing mutations via JSON-RPC 2.0 messages over the connection.
     """
     logger.info("WebSocket client connected")
-    conn = await workspace.connect(websocket)
+    await websocket.accept()
+    queue = workspace.connect()
+    conn = ClientConnection(websocket, queue)
     try:
         while True:
             data_str = await websocket.receive_text()
@@ -341,7 +369,8 @@ async def websocket_endpoint(
                 )
     except WebSocketDisconnect:
         logger.info("WebSocket client disconnected")
-        workspace.disconnect(websocket)
+        conn.cancel()
+        workspace.disconnect(queue)
 
 
 # ── Semantic REST Endpoints ────────────────────────────────────────────
