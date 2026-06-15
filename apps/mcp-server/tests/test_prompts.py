@@ -13,6 +13,9 @@ class TestSpecWorkflowPrompt:
     def test_references_current_tools(self):
         tools = [
             "launch_annotator",
+            "get_workspace_state",
+            "download_image",
+            "download_workspace_assets",
             "generate_spec_doc",
         ]
         for tool in tools:

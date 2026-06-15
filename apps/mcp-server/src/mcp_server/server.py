@@ -16,6 +16,12 @@ from tlgp_logger import get_logger
 
 from mcp_server.exceptions import ApiClientError
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
+from mcp_server.tools.workspace_api import (
+    download_image_impl,
+    download_workspace_assets_impl,
+    export_workspace_impl,
+    get_workspace_state_impl,
+)
 from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
 from mcp_server.tools.launch_annotator import launch_annotator_impl
 
@@ -30,6 +36,10 @@ mcp = FastMCP(
     instructions=(
         "TLGP Tools MCP server. Provides tools for annotating screenshots "
         "and generating .docx specification documents. "
+        "CRITICAL DIRECTIVE: You are in a strict Read-Only mode. You cannot "
+        "mutate the Engine state. Your role is to analyze the state and generate "
+        "specifications. Do NOT use terminal tools (like curl) to interact "
+        "with the Engine REST API. "
         "Use the `spec_doc_workflow` prompt to get the full workflow guide."
     ),
 )
@@ -61,97 +71,75 @@ async def launch_annotator(
 
 
 @mcp.tool()
-async def get_engine_state() -> dict:
+async def get_workspace_state() -> dict:
     """Fetch the current flat-map JSON WorkspaceState from the running Engine.
 
     Use this tool to read the latest annotation hierarchy automatically,
     instead of relying on local JSON files.
     """
-    try:
-        async with httpx.AsyncClient() as client:
-            res = await client.get("http://127.0.0.1:8000/state")
-            res.raise_for_status()
-            return res.json()
-    except httpx.HTTPStatusError as e:
-        raise ApiClientError(
-            message="Failed to fetch engine state",
-            status_code=e.response.status_code,
-            url=str(e.request.url),
-            method=e.request.method,
-            backend_detail=e.response.text,
-        ) from e
-    except httpx.RequestError as e:
-        raise ApiClientError(
-            message=f"Request to fetch engine state failed: {e}",
-            url=str(e.request.url) if hasattr(e, "request") else None,
-            method=e.request.method if hasattr(e, "request") else None,
-        ) from e
+    return await get_workspace_state_impl()
 
 
 @mcp.tool()
-async def download_engine_crops(output_dir: str) -> dict:
-    """Download all component crops and the raw image from the Engine.
-
-    Creates a clean directory containing all component crops named as `<uuid>.png`.
-    Also downloads the root screenshot as `raw.png`.
-    Use this to prepare a local directory before writing analysis.json.
+async def download_image(
+    output_path: str,
+    comp_id: str = "root",
+    show_children: bool = False,
+) -> dict:
+    """Download the full root screenshot image or a specific component image from the Engine.
 
     Args:
-        output_dir: The directory to save the images to.
+        output_path: Path where the image should be saved.
+        comp_id: The component ID (UUID) or "root" (default) for the full screenshot.
+        show_children: Whether to overlay annotated child component boxes on the image.
+    """
+    return await download_image_impl(comp_id, output_path, show_children)
+
+@mcp.tool()
+async def download_workspace_assets(
+    output_dir: str,
+    include_state: bool = True,
+    include_root: bool = True,
+    show_root_children: bool = False,
+    component_ids: list[str] | None = None,
+    show_component_children: bool = False,
+) -> dict:
+    """Download the state, root image, and component images for a workspace in a single batch.
+
+    Extracts the downloaded workspace assets directly into output_dir.
+
+    Args:
+        output_dir: Directory where the assets should be extracted.
+        include_state: Whether to download and extract the workspace state JSON file.
+        include_root: Whether to download and extract the root screenshot image.
+        show_root_children: Whether to overlay annotated child component boxes on the root image.
+        component_ids: Optional list of component UUIDs to download. If not provided, downloads all components.
+        show_component_children: Whether to overlay annotated child component boxes on the component images.
+    """
+    return await download_workspace_assets_impl(
+        output_dir=output_dir,
+        include_state=include_state,
+        include_root=include_root,
+        show_root_children=show_root_children,
+        component_ids=component_ids,
+        show_component_children=show_component_children,
+    )
+
+
+@mcp.tool()
+async def export_workspace(output_path: str) -> dict:
+    """Export the current Engine workspace to a .zip file.
+
+    Packs the WorkspaceState and the current image into a .zip archive
+    that can be re-imported later.
+
+    Args:
+        output_path: Path where the .zip file should be saved.
 
     Returns:
-        dict with status and list of downloaded files.
+        dict with status and output_path.
     """
-
-    out_path = os.path.abspath(output_dir)
-    os.makedirs(out_path, exist_ok=True)
-
-    downloaded = []
-    errors = []
-
-    try:
-        async with httpx.AsyncClient() as client:
-            state_res = await client.get("http://127.0.0.1:8000/state")
-            state_res.raise_for_status()
-            state = state_res.json()
-
-            # Download raw image
-            raw_res = await client.get("http://127.0.0.1:8000/image/root")
-            if raw_res.status_code == 200:
-                with open(os.path.join(out_path, "raw.png"), "wb") as f:
-                    f.write(raw_res.content)
-                downloaded.append("raw.png")
-
-            # Download crops
-            for comp_id in state.get("components", {}).keys():
-                crop_res = await client.get(f"http://127.0.0.1:8000/image/{comp_id}")
-                if crop_res.status_code == 200:
-                    filename = f"{comp_id}.png"
-                    with open(os.path.join(out_path, filename), "wb") as f:
-                        f.write(crop_res.content)
-                    downloaded.append(filename)
-
-        return {
-            "status": "success",
-            "output_dir": out_path,
-            "downloaded": len(downloaded),
-            "files": downloaded,
-            "errors": errors,
-        }
-    except httpx.HTTPStatusError as e:
-        raise ApiClientError(
-            message="HTTP error while downloading engine crops",
-            status_code=e.response.status_code,
-            url=str(e.request.url),
-            method=e.request.method,
-            backend_detail=e.response.text,
-        ) from e
-    except httpx.RequestError as e:
-        raise ApiClientError(
-            message=f"Request failed while downloading engine crops: {e}",
-            url=str(e.request.url) if hasattr(e, "request") else None,
-            method=e.request.method if hasattr(e, "request") else None,
-        ) from e
+    return await export_workspace_impl(output_path)
 
 
 @mcp.tool()

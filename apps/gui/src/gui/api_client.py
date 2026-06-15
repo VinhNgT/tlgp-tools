@@ -1,5 +1,6 @@
 import asyncio
 import json
+import os
 import threading
 import uuid
 from collections.abc import Callable
@@ -73,6 +74,7 @@ class EngineClient:
         self.api_url = api_url
         self.ws_url = ws_url
         self.dispatch = dispatch or (lambda f: f())
+        self.api_key = os.environ.get("ENGINE_API_KEY")
         self._ws = None
         self._loop = None
         self._thread = None
@@ -113,7 +115,10 @@ class EngineClient:
     async def _listen_ws(self):
         while True:
             try:
-                async with websockets.connect(self.ws_url) as ws:
+                headers = {}
+                if self.api_key:
+                    headers["X-API-Key"] = self.api_key
+                async with websockets.connect(self.ws_url, additional_headers=headers) as ws:
                     logger.info("Connected to Engine WebSocket")
                     self._ws = ws
                     async for message in ws:
@@ -184,8 +189,12 @@ class EngineClient:
         if self.on_log_message:
             self.dispatch(lambda m={"method": method, "url": url, "kwargs": str(kwargs)}: self.on_log_message("Outgoing HTTP", m))
         
+        headers = kwargs.pop("headers", {})
+        if self.api_key:
+            headers["X-API-Key"] = self.api_key
+        
         try:
-            res = requests.request(method, url, **kwargs)
+            res = requests.request(method, url, headers=headers, **kwargs)
         except requests.RequestException as e:
             raise ApiClientError(f"Connection failed: {e}", url=url) from e
 
@@ -221,7 +230,7 @@ class EngineClient:
         def job():
             try:
                 with open(zip_path, "rb") as f:
-                    self._request("POST", f"{self.api_url}/import", files={"file": f})
+                    self._request("POST", f"{self.api_url}/workspace/import", files={"file": f})
                 if on_complete:
                     self.dispatch(lambda: on_complete(None))
             except Exception as ex:
@@ -240,7 +249,7 @@ class EngineClient:
             try:
                 with open(image_path, "rb") as f:
                     self._request(
-                        "POST", f"{self.api_url}/import/image", files={"file": f}
+                        "POST", f"{self.api_url}/workspace/import-image", files={"file": f}
                     )
                 if on_complete:
                     self.dispatch(lambda: on_complete(None))
@@ -258,7 +267,7 @@ class EngineClient:
     ):
         def job():
             try:
-                res = self._request("GET", f"{self.api_url}/export")
+                res = self._request("GET", f"{self.api_url}/workspace/export")
                 with open(zip_path, "wb") as f:
                     f.write(res.content)
                 if on_complete:
@@ -345,7 +354,7 @@ class EngineClient:
         return res.content
 
     def get_raw_image_url(self) -> str:
-        return f"{self.api_url}/image/raw"
+        return f"{self.api_url}/images/root"
 
-    def get_crop_image_url(self, comp_id: str) -> str:
-        return f"{self.api_url}/image/crop/{comp_id}"
+    def get_component_image_url(self, comp_id: str) -> str:
+        return f"{self.api_url}/images/{comp_id}"

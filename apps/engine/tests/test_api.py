@@ -38,7 +38,7 @@ def test_global_exception_handler_parent_not_found():
 def test_global_exception_handler_invalid_archive():
     # Upload an invalid zip
     response = client.post(
-        "/import",
+        "/workspace/import",
         files={"file": ("test.zip", b"not a zip file content", "application/zip")},
     )
     assert response.status_code == 400
@@ -51,7 +51,7 @@ def test_global_exception_handler_invalid_archive():
 def test_global_exception_handler_invalid_image():
     # Upload an invalid image
     response = client.post(
-        "/import/image",
+        "/workspace/import-image",
         files={"file": ("test.png", b"not an image content", "image/png")},
     )
     assert response.status_code == 400
@@ -65,7 +65,7 @@ def test_global_exception_handler_invalid_state_export():
     workspace.raw_image_bytes = b""
     workspace.state.image = None
 
-    response = client.get("/export")
+    response = client.get("/workspace/export")
     assert response.status_code == 400
     assert "no image" in response.json()["detail"].lower()
 
@@ -214,27 +214,32 @@ def test_image_endpoint_hierarchy():
     workspace.state.rootComponents = [parent_id]
     
     # 1. Test Root
-    response = client.get("/image/root")
+    response = client.get("/images/root")
     assert response.status_code == 200
     assert response.headers["content-type"] == "image/png"
     
     # Root with show_children
-    response = client.get("/image/root?show_children=true")
+    response = client.get("/images/root?show_children=true")
     assert response.status_code == 200
     
     # 2. Test Parent Component
-    response = client.get(f"/image/{parent_id}")
+    response = client.get(f"/images/{parent_id}")
     assert response.status_code == 200
     # Parent with show_children
-    response = client.get(f"/image/{parent_id}?show_children=true")
+    response = client.get(f"/images/{parent_id}?show_children=true")
     assert response.status_code == 200
     
     # 3. Test Leaf Component
-    response = client.get(f"/image/{child_id}")
+    response = client.get(f"/images/{child_id}")
     assert response.status_code == 200
     # Leaf with show_children
-    response = client.get(f"/image/{child_id}?show_children=true")
+    response = client.get(f"/images/{child_id}?show_children=true")
     assert response.status_code == 200
+
+    # 4. Test Invalid Format
+    response = client.get("/images/invalid-format")
+    assert response.status_code == 400
+    assert "Invalid component ID format" in response.json()["detail"]
 
 def test_image_endpoint_components():
     import io
@@ -274,8 +279,8 @@ def test_image_endpoint_components():
     workspace.state.components[leaf_id] = leaf_comp
     workspace.state.rootComponents = [parent_id]
     
-    # 1. Test parent image (crop should be 50x50)
-    res_parent = client.get(f"/image/{parent_id}")
+    # 1. Test parent image (dimensions should be 50x50)
+    res_parent = client.get(f"/images/{parent_id}")
     assert res_parent.status_code == 200
     
     # We can check the dimensions of the returned image
@@ -283,8 +288,8 @@ def test_image_endpoint_components():
     assert returned_img.width == 50
     assert returned_img.height == 50
     
-    # 2. Test leaf image (crop should be 20x20)
-    res_leaf = client.get(f"/image/{leaf_id}")
+    # 2. Test leaf image (dimensions should be 20x20)
+    res_leaf = client.get(f"/images/{leaf_id}")
     assert res_leaf.status_code == 200
     
     returned_leaf = Image.open(io.BytesIO(res_leaf.content))
@@ -292,18 +297,67 @@ def test_image_endpoint_components():
     assert returned_leaf.height == 20
     
     # 3. Test root image with show_children
-    res_root_children = client.get("/image/root?show_children=true")
+    res_root_children = client.get("/images/root?show_children=true")
     assert res_root_children.status_code == 200
     
-    res_root_no_children = client.get("/image/root?show_children=false")
+    res_root_no_children = client.get("/images/root?show_children=false")
     assert res_root_no_children.status_code == 200
     
     # Verify the image bytes differ, meaning the rendering actually drew the annotations
     assert res_root_children.content != res_root_no_children.content
     
     # 4. Test parent image with show_children
-    res_parent_children = client.get(f"/image/{parent_id}?show_children=true")
+    res_parent_children = client.get(f"/images/{parent_id}?show_children=true")
     assert res_parent_children.status_code == 200
     
     # Verify parent image bytes also differ when drawing children
     assert res_parent_children.content != res_parent.content
+
+
+def test_export_batch():
+    import io
+    import zipfile
+    from PIL import Image
+    from models import Component, Bounds, ImageInfo
+
+    # Create a 100x100 dummy image
+    img = Image.new("RGBA", (100, 100), (255, 255, 255, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    valid_png_bytes = buf.getvalue()
+
+    workspace = get_workspace()
+    workspace.raw_image_bytes = valid_png_bytes
+    workspace.state.image = ImageInfo(filename="test.png", width=100, height=100)
+    
+    comp_id = uuid.uuid4()
+    comp = Component(
+        id=comp_id,
+        number="1",
+        label="Comp",
+        bounds=Bounds(x=10, y=10, w=50, h=50),
+        childrenIds=[]
+    )
+    workspace.state.components[comp_id] = comp
+    workspace.state.rootComponents = [comp_id]
+
+    payload = {
+        "include_state": True,
+        "include_root": True,
+        "show_root_children": True,
+        "components": [
+            {"id": str(comp_id), "show_children": False}
+        ]
+    }
+    
+    response = client.post("/workspace/export-batch", json=payload)
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "application/zip"
+
+    # Verify zip content
+    zip_buf = io.BytesIO(response.content)
+    with zipfile.ZipFile(zip_buf, "r") as zf:
+        namelist = zf.namelist()
+        assert "workspace.json" in namelist
+        assert "raw.png" in namelist
+        assert f"images/{comp_id}.png" in namelist

@@ -4,15 +4,19 @@ import uuid
 import zipfile
 
 import asyncio
+import os
 from fastapi import (
     APIRouter,
     Depends,
     File,
     HTTPException,
+    Security,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
+    status,
 )
+from fastapi.security import APIKeyHeader
 from fastapi.responses import Response
 from models import Bounds, Component, ImageInfo, Style, Visibility, WorkspaceState, TreeUtils
 from PIL import Image
@@ -32,6 +36,16 @@ from .state import WorkspaceManager, WorkspaceDep
 
 logger = get_logger(__name__)
 router = APIRouter()
+
+api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
+
+def verify_api_key(api_key: str | None = Security(api_key_header)):
+    expected_key = os.environ.get("ENGINE_API_KEY")
+    if expected_key and api_key != expected_key:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid API Key"
+        )
 
 class ClientConnection:
     """Wraps a WebSocket to decouple network I/O from state mutation locks via an asyncio.Queue."""
@@ -62,7 +76,7 @@ class ClientConnection:
 # ── Import / Export ────────────────────────────────────────────────────
 
 
-@router.post("/import", tags=["Import/Export"])
+@router.post("/workspace/import", tags=["Import/Export"], dependencies=[Depends(verify_api_key)])
 async def import_workspace(
     workspace: WorkspaceDep, file: UploadFile = File(...)
 ):
@@ -116,7 +130,7 @@ async def import_workspace(
     return {"status": "imported", "sessionId": workspace.state.sessionId}
 
 
-@router.post("/import/image", tags=["Import/Export"])
+@router.post("/workspace/import-image", tags=["Import/Export"], dependencies=[Depends(verify_api_key)])
 async def import_image(
     workspace: WorkspaceDep, file: UploadFile = File(...)
 ):
@@ -152,7 +166,7 @@ async def import_image(
     return {"status": "image_imported", "sessionId": workspace.state.sessionId}
 
 
-@router.get("/export")
+@router.get("/workspace/export")
 async def export_workspace(workspace: WorkspaceDep):
     """Packs the current WorkspaceState and image into a .zip file and returns it from RAM."""
     logger.info("Exporting workspace archive", sessionId=str(workspace.state.sessionId))
@@ -179,7 +193,7 @@ async def export_workspace(workspace: WorkspaceDep):
     )
 
 
-@router.get("/state", tags=["State"])
+@router.get("/workspace/state", tags=["State"])
 async def get_state(workspace: WorkspaceDep):
     """Returns the current WorkspaceState as JSON for the MCP agent to read directly."""
     return workspace.state.model_dump(mode="json")
@@ -188,27 +202,31 @@ async def get_state(workspace: WorkspaceDep):
 # ── Image Endpoints ────────────────────────────────────────────────────
 
 
-@router.get("/image/{comp_id}", tags=["Image"])
-async def get_image(
-    comp_id: str,
-    workspace: WorkspaceDep,
-    show_children: bool = False,
-):
-    """Returns an image crop for a specific component, or the full screenshot if comp_id is 'root'."""
-    if not workspace.raw_image_bytes:
-        raise InvalidStateError("No image in RAM", session_id=str(workspace.state.sessionId))
+class BatchComponentItem(BaseModel):
+    id: uuid.UUID
+    show_children: bool = False
 
+
+class BatchExportRequest(BaseModel):
+    include_state: bool = True
+    include_root: bool = False
+    show_root_children: bool = False
+    components: list[BatchComponentItem] = []
+
+
+def generate_image_bytes(
+    comp_id: str | uuid.UUID,
+    workspace: WorkspaceManager,
+    show_children: bool = False,
+) -> bytes:
+    """Generates the image bytes for root or a component, optionally drawing children annotations."""
     if comp_id == "root":
         bounds_left, bounds_top, bounds_right, bounds_bottom = 0, 0, workspace.state.image.width, workspace.state.image.height
         parent_comp = None
         children = TreeUtils.get_children(workspace.state, None) if show_children else []
         offset_x, offset_y = 0, 0
     else:
-        try:
-            comp_uuid = uuid.UUID(comp_id)
-        except ValueError:
-            raise HTTPException(status_code=400, detail="Invalid component ID format")
-
+        comp_uuid = comp_id if isinstance(comp_id, uuid.UUID) else uuid.UUID(comp_id)
         if comp_uuid not in workspace.state.components:
             raise ComponentNotFoundError("Component not found", component_id=str(comp_uuid))
         
@@ -234,8 +252,65 @@ async def get_image(
 
         buf = io.BytesIO()
         cropped.save(buf, format="PNG")
+        return buf.getvalue()
 
-    return Response(content=buf.getvalue(), media_type="image/png")
+
+@router.post("/workspace/export-batch", tags=["Import/Export"])
+async def export_batch(
+    req: BatchExportRequest,
+    workspace: WorkspaceDep,
+):
+    """Packs the requested state, root image, and component images into a single zip file in RAM and returns it."""
+    if not workspace.raw_image_bytes:
+        raise InvalidStateError(
+            "No image in RAM", session_id=str(workspace.state.sessionId)
+        )
+
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        # 1. State JSON
+        if req.include_state:
+            state_json = workspace.state.model_dump_json(indent=2)
+            zf.writestr("workspace.json", state_json)
+
+        # 2. Root Image
+        if req.include_root:
+            root_img = generate_image_bytes("root", workspace, req.show_root_children)
+            zf.writestr("raw.png", root_img)
+
+        # 3. Component Images
+        for item in req.components:
+            comp_img = generate_image_bytes(item.id, workspace, item.show_children)
+            zf.writestr(f"images/{item.id}.png", comp_img)
+
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=batch_export.zip"},
+    )
+
+
+@router.get("/images/{comp_id}", tags=["Image"])
+async def get_image(
+    comp_id: str,
+    workspace: WorkspaceDep,
+    show_children: bool = False,
+):
+    """Returns the full screenshot image (if comp_id is 'root') or a crop for a specific component."""
+    if not workspace.raw_image_bytes:
+        raise InvalidStateError("No image in RAM", session_id=str(workspace.state.sessionId))
+
+    if comp_id != "root":
+        try:
+            uuid.UUID(comp_id)
+        except ValueError:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid component ID format. Must be 'root' or a valid UUID."
+            )
+
+    img_bytes = generate_image_bytes(comp_id, workspace, show_children)
+    return Response(content=img_bytes, media_type="image/png")
 
 
 # ── WebSockets ─────────────────────────────────────────────────────────
@@ -328,6 +403,13 @@ async def websocket_endpoint(
     followed by JSON Patch deltas broadcasted on every mutation.
     Allows executing mutations via JSON-RPC 2.0 messages over the connection.
     """
+    expected_key = os.environ.get("ENGINE_API_KEY")
+    if expected_key:
+        api_key = websocket.headers.get("x-api-key")
+        if api_key != expected_key:
+            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+            return
+
     logger.info("WebSocket client connected")
     await websocket.accept()
     queue = workspace.connect()
@@ -401,7 +483,7 @@ class AddComponentRequest(BaseModel):
     visibility: Visibility | None = None
 
 
-@router.post("/components", tags=["Components"])
+@router.post("/components", tags=["Components"], dependencies=[Depends(verify_api_key)])
 async def add_component(
     req: AddComponentRequest, workspace: WorkspaceDep
 ):
@@ -423,7 +505,7 @@ class MoveComponentRequest(BaseModel):
     y: int
 
 
-@router.put("/components/{comp_id}/move", tags=["Components"])
+@router.put("/components/{comp_id}/move", tags=["Components"], dependencies=[Depends(verify_api_key)])
 async def move_component(
     comp_id: uuid.UUID,
     req: MoveComponentRequest,
@@ -442,7 +524,7 @@ class UpdateComponentRequest(BaseModel):
     visibility: Visibility | None = None
 
 
-@router.put("/components/{comp_id}", tags=["Components"])
+@router.put("/components/{comp_id}", tags=["Components"], dependencies=[Depends(verify_api_key)])
 async def update_component(
     comp_id: uuid.UUID,
     req: UpdateComponentRequest,
@@ -460,7 +542,7 @@ async def update_component(
     return {"status": "updated"}
 
 
-@router.delete("/components/{comp_id}", tags=["Components"])
+@router.delete("/components/{comp_id}", tags=["Components"], dependencies=[Depends(verify_api_key)])
 async def delete_component(
     comp_id: uuid.UUID, workspace: WorkspaceDep
 ):
@@ -469,7 +551,7 @@ async def delete_component(
     return {"status": "deleted"}
 
 
-@router.post("/session/undo", tags=["Session"])
+@router.post("/session/undo", tags=["Session"], dependencies=[Depends(verify_api_key)])
 async def session_undo(workspace: WorkspaceDep):
     logger.info("Performing undo")
     success = await workspace.undo()
@@ -478,7 +560,7 @@ async def session_undo(workspace: WorkspaceDep):
     return {"status": "undone"}
 
 
-@router.post("/session/redo", tags=["Session"])
+@router.post("/session/redo", tags=["Session"], dependencies=[Depends(verify_api_key)])
 async def session_redo(workspace: WorkspaceDep):
     logger.info("Performing redo")
     success = await workspace.redo()

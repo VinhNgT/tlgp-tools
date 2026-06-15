@@ -118,22 +118,25 @@ def test_async_rest_call_does_not_block(mock_request, dispatcher):
     def on_complete(err):
         callback_executed.set()
 
-    # Create dummy zip file
-    with open("dummy.zip", "wb") as f:
-        f.write(b"")
+    from unittest.mock import mock_open
+    patcher = patch("gui.api_client.open", mock_open(read_data=b""), create=True)
+    patcher.start()
 
-    client.import_zip("dummy.zip", on_complete)
-    
-    call_duration = time.time() - start_time
-    # The call should return immediately, way before the 0.2s sleep in slow_request
-    assert call_duration < 0.1
-    
-    # Wait for the background executor to finish the job
-    time.sleep(0.3)
-    dispatcher.process_queue()
-    
-    assert callback_executed.is_set()
-    client.stop()
+    try:
+        client.import_zip("dummy.zip", on_complete)
+        
+        call_duration = time.time() - start_time
+        # The call should return immediately, way before the 0.2s sleep in slow_request
+        assert call_duration < 0.1
+        
+        # Wait for the background executor to finish the job
+        time.sleep(0.3)
+        dispatcher.process_queue()
+        
+        assert callback_executed.is_set()
+    finally:
+        client.stop()
+        patcher.stop()
 
 
 class AsyncWsMock:

@@ -10,8 +10,9 @@ The user may converse in Vietnamese or English. However, **all content written t
 ## Available Tools
 
 - `launch_annotator` — spawn the Engine and the Annotation GUI for the user
-- `get_engine_state` — fetch the current Flat Map workspace state from the Engine
-- `download_engine_crops` — explicitly download all component crops into a local directory
+- `get_workspace_state` — fetch the current Flat Map workspace state from the Engine
+- `download_image` — download the root screenshot image or a specific component image
+- `download_workspace_assets` — download the state and all images in a single batch operation
 - `generate_spec_doc` — validate analysis data and generate the .docx
 
 ## Source Priority
@@ -33,13 +34,13 @@ Wait for the user to confirm before proceeding.
 
 ### 2a. Read Annotation State
 
-Call `get_engine_state()`. This returns the `WorkspaceState` JSON.
+Call `get_workspace_state()`. This returns the `WorkspaceState` JSON.
 Note each component's `id` (a UUID), `label`, and whether it has children in `childrenIds` (non-leaf) or not (leaf).
 
-### 2b. Download Images
-
-Call `download_engine_crops(output_dir="./workspace_xyz")` to explicitly prepare a local directory.
-This will save `raw.png` and `<uuid>.png` for every component into `./workspace_xyz`.
+Download the state and all images in a single batch operation:
+1. Call `download_workspace_assets(output_dir="./workspace_xyz")`. This will automatically download and extract `workspace.json`, `raw.png`, and all component images (inside `images/`) into `./workspace_xyz`.
+Alternatively, you can call the individual read-only tool:
+- `download_image(output_path="./workspace_xyz/raw.png")` to download the root screenshot, or `download_image(comp_id="...", output_path="./workspace_xyz/images/<uuid>.png")` to download a specific component image.
 
 ### 2c. Vision analysis
 
@@ -104,7 +105,7 @@ Every field maps to a specific location in the generated .docx document.
 | `label` | `str` | Component name (from annotation label) |
 | `description` | `str` | Vietnamese description of the component's purpose |
 | `isLeaf` | `bool` | True if component has no children |
-| `imageFile` | `str?` | Filename of the cropped annotated image (e.g. `<uuid>.png`) |
+| `imageFile` | `str?` | Filename of the component annotated image (e.g. `<uuid>.png`) |
 | `children` | `list[ChildElement]` | UI elements inside this component |
 | `interactions` | `list[Interaction]` | User action / system reaction pairs |
 

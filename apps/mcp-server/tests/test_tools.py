@@ -283,7 +283,8 @@ class TestGenerateSpecDoc:
 
 
 class TestLaunchAnnotator:
-    def test_launch_annotator_success(self, tmp_path, monkeypatch):
+    @pytest.mark.anyio
+    async def test_launch_annotator_success(self, tmp_path, monkeypatch):
 
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
@@ -296,21 +297,31 @@ class TestLaunchAnnotator:
             lambda name: "/usr/local/bin/uv",
         )
 
-        # Mock requests.get and requests.post to avoid actual HTTP calls and timeouts
-        mock_get = MagicMock()
-        mock_get.return_value.status_code = 200
-        monkeypatch.setattr("mcp_server.tools.launch_annotator.requests.get", mock_get)
+        # Mock httpx.AsyncClient to avoid actual HTTP calls and timeouts
+        class MockAsyncClient:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def get(self, url, *args, **kwargs):
+                mock_res = MagicMock()
+                mock_res.status_code = 200
+                return mock_res
+            async def post(self, url, *args, **kwargs):
+                mock_res = MagicMock()
+                mock_res.status_code = 200
+                return mock_res
 
-        mock_post = MagicMock()
         monkeypatch.setattr(
-            "mcp_server.tools.launch_annotator.requests.post", mock_post
+            "mcp_server.tools.launch_annotator.httpx.AsyncClient",
+            MockAsyncClient,
         )
 
         # Create dummy screenshot to pass validation
         screenshot = tmp_path / "test.png"
         screenshot.write_bytes(b"dummy")
 
-        result = launch_annotator_impl(screenshot_path=str(screenshot))
+        result = await launch_annotator_impl(screenshot_path=str(screenshot))
         assert result["engine_pid"] == 12345
         assert result["gui_pid"] == 12345
         assert result["engine_ready"] is True
@@ -322,11 +333,12 @@ class TestLaunchAnnotator:
             assert call_args[0] == "/usr/local/bin/uv"
             assert "run" in call_args
 
-    def test_raises_when_uv_not_found(self, tmp_path, monkeypatch):
+    @pytest.mark.anyio
+    async def test_raises_when_uv_not_found(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
             "mcp_server.tools.launch_annotator.shutil.which",
             lambda name: None,
         )
 
         with pytest.raises(RuntimeError, match="uv is not installed"):
-            launch_annotator_impl(screenshot_path=str(tmp_path / "out"))
+            await launch_annotator_impl(screenshot_path=str(tmp_path / "out"))
