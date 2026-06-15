@@ -10,14 +10,13 @@ from fastapi import (
     Depends,
     File,
     HTTPException,
-    Security,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
     status,
 )
 from fastapi.responses import Response
-from fastapi.security import APIKeyHeader
+
 from models import (
     Bounds,
     ImageInfo,
@@ -44,15 +43,7 @@ from .tree_math import recalculate_tree
 logger = get_logger(__name__)
 router = APIRouter()
 
-api_key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
 
-def verify_api_key(api_key: str | None = Security(api_key_header)):
-    expected_key = os.environ.get("ENGINE_API_KEY")
-    if expected_key and api_key != expected_key:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid API Key"
-        )
 
 class ClientConnection:
     """Wraps a WebSocket to decouple network I/O from state mutation locks via an asyncio.Queue."""
@@ -83,7 +74,7 @@ class ClientConnection:
 # ── Import / Export ────────────────────────────────────────────────────
 
 
-@router.post("/workspace/import", tags=["Import/Export"], dependencies=[Depends(verify_api_key)])
+@router.post("/workspace/import", tags=["Import/Export"])
 async def import_workspace(
     workspace: WorkspaceDep, file: UploadFile = File(...)
 ):
@@ -136,7 +127,7 @@ async def import_workspace(
     return {"status": "imported", "sessionId": workspace.state.sessionId}
 
 
-@router.post("/workspace/import-image", tags=["Import/Export"], dependencies=[Depends(verify_api_key)])
+@router.post("/workspace/import-image", tags=["Import/Export"])
 async def import_image(
     workspace: WorkspaceDep, file: UploadFile = File(...)
 ):
@@ -209,7 +200,7 @@ class SetReadOnlyRequest(BaseModel):
     read_only: bool
 
 
-@router.put("/workspace/readonly", tags=["State"], dependencies=[Depends(verify_api_key)])
+@router.put("/workspace/readonly", tags=["State"])
 async def set_workspace_readonly(
     req: SetReadOnlyRequest, workspace: WorkspaceDep
 ):
@@ -427,12 +418,7 @@ async def websocket_endpoint(
     followed by JSON Patch deltas broadcasted on every mutation.
     Allows executing mutations via JSON-RPC 2.0 messages over the connection.
     """
-    expected_key = os.environ.get("ENGINE_API_KEY")
-    if expected_key:
-        api_key = websocket.headers.get("x-api-key")
-        if api_key != expected_key:
-            await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-            return
+
 
     logger.info("WebSocket client connected")
     await websocket.accept()
@@ -507,7 +493,7 @@ class AddComponentRequest(BaseModel):
     visibility: Visibility | None = None
 
 
-@router.post("/components", tags=["Components"], dependencies=[Depends(verify_api_key)])
+@router.post("/components", tags=["Components"])
 async def add_component(
     req: AddComponentRequest, workspace: WorkspaceDep
 ):
@@ -529,7 +515,7 @@ class MoveComponentRequest(BaseModel):
     y: int
 
 
-@router.put("/components/{comp_id}/move", tags=["Components"], dependencies=[Depends(verify_api_key)])
+@router.put("/components/{comp_id}/move", tags=["Components"])
 async def move_component(
     comp_id: uuid.UUID,
     req: MoveComponentRequest,
@@ -548,7 +534,7 @@ class UpdateComponentRequest(BaseModel):
     visibility: Visibility | None = None
 
 
-@router.put("/components/{comp_id}", tags=["Components"], dependencies=[Depends(verify_api_key)])
+@router.put("/components/{comp_id}", tags=["Components"])
 async def update_component(
     comp_id: uuid.UUID,
     req: UpdateComponentRequest,
@@ -566,7 +552,7 @@ async def update_component(
     return {"status": "updated"}
 
 
-@router.delete("/components/{comp_id}", tags=["Components"], dependencies=[Depends(verify_api_key)])
+@router.delete("/components/{comp_id}", tags=["Components"])
 async def delete_component(
     comp_id: uuid.UUID, workspace: WorkspaceDep
 ):
@@ -575,7 +561,7 @@ async def delete_component(
     return {"status": "deleted"}
 
 
-@router.post("/session/undo", tags=["Session"], dependencies=[Depends(verify_api_key)])
+@router.post("/session/undo", tags=["Session"])
 async def session_undo(workspace: WorkspaceDep):
     logger.info("Performing undo")
     success = await workspace.undo()
@@ -584,7 +570,7 @@ async def session_undo(workspace: WorkspaceDep):
     return {"status": "undone"}
 
 
-@router.post("/session/redo", tags=["Session"], dependencies=[Depends(verify_api_key)])
+@router.post("/session/redo", tags=["Session"])
 async def session_redo(workspace: WorkspaceDep):
     logger.info("Performing redo")
     success = await workspace.redo()

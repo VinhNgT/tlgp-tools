@@ -21,7 +21,6 @@ GUI_LOGS: deque[str] = deque(maxlen=500)
 # Track active subprocesses (Popen instances)
 ACTIVE_PROCESSES: list[subprocess.Popen] = []
 
-# Store the active API key in-memory instead of mutating os.environ globally (avoids test contamination)
 ENGINE_API_KEY: str | None = None
 
 
@@ -125,17 +124,11 @@ def read_daemon_logs_impl(daemon: str = "engine", lines: int = 100) -> dict:
 
 async def set_workspace_readonly_impl(read_only: bool) -> dict:
     """Toggle the workspace read-only mode in the engine."""
-    api_key = ENGINE_API_KEY or os.environ.get("ENGINE_API_KEY")
-    headers = {}
-    if api_key:
-        headers["X-API-Key"] = api_key
-
     try:
         async with httpx.AsyncClient() as client:
             res = await client.put(
                 "http://127.0.0.1:8000/workspace/readonly",
                 json={"read_only": read_only},
-                headers=headers,
             )
             res.raise_for_status()
             return res.json()

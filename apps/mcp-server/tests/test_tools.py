@@ -435,10 +435,11 @@ class TestDaemonControl:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def put(self, url, json, headers, *args, **kwargs):
+            async def put(self, url, *args, **kwargs):
                 mock_res = MagicMock()
                 mock_res.status_code = 200
-                mock_res.json.return_value = {"status": "success", "read_only": json["read_only"]}
+                json_data = kwargs.get("json", {})
+                mock_res.json.return_value = {"status": "success", "read_only": json_data.get("read_only")}
                 return mock_res
 
         monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)

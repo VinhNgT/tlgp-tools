@@ -74,7 +74,7 @@ class EngineClient:
         self.api_url = api_url
         self.ws_url = ws_url
         self.dispatch = dispatch or (lambda f: f())
-        self.api_key = os.environ.get("ENGINE_API_KEY")
+        self.api_key = None
         self._ws = None
         self._loop = None
         self._thread = None
@@ -115,10 +115,7 @@ class EngineClient:
     async def _listen_ws(self):
         while True:
             try:
-                headers = {}
-                if self.api_key:
-                    headers["X-API-Key"] = self.api_key
-                async with websockets.connect(self.ws_url, additional_headers=headers) as ws:
+                async with websockets.connect(self.ws_url) as ws:
                     logger.info("Connected to Engine WebSocket")
                     self._ws = ws
                     async for message in ws:
@@ -190,8 +187,6 @@ class EngineClient:
             self.dispatch(lambda m={"method": method, "url": url, "kwargs": str(kwargs)}: self.on_log_message("Outgoing HTTP", m))
 
         headers = kwargs.pop("headers", {})
-        if self.api_key:
-            headers["X-API-Key"] = self.api_key
 
         try:
             res = requests.request(method, url, headers=headers, **kwargs)

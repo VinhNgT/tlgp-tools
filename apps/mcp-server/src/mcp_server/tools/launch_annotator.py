@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import os
-import secrets
+
 import shutil
 import subprocess
 import sys
@@ -48,11 +48,7 @@ async def launch_annotator_impl(
 
     workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
 
-    api_key = secrets.token_hex(16)
-    dc.ENGINE_API_KEY = api_key
-
     env = os.environ.copy()
-    env["ENGINE_API_KEY"] = api_key
 
     # Spawn Engine
     engine_cmd = [uv_bin, "run", "python", "-m", "engine"]
@@ -103,13 +99,12 @@ async def launch_annotator_impl(
             await asyncio.sleep(0.1)
 
         if engine_ready:
-            headers = {"X-API-Key": api_key}
             if screenshot_path:
                 with open(os.path.abspath(screenshot_path), "rb") as f:
-                    await client.post("http://127.0.0.1:8000/workspace/import-image", files={"file": f}, headers=headers)
+                    await client.post("http://127.0.0.1:8000/workspace/import-image", files={"file": f})
             elif workspace_zip:
                 with open(os.path.abspath(workspace_zip), "rb") as f:
-                    await client.post("http://127.0.0.1:8000/workspace/import", files={"file": f}, headers=headers)
+                    await client.post("http://127.0.0.1:8000/workspace/import", files={"file": f})
 
     return {
         "engine_pid": engine_proc.pid,
