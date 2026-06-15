@@ -160,3 +160,30 @@ async def export_workspace_impl(output_path: str) -> dict:
             url=str(e.request.url) if hasattr(e, "request") else None,
             method=e.request.method if hasattr(e, "request") else None,
         ) from e
+
+
+async def get_image_bytes_impl(comp_id: str, show_children: bool = False) -> bytes:
+    """Fetch raw image bytes for a specific component from the Engine."""
+    try:
+        async with httpx.AsyncClient() as client:
+            res = await client.get(
+                f"http://127.0.0.1:8000/images/{comp_id}",
+                params={"show_children": show_children}
+            )
+            res.raise_for_status()
+            return res.content
+    except httpx.HTTPStatusError as e:
+        raise ApiClientError(
+            message=f"HTTP error while fetching image bytes for {comp_id}",
+            status_code=e.response.status_code,
+            url=str(e.request.url),
+            method=e.request.method,
+            backend_detail=e.response.text,
+        ) from e
+    except httpx.RequestError as e:
+        raise ApiClientError(
+            message=f"Request failed while fetching image bytes for {comp_id}: {e}",
+            url=str(e.request.url) if hasattr(e, "request") else None,
+            method=e.request.method if hasattr(e, "request") else None,
+        ) from e
+

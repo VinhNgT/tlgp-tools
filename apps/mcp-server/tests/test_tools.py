@@ -447,3 +447,52 @@ class TestDaemonControl:
         assert res["status"] == "success"
         assert res["read_only"] is True
 
+
+class TestGenerateSpecDocWrapper:
+    @pytest.mark.anyio
+    async def test_generate_spec_doc_progress_and_elicitation(self, tmp_path):
+        from mcp_server.server import generate_spec_doc
+        from unittest.mock import AsyncMock
+
+        screen_dir = _create_export_dir(tmp_path)
+        analysis = _build_analysis(screen_dir)
+
+        # Force a component description to be empty to trigger elicitation
+        analysis["components"][0]["description"] = ""
+
+        # Mock Context
+        ctx = MagicMock()
+        ctx.report_progress = AsyncMock()
+        ctx.log = AsyncMock()
+        
+        # Mock elicitation response
+        mock_elicit_result = MagicMock()
+        mock_elicit_result.action = "accept"
+        mock_elicit_result.data.description = "Elicited Header Description"
+        ctx.elicit = AsyncMock(return_value=mock_elicit_result)
+
+        # Call generate_spec_doc wrapper
+        result = await generate_spec_doc(
+            ctx=ctx,
+            analysis=analysis,
+            output_path=str(tmp_path / "out.docx")
+        )
+
+        assert result["valid"] is True
+        
+        # Verify progress was reported
+        ctx.report_progress.assert_any_call(10, 100, "Loading and validating analysis data...")
+        ctx.report_progress.assert_any_call(30, 100, "Eliciting description for 'Header'...")
+        ctx.report_progress.assert_any_call(60, 100, "Running document generation...")
+        ctx.report_progress.assert_any_call(100, 100, "Spec generation complete.")
+
+        # Verify elicitation was called
+        ctx.elicit.assert_called_once()
+        
+        # Verify the description was updated in the resulting doc/JSON
+        analysis_json = screen_dir / "analysis.json"
+        assert analysis_json.exists()
+        saved = json.loads(analysis_json.read_text(encoding="utf-8"))
+        assert saved["components"][0]["description"] == "Elicited Header Description"
+
+

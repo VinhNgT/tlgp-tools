@@ -8,10 +8,12 @@ Exposes two tools (one per underlying package) and one orchestration prompt:
 
 from __future__ import annotations
 
-from mcp.server.fastmcp import FastMCP
+import json
+
+from mcp.server.fastmcp import Context, FastMCP
 from tlgp_logger import get_logger
 
-from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
+from mcp_server.prompts import SPEC_WORKFLOW_PROMPT, get_prompt_section
 from mcp_server.tools.daemon_control import (
     get_daemon_status_impl,
     kill_daemons_impl,
@@ -28,6 +30,7 @@ from mcp_server.tools.workspace_api import (
     download_image_impl,
     download_workspace_assets_impl,
     export_workspace_impl,
+    get_image_bytes_impl,
     get_workspace_state_impl,
 )
 
@@ -51,6 +54,54 @@ mcp = FastMCP(
 )
 
 register_exit_handlers()
+
+
+# ============================================================
+# Resources
+# ============================================================
+
+
+@mcp.resource("tlgp://workspace/state")
+async def get_workspace_state_resource() -> str:
+    """Read-only access to the latest flat-map JSON WorkspaceState."""
+    state = await get_workspace_state_impl()
+    return json.dumps(state, indent=2, ensure_ascii=False)
+
+
+@mcp.resource("tlgp://workspace/components/{comp_id}/image")
+async def get_component_image_resource(comp_id: str) -> bytes:
+    """Fetch the raw image bytes for a specific component from the Engine."""
+    return await get_image_bytes_impl(comp_id)
+
+
+@mcp.resource("tlgp://daemons/logs/{daemon_name}")
+def get_daemon_logs_resource(daemon_name: str) -> str:
+    """Read the recent log lines from engine or gui daemon.
+
+    Args:
+        daemon_name: The daemon name ('engine' or 'gui').
+    """
+    res = read_daemon_logs_impl(daemon_name, lines=100)
+    return res.get("logs", "")
+
+
+@mcp.resource("tlgp://spec/schema")
+def get_spec_schema_resource() -> str:
+    """Read-only access to the analysis.json Schema Reference."""
+    return get_prompt_section("analysis.json Schema Reference")
+
+
+@mcp.resource("tlgp://spec/classification-guide")
+def get_spec_classification_guide_resource() -> str:
+    """Read-only access to the UI Control Type Classification Guide."""
+    return get_prompt_section("UI Control Type Classification Guide")
+
+
+@mcp.resource("tlgp://spec/example-analysis")
+def get_spec_example_analysis_resource() -> str:
+    """Read-only access to a complete example analysis.json structure."""
+    return get_prompt_section("Example: Complete Analysis Dict")
+
 
 
 # ============================================================
@@ -152,7 +203,8 @@ async def export_workspace(output_path: str) -> dict:
 
 
 @mcp.tool()
-def generate_spec_doc(
+async def generate_spec_doc(
+    ctx: Context,
     analysis: dict | None = None,
     analysis_path: str | None = None,
     output_path: str | None = None,
@@ -182,12 +234,82 @@ def generate_spec_doc(
     Returns:
         dict with valid, output_path, tables, images, warnings, errors.
     """
-    return generate_spec_doc_impl(
+    await ctx.report_progress(10, 100, "Loading and validating analysis data...")
+
+    if analysis_path:
+        try:
+            with open(analysis_path, encoding="utf-8") as f:
+                analysis = json.load(f)
+        except Exception as e:
+            return {
+                "valid": False,
+                "errors": [f"Failed to read analysis_path: {e}"],
+                "warnings": [],
+            }
+
+    if not analysis:
+        return {
+            "valid": False,
+            "errors": ["Either 'analysis' or 'analysis_path' must be provided"],
+            "warnings": [],
+        }
+
+    # If not in validate_only mode, run description elicitation
+    if not validate_only:
+        try:
+            from doc_generator.models import AnalysisData
+            from pydantic import BaseModel, Field
+
+            class ComponentDescription(BaseModel):
+                description: str = Field(..., description="A brief 1-sentence UX description of the component")
+
+            data = AnalysisData.model_validate(analysis)
+            non_leaf = [c for c in data.components if not c.isLeaf]
+
+            updated = False
+            for comp in non_leaf:
+                if not comp.description:
+                    await ctx.report_progress(30, 100, f"Eliciting description for '{comp.label}'...")
+                    await ctx.log("info", f"Eliciting description for component '{comp.label}'...")
+                    try:
+                        result = await ctx.elicit(
+                            message=f"The component '{comp.label}' (id={comp.id}) has an empty description. Please provide a UX description.",
+                            schema=ComponentDescription
+                        )
+                        if result.action == "accept":
+                            comp.description = result.data.description
+                            # Update the dict structure
+                            for c_dict in analysis.get("components", []):
+                                if c_dict.get("id") == comp.id:
+                                    c_dict["description"] = comp.description
+                                    updated = True
+                                    break
+                    except Exception as e:
+                        await ctx.log("error", f"Elicitation failed for component '{comp.label}': {e}")
+
+            if updated and analysis_path:
+                try:
+                    with open(analysis_path, "w", encoding="utf-8") as f:
+                        json.dump(analysis, f, indent=2, ensure_ascii=False)
+                except Exception as e:
+                    await ctx.log("warning", f"Failed to write updated analysis back to {analysis_path}: {e}")
+
+        except Exception:
+            # Let the main generator function handle parsing/validation error output
+            pass
+
+    await ctx.report_progress(60, 100, "Running document generation...")
+
+    result = generate_spec_doc_impl(
         analysis=analysis,
-        analysis_path=analysis_path,
+        analysis_path=None,
         output_path=output_path,
         validate_only=validate_only,
     )
+
+    await ctx.report_progress(100, 100, "Spec generation complete.")
+    return result
+
 
 
 # ============================================================
@@ -196,16 +318,38 @@ def generate_spec_doc(
 
 
 @mcp.prompt()
-def spec_doc_workflow(section_prefix: str = "1.1") -> str:
+async def spec_doc_workflow(section_prefix: str = "1.1") -> list:
     """Full workflow for creating a TLGP screen specification document.
 
     Guides the agent through: annotating screenshots, performing vision
     and codebase analysis, and generating the final .docx.
+    Automatically embeds the latest workspace state resource if available.
 
     Args:
         section_prefix: Section number prefix (default "1.1").
     """
-    return SPEC_WORKFLOW_PROMPT.replace("{section_prefix}", section_prefix)
+    state_json = "{}"
+    try:
+        state = await get_workspace_state_impl()
+        state_json = json.dumps(state, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+    return [
+        SPEC_WORKFLOW_PROMPT.replace("{section_prefix}", section_prefix),
+        {
+            "role": "user",
+            "content": {
+                "type": "resource",
+                "resource": {
+                    "uri": "tlgp://workspace/state",
+                    "mimeType": "application/json",
+                    "text": state_json,
+                }
+            }
+        }
+    ]
+
 
 
 @mcp.tool()

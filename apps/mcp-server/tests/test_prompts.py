@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+import pytest
+from unittest.mock import AsyncMock, patch
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
+from mcp_server.server import spec_doc_workflow
 
 
 class TestSpecWorkflowPrompt:
@@ -88,3 +91,17 @@ class TestSpecWorkflowPrompt:
     def test_no_external_service_references(self):
         assert "createDocument" not in SPEC_WORKFLOW_PROMPT
         assert "insertTable" not in SPEC_WORKFLOW_PROMPT
+
+    @pytest.mark.anyio
+    @patch("mcp_server.server.get_workspace_state_impl", new_callable=AsyncMock)
+    async def test_spec_doc_workflow_renders(self, mock_state_impl):
+        mock_state_impl.return_value = {"components": {}, "screen": {}}
+        res = await spec_doc_workflow("3.2")
+        assert isinstance(res, list)
+        assert len(res) == 2
+        assert "3.2" in res[0]
+        assert res[1]["role"] == "user"
+        assert res[1]["content"]["type"] == "resource"
+        assert res[1]["content"]["resource"]["uri"] == "tlgp://workspace/state"
+        mock_state_impl.assert_called_once()
+

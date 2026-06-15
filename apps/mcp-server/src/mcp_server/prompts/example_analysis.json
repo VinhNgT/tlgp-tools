@@ -1,0 +1,113 @@
+{
+  "sectionPrefix": "{section_prefix}",
+  "exportDir": "./workspace_xyz",
+  "components": [
+    {
+      "id": 1,
+      "label": "Header",
+      "description": "Thanh tiêu đề phía trên cùng của màn hình",
+      "isLeaf": false,
+      "imageFile": "a1b2c3d4-e5f6-7890-1234-56789abcdef0.png",
+      "children": [
+        {
+          "stt": 1,
+          "label": "Back Button",
+          "controlType": "Icon",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Nút quay lại màn hình trước"
+        },
+        {
+          "stt": 2,
+          "label": "Title",
+          "controlType": "Text",
+          "required": "",
+          "maxLength": "",
+          "editable": "",
+          "description": "Tiêu đề màn hình hiển thị tên sản phẩm"
+        }
+      ],
+      "interactions": [
+        {
+          "action": "Click vào nút Back",
+          "reaction": "Hệ thống quay về màn hình trước đó"
+        }
+      ]
+    },
+    {
+      "id": 2,
+      "label": "Banner",
+      "description": "",
+      "isLeaf": true,
+      "imageFile": null,
+      "children": [],
+      "interactions": []
+    }
+  ],
+  "screen": {
+    "name": "Chi tiết sản phẩm",
+    "description": "Màn hình hiển thị thông tin chi tiết của sản phẩm",
+    "imageFiles": ["raw.png"],
+    "topLevelChildren": [
+      {
+        "stt": 1,
+        "label": "Header",
+        "controlType": "Component",
+        "required": "",
+        "maxLength": "",
+        "editable": "",
+        "description": "Thanh tiêu đề chứa nút quay lại và tên sản phẩm"
+      },
+      {
+        "stt": 2,
+        "label": "Banner",
+        "controlType": "Image",
+        "required": "",
+        "maxLength": "",
+        "editable": "",
+        "description": "Ảnh banner quảng cáo sản phẩm"
+      }
+    ],
+    "interactions": [
+      {
+        "action": "Mở màn hình",
+        "reaction": "Hệ thống gọi API lấy chi tiết sản phẩm và hiển thị"
+      }
+    ]
+  },
+  "apis": [
+    {
+      "number": 1,
+      "method": "GET",
+      "title": "Lấy chi tiết sản phẩm",
+      "url": "/api/v1/products/{id}",
+      "requestParams": [
+        {
+          "name": "id",
+          "meaning": "ID sản phẩm",
+          "required": "Có",
+          "dataType": "int",
+          "limit": "",
+          "defaultValue": ""
+        }
+      ],
+      "requestBodyType": "",
+      "requestDescription": "",
+      "responseType": "ProductDetailDto",
+      "responseFields": [
+        {
+          "name": "name",
+          "meaning": "Tên sản phẩm",
+          "required": "Có",
+          "dataType": "String",
+          "limit": "",
+          "defaultValue": ""
+        }
+      ],
+      "responseDescription": "",
+      "subDtos": []
+    }
+  ],
+  "discrepancies": []
+}
