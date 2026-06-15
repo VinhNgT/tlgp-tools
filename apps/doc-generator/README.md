@@ -14,11 +14,12 @@ The script reads an `analysis.json` file containing the structured screen analys
 
 ## Output
 
-A `.docx` file with:
-- Component sections with headings, info tables, UI element tables, interaction tables
-- Screen overview section
-- API documentation with request/response parameter tables
-- All formatting applied automatically from `spec_format.toml`
+- A `.docx` file with:
+  - Component sections with headings, info tables, UI element tables, interaction tables
+  - Screen overview section
+  - API documentation with request/response parameter tables
+  - All formatting applied automatically from `spec_format.toml`
+- An `analysis.json` file copied/saved in the same directory as the `.docx` file for record-keeping.
 
 ## Formatting
 

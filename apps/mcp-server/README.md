@@ -87,12 +87,12 @@ Spawns the TLGP Annotation Tool GUI as a background process. The user annotates 
 
 ### `generate_spec_doc`
 
-Validates analysis data and generates a formatted `.docx` specification document. Accepts either a complete analysis dict (conforming to the AnalysisData schema) or a file path to an `analysis.json` file on disk. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
+Validates analysis data, generates a formatted `.docx` specification document, and saves the final analysis JSON data alongside it as `analysis.json` for record-keeping. Accepts either a complete analysis dict (conforming to the AnalysisData schema) or a file path to an `analysis.json` file on disk. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
 
 **Args:**
 - `analysis` — optional complete analysis data dict (see the `spec_doc_workflow` prompt for the full schema reference)
 - `analysis_path` — optional path to an `analysis.json` file. Highly recommended for large payloads to bypass IDE client serialization limitations.
-- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `exportDir`)
+- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `exportDir`). The analysis JSON data will also be saved next to it.
 - `validate_only` — if `True`, validate without generating (useful for catching errors early)
 
 ## Prompts

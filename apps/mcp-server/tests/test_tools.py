@@ -241,6 +241,12 @@ class TestGenerateSpecDoc:
         assert result["output_path"] == str(custom_out)
         assert custom_out.exists()
 
+        # Verify analysis JSON is written alongside the custom docx path
+        analysis_json = tmp_path / "analysis.json"
+        assert analysis_json.exists()
+        saved = json.loads(analysis_json.read_text(encoding="utf-8"))
+        assert saved["sectionPrefix"] == "1.1"
+
     def test_analysis_json_side_effect(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
@@ -503,7 +509,7 @@ class TestGenerateSpecDocWrapper:
         ctx.elicit.assert_called_once()
 
         # Verify the description was updated in the resulting doc/JSON
-        analysis_json = screen_dir / "analysis.json"
+        analysis_json = tmp_path / "analysis.json"
         assert analysis_json.exists()
         saved = json.loads(analysis_json.read_text(encoding="utf-8"))
         assert saved["components"][0]["description"] == "Elicited Header Description"

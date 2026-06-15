@@ -33,5 +33,5 @@ Before starting, read these resources to understand the component classification
 ### Step 4: Validate & Generate
 1. **IDE Parameter Bypass:** If the analysis data is large (e.g., >10KB), you MUST call `write_analysis_json(data=...)` to save it to disk and retrieve the file path. Pass this path as `analysis_path` to `generate_spec_doc`.
 2. **Validate:** Run `generate_spec_doc(analysis_path=..., validate_only=True)`. Fix any warnings or errors returned.
-3. **Generate:** Run `generate_spec_doc(analysis_path=..., validate_only=False)`.
+3. **Generate:** Run `generate_spec_doc(analysis_path=..., validate_only=False)`. This will generate the `.docx` document and automatically save/copy the final `analysis.json` next to the `.docx` file for record-keeping.
 4. **Unlock Workspace:** Call `set_workspace_readonly(read_only=False)` to return edit control to the user.

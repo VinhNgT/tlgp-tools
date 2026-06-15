@@ -221,9 +221,8 @@ class SpecGeneratorService:
         out.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(out))
 
-        # Save analysis data JSON inside export folder
-        export_dir = Path(data.exportDir)
-        analysis_json_path = export_dir / "analysis.json"
+        # Save analysis data JSON alongside the exported docx
+        analysis_json_path = out.parent / "analysis.json"
         analysis_json_path.write_text(
             json.dumps(analysis, indent=2, ensure_ascii=False),
             encoding="utf-8",

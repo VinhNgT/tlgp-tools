@@ -65,7 +65,8 @@ mcp = FastMCP(
         "3. VIETNAMESE LANGUAGE REQUIREMENT: All user-facing UI labels, component descriptions, screen descriptions, actions, reactions, and discrepancies written to the analysis data structure MUST be in Vietnamese.\n"
         "4. PARAMETER PAYLOAD LIMITATION: Direct 'analysis' dictionary arguments to 'generate_spec_doc' must not exceed 10KB to prevent JSON-RPC transport corruption. For larger payloads, save the data using the 'write_analysis_json' tool first, and pass the resulting absolute path via 'analysis_path'.\n"
         "5. STRICT VALIDATION PIPELINE: Always run 'generate_spec_doc(validate_only=True)' and review/resolve all validation warnings and errors before calling the tool with 'validate_only=False'.\n"
-        "6. REFERENCE GUIDES & DATA: Prior to performing any analysis or constructing parameters, read the resource guides:\n"
+        "6. ANALYSIS JSON RECORD-KEEPING: When compiling a specification document (validate_only=False), the tool automatically saves the final analysis JSON data as 'analysis.json' in the same directory as the generated '.docx' file.\n"
+        "7. REFERENCE GUIDES & DATA: Prior to performing any analysis or constructing parameters, read the resource guides:\n"
         "   - 'tlgp://spec/schema' (JSON Schema structure)\n"
         "   - 'tlgp://spec/classification-guide' (UI Control type rules)\n"
         "   - 'tlgp://spec/example-analysis' (Complete example analysis data structure)\n"
@@ -236,11 +237,12 @@ async def generate_spec_doc(
     2. Parameter Payload Limitation: If the analysis dictionary is large (e.g., over 10KB), passing it directly via the 'analysis' parameter may corrupt the JSON-RPC transport middleware. You MUST call `write_analysis_json` first to save it to disk, and pass the resulting absolute path via the 'analysis_path' parameter.
     3. Strict Validation Workflow: Always run `generate_spec_doc(validate_only=True)` first to validate the payload structure and component images. Address any warnings or errors before proceeding to document generation with `validate_only=False`.
     4. Guidelines: Read resources `tlgp://spec/classification-guide` and `tlgp://spec/schema` before preparing the payload.
+    5. Output Location: When generating the document (validate_only=False), the analysis JSON payload is always saved as `analysis.json` in the same directory as the generated `.docx` file.
 
     Args:
         analysis: Complete analysis data dict.
         analysis_path: Path to saved analysis.json file (highly recommended for large payloads to bypass size limits).
-        output_path: Where to save the .docx. Defaults to <screen_name>.docx in exportDir.
+        output_path: Where to save the .docx. Defaults to <screen_name>.docx in exportDir. The analysis.json file will be written to the same directory.
         validate_only: If True, validates structure and checks files without compiling.
 
     Returns:
