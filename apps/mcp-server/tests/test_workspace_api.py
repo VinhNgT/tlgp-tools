@@ -1,3 +1,5 @@
+"""Tests for the WorkspaceClient API methods."""
+
 from __future__ import annotations
 
 import io
@@ -6,14 +8,8 @@ from pathlib import Path
 
 import httpx
 import pytest
+from mcp_server.client import WorkspaceClient
 from mcp_server.exceptions import ApiClientError
-from mcp_server.tools.workspace_api import (
-    download_image_impl,
-    download_workspace_assets_impl,
-    export_workspace_impl,
-    get_image_bytes_impl,
-    get_workspace_state_impl,
-)
 
 
 def test_api_client_error_serialization():
@@ -52,18 +48,21 @@ class TestWorkspaceApi:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def get(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
+                # We mock HTTP request method
+                assert method == "GET"
+                assert "workspace/state" in url
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
-        res = await get_workspace_state_impl()
+        client = WorkspaceClient()
+        res = await client.get_workspace_state()
         assert res["version"] == 1
         assert res["sessionId"] == "abc"
 
     @pytest.mark.anyio
     async def test_get_workspace_state_http_status_error(self, monkeypatch):
-        # Create a mock request and response
         req = httpx.Request("GET", "http://localhost/state")
         resp = httpx.Response(404, request=req, text="Not found details")
 
@@ -72,13 +71,14 @@ class TestWorkspaceApi:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def get(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
                 raise httpx.HTTPStatusError("Not Found", request=req, response=resp)
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
+        client = WorkspaceClient()
         with pytest.raises(ApiClientError) as exc_info:
-            await get_workspace_state_impl()
+            await client.get_workspace_state()
 
         err = exc_info.value
         assert err.status_code == 404
@@ -95,13 +95,14 @@ class TestWorkspaceApi:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def get(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
                 raise httpx.RequestError("Connection refused", request=req)
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
+        client = WorkspaceClient()
         with pytest.raises(ApiClientError) as exc_info:
-            await get_workspace_state_impl()
+            await client.get_workspace_state()
 
         err = exc_info.value
         assert "Connection refused" in err.message
@@ -121,13 +122,16 @@ class TestWorkspaceApi:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def get(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
+                assert method == "GET"
+                assert "images/comp-uuid" in url
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
         out_file = tmp_path / "images" / "output.png"
-        res = await download_image_impl("comp-uuid", str(out_file))
+        client = WorkspaceClient()
+        res = await client.download_image("comp-uuid", str(out_file))
 
         assert res["status"] == "success"
         assert Path(res["output_path"]).exists()
@@ -148,7 +152,7 @@ class TestWorkspaceApi:
             def raise_for_status(self):
                 pass
             def json(self):
-                # When get_workspace_state_impl is called internally if component_ids is None
+                # When get_workspace_state is called internally if component_ids is None
                 return {"components": {"comp1": {}}}
 
         class MockAsyncClient:
@@ -156,15 +160,19 @@ class TestWorkspaceApi:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def get(self, url, *args, **kwargs):
-                return MockResponse()
-            async def post(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
+                # Can be GET for workspace state or POST for export-batch
+                if method == "GET":
+                    assert "workspace/state" in url
+                elif method == "POST":
+                    assert "workspace/export-batch" in url
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
         out_dir = tmp_path / "extracted_assets"
-        res = await download_workspace_assets_impl(
+        client = WorkspaceClient()
+        res = await client.download_workspace_assets(
             output_dir=str(out_dir),
             include_state=True,
             include_root=True,
@@ -190,13 +198,16 @@ class TestWorkspaceApi:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def get(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
+                assert method == "GET"
+                assert "workspace/export" in url
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
         out_zip = tmp_path / "exports" / "workspace.zip"
-        res = await export_workspace_impl(str(out_zip))
+        client = WorkspaceClient()
+        res = await client.export_workspace(str(out_zip))
 
         assert res["status"] == "success"
         assert Path(res["output_path"]).exists()
@@ -215,10 +226,13 @@ class TestWorkspaceApi:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def get(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
+                assert method == "GET"
+                assert "images/comp-uuid" in url
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
 
-        res = await get_image_bytes_impl("comp-uuid")
+        client = WorkspaceClient()
+        res = await client.get_image_bytes("comp-uuid")
         assert res == b"raw_bytes"

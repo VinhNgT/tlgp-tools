@@ -94,9 +94,9 @@ class TestSpecWorkflowPrompt:
         assert "insertTable" not in SPEC_WORKFLOW_PROMPT
 
     @pytest.mark.anyio
-    @patch("mcp_server.server.get_workspace_state_impl", new_callable=AsyncMock)
-    async def test_spec_doc_workflow_renders(self, mock_state_impl):
-        mock_state_impl.return_value = {"components": {}, "screen": {}}
+    @patch("mcp_server.server.client.get_workspace_state", new_callable=AsyncMock)
+    async def test_spec_doc_workflow_renders(self, mock_get_state):
+        mock_get_state.return_value = {"components": {}, "screen": {}}
         res = await spec_doc_workflow("3.2")
         assert isinstance(res, list)
         assert len(res) == 2
@@ -104,5 +104,4 @@ class TestSpecWorkflowPrompt:
         assert res[1]["role"] == "user"
         assert res[1]["content"]["type"] == "resource"
         assert res[1]["content"]["resource"]["uri"] == "tlgp://workspace/state"
-        mock_state_impl.assert_called_once()
-
+        mock_get_state.assert_called_once()

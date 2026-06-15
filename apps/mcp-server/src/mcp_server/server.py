@@ -1,9 +1,6 @@
 """FastMCP server — tools and prompts for the TLGP toolchain.
 
-Exposes two tools (one per underlying package) and one orchestration prompt:
-- launch_annotator  → tlgp-annotation-tool
-- generate_spec_doc → doc-generator
-- spec_doc_workflow → prompt that guides the agent through the full workflow
+Exposes tools for screenshot annotation and .docx specification document generation.
 """
 
 from __future__ import annotations
@@ -13,31 +10,27 @@ import json
 from mcp.server.fastmcp import Context, FastMCP
 from tlgp_logger import get_logger
 
+from mcp_server.client import WorkspaceClient
+from mcp_server.manager import DaemonManager
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT, get_prompt_section
-from mcp_server.tools.daemon_control import (
-    get_daemon_status_impl,
-    kill_daemons_impl,
-    read_daemon_logs_impl,
-    register_exit_handlers,
-    set_workspace_readonly_impl,
-)
-from mcp_server.tools.generate_spec_doc import (
-    generate_spec_doc_impl,
-    write_analysis_json_impl,
-)
-from mcp_server.tools.launch_annotator import launch_annotator_impl
-from mcp_server.tools.workspace_api import (
-    download_image_impl,
-    download_workspace_assets_impl,
-    export_workspace_impl,
-    get_image_bytes_impl,
-    get_workspace_state_impl,
-)
+from mcp_server.services import SpecGeneratorService
 
 logger = get_logger(__name__)
 
 # ============================================================
-# Server instance
+# Core Services & Clients
+# ============================================================
+
+client = WorkspaceClient()
+daemon_manager = DaemonManager()
+spec_service = SpecGeneratorService()
+
+# Automatically clean up daemon processes on program exit
+daemon_manager.register_exit_handlers()
+
+
+# ============================================================
+# Server Instance
 # ============================================================
 
 mcp = FastMCP(
@@ -53,8 +46,6 @@ mcp = FastMCP(
     ),
 )
 
-register_exit_handlers()
-
 
 # ============================================================
 # Resources
@@ -64,14 +55,14 @@ register_exit_handlers()
 @mcp.resource("tlgp://workspace/state")
 async def get_workspace_state_resource() -> str:
     """Read-only access to the latest flat-map JSON WorkspaceState."""
-    state = await get_workspace_state_impl()
+    state = await client.get_workspace_state()
     return json.dumps(state, indent=2, ensure_ascii=False)
 
 
 @mcp.resource("tlgp://workspace/components/{comp_id}/image")
 async def get_component_image_resource(comp_id: str) -> bytes:
     """Fetch the raw image bytes for a specific component from the Engine."""
-    return await get_image_bytes_impl(comp_id)
+    return await client.get_image_bytes(comp_id)
 
 
 @mcp.resource("tlgp://daemons/logs/{daemon_name}")
@@ -81,7 +72,7 @@ def get_daemon_logs_resource(daemon_name: str) -> str:
     Args:
         daemon_name: The daemon name ('engine' or 'gui').
     """
-    res = read_daemon_logs_impl(daemon_name, lines=100)
+    res = daemon_manager.read_daemon_logs(daemon_name, lines=100)
     return res.get("logs", "")
 
 
@@ -101,7 +92,6 @@ def get_spec_classification_guide_resource() -> str:
 def get_spec_example_analysis_resource() -> str:
     """Read-only access to a complete example analysis.json structure."""
     return get_prompt_section("Example: Complete Analysis Dict")
-
 
 
 # ============================================================
@@ -127,7 +117,11 @@ async def launch_annotator(
     Returns:
         dict with engine_pid and gui_pid.
     """
-    return await launch_annotator_impl(screenshot_path, workspace_zip)
+    return await daemon_manager.launch_annotator(
+        screenshot_path=screenshot_path,
+        workspace_zip=workspace_zip,
+        client=client.client,
+    )
 
 
 @mcp.tool()
@@ -137,7 +131,7 @@ async def get_workspace_state() -> dict:
     Use this tool to read the latest annotation hierarchy automatically,
     instead of relying on local JSON files.
     """
-    return await get_workspace_state_impl()
+    return await client.get_workspace_state()
 
 
 @mcp.tool()
@@ -153,7 +147,8 @@ async def download_image(
         comp_id: The component ID (UUID) or "root" (default) for the full screenshot.
         show_children: Whether to overlay annotated child component boxes on the image.
     """
-    return await download_image_impl(comp_id, output_path, show_children)
+    return await client.download_image(comp_id, output_path, show_children)
+
 
 @mcp.tool()
 async def download_workspace_assets(
@@ -176,7 +171,7 @@ async def download_workspace_assets(
         component_ids: Optional list of component UUIDs to download. If not provided, downloads all components.
         show_component_children: Whether to overlay annotated child component boxes on the component images.
     """
-    return await download_workspace_assets_impl(
+    return await client.download_workspace_assets(
         output_dir=output_dir,
         include_state=include_state,
         include_root=include_root,
@@ -199,7 +194,7 @@ async def export_workspace(output_path: str) -> dict:
     Returns:
         dict with status and output_path.
     """
-    return await export_workspace_impl(output_path)
+    return await client.export_workspace(output_path)
 
 
 @mcp.tool()
@@ -213,8 +208,7 @@ async def generate_spec_doc(
     """Generate a TLGP specification document (.docx).
 
     Takes completed analysis data and generates a formatted specification
-    document. The analysis dict must conform to the AnalysisData schema
-    (documented in the create_spec_doc prompt).
+    document. The analysis dict must conform to the AnalysisData schema.
 
     The tool validates all data and image references, generates the .docx,
     and saves analysis.json alongside it for record-keeping.
@@ -234,82 +228,13 @@ async def generate_spec_doc(
     Returns:
         dict with valid, output_path, tables, images, warnings, errors.
     """
-    await ctx.report_progress(10, 100, "Loading and validating analysis data...")
-
-    if analysis_path:
-        try:
-            with open(analysis_path, encoding="utf-8") as f:
-                analysis = json.load(f)
-        except Exception as e:
-            return {
-                "valid": False,
-                "errors": [f"Failed to read analysis_path: {e}"],
-                "warnings": [],
-            }
-
-    if not analysis:
-        return {
-            "valid": False,
-            "errors": ["Either 'analysis' or 'analysis_path' must be provided"],
-            "warnings": [],
-        }
-
-    # If not in validate_only mode, run description elicitation
-    if not validate_only:
-        try:
-            from doc_generator.models import AnalysisData
-            from pydantic import BaseModel, Field
-
-            class ComponentDescription(BaseModel):
-                description: str = Field(..., description="A brief 1-sentence UX description of the component")
-
-            data = AnalysisData.model_validate(analysis)
-            non_leaf = [c for c in data.components if not c.isLeaf]
-
-            updated = False
-            for comp in non_leaf:
-                if not comp.description:
-                    await ctx.report_progress(30, 100, f"Eliciting description for '{comp.label}'...")
-                    await ctx.log("info", f"Eliciting description for component '{comp.label}'...")
-                    try:
-                        result = await ctx.elicit(
-                            message=f"The component '{comp.label}' (id={comp.id}) has an empty description. Please provide a UX description.",
-                            schema=ComponentDescription
-                        )
-                        if result.action == "accept":
-                            comp.description = result.data.description
-                            # Update the dict structure
-                            for c_dict in analysis.get("components", []):
-                                if c_dict.get("id") == comp.id:
-                                    c_dict["description"] = comp.description
-                                    updated = True
-                                    break
-                    except Exception as e:
-                        await ctx.log("error", f"Elicitation failed for component '{comp.label}': {e}")
-
-            if updated and analysis_path:
-                try:
-                    with open(analysis_path, "w", encoding="utf-8") as f:
-                        json.dump(analysis, f, indent=2, ensure_ascii=False)
-                except Exception as e:
-                    await ctx.log("warning", f"Failed to write updated analysis back to {analysis_path}: {e}")
-
-        except Exception:
-            # Let the main generator function handle parsing/validation error output
-            pass
-
-    await ctx.report_progress(60, 100, "Running document generation...")
-
-    result = generate_spec_doc_impl(
+    return await spec_service.generate(
+        ctx=ctx,
         analysis=analysis,
-        analysis_path=None,
+        analysis_path=analysis_path,
         output_path=output_path,
         validate_only=validate_only,
     )
-
-    await ctx.report_progress(100, 100, "Spec generation complete.")
-    return result
-
 
 
 # ============================================================
@@ -330,7 +255,7 @@ async def spec_doc_workflow(section_prefix: str = "1.1") -> list:
     """
     state_json = "{}"
     try:
-        state = await get_workspace_state_impl()
+        state = await client.get_workspace_state()
         state_json = json.dumps(state, indent=2, ensure_ascii=False)
     except Exception:
         pass
@@ -351,7 +276,6 @@ async def spec_doc_workflow(section_prefix: str = "1.1") -> list:
     ]
 
 
-
 @mcp.tool()
 def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
     """Safely write analysis data structure to analysis.json in the export directory.
@@ -360,19 +284,19 @@ def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
         data: Complete analysis data dict.
         filename: Name of the output JSON file (defaults to "analysis.json").
     """
-    return write_analysis_json_impl(data, filename)
+    return spec_service.write_analysis_json(data, filename)
 
 
 @mcp.tool()
 async def get_daemon_status() -> dict:
     """Get status of background annotation tool GUI and engine processes."""
-    return await get_daemon_status_impl()
+    return await daemon_manager.get_status(client=client.client)
 
 
 @mcp.tool()
 def kill_daemons() -> dict:
     """Cleanly terminate all background annotation GUI and engine processes."""
-    return kill_daemons_impl()
+    return daemon_manager.kill_daemons()
 
 
 @mcp.tool()
@@ -383,7 +307,7 @@ def read_daemon_logs(daemon: str = "engine", lines: int = 100) -> dict:
         daemon: The daemon name ('engine' or 'gui').
         lines: Max number of tailing log lines to retrieve (default 100).
     """
-    return read_daemon_logs_impl(daemon, lines)
+    return daemon_manager.read_daemon_logs(daemon, lines)
 
 
 @mcp.tool()
@@ -393,5 +317,4 @@ async def set_workspace_readonly(read_only: bool) -> dict:
     Args:
         read_only: True to lock workspace in read-only mode, False to allow edits.
     """
-    return await set_workspace_readonly_impl(read_only)
-
+    return await client.set_workspace_readonly(read_only)

@@ -1,27 +1,17 @@
-"""Tests for MCP tools: launch_annotator and generate_spec_doc."""
+"""Tests for MCP tools, services, and managers."""
 
 from __future__ import annotations
 
 import io
 import json
 from pathlib import Path
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from mcp_server.tools.daemon_control import (
-    ACTIVE_PROCESSES,
-    ENGINE_LOGS,
-    GUI_LOGS,
-    get_daemon_status_impl,
-    kill_daemons_impl,
-    read_daemon_logs_impl,
-    set_workspace_readonly_impl,
-)
-from mcp_server.tools.generate_spec_doc import (
-    generate_spec_doc_impl,
-    write_analysis_json_impl,
-)
-from mcp_server.tools.launch_annotator import launch_annotator_impl
+from mcp_server.client import WorkspaceClient
+from mcp_server.manager import DaemonManager
+from mcp_server.server import generate_spec_doc
+from mcp_server.services import SpecGeneratorService
 from PIL import Image as PILImage
 
 # ============================================================
@@ -31,7 +21,6 @@ from PIL import Image as PILImage
 
 def _make_png_bytes() -> bytes:
     """Create a valid 1x1 white PNG for image validation tests."""
-
     buf = io.BytesIO()
     PILImage.new("RGB", (1, 1), color=(255, 255, 255)).save(buf, format="PNG")
     return buf.getvalue()
@@ -137,8 +126,9 @@ class TestGenerateSpecDoc:
     def test_valid_generates_docx(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert result["valid"] is True
         assert "output_path" in result
@@ -148,8 +138,9 @@ class TestGenerateSpecDoc:
     def test_validate_only(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
-        result = generate_spec_doc_impl(analysis, validate_only=True)
+        result = service.generate_spec_doc_impl(analysis, validate_only=True)
 
         assert result["valid"] is True
         assert "output_path" not in result
@@ -160,24 +151,27 @@ class TestGenerateSpecDoc:
         assert result["images"] >= 1
 
     def test_schema_validation_failure(self):
-        result = generate_spec_doc_impl({"sectionPrefix": "1.1"})
+        service = SpecGeneratorService()
+        result = service.generate_spec_doc_impl({"sectionPrefix": "1.1"})
 
         assert result["valid"] is False
         assert len(result["errors"]) > 0
 
     def test_invalid_analysis_type(self):
-        result = generate_spec_doc_impl({"components": "not_a_list"})
+        service = SpecGeneratorService()
+        result = service.generate_spec_doc_impl({"components": "not_a_list"})
 
         assert result["valid"] is False
 
     def test_missing_image_is_error(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
         # Remove the component image
         (screen_dir / f"{screen_dir.name}_1_annotated.png").unlink()
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert result["valid"] is False
         assert any("image not found" in e for e in result["errors"])
@@ -185,11 +179,12 @@ class TestGenerateSpecDoc:
     def test_missing_screen_image_is_error(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
         # Remove the screen image
         (screen_dir / f"{screen_dir.name}_annotated.png").unlink()
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert result["valid"] is False
         assert any("Screen image not found" in e for e in result["errors"])
@@ -197,12 +192,13 @@ class TestGenerateSpecDoc:
     def test_warnings_for_empty_fields(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
         # Clear some fields to trigger warnings
         analysis["components"][0]["children"][0]["controlType"] = ""
         analysis["components"][0]["description"] = ""
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert result["valid"] is True
         assert len(result["warnings"]) > 0
@@ -210,8 +206,9 @@ class TestGenerateSpecDoc:
     def test_no_apis_warning(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert any("No APIs defined" in w for w in result["warnings"])
 
@@ -225,8 +222,9 @@ class TestGenerateSpecDoc:
                 "codeObservation": "No handler",
             },
         ]
+        service = SpecGeneratorService()
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert result["valid"] is True
         assert any("Discrepancy" in w for w in result["warnings"])
@@ -234,9 +232,10 @@ class TestGenerateSpecDoc:
     def test_custom_output_path(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
         custom_out = tmp_path / "custom_output.docx"
-        result = generate_spec_doc_impl(analysis, output_path=str(custom_out))
+        result = service.generate_spec_doc_impl(analysis, output_path=str(custom_out))
 
         assert result["valid"] is True
         assert result["output_path"] == str(custom_out)
@@ -245,8 +244,9 @@ class TestGenerateSpecDoc:
     def test_analysis_json_side_effect(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
-        generate_spec_doc_impl(analysis)
+        service.generate_spec_doc_impl(analysis)
 
         analysis_json = screen_dir / "analysis.json"
         assert analysis_json.exists()
@@ -256,22 +256,26 @@ class TestGenerateSpecDoc:
     def test_no_message_in_response(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert "message" not in result
         assert result["valid"] is True
 
     def test_nonexistent_export_dir(self, tmp_path):
         analysis = _build_analysis(tmp_path / "nonexistent")
+        service = SpecGeneratorService()
 
-        result = generate_spec_doc_impl(analysis)
+        result = service.generate_spec_doc_impl(analysis)
 
         assert result["valid"] is False
 
-    def test_generate_with_analysis_path(self, tmp_path):
+    @pytest.mark.anyio
+    async def test_generate_with_analysis_path(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        service = SpecGeneratorService()
 
         # Write analysis to file
         analysis_json_file = tmp_path / "test_analysis.json"
@@ -279,13 +283,15 @@ class TestGenerateSpecDoc:
             json.dumps(analysis, ensure_ascii=False), encoding="utf-8"
         )
 
-        result = generate_spec_doc_impl(analysis_path=str(analysis_json_file))
+        result = await service.generate(analysis_path=str(analysis_json_file))
 
         assert result["valid"] is True
         assert Path(result["output_path"]).exists()
 
-    def test_analysis_path_does_not_exist(self):
-        result = generate_spec_doc_impl(analysis_path="nonexistent_file.json")
+    @pytest.mark.anyio
+    async def test_analysis_path_does_not_exist(self):
+        service = SpecGeneratorService()
+        result = await service.generate(analysis_path="nonexistent_file.json")
 
         assert result["valid"] is False
         assert "Failed to read analysis_path" in result["errors"][0]
@@ -297,15 +303,14 @@ class TestGenerateSpecDoc:
 class TestLaunchAnnotator:
     @pytest.mark.anyio
     async def test_launch_annotator_success(self, tmp_path, monkeypatch):
-
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
         monkeypatch.setattr(
-            "mcp_server.tools.launch_annotator.subprocess.Popen",
+            "mcp_server.manager.subprocess.Popen",
             mock_popen,
         )
         monkeypatch.setattr(
-            "mcp_server.tools.launch_annotator.shutil.which",
+            "mcp_server.manager.shutil.which",
             lambda name: "/usr/local/bin/uv",
         )
 
@@ -325,7 +330,7 @@ class TestLaunchAnnotator:
                 return mock_res
 
         monkeypatch.setattr(
-            "mcp_server.tools.launch_annotator.httpx.AsyncClient",
+            "mcp_server.manager.httpx.AsyncClient",
             MockAsyncClient,
         )
 
@@ -333,7 +338,8 @@ class TestLaunchAnnotator:
         screenshot = tmp_path / "test.png"
         screenshot.write_bytes(b"dummy")
 
-        result = await launch_annotator_impl(screenshot_path=str(screenshot))
+        manager = DaemonManager()
+        result = await manager.launch_annotator(screenshot_path=str(screenshot))
         assert result["engine_pid"] == 12345
         assert result["gui_pid"] == 12345
         assert result["engine_ready"] is True
@@ -348,12 +354,13 @@ class TestLaunchAnnotator:
     @pytest.mark.anyio
     async def test_raises_when_uv_not_found(self, tmp_path, monkeypatch):
         monkeypatch.setattr(
-            "mcp_server.tools.launch_annotator.shutil.which",
+            "mcp_server.manager.shutil.which",
             lambda name: None,
         )
 
+        manager = DaemonManager()
         with pytest.raises(RuntimeError, match="uv is not installed"):
-            await launch_annotator_impl(screenshot_path=str(tmp_path / "out"))
+            await manager.launch_annotator(screenshot_path=str(tmp_path / "out"))
 
 
 class TestWriteAnalysisJson:
@@ -362,7 +369,8 @@ class TestWriteAnalysisJson:
         export_dir.mkdir()
         data = {"exportDir": str(export_dir), "test": "data"}
 
-        res = write_analysis_json_impl(data, "test.json")
+        service = SpecGeneratorService()
+        res = service.write_analysis_json(data, "test.json")
         assert res["success"] is True
         assert "analysis_path" in res
 
@@ -371,12 +379,14 @@ class TestWriteAnalysisJson:
         assert json.loads(filepath.read_text(encoding="utf-8")) == data
 
     def test_missing_export_dir(self):
-        res = write_analysis_json_impl({"test": "data"})
+        service = SpecGeneratorService()
+        res = service.write_analysis_json({"test": "data"})
         assert res["success"] is False
         assert "Missing 'exportDir'" in res["error"]
 
     def test_invalid_export_dir(self):
-        res = write_analysis_json_impl({"exportDir": "nonexistent_dir"})
+        service = SpecGeneratorService()
+        res = service.write_analysis_json({"exportDir": "nonexistent_dir"})
         assert res["success"] is False
         assert "not a valid directory" in res["error"]
 
@@ -384,7 +394,8 @@ class TestWriteAnalysisJson:
 class TestDaemonControl:
     @pytest.mark.anyio
     async def test_get_daemon_status(self, monkeypatch):
-        ACTIVE_PROCESSES.clear()
+        manager = DaemonManager()
+        manager.active_processes.clear()
 
         class MockAsyncClient:
             async def __aenter__(self):
@@ -398,18 +409,19 @@ class TestDaemonControl:
 
         monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
 
-        status = await get_daemon_status_impl()
+        status = await manager.get_status()
         assert status["engine"]["running"] is True
         assert status["gui"]["running"] is False
 
     def test_read_daemon_logs(self):
-        ENGINE_LOGS.clear()
-        GUI_LOGS.clear()
+        manager = DaemonManager()
+        manager.engine_logs.clear()
+        manager.gui_logs.clear()
 
-        ENGINE_LOGS.append("line1\n")
-        ENGINE_LOGS.append("line2\n")
+        manager.engine_logs.append("line1\n")
+        manager.engine_logs.append("line2\n")
 
-        res = read_daemon_logs_impl("engine", lines=1)
+        res = manager.read_daemon_logs("engine", lines=1)
         assert res["daemon"] == "engine"
         assert res["line_count"] == 1
         assert res["logs"] == "line2\n"
@@ -419,13 +431,14 @@ class TestDaemonControl:
         mock_proc.poll.return_value = None
         mock_proc.pid = 12345
 
-        ACTIVE_PROCESSES.clear()
-        ACTIVE_PROCESSES.append(mock_proc)
+        manager = DaemonManager()
+        manager.active_processes.clear()
+        manager.active_processes.append(mock_proc)
 
-        res = kill_daemons_impl()
+        res = manager.kill_daemons()
         assert res["status"] == "success"
         assert 12345 in res["terminated_pids"]
-        assert len(ACTIVE_PROCESSES) == 0
+        assert len(manager.active_processes) == 0
         assert mock_proc.terminate.call_count == 1
 
     @pytest.mark.anyio
@@ -435,7 +448,8 @@ class TestDaemonControl:
                 return self
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
-            async def put(self, url, *args, **kwargs):
+            async def request(self, method, url, *args, **kwargs):
+                assert method == "PUT"
                 mock_res = MagicMock()
                 mock_res.status_code = 200
                 json_data = kwargs.get("json", {})
@@ -444,7 +458,8 @@ class TestDaemonControl:
 
         monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
 
-        res = await set_workspace_readonly_impl(True)
+        client = WorkspaceClient()
+        res = await client.set_workspace_readonly(True)
         assert res["status"] == "success"
         assert res["read_only"] is True
 
@@ -452,10 +467,6 @@ class TestDaemonControl:
 class TestGenerateSpecDocWrapper:
     @pytest.mark.anyio
     async def test_generate_spec_doc_progress_and_elicitation(self, tmp_path):
-        from unittest.mock import AsyncMock
-
-        from mcp_server.server import generate_spec_doc
-
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
 
@@ -496,5 +507,3 @@ class TestGenerateSpecDocWrapper:
         assert analysis_json.exists()
         saved = json.loads(analysis_json.read_text(encoding="utf-8"))
         assert saved["components"][0]["description"] == "Elicited Header Description"
-
-

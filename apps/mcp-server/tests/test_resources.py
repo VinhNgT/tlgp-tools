@@ -17,32 +17,32 @@ from mcp_server.server import (
 
 class TestMcpResources:
     @pytest.mark.anyio
-    @patch("mcp_server.server.get_workspace_state_impl", new_callable=AsyncMock)
-    async def test_get_workspace_state_resource(self, mock_state_impl):
+    @patch("mcp_server.server.client.get_workspace_state", new_callable=AsyncMock)
+    async def test_get_workspace_state_resource(self, mock_get_state):
         mock_state = {"components": {}, "screen": {}}
-        mock_state_impl.return_value = mock_state
+        mock_get_state.return_value = mock_state
 
         result = await get_workspace_state_resource()
         assert "components" in result
         assert "screen" in result
-        mock_state_impl.assert_called_once()
+        mock_get_state.assert_called_once()
 
     @pytest.mark.anyio
-    @patch("mcp_server.server.get_image_bytes_impl", new_callable=AsyncMock)
-    async def test_get_component_image_resource(self, mock_image_impl):
-        mock_image_impl.return_value = b"image_bytes"
+    @patch("mcp_server.server.client.get_image_bytes", new_callable=AsyncMock)
+    async def test_get_component_image_resource(self, mock_image_bytes):
+        mock_image_bytes.return_value = b"image_bytes"
 
         result = await get_component_image_resource("comp_123")
         assert result == b"image_bytes"
-        mock_image_impl.assert_called_once_with("comp_123")
+        mock_image_bytes.assert_called_once_with("comp_123")
 
-    @patch("mcp_server.server.read_daemon_logs_impl")
-    def test_get_daemon_logs_resource(self, mock_logs_impl):
-        mock_logs_impl.return_value = {"logs": "log line 1\nlog line 2\n"}
+    @patch("mcp_server.server.daemon_manager.read_daemon_logs")
+    def test_get_daemon_logs_resource(self, mock_read_logs):
+        mock_read_logs.return_value = {"logs": "log line 1\nlog line 2\n"}
 
         result = get_daemon_logs_resource("engine")
         assert "log line 1" in result
-        mock_logs_impl.assert_called_once_with("engine", lines=100)
+        mock_read_logs.assert_called_once_with("engine", lines=100)
 
     def test_get_spec_schema_resource(self):
         result = get_spec_schema_resource()
@@ -58,4 +58,3 @@ class TestMcpResources:
         result = get_spec_example_analysis_resource()
         assert "Example" in result
         assert "Chi tiết sản phẩm" in result
-
