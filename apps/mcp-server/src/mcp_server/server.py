@@ -12,7 +12,11 @@ from tlgp_logger import get_logger
 
 from mcp_server.client import WorkspaceClient
 from mcp_server.manager import DaemonManager
-from mcp_server.prompts import get_prompt_section, get_spec_workflow_prompt
+from mcp_server.prompts import (
+    get_prompt_section,
+    get_spec_workflow_prompt,
+    get_strict_guidelines_content,
+)
 from mcp_server.services import SpecGeneratorService
 
 logger = get_logger(__name__)
@@ -60,13 +64,9 @@ mcp = FastMCP(
     instructions=(
         "TLGP Tools MCP server. Provides tools for annotating screenshots and compiling .docx specification documents.\n\n"
         "SYSTEM DIRECTIVES & BOUNDARIES:\n"
-        "1. STRICT ENGINE READ-ONLY MODE: You are strictly prohibited from mutating the Engine state directly (e.g. creating, moving, updating, deleting components, or undoing/redoing actions). All state changes must be performed by the user in the GUI.\n"
-        "2. NO REST API DIRECT BYPASS: Do NOT bypass the MCP server layer (e.g., using curl, terminal/shell commands, or custom Python scripts) to interact directly with the running Engine REST API.\n"
-        "3. VIETNAMESE LANGUAGE REQUIREMENT: All user-facing UI labels, component descriptions, screen descriptions, actions, reactions, and discrepancies written to the analysis data structure MUST be in Vietnamese.\n"
-        "4. PARAMETER PAYLOAD LIMITATION: Direct 'analysis' dictionary arguments to 'generate_spec_doc' must not exceed 10KB to prevent JSON-RPC transport corruption. For larger payloads, save the data using the 'write_analysis_json' tool first, and pass the resulting absolute path via 'analysis_path'.\n"
-        "5. STRICT VALIDATION PIPELINE: Always run 'generate_spec_doc(validate_only=True)' and review/resolve all validation warnings and errors before calling the tool with 'validate_only=False'.\n"
-        "6. ANALYSIS JSON RECORD-KEEPING: When compiling a specification document (validate_only=False), the tool automatically saves the final analysis JSON data as 'analysis.json' in the same directory as the generated '.docx' file.\n"
-        "7. REFERENCE GUIDES & DATA: Prior to performing any analysis or constructing parameters, read the resource guides:\n"
+        f"{get_strict_guidelines_content()}\n\n"
+        "REQUIRED REFERENCE GUIDES & DATA:\n"
+        "Prior to performing any analysis or constructing parameters, read the resource guides:\n"
         "   - 'tlgp://spec/schema' (JSON Schema structure)\n"
         "   - 'tlgp://spec/classification-guide' (UI Control type rules)\n"
         "   - 'tlgp://spec/example-analysis' (Complete example analysis data structure)\n"

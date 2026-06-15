@@ -8,7 +8,7 @@ Every field maps to a specific location in the generated .docx document.
 |---|---|---|
 | `sectionPrefix` | `str` | Section number prefix for component headings (e.g., "1.1") |
 | `exportDir` | `str` | Absolute path to the annotation export directory |
-| `components` | `list[Component]` | All annotated components |
+| `components` | `list[Component]` | All annotated components. Must be sorted in post-order DFS sequence (child components first, parent components later) |
 | `screen` | `Screen` | Screen-level metadata |
 | `apis` | `list[Api]` | API documentation from codebase analysis |
 | `discrepancies` | `list[Discrepancy]` | Conflicts between screenshots and code |
@@ -20,7 +20,7 @@ Every field maps to a specific location in the generated .docx document.
 | `id` | `int` | Sequential annotation box ID |
 | `label` | `str` | Component name (from annotation label) |
 | `description` | `str` | Vietnamese description of the component's purpose |
-| `isLeaf` | `bool` | True if component has no children |
+| `isLeaf` | `bool` | True if component has no children. Every single non-leaf box in the workspace state must have an entry in components with isLeaf set to false |
 | `imageFile` | `str?` | Filename of the component annotated image (e.g. `<uuid>.png`) |
 | `children` | `list[ChildElement]` | UI elements inside this component |
 | `interactions` | `list[Interaction]` | User action / system reaction pairs |

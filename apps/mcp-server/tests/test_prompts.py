@@ -5,7 +5,7 @@ from __future__ import annotations
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from mcp_server.prompts import get_spec_workflow_prompt
+from mcp_server.prompts import get_spec_workflow_prompt, get_strict_guidelines_content
 from mcp_server.server import spec_doc_workflow
 
 SPEC_WORKFLOW_PROMPT = ""
@@ -83,6 +83,27 @@ class TestSpecWorkflowPrompt:
     def test_validate_only_documented(self):
         assert "validate_only" in SPEC_WORKFLOW_PROMPT
 
+    def test_children_annotations_documented(self):
+        assert "show_root_children=True" in SPEC_WORKFLOW_PROMPT
+        assert "show_component_children=True" in SPEC_WORKFLOW_PROMPT
+        assert "show_root_children=False" in SPEC_WORKFLOW_PROMPT
+        assert "show_component_children=False" in SPEC_WORKFLOW_PROMPT
+        assert "children annotations" in SPEC_WORKFLOW_PROMPT.lower()
+
+    def test_dfs_ordering_documented(self):
+        assert "dfs" in SPEC_WORKFLOW_PROMPT.lower()
+        assert "depth-first search" in SPEC_WORKFLOW_PROMPT.lower()
+
+    def test_non_leaf_completeness_documented(self):
+        assert "non-leaf box" in SPEC_WORKFLOW_PROMPT.lower()
+        assert "isleaf" in SPEC_WORKFLOW_PROMPT.lower()
+        assert "false" in SPEC_WORKFLOW_PROMPT.lower()
+
+    def test_leaf_components_analysis_documented(self):
+        assert "leaf component" in SPEC_WORKFLOW_PROMPT.lower()
+        assert "isleaf" in SPEC_WORKFLOW_PROMPT.lower()
+        assert "true" in SPEC_WORKFLOW_PROMPT.lower()
+
     def test_no_external_service_references(self):
         assert "createDocument" not in SPEC_WORKFLOW_PROMPT
         assert "insertTable" not in SPEC_WORKFLOW_PROMPT
@@ -101,3 +122,16 @@ class TestSpecWorkflowPrompt:
         assert res[1]["content"]["type"] == "resource"
         assert res[1]["content"]["resource"]["uri"] == "tlgp://workspace/state"
         mock_client.get_workspace_state.assert_called_once()
+
+
+class TestStrictGuidelines:
+    def test_get_strict_guidelines_content(self):
+        content = get_strict_guidelines_content()
+        assert isinstance(content, str)
+        assert len(content) > 100
+        assert "Vietnamese Translation Rule" in content
+        assert "Strict Read-Only Mode" in content
+        assert "DFS Document Ordering" in content
+        assert "Children Annotations Overlay" in content
+        assert "Leaf Components" in content
+

@@ -44,9 +44,16 @@ _ANNOTATION_JSON_EXAMPLE = """\
 }"""
 
 
+def get_strict_guidelines_content() -> str:
+    """Read the consolidated strict guidelines from markdown."""
+    return (_PROMPT_DIR / "strict_guidelines.md").read_text(encoding="utf-8").strip()
+
+
 def _build_prompt() -> str:
     """Load the prompt markdown containing workflow instructions."""
-    return (_PROMPT_DIR / "spec_workflow.md").read_text(encoding="utf-8").strip()
+    workflow = (_PROMPT_DIR / "spec_workflow.md").read_text(encoding="utf-8")
+    guidelines = get_strict_guidelines_content()
+    return workflow.replace("{strict_guidelines}", guidelines).strip()
 
 
 def get_spec_workflow_prompt() -> str:
