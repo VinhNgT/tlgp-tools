@@ -23,16 +23,44 @@ def shift_descendants(state: WorkspaceState, comp_id: uuid.UUID, dx: int, dy: in
             shift_descendants(state, child_id, dx, dy)
 
 
+class ClientConnection:
+    """Wraps a WebSocket to decouple network I/O from state mutation locks via an asyncio.Queue."""
+    def __init__(self, websocket: WebSocket):
+        self.websocket = websocket
+        self.queue = asyncio.Queue(maxsize=10000)
+        self.task = asyncio.create_task(self._worker())
+        
+    async def _worker(self):
+        while True:
+            try:
+                msg = await self.queue.get()
+                await self.websocket.send_json(msg)
+                self.queue.task_done()
+            except Exception:
+                # If network fails, the API layer will handle the WebSocketDisconnect exception
+                # on the receive loop and call workspace.disconnect(), which will cancel this task.
+                break
+                
+    def send_msg(self, msg: dict):
+        try:
+            self.queue.put_nowait(msg)
+        except asyncio.QueueFull:
+            pass # Drop message if client is too slow to avoid OOM
+            
+    def cancel(self):
+        self.task.cancel()
+
+
 class WorkspaceManager:
     """
     In-memory state manager for the annotation engine.
     Holds the single source of truth WorkspaceState, computes JSON Patches
-    upon mutation, and broadcasts them to all connected WebSocket clients.
+    upon mutation, and broadcasts them to all connected WebSocket clients via queues.
     """
 
     def __init__(self):
         self._state = WorkspaceState(sessionId=uuid.uuid4())
-        self._clients: list[WebSocket] = []
+        self._clients: list[ClientConnection] = []
         self._lock = asyncio.Lock()
         self.raw_image_bytes: bytes = b""
         self._history: list[dict] = []
@@ -50,27 +78,28 @@ class WorkspaceManager:
         self._history.append(self._state.model_dump(mode="json"))
         self._pointer += 1
 
-    async def connect(self, websocket: WebSocket):
+    async def connect(self, websocket: WebSocket) -> ClientConnection:
         await websocket.accept()
-        self._clients.append(websocket)
+        conn = ClientConnection(websocket)
+        self._clients.append(conn)
         # Send the full state immediately upon connection
-        await websocket.send_json(
+        conn.send_msg(
             {"type": "full_sync", "state": self._state.model_dump(mode="json")}
         )
+        return conn
 
     def disconnect(self, websocket: WebSocket):
-        if websocket in self._clients:
-            self._clients.remove(websocket)
+        for conn in list(self._clients):
+            if conn.websocket == websocket:
+                conn.cancel()
+                self._clients.remove(conn)
 
-    async def broadcast_patch(self, patch: list):
+    def broadcast_patch(self, patch: list):
         if not patch:
             return
         msg = {"type": "patch", "revision": self._state.revision, "patch": patch}
         for client in self._clients:
-            try:
-                await client.send_json(msg)
-            except Exception:
-                pass
+            client.send_msg(msg)
 
     async def mutate(self, mutation_fn: Callable[[WorkspaceState], None]):
         """
@@ -94,15 +123,12 @@ class WorkspaceManager:
 
                 # Broadcast full sync since sessionId changed
                 for client in list(self._clients):
-                    try:
-                        await client.send_json(
-                            {
-                                "type": "full_sync",
-                                "state": self._state.model_dump(mode="json"),
-                            }
-                        )
-                    except Exception:
-                        pass
+                    client.send_msg(
+                        {
+                            "type": "full_sync",
+                            "state": self._state.model_dump(mode="json"),
+                        }
+                    )
                 return
 
             # Increment OCC revision integer
@@ -117,7 +143,7 @@ class WorkspaceManager:
             patch = jsonpatch.make_patch(old_dict, new_dict).patch
 
             # Broadcast the deltas
-            await self.broadcast_patch(patch)
+            self.broadcast_patch(patch)
 
     async def undo(self) -> bool:
         async with self._lock:
@@ -129,7 +155,7 @@ class WorkspaceManager:
                 self._state.revision += 1
                 new_dict = self._state.model_dump(mode="json")
                 patch = jsonpatch.make_patch(old_dict, new_dict).patch
-                await self.broadcast_patch(patch)
+                self.broadcast_patch(patch)
                 return True
             return False
 
@@ -143,7 +169,7 @@ class WorkspaceManager:
                 self._state.revision += 1
                 new_dict = self._state.model_dump(mode="json")
                 patch = jsonpatch.make_patch(old_dict, new_dict).patch
-                await self.broadcast_patch(patch)
+                self.broadcast_patch(patch)
                 return True
             return False
 

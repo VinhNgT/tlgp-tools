@@ -205,7 +205,7 @@ class MockAppWindow:
             self.breadcrumbs_text = "Root"
 
     def set_canvas_image(self, img):
-        pass
+        self.canvas.canvas_image = img
 
     def set_ui_interactive(self, enabled: bool):
         pass
@@ -270,6 +270,7 @@ class MockDialogService(DialogService):
 class MockEngineClient:
     def __init__(self):
         self.state = None
+        self.api_url = "http://mock_url"
         self.on_state_changed = None
         self.on_error = None
         self.imported_zip = None
@@ -661,3 +662,45 @@ def test_controller_context_menu_generation():
     assert "Delete (Delete)" in labels
     assert "Focus Target" in labels
     assert "Toggle Labels (T)" in labels
+
+def test_controller_state_sync_triggers_updates():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+    dialogs = MockDialogService()
+
+    controller = AppController(client, store, view, dialogs)
+
+    # Provide an initial state with an image payload
+    session_id = uuid4()
+    ws = WorkspaceState(
+        sessionId=session_id,
+        image=ImageInfo(filename="test.png", width=1000, height=1000),
+        components={}
+    )
+
+    client.state = ws
+
+    # Simulate API client triggering the callback
+    controller._on_state_sync_received()
+
+    # Verify Store Updated
+    assert store.state.workspace_state == ws
+
+    # Verify Canvas updated (via store subscription)
+    assert view.canvas.canvas_workspace_state == ws
+
+    # Verify loaded session id is tracked
+    assert controller._loaded_session_id == str(session_id)
+
+    # Verify image fetching triggered (because image is set but canvas image was none)
+    # The mock client returns a dummy image byte array in get_raw_image_data
+    assert view.canvas.canvas_image is not None
+    assert view.canvas.canvas_image.width == 10  # Mock returns 10x10 image
+
+    # Null state handling (disconnect)
+    client.state = None
+    controller._on_state_sync_received()
+
+    assert store.state.workspace_state is None
+    assert controller._loaded_session_id is None

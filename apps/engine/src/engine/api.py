@@ -287,7 +287,7 @@ async def websocket_endpoint(
     Allows executing mutations via JSON-RPC 2.0 messages over the connection.
     """
     logger.info("WebSocket client connected")
-    await workspace.connect(websocket)
+    conn = await workspace.connect(websocket)
     try:
         while True:
             data_str = await websocket.receive_text()
@@ -295,7 +295,7 @@ async def websocket_endpoint(
                 rpc_req = json.loads(data_str)
             except json.JSONDecodeError as e:
                 logger.error("Failed to parse WebSocket text as JSON", error=str(e))
-                await websocket.send_json(
+                conn.send_msg(
                     {
                         "jsonrpc": "2.0",
                         "error": {"code": -32700, "message": "Parse error"},
@@ -313,7 +313,7 @@ async def websocket_endpoint(
 
             try:
                 result = await handle_json_rpc(method, params, workspace)
-                await websocket.send_json(
+                conn.send_msg(
                     {"jsonrpc": "2.0", "result": result, "id": req_id}
                 )
             except Exception as e:
@@ -322,7 +322,7 @@ async def websocket_endpoint(
                 )
                 error_msg = getattr(e, "message", str(e))
                 error_details = getattr(e, "details", None)
-                await websocket.send_json(
+                conn.send_msg(
                     {
                         "jsonrpc": "2.0",
                         "error": {
@@ -333,7 +333,7 @@ async def websocket_endpoint(
                         "id": req_id,
                     }
                 )
-                await websocket.send_json(
+                conn.send_msg(
                     {
                         "type": "full_sync",
                         "state": workspace.state.model_dump(mode="json"),
