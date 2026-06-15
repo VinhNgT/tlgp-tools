@@ -47,6 +47,12 @@ class GestureHandler(Protocol):
 
     def on_right_click(self, canvas: Any, event: Any, cx: float, cy: float) -> None: ...
 
+    def on_middle_click(self, canvas: Any, event: Any) -> None: ...
+
+    def on_middle_drag(self, canvas: Any, event: Any) -> None: ...
+
+    def on_middle_release(self, canvas: Any, event: Any, cx: float, cy: float) -> None: ...
+
     def on_control_click(
         self, canvas: Any, event: Any, cx: float, cy: float
     ) -> None: ...
@@ -180,8 +186,16 @@ class AnnotationCanvasView(tk.Canvas):
         self.bind("<Motion>", self.on_mouse_move)
         self.bind("<Configure>", self.on_canvas_resize)
 
-        self.bind("<Button-2>", self.on_right_click)
-        self.bind("<Button-3>", self.on_right_click)
+        if self.tk.call("tk", "windowingsystem") == "aqua":
+            self.bind("<Button-2>", self.on_right_click)
+            self.bind("<Button-3>", self.on_middle_click)
+            self.bind("<B3-Motion>", self.on_middle_drag)
+            self.bind("<ButtonRelease-3>", self.on_middle_release)
+        else:
+            self.bind("<Button-3>", self.on_right_click)
+            self.bind("<Button-2>", self.on_middle_click)
+            self.bind("<B2-Motion>", self.on_middle_drag)
+            self.bind("<ButtonRelease-2>", self.on_middle_release)
 
         self.bind("<Control-Button-1>", self._on_control_click)
         self.bind("<MouseWheel>", self._on_scroll)
@@ -845,6 +859,18 @@ class AnnotationCanvasView(tk.Canvas):
         cx = self.canvasx(event.x)
         cy = self.canvasy(event.y)
         self.gestures.on_right_click(self, event, cx, cy)
+
+    def on_middle_click(self, event):
+        self.focus_set()
+        self.gestures.on_middle_click(self, event)
+
+    def on_middle_drag(self, event):
+        self.gestures.on_middle_drag(self, event)
+
+    def on_middle_release(self, event):
+        cx = self.canvasx(event.x)
+        cy = self.canvasy(event.y)
+        self.gestures.on_middle_release(self, event, cx, cy)
 
     def _on_control_click(self, event):
         cx = self.canvasx(event.x)

@@ -80,6 +80,9 @@ class MockCanvasContext:
     def draw_boxes(self):
         pass
 
+    def is_effectively_locked(self, box) -> bool:
+        return False
+
     def set_selection(self, boxes):
         self._selection = boxes
         self.store.update_state(
@@ -126,14 +129,18 @@ class MockCanvasContext:
 
 
 def test_hit_box_empty():
+    store = UIStateStore()
+    canvas = MockCanvasContext(store)
     transformer = ViewportTransformer()
     gestures = GestureInterpreter(transformer)
 
-    hit = gestures.hit_box(100.0, 100.0, [], [], 1.0, [], [], (0.0, 0.0))
+    hit = gestures.hit_box(canvas, 100.0, 100.0, [], [], 1.0, [], [], (0.0, 0.0))
     assert hit is None
 
 
 def test_hit_box_contains_pointer():
+    store = UIStateStore()
+    canvas = MockCanvasContext(store)
     transformer = ViewportTransformer()
     transformer.update_image_size(1000, 1000)
     transformer.rebuild_segments([])
@@ -149,16 +156,18 @@ def test_hit_box_contains_pointer():
     )
 
     # Pointer is inside bounds (zoom=1.0)
-    hit = gestures.hit_box(100.0, 100.0, [comp], [], 1.0, [], [], (0.0, 0.0))
+    hit = gestures.hit_box(canvas, 100.0, 100.0, [comp], [], 1.0, [], [], (0.0, 0.0))
     assert hit is not None
     assert hit.id == comp.id
 
     # Pointer is outside bounds (zoom=1.0)
-    hit_outside = gestures.hit_box(200.0, 200.0, [comp], [], 1.0, [], [], (0.0, 0.0))
+    hit_outside = gestures.hit_box(canvas, 200.0, 200.0, [comp], [], 1.0, [], [], (0.0, 0.0))
     assert hit_outside is None
 
 
 def test_hit_handle_when_selected():
+    store = UIStateStore()
+    canvas = MockCanvasContext(store)
     transformer = ViewportTransformer()
     transformer.update_image_size(1000, 1000)
     transformer.rebuild_segments([])
@@ -176,15 +185,15 @@ def test_hit_handle_when_selected():
     )
 
     # NW handle is at (50, 50). Let's test close to it: (51.0, 51.0)
-    handle = gestures.hit_handle(51.0, 51.0, [comp], 1.0, [], [], (0.0, 0.0))
+    handle = gestures.hit_handle(canvas, 51.0, 51.0, [comp], 1.0, [], [], (0.0, 0.0))
     assert handle == "nw"
 
     # NE handle is at (150, 50). Close to it: (149.0, 50.0)
-    handle_ne = gestures.hit_handle(149.0, 50.0, [comp], 1.0, [], [], (0.0, 0.0))
+    handle_ne = gestures.hit_handle(canvas, 149.0, 50.0, [comp], 1.0, [], [], (0.0, 0.0))
     assert handle_ne == "ne"
 
     # Far away -> no handle hit
-    handle_none = gestures.hit_handle(100.0, 75.0, [comp], 1.0, [], [], (0.0, 0.0))
+    handle_none = gestures.hit_handle(canvas, 100.0, 75.0, [comp], 1.0, [], [], (0.0, 0.0))
     assert handle_none is None
 
 
@@ -451,22 +460,22 @@ def test_gesture_on_scroll_vertical_and_horizontal():
 
     # Vertical mouse wheel scroll (delta=120)
     gestures.on_scroll(canvas, MockEvent(delta=120))
-    assert store.state.pan_offset == (0.0, -120.0)
+    assert store.state.pan_offset == (0.0, 120.0)
 
     # Horizontal mouse wheel scroll (Shift + delta=120)
     store.update_state("viewport", pan_offset=(0.0, 0.0))
     gestures.on_scroll(canvas, MockEvent(delta=120, state=0x0001))  # Shift
-    assert store.state.pan_offset == (-120.0, 0.0)
+    assert store.state.pan_offset == (120.0, 0.0)
 
     # Linux scroll up (Button-4)
     store.update_state("viewport", pan_offset=(0.0, 0.0))
     gestures.on_scroll(canvas, MockEvent(num=4))
-    assert store.state.pan_offset == (0.0, -40.0)
+    assert store.state.pan_offset == (0.0, 40.0)
 
     # Linux scroll down (Button-5)
     store.update_state("viewport", pan_offset=(0.0, 0.0))
     gestures.on_scroll(canvas, MockEvent(num=5))
-    assert store.state.pan_offset == (0.0, 40.0)
+    assert store.state.pan_offset == (0.0, -40.0)
 
 
 def test_gesture_on_scroll_zoom():
@@ -531,3 +540,33 @@ def test_gesture_on_touchpad_scroll():
     res_zoom = gestures.on_touchpad_scroll(canvas, event_zoom)
     assert res_zoom == "break"
     assert store.state.zoom_factor == pytest.approx(1.1)
+
+
+def test_middle_mouse_dragging():
+    store = UIStateStore()
+    transformer = ViewportTransformer()
+    transformer.update_image_size(1000, 1000)
+    gestures = GestureInterpreter(transformer)
+
+    canvas = MockCanvasContext(store)
+    store.update_state("viewport", zoom_factor=1.0, pan_offset=(0.0, 0.0))
+
+    class MockEvent:
+        def __init__(self, x, y):
+            self.x = x
+            self.y = y
+
+    # Press middle mouse at (100, 100)
+    gestures.on_middle_click(canvas, MockEvent(100, 100))
+    assert gestures.space_panning is True
+    assert gestures.pan_start_mouse == (100, 100)
+    assert gestures.pan_start_offset == (0.0, 0.0)
+    assert canvas.cursor_name == "pan_active"
+
+    # Drag to (150, 200) -> pan_offset should change by (+50, +100)
+    gestures.on_middle_drag(canvas, MockEvent(150, 200))
+    assert store.state.pan_offset == (50.0, 100.0)
+
+    # Release middle mouse
+    gestures.on_middle_release(canvas, MockEvent(150, 200), 150.0, 200.0)
+    assert gestures.space_panning is False

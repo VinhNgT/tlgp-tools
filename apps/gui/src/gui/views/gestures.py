@@ -824,6 +824,36 @@ class GestureInterpreter:
 
         canvas.set_cursor("default")
 
+    def on_middle_click(self, canvas: Any, event):
+        """Initiates viewport space panning via middle mouse press."""
+        if not canvas.full_pil_img:
+            return
+        self.space_panning = True
+        self.pan_start_mouse = (event.x, event.y)
+        self.pan_start_offset = canvas.pan_offset
+        canvas.set_cursor("pan_active")
+
+    def on_middle_drag(self, canvas: Any, event):
+        """Handles viewport space panning via middle mouse dragging."""
+        if not canvas.full_pil_img:
+            return
+        if self.space_panning:
+            dx = event.x - self.pan_start_mouse[0]
+            dy = event.y - self.pan_start_mouse[1]
+            new_pan_x = self.pan_start_offset[0] + dx
+            new_pan_y = self.pan_start_offset[1] + dy
+            if canvas.on_viewport_change_request:
+                canvas.on_viewport_change_request(
+                    canvas.zoom_factor, (new_pan_x, new_pan_y)
+                )
+
+    def on_middle_release(self, canvas: Any, event, cx: float, cy: float):
+        """Concludes viewport space panning via middle mouse release."""
+        if not canvas.full_pil_img:
+            return
+        self.space_panning = False
+        self.on_mouse_move(canvas, event, cx, cy)
+
     def on_right_click(self, canvas: Any, event, cx: float, cy: float):
         """Identifies right-clicked component and triggers the context menu delegate."""
         if not canvas.full_pil_img:
@@ -908,14 +938,14 @@ class GestureInterpreter:
         else:
             pan_x, pan_y = state.pan_offset
             if event.num == 4:
-                pan_y -= 40
-            elif event.num == 5:
                 pan_y += 40
+            elif event.num == 5:
+                pan_y -= 40
             elif event.delta != 0:
                 if is_shift:
-                    pan_x -= event.delta
+                    pan_x += event.delta
                 else:
-                    pan_y -= event.delta
+                    pan_y += event.delta
 
             if canvas.on_viewport_change_request:
                 canvas.on_viewport_change_request(canvas.zoom_factor, (pan_x, pan_y))
