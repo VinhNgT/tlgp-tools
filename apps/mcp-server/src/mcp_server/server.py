@@ -8,22 +8,28 @@ Exposes two tools (one per underlying package) and one orchestration prompt:
 
 from __future__ import annotations
 
-import os
-
-import httpx
 from mcp.server.fastmcp import FastMCP
 from tlgp_logger import get_logger
 
-from mcp_server.exceptions import ApiClientError
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
+from mcp_server.tools.daemon_control import (
+    get_daemon_status_impl,
+    kill_daemons_impl,
+    read_daemon_logs_impl,
+    register_exit_handlers,
+    set_workspace_readonly_impl,
+)
+from mcp_server.tools.generate_spec_doc import (
+    generate_spec_doc_impl,
+    write_analysis_json_impl,
+)
+from mcp_server.tools.launch_annotator import launch_annotator_impl
 from mcp_server.tools.workspace_api import (
     download_image_impl,
     download_workspace_assets_impl,
     export_workspace_impl,
     get_workspace_state_impl,
 )
-from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
-from mcp_server.tools.launch_annotator import launch_annotator_impl
 
 logger = get_logger(__name__)
 
@@ -43,6 +49,9 @@ mcp = FastMCP(
         "Use the `spec_doc_workflow` prompt to get the full workflow guide."
     ),
 )
+
+register_exit_handlers()
+
 
 # ============================================================
 # Tools
@@ -197,3 +206,48 @@ def spec_doc_workflow(section_prefix: str = "1.1") -> str:
         section_prefix: Section number prefix (default "1.1").
     """
     return SPEC_WORKFLOW_PROMPT.replace("{section_prefix}", section_prefix)
+
+
+@mcp.tool()
+def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
+    """Safely write analysis data structure to analysis.json in the export directory.
+
+    Args:
+        data: Complete analysis data dict.
+        filename: Name of the output JSON file (defaults to "analysis.json").
+    """
+    return write_analysis_json_impl(data, filename)
+
+
+@mcp.tool()
+async def get_daemon_status() -> dict:
+    """Get status of background annotation tool GUI and engine processes."""
+    return await get_daemon_status_impl()
+
+
+@mcp.tool()
+def kill_daemons() -> dict:
+    """Cleanly terminate all background annotation GUI and engine processes."""
+    return kill_daemons_impl()
+
+
+@mcp.tool()
+def read_daemon_logs(daemon: str = "engine", lines: int = 100) -> dict:
+    """Read the recent log lines from engine or gui daemon.
+
+    Args:
+        daemon: The daemon name ('engine' or 'gui').
+        lines: Max number of tailing log lines to retrieve (default 100).
+    """
+    return read_daemon_logs_impl(daemon, lines)
+
+
+@mcp.tool()
+async def set_workspace_readonly(read_only: bool) -> dict:
+    """Toggle the engine workspace read-only mode to prevent or allow mutations.
+
+    Args:
+        read_only: True to lock workspace in read-only mode, False to allow edits.
+    """
+    return await set_workspace_readonly_impl(read_only)
+

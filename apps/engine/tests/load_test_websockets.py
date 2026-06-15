@@ -1,12 +1,13 @@
 import asyncio
 import json
-import time
-import subprocess
-import websockets
-import sys
-import httpx
-from uuid import uuid4
 import os
+import subprocess
+import sys
+import time
+from uuid import uuid4
+
+import httpx
+import websockets
 
 PORT = 8089
 WS_URL = f"ws://localhost:{PORT}/ws"
@@ -19,10 +20,10 @@ async def client_task(client_id, ready_event, start_event, stats):
         async with websockets.connect(WS_URL, open_timeout=10, ping_timeout=None) as ws:
             # Receive full sync
             full_sync = json.loads(await ws.recv())
-            
+
             ready_event.set()
             await start_event.wait()
-            
+
             # Fire mutations
             for i in range(MUTATIONS_PER_CLIENT):
                 req = {
@@ -36,11 +37,11 @@ async def client_task(client_id, ready_event, start_event, stats):
                     "id": f"{client_id}-{i}"
                 }
                 await ws.send(json.dumps(req))
-                
+
             patches_received = 0
             rpc_responses = 0
             expected_patches = NUM_CLIENTS * MUTATIONS_PER_CLIENT
-            
+
             while patches_received < expected_patches or rpc_responses < MUTATIONS_PER_CLIENT:
                 msg = json.loads(await asyncio.wait_for(ws.recv(), timeout=10.0))
                 if "type" in msg and msg["type"] == "patch":
@@ -51,7 +52,7 @@ async def client_task(client_id, ready_event, start_event, stats):
                         print(f"RPC Error: {msg['error']}")
                 if (patches_received + rpc_responses) % 500 == 0:
                     print(f"Client {client_id} received {patches_received} patches and {rpc_responses} rpc responses")
-                    
+
             stats["success"] += 1
     except Exception as e:
         print(f"Client {client_id} failed: {e}")
@@ -66,7 +67,7 @@ async def main():
         stderr=subprocess.DEVNULL,
         cwd=os.path.join(os.path.dirname(__file__), "..", "src")
     )
-    
+
     try:
         # Wait for server
         for _ in range(20):
@@ -86,7 +87,7 @@ async def main():
         dummy_path = os.path.join(os.path.dirname(__file__), "dummy.png")
         with open(dummy_path, "wb") as f:
             f.write(b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01\x08\x06\x00\x00\x00\x1f\x15\xc4\x89\x00\x00\x00\x0bIDAT\x08\xd7c\xf8\xff\xff\x3f\x00\x05\xfe\x02\xfe\xa7\x35\x81\x84\x00\x00\x00\x00IEND\xaeB`\x82")
-            
+
         async with httpx.AsyncClient() as client:
             with open(dummy_path, "rb") as f:
                 await client.post(f"{REST_URL}/import/image", files={"file": ("dummy.png", f, "image/png")})
@@ -95,21 +96,21 @@ async def main():
         ready_events = [asyncio.Event() for _ in range(NUM_CLIENTS)]
         start_event = asyncio.Event()
         stats = {"success": 0}
-        
+
         tasks = []
         for i in range(NUM_CLIENTS):
             tasks.append(asyncio.create_task(client_task(i, ready_events[i], start_event, stats)))
-            
+
         # Wait for all to connect
         await asyncio.gather(*[e.wait() for e in ready_events])
-        
+
         print(f"All {NUM_CLIENTS} clients connected. Firing mutations...")
         start_time = time.time()
         start_event.set()
-        
+
         # Wait for all to finish
         await asyncio.gather(*tasks)
-        
+
         duration = time.time() - start_time
         print(f"Completed in {duration:.2f} seconds.")
         print(f"Clients successful: {stats['success']}/{NUM_CLIENTS}")

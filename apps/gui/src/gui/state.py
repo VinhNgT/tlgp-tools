@@ -37,7 +37,7 @@ class UIStateStore:
         for callback in self._listeners[event_type]:
             try:
                 callback()
-            except Exception as e:
+            except Exception:
                 import logging
                 logging.getLogger(__name__).exception("Error in state change subscriber")
 

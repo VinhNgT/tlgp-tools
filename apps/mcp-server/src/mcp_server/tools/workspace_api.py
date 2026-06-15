@@ -1,8 +1,11 @@
-import os
 import io
+import os
 import zipfile
+
 import httpx
+
 from mcp_server.exceptions import ApiClientError
+
 
 async def get_workspace_state_impl() -> dict:
     """Implementation of get_workspace_state tool."""
@@ -36,12 +39,12 @@ async def download_image_impl(comp_id: str, output_path: str, show_children: boo
                 params={"show_children": show_children}
             )
             res.raise_for_status()
-            
+
             out_path = os.path.abspath(output_path)
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             with open(out_path, "wb") as f:
                 f.write(res.content)
-                
+
             return {
                 "status": "success",
                 "output_path": out_path
@@ -133,12 +136,12 @@ async def export_workspace_impl(output_path: str) -> dict:
         async with httpx.AsyncClient() as client:
             res = await client.get("http://127.0.0.1:8000/workspace/export")
             res.raise_for_status()
-            
+
             out_path = os.path.abspath(output_path)
             os.makedirs(os.path.dirname(out_path), exist_ok=True)
             with open(out_path, "wb") as f:
                 f.write(res.content)
-                
+
             return {
                 "status": "success",
                 "output_path": out_path

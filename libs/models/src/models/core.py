@@ -63,8 +63,10 @@ class WorkspaceState(BaseModel):
     version: int = 1
     sessionId: UUID
     revision: int = 0
+    readOnly: bool = False
     screen: ScreenInfo = Field(default_factory=ScreenInfo)
     image: ImageInfo | None = None
     cutLines: list[int] = Field(default_factory=list)
     rootComponents: list[UUID] = Field(default_factory=list)
     components: dict[UUID, Component] = Field(default_factory=dict)
+

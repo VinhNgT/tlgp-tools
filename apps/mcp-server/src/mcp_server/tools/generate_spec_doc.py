@@ -176,3 +176,37 @@ def generate_spec_doc_impl(
         "images": image_count,
         "warnings": warnings,
     }
+
+
+def write_analysis_json_impl(data: dict, filename: str = "analysis.json") -> dict:
+    """Safely write analysis data structure to analysis.json in the export directory."""
+    export_dir_str = data.get("exportDir")
+    if not export_dir_str:
+        return {
+            "success": False,
+            "error": "Missing 'exportDir' key in the analysis data.",
+        }
+
+    export_dir = Path(export_dir_str)
+    if not export_dir.is_dir():
+        return {
+            "success": False,
+            "error": f"The exportDir '{export_dir_str}' is not a valid directory.",
+        }
+
+    try:
+        out_path = export_dir / filename
+        out_path.write_text(
+            json.dumps(data, indent=2, ensure_ascii=False),
+            encoding="utf-8",
+        )
+        return {
+            "success": True,
+            "analysis_path": str(out_path.resolve()),
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": f"Failed to write analysis JSON file: {e}",
+        }
+

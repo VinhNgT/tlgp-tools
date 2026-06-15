@@ -1,8 +1,13 @@
 import uuid
+
 import pytest
-from engine.state import get_workspace, WorkspaceManager
-from engine.exceptions import ComponentNotFoundError, InvalidStateError, ParentNotFoundError, BoundaryViolationError
-from models import Bounds, ImageInfo, Style, Visibility
+from engine.exceptions import (
+    BoundaryViolationError,
+    InvalidStateError,
+)
+from engine.state import WorkspaceManager, get_workspace
+from models import Bounds, ImageInfo, Visibility
+
 
 @pytest.fixture
 def anyio_backend():
@@ -138,7 +143,7 @@ async def test_update_cut_lines_validation(workspace: WorkspaceManager):
 
     with pytest.raises(InvalidStateError):
         await workspace.update_cut_lines(lines=[200])
-    
+
     assert workspace.state.cutLines == []
 
     await workspace.update_cut_lines(lines=[100])

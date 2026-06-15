@@ -1,10 +1,12 @@
 import asyncio
 import uuid
-import pytest
+
 import httpx
+import pytest
 from engine.app import app
 from engine.state import get_workspace
 from models import ImageInfo
+
 
 @pytest.fixture
 def anyio_backend():
@@ -29,7 +31,7 @@ async def test_concurrent_mutations_maintain_history():
     losing any patches or writes.
     """
     workspace = get_workspace()
-    
+
     # Pre-create a component
     comp_id = uuid.uuid4()
     async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url="http://test") as client:
@@ -72,10 +74,10 @@ async def test_concurrent_tree_recalculations():
     corrupt the recalculate_tree boundaries.
     """
     workspace = get_workspace()
-    
+
     parent_id = uuid.uuid4()
     child_ids = [uuid.uuid4() for _ in range(50)]
-    
+
     transport = httpx.ASGITransport(app=app)
     async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
         # Create parent
@@ -87,7 +89,7 @@ async def test_concurrent_tree_recalculations():
                 "bounds": {"x": 0, "y": 0, "w": 1000, "h": 1000},
             },
         )
-        
+
         # Create 50 children linearly
         for i, cid in enumerate(child_ids):
             await client.post(
@@ -99,17 +101,17 @@ async def test_concurrent_tree_recalculations():
                     "bounds": {"x": 10, "y": 10, "w": 50, "h": 50},
                 },
             )
-            
+
         # Concurrently resize all children
         async def resize_child(cid: uuid.UUID, i: int):
             await client.put(
                 f"/components/{cid}",
                 json={"bounds": {"x": 10, "y": 10, "w": 60 + i, "h": 60 + i}}
             )
-            
+
         tasks = [resize_child(cid, i) for i, cid in enumerate(child_ids)]
         await asyncio.gather(*tasks)
-        
+
     # Check that children resized
     # And tree math was run (all children should have assigned numbers instead of empty string)
     for cid in child_ids:

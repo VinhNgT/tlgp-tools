@@ -8,7 +8,19 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
-from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
+from mcp_server.tools.daemon_control import (
+    ACTIVE_PROCESSES,
+    ENGINE_LOGS,
+    GUI_LOGS,
+    get_daemon_status_impl,
+    kill_daemons_impl,
+    read_daemon_logs_impl,
+    set_workspace_readonly_impl,
+)
+from mcp_server.tools.generate_spec_doc import (
+    generate_spec_doc_impl,
+    write_analysis_json_impl,
+)
 from mcp_server.tools.launch_annotator import launch_annotator_impl
 from PIL import Image as PILImage
 
@@ -342,3 +354,96 @@ class TestLaunchAnnotator:
 
         with pytest.raises(RuntimeError, match="uv is not installed"):
             await launch_annotator_impl(screenshot_path=str(tmp_path / "out"))
+
+
+class TestWriteAnalysisJson:
+    def test_write_success(self, tmp_path):
+        export_dir = tmp_path / "export"
+        export_dir.mkdir()
+        data = {"exportDir": str(export_dir), "test": "data"}
+
+        res = write_analysis_json_impl(data, "test.json")
+        assert res["success"] is True
+        assert "analysis_path" in res
+
+        filepath = Path(res["analysis_path"])
+        assert filepath.exists()
+        assert json.loads(filepath.read_text(encoding="utf-8")) == data
+
+    def test_missing_export_dir(self):
+        res = write_analysis_json_impl({"test": "data"})
+        assert res["success"] is False
+        assert "Missing 'exportDir'" in res["error"]
+
+    def test_invalid_export_dir(self):
+        res = write_analysis_json_impl({"exportDir": "nonexistent_dir"})
+        assert res["success"] is False
+        assert "not a valid directory" in res["error"]
+
+
+class TestDaemonControl:
+    @pytest.mark.anyio
+    async def test_get_daemon_status(self, monkeypatch):
+        ACTIVE_PROCESSES.clear()
+
+        class MockAsyncClient:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def get(self, *args, **kwargs):
+                mock_res = MagicMock()
+                mock_res.status_code = 200
+                return mock_res
+
+        monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
+
+        status = await get_daemon_status_impl()
+        assert status["engine"]["running"] is True
+        assert status["gui"]["running"] is False
+
+    def test_read_daemon_logs(self):
+        ENGINE_LOGS.clear()
+        GUI_LOGS.clear()
+
+        ENGINE_LOGS.append("line1\n")
+        ENGINE_LOGS.append("line2\n")
+
+        res = read_daemon_logs_impl("engine", lines=1)
+        assert res["daemon"] == "engine"
+        assert res["line_count"] == 1
+        assert res["logs"] == "line2\n"
+
+    def test_kill_daemons(self):
+        mock_proc = MagicMock()
+        mock_proc.poll.return_value = None
+        mock_proc.pid = 12345
+
+        ACTIVE_PROCESSES.clear()
+        ACTIVE_PROCESSES.append(mock_proc)
+
+        res = kill_daemons_impl()
+        assert res["status"] == "success"
+        assert 12345 in res["terminated_pids"]
+        assert len(ACTIVE_PROCESSES) == 0
+        assert mock_proc.terminate.call_count == 1
+
+    @pytest.mark.anyio
+    async def test_set_workspace_readonly(self, monkeypatch):
+        class MockAsyncClient:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def put(self, url, json, headers, *args, **kwargs):
+                mock_res = MagicMock()
+                mock_res.status_code = 200
+                mock_res.json.return_value = {"status": "success", "read_only": json["read_only"]}
+                return mock_res
+
+        monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
+
+        res = await set_workspace_readonly_impl(True)
+        assert res["status"] == "success"
+        assert res["read_only"] is True
+

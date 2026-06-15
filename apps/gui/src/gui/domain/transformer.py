@@ -42,7 +42,7 @@ class ViewportTransformer:
 
     def has_active_cuts(self, parent_stack: list[UUID], cut_lines: list[int]) -> bool:
         """Determines if horizontal segment spacing rules are currently visible in the active hierarchy level."""
-        # Cut lines and their visual gaps must remain active and visible 
+        # Cut lines and their visual gaps must remain active and visible
         # at all hierarchy levels, including when drilled down into a component.
         return len(cut_lines) > 0
 

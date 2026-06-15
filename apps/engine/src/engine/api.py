@@ -1,10 +1,10 @@
+import asyncio
 import io
 import json
+import os
 import uuid
 import zipfile
 
-import asyncio
-import os
 from fastapi import (
     APIRouter,
     Depends,
@@ -16,9 +16,16 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
-from fastapi.security import APIKeyHeader
 from fastapi.responses import Response
-from models import Bounds, Component, ImageInfo, Style, Visibility, WorkspaceState, TreeUtils
+from fastapi.security import APIKeyHeader
+from models import (
+    Bounds,
+    ImageInfo,
+    Style,
+    TreeUtils,
+    Visibility,
+    WorkspaceState,
+)
 from PIL import Image
 from pydantic import BaseModel
 from rendering.renderer import draw_annotations_on_image
@@ -29,10 +36,10 @@ from .exceptions import (
     InvalidArchiveError,
     InvalidImageError,
     InvalidStateError,
-    ParentNotFoundError,
     UndoRedoError,
 )
-from .state import WorkspaceManager, WorkspaceDep
+from .state import WorkspaceDep, WorkspaceManager
+from .tree_math import recalculate_tree
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -53,7 +60,7 @@ class ClientConnection:
         self.websocket = websocket
         self.queue = queue
         self.task = asyncio.create_task(self._worker())
-        
+
     async def _worker(self):
         while True:
             try:
@@ -62,13 +69,13 @@ class ClientConnection:
                 self.queue.task_done()
             except Exception:
                 break
-                
+
     def send_msg(self, msg: dict):
         try:
             self.queue.put_nowait(msg)
         except asyncio.QueueFull:
             pass # Drop message if client is too slow to avoid OOM
-            
+
     def cancel(self):
         self.task.cancel()
 
@@ -114,7 +121,6 @@ async def import_workspace(
 
     # Replace the global state entirely
     def mutate(state: WorkspaceState):
-        from .tree_math import recalculate_tree
         state.sessionId = uuid.uuid4()  # New session ID forces clients to hard-refresh
         state.screen = new_state.screen
         state.image = new_state.image
@@ -123,7 +129,7 @@ async def import_workspace(
         state.components = new_state.components
         recalculate_tree(state)
 
-    await workspace.mutate(mutate)
+    await workspace.mutate(mutate, force=True)
     logger.info(
         "Successfully imported workspace", sessionId=str(workspace.state.sessionId)
     )
@@ -159,7 +165,7 @@ async def import_image(
         state.rootComponents = []
         state.components = {}
 
-    await workspace.mutate(mutate)
+    await workspace.mutate(mutate, force=True)
     logger.info(
         "Successfully imported raw image", sessionId=str(workspace.state.sessionId)
     )
@@ -199,6 +205,24 @@ async def get_state(workspace: WorkspaceDep):
     return workspace.state.model_dump(mode="json")
 
 
+class SetReadOnlyRequest(BaseModel):
+    read_only: bool
+
+
+@router.put("/workspace/readonly", tags=["State"], dependencies=[Depends(verify_api_key)])
+async def set_workspace_readonly(
+    req: SetReadOnlyRequest, workspace: WorkspaceDep
+):
+    """Sets the readOnly flag on the WorkspaceState. Mutates the state with force=True."""
+    logger.info("Setting workspace read-only status", read_only=req.read_only)
+
+    def mutate_fn(state: WorkspaceState):
+        state.readOnly = req.read_only
+
+    await workspace.mutate(mutate_fn, force=True)
+    return {"status": "success", "read_only": workspace.state.readOnly}
+
+
 # ── Image Endpoints ────────────────────────────────────────────────────
 
 
@@ -229,7 +253,7 @@ def generate_image_bytes(
         comp_uuid = comp_id if isinstance(comp_id, uuid.UUID) else uuid.UUID(comp_id)
         if comp_uuid not in workspace.state.components:
             raise ComponentNotFoundError("Component not found", component_id=str(comp_uuid))
-        
+
         comp = workspace.state.components[comp_uuid]
         bounds = comp.bounds
         bounds_left, bounds_top, bounds_right, bounds_bottom = bounds.left, bounds.top, bounds.right, bounds.bottom
@@ -239,7 +263,7 @@ def generate_image_bytes(
 
     with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
         cropped = img.crop((bounds_left, bounds_top, bounds_right, bounds_bottom))
-        
+
         if show_children and children:
             cropped = draw_annotations_on_image(
                 cropped,
@@ -303,11 +327,11 @@ async def get_image(
     if comp_id != "root":
         try:
             uuid.UUID(comp_id)
-        except ValueError:
+        except ValueError as err:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Invalid component ID format. Must be 'root' or a valid UUID."
-            )
+            ) from err
 
     img_bytes = generate_image_bytes(comp_id, workspace, show_children)
     return Response(content=img_bytes, media_type="image/png")

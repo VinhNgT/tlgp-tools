@@ -32,6 +32,8 @@ Wait for the user to confirm before proceeding.
 
 ## Step 2: Analyze & Prepare Workspace
 
+Call `set_workspace_readonly(read_only=True)` to notify the user and lock the workspace in read-only mode during your analysis.
+
 ### 2a. Read Annotation State
 
 Call `get_workspace_state()`. This returns the `WorkspaceState` JSON.
@@ -60,25 +62,27 @@ Search the project code for APIs, DTOs, and navigation routes related to this sc
 If the code contradicts the screenshots, log entries in `discrepancies`
 but always describe the UI based on what the image shows.
 
-### 2d. Validate
+### 2d. Validate & Save
 
-Validate the analysis data to check for errors before generating.
+Prepare and validate the analysis data before generating the document.
 
 > [!IMPORTANT]
 > **IDE Payload Limitation Bypass**:
-> If your `analysis` data is large (e.g. over 10-20KB), the IDE client middleware may corrupt the tool call parameters (causing `analysis` is missing validation errors).
+> If your `analysis` data is large (e.g. over 10-20KB), the IDE client middleware may corrupt the tool call parameters.
 > To bypass this:
-> 1. Save the analysis dict as a JSON file locally inside your downloaded workspace (e.g., `./workspace_xyz/analysis.json`). Note: ensure `exportDir` inside the JSON points to this directory (e.g., `./workspace_xyz`).
-> 2. Call `generate_spec_doc` passing an empty dictionary `analysis={}` along with the absolute path `analysis_path="./workspace_xyz/analysis.json"`.
+> 1. Call `write_analysis_json(data=...)` passing the analysis dictionary. This safely saves it to `analysis.json` inside the export directory and returns the absolute path.
+> 2. Pass this path as `analysis_path` to the validation and generation tools.
 
-Otherwise, call `generate_spec_doc(analysis_path="./workspace_xyz/analysis.json", validate_only=True)`. Fix any issues and re-validate.
+Call `generate_spec_doc(analysis_path="./workspace_xyz/analysis.json", validate_only=True)`. Fix any issues and re-validate.
 
 ## Step 3: Generate
 
-Call `generate_spec_doc(analysis_path="./workspace_xyz/analysis.json")`.
+1. Call `generate_spec_doc(analysis_path="./workspace_xyz/analysis.json")`.
+2. Call `set_workspace_readonly(read_only=False)` to unlock the workspace and return edit control to the user.
 
-- **If errors:** Fix the analysis dict and retry.
+- **If errors:** Fix the analysis dict, save it using `write_analysis_json`, and retry generation.
 - **If success:** Report the .docx path and any warnings to the user.
+
 
 ---
 

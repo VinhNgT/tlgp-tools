@@ -1,8 +1,10 @@
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
 import pytest
 from gui.views.canvas import AnnotationCanvasView
-from models import Bounds, Component, WorkspaceState, Style, Visibility
+from models import Bounds, Component, Style, Visibility, WorkspaceState
+
 
 @patch("tkinter.Canvas.__init__", lambda *args, **kwargs: None)
 @patch("tkinter.Canvas.bind", lambda *args, **kwargs: None)
@@ -106,7 +108,7 @@ def test_zoom_focus_target_multi_selection():
     args, kwargs = canvas.on_viewport_change_request.call_args
     zoom_factor = args[0]
     scroll_x, scroll_y = args[1]
-    
+
     assert zoom_factor == pytest.approx(1.7333333333333334)
     assert scroll_x == pytest.approx(400 - 250 * zoom_factor)
     assert scroll_y == pytest.approx(300 - 250 * zoom_factor)

@@ -1,31 +1,43 @@
-"""Tool: launch_annotator — spawn the TLGP annotation tool GUI."""
+"""Tool: launch_annotator — spawn the TLGP annotation tool GUI and engine."""
 
 from __future__ import annotations
 
+import asyncio
 import os
+import secrets
 import shutil
 import subprocess
 import sys
-import asyncio
+import threading
 
 import httpx
+
+import mcp_server.tools.daemon_control as dc
+from mcp_server.tools.daemon_control import ACTIVE_PROCESSES, ENGINE_LOGS, GUI_LOGS
+
+
+def _pipe_stream(stream, log_deque, dest_stream):
+    """Drain stream line-by-line, append to log_deque, and write to dest_stream."""
+    try:
+        for line in iter(stream.readline, b""):
+            decoded = line.decode("utf-8", errors="replace")
+            log_deque.append(decoded)
+            dest_stream.write(decoded)
+            dest_stream.flush()
+    except Exception:
+        pass
+    finally:
+        stream.close()
 
 
 async def launch_annotator_impl(
     screenshot_path: str | None = None,
     workspace_zip: str | None = None,
 ) -> dict:
-    """Spawn the annotation tool as a background subprocess.
+    """Spawn the annotation tool and engine as background subprocesses.
 
-    Constructs a command line equivalent to:
-        uv run python -m tlgp_annotation_tool [screenshot] -o <output_dir>
-        uv run python -m tlgp_annotation_tool -s <session.json> -o <output_dir>
-
-    Uses ``uv run`` instead of ``sys.executable`` so the annotation tool
-    resolves correctly from the uv workspace regardless of which Python
-    interpreter the MCP server was started with.
-
-    The process is detached so it doesn't block the MCP server.
+    Pipes stdout/stderr to in-memory log deques and mirrors them to sys.stderr.
+    Registers process handles for lifecycle management and automatic cleanup on exit.
     """
     if screenshot_path and workspace_zip:
         raise ValueError("screenshot_path and workspace_zip are mutually exclusive")
@@ -34,10 +46,11 @@ async def launch_annotator_impl(
     if not uv_bin:
         raise RuntimeError("uv is not installed or not on PATH")
 
-    import secrets
     workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
-    
+
     api_key = secrets.token_hex(16)
+    dc.ENGINE_API_KEY = api_key
+
     env = os.environ.copy()
     env["ENGINE_API_KEY"] = api_key
 
@@ -48,8 +61,8 @@ async def launch_annotator_impl(
         cwd=os.path.join(workspace_root, "apps", "engine"),
         env=env,
         stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=sys.stderr,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         start_new_session=True,
     )
 
@@ -60,14 +73,24 @@ async def launch_annotator_impl(
         cwd=os.path.join(workspace_root, "apps", "gui"),
         env=env,
         stdin=subprocess.DEVNULL,
-        stdout=sys.stderr,
-        stderr=sys.stderr,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
         start_new_session=True,
     )
 
+    # Register active processes
+    ACTIVE_PROCESSES.append(engine_proc)
+    ACTIVE_PROCESSES.append(gui_proc)
+
+    # Start piping threads
+    threading.Thread(target=_pipe_stream, args=(engine_proc.stdout, ENGINE_LOGS, sys.stderr), daemon=True).start()
+    threading.Thread(target=_pipe_stream, args=(engine_proc.stderr, ENGINE_LOGS, sys.stderr), daemon=True).start()
+    threading.Thread(target=_pipe_stream, args=(gui_proc.stdout, GUI_LOGS, sys.stderr), daemon=True).start()
+    threading.Thread(target=_pipe_stream, args=(gui_proc.stderr, GUI_LOGS, sys.stderr), daemon=True).start()
+
     # Wait for Engine to be ready
     engine_ready = False
-    
+
     async with httpx.AsyncClient() as client:
         for _ in range(30):  # Wait up to 3 seconds
             try:

@@ -236,7 +236,7 @@ class AppController:
 
             comp_visible = getattr(comp.visibility, "visible", True)
             comp_locked = getattr(comp.visibility, "locked", False)
-            
+
             is_effectively_visible = comp_visible and parent_visible
             is_effectively_locked = comp_locked or parent_locked
 
@@ -306,7 +306,7 @@ class AppController:
         selected_ids = self.store.state.selected_component_ids
         state = self.store.state.workspace_state
         active_interaction = self.store.state.active_interaction
-        
+
         if len(selected_ids) == 1 and state:
             comp_id = selected_ids[0]
             comp = state.components.get(comp_id)
@@ -314,7 +314,7 @@ class AppController:
                 bounds = comp.bounds
                 if active_interaction and comp_id in active_interaction:
                     bounds = active_interaction[comp_id]
-                    
+
                 self.view.properties.update_properties_panel(
                     box_id=str(comp.id),
                     label=comp.label,
@@ -384,7 +384,7 @@ class AppController:
             text_focused=False,
         )
         self.view.set_mode_str("select")
-        
+
         self.client.stop()
         self.client.start()
 

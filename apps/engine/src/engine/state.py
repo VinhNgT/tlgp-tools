@@ -77,13 +77,15 @@ class WorkspaceManager:
             except asyncio.QueueFull:
                 pass
 
-    async def mutate(self, mutation_fn: Callable[[WorkspaceState], None]):
+    async def mutate(self, mutation_fn: Callable[[WorkspaceState], None], force: bool = False):
         """
         Executes a mutation function on the state, automatically computes the
         minimal JSON patch, increments the OCC revision, and broadcasts to clients.
         Uses an asyncio.Lock to ensure thread-safety against concurrent mutations.
         """
         async with self._lock:
+            if self._state.readOnly and not force:
+                raise InvalidStateError("Workspace is currently read-only", session_id=str(self._state.sessionId))
             old_dict = self._state.model_dump(mode="json")
             old_session_id = self._state.sessionId
 
@@ -123,8 +125,10 @@ class WorkspaceManager:
             # Broadcast the deltas
             self.broadcast_patch(patch)
 
-    async def undo(self) -> bool:
+    async def undo(self, force: bool = False) -> bool:
         async with self._lock:
+            if self._state.readOnly and not force:
+                raise InvalidStateError("Workspace is currently read-only", session_id=str(self._state.sessionId))
             if self._pointer > 0:
                 old_dict = self._state.model_dump(mode="json")
                 self._pointer -= 1
@@ -137,8 +141,10 @@ class WorkspaceManager:
                 return True
             return False
 
-    async def redo(self) -> bool:
+    async def redo(self, force: bool = False) -> bool:
         async with self._lock:
+            if self._state.readOnly and not force:
+                raise InvalidStateError("Workspace is currently read-only", session_id=str(self._state.sessionId))
             if self._pointer < len(self._history) - 1:
                 old_dict = self._state.model_dump(mode="json")
                 self._pointer += 1
@@ -223,9 +229,9 @@ class WorkspaceManager:
         def mutate_fn(state: WorkspaceState):
             if comp_id not in state.components:
                 raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
-            
+
             comp = state.components[comp_id]
-            
+
             if label is not None:
                 comp.label = label
             if bounds is not None:
@@ -234,7 +240,7 @@ class WorkspaceManager:
                 comp.style = style
             if visibility is not None:
                 comp.visibility = visibility
-            
+
             if parent_id is not None and parent_id != comp.parentId:
                 # Remove from old parent/roots
                 if comp.parentId:
@@ -244,7 +250,7 @@ class WorkspaceManager:
                 else:
                     if comp_id in state.rootComponents:
                         state.rootComponents.remove(comp_id)
-                
+
                 # Add to new parent
                 comp.parentId = parent_id
                 new_parent = state.components.get(parent_id)
@@ -267,10 +273,10 @@ class WorkspaceManager:
         def mutate_fn(state: WorkspaceState):
             if comp_id not in state.components:
                 raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
-            
+
             comp = state.components[comp_id]
             parent_id = comp.parentId
-            
+
             if comp.parentId:
                 parent = state.components.get(comp.parentId)
                 if parent and comp_id in parent.childrenIds:
@@ -278,14 +284,14 @@ class WorkspaceManager:
             else:
                 if comp_id in state.rootComponents:
                     state.rootComponents.remove(comp_id)
-            
+
             def delete_recursive(cid: uuid.UUID):
                 c = state.components.get(cid)
                 if c:
                     for child_id in list(c.childrenIds):
                         delete_recursive(child_id)
                     del state.components[cid]
-                    
+
             delete_recursive(comp_id)
             recalculate_tree(state, changed_id=parent_id if parent_id else "roots")
 

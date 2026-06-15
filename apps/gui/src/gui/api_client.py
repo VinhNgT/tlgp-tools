@@ -188,11 +188,11 @@ class EngineClient:
         """Centralized helper for HTTP requests to standardise error handling and exception logging."""
         if self.on_log_message:
             self.dispatch(lambda m={"method": method, "url": url, "kwargs": str(kwargs)}: self.on_log_message("Outgoing HTTP", m))
-        
+
         headers = kwargs.pop("headers", {})
         if self.api_key:
             headers["X-API-Key"] = self.api_key
-        
+
         try:
             res = requests.request(method, url, headers=headers, **kwargs)
         except requests.RequestException as e:

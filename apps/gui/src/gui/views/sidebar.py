@@ -14,10 +14,10 @@ class SidebarTreeView(ttk.Frame):
         )
 
         self.tree = ttk.Treeview(self, selectmode="browse", show="tree")
-        
+
         tree_scroll = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
         tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        
+
         self.tree.configure(yscrollcommand=tree_scroll.set)
         self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -29,7 +29,7 @@ class SidebarTreeView(ttk.Frame):
             self.tree.bind("<Control-Button-1>", self._on_right_click)
         else:
             self.tree.bind("<Button-3>", self._on_right_click)
-            
+
         self.tree.bind("<Double-1>", self._on_double_click)
 
         self.on_component_selected = None
