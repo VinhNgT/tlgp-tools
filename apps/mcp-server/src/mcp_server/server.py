@@ -10,10 +10,11 @@ from __future__ import annotations
 
 import os
 
-import requests
+import httpx
 from mcp.server.fastmcp import FastMCP
 from tlgp_logger import get_logger
 
+from mcp_server.exceptions import ApiClientError
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
 from mcp_server.tools.generate_spec_doc import generate_spec_doc_impl
 from mcp_server.tools.launch_annotator import launch_annotator_impl
@@ -39,7 +40,7 @@ mcp = FastMCP(
 
 
 @mcp.tool()
-def launch_annotator(
+async def launch_annotator(
     screenshot_path: str | None = None,
     workspace_zip: str | None = None,
 ) -> dict:
@@ -56,26 +57,39 @@ def launch_annotator(
     Returns:
         dict with engine_pid and gui_pid.
     """
-    return launch_annotator_impl(screenshot_path, workspace_zip)
+    return await launch_annotator_impl(screenshot_path, workspace_zip)
 
 
 @mcp.tool()
-def get_engine_state() -> dict:
+async def get_engine_state() -> dict:
     """Fetch the current flat-map JSON WorkspaceState from the running Engine.
 
     Use this tool to read the latest annotation hierarchy automatically,
     instead of relying on local JSON files.
     """
     try:
-        res = requests.get("http://127.0.0.1:8000/state")
-        res.raise_for_status()
-        return res.json()
-    except Exception as e:
-        return {"error": str(e)}
+        async with httpx.AsyncClient() as client:
+            res = await client.get("http://127.0.0.1:8000/state")
+            res.raise_for_status()
+            return res.json()
+    except httpx.HTTPStatusError as e:
+        raise ApiClientError(
+            message="Failed to fetch engine state",
+            status_code=e.response.status_code,
+            url=str(e.request.url),
+            method=e.request.method,
+            backend_detail=e.response.text,
+        ) from e
+    except httpx.RequestError as e:
+        raise ApiClientError(
+            message=f"Request to fetch engine state failed: {e}",
+            url=str(e.request.url) if hasattr(e, "request") else None,
+            method=e.request.method if hasattr(e, "request") else None,
+        ) from e
 
 
 @mcp.tool()
-def download_engine_crops(output_dir: str) -> dict:
+async def download_engine_crops(output_dir: str) -> dict:
     """Download all component crops and the raw image from the Engine.
 
     Creates a clean directory containing all component crops named as `<uuid>.png`.
@@ -96,25 +110,26 @@ def download_engine_crops(output_dir: str) -> dict:
     errors = []
 
     try:
-        state_res = requests.get("http://127.0.0.1:8000/state")
-        state_res.raise_for_status()
-        state = state_res.json()
+        async with httpx.AsyncClient() as client:
+            state_res = await client.get("http://127.0.0.1:8000/state")
+            state_res.raise_for_status()
+            state = state_res.json()
 
-        # Download raw image
-        raw_res = requests.get("http://127.0.0.1:8000/image/raw")
-        if raw_res.status_code == 200:
-            with open(os.path.join(out_path, "raw.png"), "wb") as f:
-                f.write(raw_res.content)
-            downloaded.append("raw.png")
+            # Download raw image
+            raw_res = await client.get("http://127.0.0.1:8000/image/root")
+            if raw_res.status_code == 200:
+                with open(os.path.join(out_path, "raw.png"), "wb") as f:
+                    f.write(raw_res.content)
+                downloaded.append("raw.png")
 
-        # Download crops
-        for comp_id in state.get("components", {}).keys():
-            crop_res = requests.get(f"http://127.0.0.1:8000/image/crop/{comp_id}")
-            if crop_res.status_code == 200:
-                filename = f"{comp_id}.png"
-                with open(os.path.join(out_path, filename), "wb") as f:
-                    f.write(crop_res.content)
-                downloaded.append(filename)
+            # Download crops
+            for comp_id in state.get("components", {}).keys():
+                crop_res = await client.get(f"http://127.0.0.1:8000/image/{comp_id}")
+                if crop_res.status_code == 200:
+                    filename = f"{comp_id}.png"
+                    with open(os.path.join(out_path, filename), "wb") as f:
+                        f.write(crop_res.content)
+                    downloaded.append(filename)
 
         return {
             "status": "success",
@@ -123,8 +138,20 @@ def download_engine_crops(output_dir: str) -> dict:
             "files": downloaded,
             "errors": errors,
         }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
+    except httpx.HTTPStatusError as e:
+        raise ApiClientError(
+            message="HTTP error while downloading engine crops",
+            status_code=e.response.status_code,
+            url=str(e.request.url),
+            method=e.request.method,
+            backend_detail=e.response.text,
+        ) from e
+    except httpx.RequestError as e:
+        raise ApiClientError(
+            message=f"Request failed while downloading engine crops: {e}",
+            url=str(e.request.url) if hasattr(e, "request") else None,
+            method=e.request.method if hasattr(e, "request") else None,
+        ) from e
 
 
 @mcp.tool()

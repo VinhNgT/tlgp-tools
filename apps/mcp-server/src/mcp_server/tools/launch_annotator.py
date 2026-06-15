@@ -6,12 +6,12 @@ import os
 import shutil
 import subprocess
 import sys
-import time
+import asyncio
 
-import requests
+import httpx
 
 
-def launch_annotator_impl(
+async def launch_annotator_impl(
     screenshot_path: str | None = None,
     workspace_zip: str | None = None,
 ) -> dict:
@@ -34,11 +34,13 @@ def launch_annotator_impl(
     if not uv_bin:
         raise RuntimeError("uv is not installed or not on PATH")
 
+    workspace_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../../.."))
+
     # Spawn Engine
     engine_cmd = [uv_bin, "run", "python", "-m", "engine"]
     engine_proc = subprocess.Popen(
         engine_cmd,
-        cwd=os.path.abspath("apps/engine"),
+        cwd=os.path.join(workspace_root, "apps", "engine"),
         stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
         stderr=sys.stderr,
@@ -49,7 +51,7 @@ def launch_annotator_impl(
     gui_cmd = [uv_bin, "run", "python", "-m", "gui"]
     gui_proc = subprocess.Popen(
         gui_cmd,
-        cwd=os.path.abspath("apps/gui"),
+        cwd=os.path.join(workspace_root, "apps", "gui"),
         stdin=subprocess.DEVNULL,
         stdout=sys.stderr,
         stderr=sys.stderr,
@@ -58,23 +60,25 @@ def launch_annotator_impl(
 
     # Wait for Engine to be ready
     engine_ready = False
-    for _ in range(30):  # Wait up to 3 seconds
-        try:
-            res = requests.get("http://127.0.0.1:8000/state")
-            if res.status_code == 200:
-                engine_ready = True
-                break
-        except requests.exceptions.ConnectionError:
-            pass
-        time.sleep(0.1)
+    
+    async with httpx.AsyncClient() as client:
+        for _ in range(30):  # Wait up to 3 seconds
+            try:
+                res = await client.get("http://127.0.0.1:8000/state")
+                if res.status_code == 200:
+                    engine_ready = True
+                    break
+            except httpx.RequestError:
+                pass
+            await asyncio.sleep(0.1)
 
-    if engine_ready:
-        if screenshot_path:
-            with open(os.path.abspath(screenshot_path), "rb") as f:
-                requests.post("http://127.0.0.1:8000/import/image", files={"file": f})
-        elif workspace_zip:
-            with open(os.path.abspath(workspace_zip), "rb") as f:
-                requests.post("http://127.0.0.1:8000/import", files={"file": f})
+        if engine_ready:
+            if screenshot_path:
+                with open(os.path.abspath(screenshot_path), "rb") as f:
+                    await client.post("http://127.0.0.1:8000/import/image", files={"file": f})
+            elif workspace_zip:
+                with open(os.path.abspath(workspace_zip), "rb") as f:
+                    await client.post("http://127.0.0.1:8000/import", files={"file": f})
 
     return {
         "engine_pid": engine_proc.pid,
