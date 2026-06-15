@@ -82,7 +82,8 @@ class SidebarTreeView(ttk.Frame):
 
         to_delete = set(self._tree_nodes.keys()) - synced_ids
         for item_id in to_delete:
-            self.tree.delete(item_id)
+            if self.tree.exists(item_id):
+                self.tree.delete(item_id)
             self._tree_nodes.pop(item_id, None)
 
     def select_component(self, comp_id: UUID):
