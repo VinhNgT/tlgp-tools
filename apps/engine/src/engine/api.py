@@ -1,13 +1,11 @@
 import asyncio
 import io
 import json
-import os
 import uuid
 import zipfile
 
 from fastapi import (
     APIRouter,
-    Depends,
     File,
     HTTPException,
     UploadFile,
@@ -16,7 +14,6 @@ from fastapi import (
     status,
 )
 from fastapi.responses import Response
-
 from models import (
     Bounds,
     ImageInfo,

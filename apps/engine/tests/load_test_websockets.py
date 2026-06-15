@@ -19,7 +19,7 @@ async def client_task(client_id, ready_event, start_event, stats):
     try:
         async with websockets.connect(WS_URL, open_timeout=10, ping_timeout=None) as ws:
             # Receive full sync
-            full_sync = json.loads(await ws.recv())
+            json.loads(await ws.recv())
 
             ready_event.set()
             await start_event.wait()

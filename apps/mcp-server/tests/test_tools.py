@@ -452,8 +452,9 @@ class TestDaemonControl:
 class TestGenerateSpecDocWrapper:
     @pytest.mark.anyio
     async def test_generate_spec_doc_progress_and_elicitation(self, tmp_path):
-        from mcp_server.server import generate_spec_doc
         from unittest.mock import AsyncMock
+
+        from mcp_server.server import generate_spec_doc
 
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
@@ -465,7 +466,7 @@ class TestGenerateSpecDocWrapper:
         ctx = MagicMock()
         ctx.report_progress = AsyncMock()
         ctx.log = AsyncMock()
-        
+
         # Mock elicitation response
         mock_elicit_result = MagicMock()
         mock_elicit_result.action = "accept"
@@ -480,7 +481,7 @@ class TestGenerateSpecDocWrapper:
         )
 
         assert result["valid"] is True
-        
+
         # Verify progress was reported
         ctx.report_progress.assert_any_call(10, 100, "Loading and validating analysis data...")
         ctx.report_progress.assert_any_call(30, 100, "Eliciting description for 'Header'...")
@@ -489,7 +490,7 @@ class TestGenerateSpecDocWrapper:
 
         # Verify elicitation was called
         ctx.elicit.assert_called_once()
-        
+
         # Verify the description was updated in the resulting doc/JSON
         analysis_json = screen_dir / "analysis.json"
         assert analysis_json.exists()

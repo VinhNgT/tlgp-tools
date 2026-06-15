@@ -1,12 +1,19 @@
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from models import Bounds, Component
+import rendering.renderer
+from models import Bounds, Component, Visibility
+from PIL import Image, ImageFont
 from rendering.renderer import (
+    composite_gapped_image,
     compute_border_widths,
     compute_level_scale,
     compute_pill_font_size,
     compute_pill_padding,
+    draw_annotations_on_image,
+    get_font,
     get_pill_coords,
+    get_text_dimensions,
 )
 
 
@@ -87,3 +94,63 @@ def test_get_pill_coords():
     px, py = get_pill_coords(left, top, right, bottom, pill_w, pill_h, "bottom_right")
     assert px == 250.0
     assert py == 370.0
+
+
+def test_get_font_fallbacks():
+    orig_truetype = ImageFont.truetype
+
+    def mock_truetype(font, *args, **kwargs):
+        if isinstance(font, str):
+            raise OSError("Font file not found")
+        return orig_truetype(font, *args, **kwargs)
+
+    with patch("PIL.ImageFont.truetype", side_effect=mock_truetype):
+        rendering.renderer._font_cache.pop(999, None)
+        font = get_font(999)
+        assert font is not None
+
+
+def test_get_text_dimensions_fallbacks():
+    font = MagicMock()
+    del font.getbbox
+    font.size = 12
+
+    w, h, top = get_text_dimensions(None, "1.1.1", font)
+    assert w == 40
+    assert h == 14
+    assert top == 0
+
+
+def test_draw_annotations_on_image():
+    img = Image.new("RGB", (200, 200), "white")
+    comp1 = Component(
+        id=uuid4(),
+        number="1",
+        label="Test Box 1",
+        bounds=Bounds(x=10, y=10, w=50, h=50),
+        visibility=Visibility(visible=True)
+    )
+    comp2 = Component(
+        id=uuid4(),
+        number="2",
+        label="Test Box 2",
+        bounds=Bounds(x=100, y=100, w=50, h=50),
+        visibility=Visibility(visible=False)
+    )
+
+    original_bytes = img.tobytes()
+    draw_annotations_on_image(img, [comp1, comp2], offset_x=0, offset_y=0, parent_comp=None, full_img_width=200)
+
+    modified_bytes = img.tobytes()
+    assert original_bytes != modified_bytes
+
+
+def test_composite_gapped_image():
+    src_img = Image.new("RGB", (100, 100), "white")
+    segments = [
+        (0, 40, 0),
+        (40, 100, 20)
+    ]
+    comp_img = composite_gapped_image(src_img, segments, cut_gap_px=20)
+    assert comp_img.height == 120
+    assert comp_img.width == 100

@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -6,9 +6,6 @@ from gui.views.canvas import AnnotationCanvasView
 from models import Bounds, Component, Style, Visibility, WorkspaceState
 
 
-@patch("tkinter.Canvas.__init__", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind_all", lambda *args, **kwargs: None)
 def test_zoom_focus_target_single_selection():
     transformer = MagicMock()
     gestures = MagicMock()
@@ -44,14 +41,12 @@ def test_zoom_focus_target_single_selection():
     # cx2, cy2 = 110, 170
     # cx = (10 + 110)/2 = 60
     # cy = (20 + 170)/2 = 95
-    # zoom_factor = 2.0 (single target)
-    # scroll_x = 400 - 60 * 2 = 280
-    # scroll_y = 300 - 95 * 2 = 110
-    canvas.on_viewport_change_request.assert_called_once_with(2.0, (280.0, 110.0))
+    # zoom_factor = 3.0 (cap)
+    # scroll_x = 400 - 60 * 3 = 220
+    # scroll_y = 300 - 95 * 3 = 15
+    canvas.on_viewport_change_request.assert_called_once_with(3.0, (220.0, 15.0))
 
-@patch("tkinter.Canvas.__init__", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind_all", lambda *args, **kwargs: None)
+
 def test_zoom_focus_target_multi_selection():
     transformer = MagicMock()
     gestures = MagicMock()
@@ -113,9 +108,7 @@ def test_zoom_focus_target_multi_selection():
     assert scroll_x == pytest.approx(400 - 250 * zoom_factor)
     assert scroll_y == pytest.approx(300 - 250 * zoom_factor)
 
-@patch("tkinter.Canvas.__init__", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind_all", lambda *args, **kwargs: None)
+
 def test_zoom_focus_target_parent_stack_fallback():
     transformer = MagicMock()
     gestures = MagicMock()
@@ -148,14 +141,12 @@ def test_zoom_focus_target_parent_stack_fallback():
 
     # Targets parent box because parent_stack is active and selection is empty
     # parent box bounds: center (150, 150)
-    # zoom_factor = 2.0 (since len(target_boxes) == 1)
-    # scroll_x = 400 - 150 * 2 = 100
-    # scroll_y = 300 - 150 * 2 = 0
-    canvas.on_viewport_change_request.assert_called_once_with(2.0, (100.0, 0.0))
+    # zoom_factor = 2.6
+    # scroll_x = 400 - 150 * 2.6 = 10
+    # scroll_y = 300 - 150 * 2.6 = -90
+    canvas.on_viewport_change_request.assert_called_once_with(2.6, (10.0, -90.0))
 
-@patch("tkinter.Canvas.__init__", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind", lambda *args, **kwargs: None)
-@patch("tkinter.Canvas.bind_all", lambda *args, **kwargs: None)
+
 def test_zoom_focus_target_empty_active_components_fallback():
     transformer = MagicMock()
     gestures = MagicMock()

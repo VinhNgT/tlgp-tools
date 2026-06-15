@@ -1,4 +1,5 @@
 import io
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 from gui.controllers.controller import AppController
@@ -40,6 +41,10 @@ class MockCanvasView:
         self.zoom_focus_target_called = False
         self.toggle_labels_visibility_called = False
 
+        self.full_pil_img = None
+        self.gestures = MagicMock()
+        self.gestures.is_dragging = False
+
     @property
     def canvas_image(self):
         return self._canvas_image
@@ -58,6 +63,7 @@ class MockCanvasView:
     @is_canvas_dragging.setter
     def is_canvas_dragging(self, val: bool):
         self._is_canvas_dragging = val
+        self.gestures.is_dragging = val
 
     def fit_to_screen(self):
         pass
@@ -128,6 +134,7 @@ class MockPropertiesView:
         self.properties_h = None
         self.properties_is_visible = None
         self.properties_is_locked = None
+        self.properties_is_effectively_locked = None
         self.properties_pill_corner = None
         self.properties_disabled = False
         self.properties_focused_fields = set()
@@ -143,6 +150,7 @@ class MockPropertiesView:
         h,
         is_visible,
         is_locked,
+        is_effectively_locked,
         pill_corner,
     ):
         self.properties_box_id = box_id
@@ -153,6 +161,7 @@ class MockPropertiesView:
         self.properties_h = h
         self.properties_is_visible = is_visible
         self.properties_is_locked = is_locked
+        self.properties_is_effectively_locked = is_effectively_locked
         self.properties_pill_corner = pill_corner
 
     def is_field_focused(self, field_name):
@@ -335,6 +344,7 @@ def test_controller_export_zip(tmp_path):
     view = MockAppWindow()
     # Mock loaded image on canvas
     view.canvas.canvas_image = Image.new("RGB", (100, 100))
+    view.canvas.full_pil_img = view.canvas.canvas_image
     dialogs = MockDialogService()
     dialogs.mock_save_path = str(tmp_path / "mock_output.zip")
 
@@ -357,6 +367,7 @@ def test_controller_open_cut_editor():
     )
     store.update_state("workspace", workspace_state=ws)
     view.canvas.canvas_image = Image.new("RGB", (1000, 1000))
+    view.canvas.full_pil_img = view.canvas.canvas_image
 
     dialogs = MockDialogService()
 
@@ -519,7 +530,9 @@ def test_controller_sidebar_tree_structure():
 
     child_node = root_node["children"][0]
     assert child_node["id"] == str(child_id)
-    assert child_node["text"] == "Child Comp (hidden, locked)"
+    assert child_node["text"] == "Child Comp"
+    assert "hidden" in child_node["tags"]
+    assert "locked" in child_node["tags"]
     assert len(child_node["children"]) == 0
 
 
@@ -627,6 +640,7 @@ def test_controller_context_menu_generation():
 
     # Mock canvas image presence
     view.canvas.canvas_image = Image.new("RGB", (100, 100))
+    view.canvas.full_pil_img = view.canvas.canvas_image
 
     comp_id = uuid4()
     clicked = Component(

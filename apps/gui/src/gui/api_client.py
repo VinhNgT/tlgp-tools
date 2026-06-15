@@ -1,6 +1,5 @@
 import asyncio
 import json
-import os
 import threading
 import uuid
 from collections.abc import Callable

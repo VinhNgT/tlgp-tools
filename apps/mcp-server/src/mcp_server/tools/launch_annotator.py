@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import os
-
 import shutil
 import subprocess
 import sys
@@ -12,7 +11,6 @@ import threading
 
 import httpx
 
-import mcp_server.tools.daemon_control as dc
 from mcp_server.tools.daemon_control import ACTIVE_PROCESSES, ENGINE_LOGS, GUI_LOGS
 
 

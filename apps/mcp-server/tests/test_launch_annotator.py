@@ -1,0 +1,129 @@
+from __future__ import annotations
+
+from unittest.mock import MagicMock
+
+import httpx
+import pytest
+from mcp_server.tools.launch_annotator import launch_annotator_impl
+
+
+@pytest.mark.anyio
+async def test_launch_annotator_timeout_failure(monkeypatch):
+    # Mock subprocess.Popen
+    mock_popen = MagicMock()
+    mock_popen.return_value.pid = 9999
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.subprocess.Popen",
+        mock_popen,
+    )
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.shutil.which",
+        lambda name: "/usr/bin/uv",
+    )
+
+    # Mock AsyncClient so get always fails
+    class MockAsyncClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+        async def get(self, url, *args, **kwargs):
+            raise httpx.RequestError("Engine not ready")
+
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.httpx.AsyncClient",
+        MockAsyncClient,
+    )
+
+    result = await launch_annotator_impl()
+    assert result["engine_pid"] == 9999
+    assert result["gui_pid"] == 9999
+    assert result["engine_ready"] is False
+
+
+@pytest.mark.anyio
+async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
+    mock_popen = MagicMock()
+    mock_popen.return_value.pid = 1111
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.subprocess.Popen",
+        mock_popen,
+    )
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.shutil.which",
+        lambda name: "/usr/bin/uv",
+    )
+
+    posted_urls = []
+    # Mock AsyncClient to succeed on get and capture post
+    class MockAsyncClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+        async def get(self, url, *args, **kwargs):
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            return mock_res
+        async def post(self, url, *args, **kwargs):
+            posted_urls.append(url)
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            return mock_res
+
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.httpx.AsyncClient",
+        MockAsyncClient,
+    )
+
+    dummy_screenshot = tmp_path / "screenshot.png"
+    dummy_screenshot.write_bytes(b"image_bytes")
+
+    result = await launch_annotator_impl(screenshot_path=str(dummy_screenshot))
+    assert result["engine_pid"] == 1111
+    assert result["engine_ready"] is True
+    assert "http://127.0.0.1:8000/workspace/import-image" in posted_urls
+
+
+@pytest.mark.anyio
+async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
+    mock_popen = MagicMock()
+    mock_popen.return_value.pid = 2222
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.subprocess.Popen",
+        mock_popen,
+    )
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.shutil.which",
+        lambda name: "/usr/bin/uv",
+    )
+
+    posted_urls = []
+    # Mock AsyncClient to succeed on get and capture post
+    class MockAsyncClient:
+        async def __aenter__(self):
+            return self
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+        async def get(self, url, *args, **kwargs):
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            return mock_res
+        async def post(self, url, *args, **kwargs):
+            posted_urls.append(url)
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            return mock_res
+
+    monkeypatch.setattr(
+        "mcp_server.tools.launch_annotator.httpx.AsyncClient",
+        MockAsyncClient,
+    )
+
+    dummy_zip = tmp_path / "workspace.zip"
+    dummy_zip.write_bytes(b"zip_bytes")
+
+    result = await launch_annotator_impl(workspace_zip=str(dummy_zip))
+    assert result["engine_pid"] == 2222
+    assert result["engine_ready"] is True
+    assert "http://127.0.0.1:8000/workspace/import" in posted_urls

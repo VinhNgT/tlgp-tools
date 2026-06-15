@@ -2,8 +2,10 @@ import json
 import logging
 import sys
 from io import StringIO
+from unittest.mock import MagicMock
 
-from tlgp_logger import get_logger, setup_logging
+from structlog.testing import capture_logs
+from tlgp_logger import get_logger, setup_excepthook, setup_logging
 
 
 def test_logger_json_format():
@@ -48,3 +50,42 @@ def test_standard_logging_interception():
         assert log_data["logger"] == "stdlib_logger"
     finally:
         sys.stderr = stderr
+
+
+def test_excepthook_interception():
+    original_hook = sys.excepthook
+
+    setup_logging(log_level="INFO", json_format=True)
+    setup_excepthook()
+
+    try:
+        with capture_logs() as captured:
+            try:
+                raise ValueError("unhandled error test")
+            except ValueError:
+                sys.excepthook(*sys.exc_info())
+
+        assert len(captured) == 1
+        log_data = captured[0]
+        assert log_data["log_level"] == "critical"
+        assert "Unhandled exception caught by global hook" in log_data["event"]
+    finally:
+        sys.excepthook = original_hook
+
+
+def test_excepthook_keyboard_interrupt():
+    original_hook = sys.excepthook
+    original_sys_excepthook = sys.__excepthook__
+
+    mock_sys_excepthook = MagicMock()
+    sys.__excepthook__ = mock_sys_excepthook
+
+    setup_excepthook()
+
+    try:
+        sys.excepthook(KeyboardInterrupt, KeyboardInterrupt(), None)
+        mock_sys_excepthook.assert_called_once()
+    finally:
+        sys.excepthook = original_hook
+        sys.__excepthook__ = original_sys_excepthook
+

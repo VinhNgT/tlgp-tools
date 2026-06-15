@@ -54,18 +54,18 @@ def test_transformer_with_cuts():
     assert ay2 == 700
 
 
-def test_transformer_parent_stack_disables_cuts():
+def test_transformer_parent_stack_keeps_cuts():
     transformer = ViewportTransformer(cut_gap_px=20)
     transformer.update_image_size(1000, 1000)
     cut_lines = [300, 600]
     transformer.rebuild_segments(cut_lines)
 
-    # Drill down active -> cuts ignored visually
+    # Drill down active -> cuts remain visible/active
     parent_stack = [uuid4()]
 
     cx, cy = transformer.to_canvas(100, 400, 2.0, parent_stack, cut_lines)
     assert cx == 200.0
-    assert cy == 800.0  # straight zoom 400 * 2.0
+    assert cy == 840.0  # (400 + 20) * 2.0
 
 
 def test_transformer_get_boundary():
@@ -115,9 +115,9 @@ def test_transformer_get_segment_y_bounds():
     assert seg_top == 600
     assert seg_bot == 1000
 
-    # Drill down active disables horizontal cuts segment clamping
+    # Drill down active -> horizontal cuts segment clamping remains active
     seg_top, seg_bot = transformer.get_segment_y_bounds(
         400, [uuid4()], cut_lines, boundary
     )
-    assert seg_top == 0
-    assert seg_bot == 1000
+    assert seg_top == 300
+    assert seg_bot == 599

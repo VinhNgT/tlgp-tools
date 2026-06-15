@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import AsyncMock, patch
+
+import pytest
 from mcp_server.prompts import SPEC_WORKFLOW_PROMPT
 from mcp_server.server import spec_doc_workflow
 

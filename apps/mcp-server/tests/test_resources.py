@@ -2,16 +2,16 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from mcp_server.server import (
     get_component_image_resource,
     get_daemon_logs_resource,
-    get_workspace_state_resource,
-    get_spec_schema_resource,
     get_spec_classification_guide_resource,
     get_spec_example_analysis_resource,
+    get_spec_schema_resource,
+    get_workspace_state_resource,
 )
 
 

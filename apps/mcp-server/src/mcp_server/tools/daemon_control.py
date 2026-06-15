@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import atexit
-import os
 import subprocess
 from collections import deque
 

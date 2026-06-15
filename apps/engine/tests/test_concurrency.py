@@ -70,7 +70,7 @@ async def test_concurrent_mutations_maintain_history():
 @pytest.mark.anyio
 async def test_concurrent_tree_recalculations():
     """
-    Tests that simultaneous updates to bounds on siblings/children don't 
+    Tests that simultaneous updates to bounds on siblings/children don't
     corrupt the recalculate_tree boundaries.
     """
     workspace = get_workspace()
