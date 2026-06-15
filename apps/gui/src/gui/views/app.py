@@ -346,7 +346,7 @@ class MainAppWindow(tk.Tk):
     def is_text_focused(self) -> bool:
         return self.properties.is_text_focused()
 
-    def set_ui_interactive(self, enabled: bool):
+    def set_ui_interactive(self, enabled: bool, unreachable: bool = False):
         state = tk.NORMAL if enabled else tk.DISABLED
         self.btn_mode_select.config(state=state)
         self.btn_mode_draw.config(state=state)
@@ -376,6 +376,8 @@ class MainAppWindow(tk.Tk):
                 self.edit_menu.entryconfig(label, state=state)
             except Exception:
                 pass
+
+        self.canvas.set_interactive(enabled, unreachable=unreachable)
 
     def _update_tool_mode(self):
         mode = self.mode_var.get()
@@ -467,8 +469,8 @@ class MainAppWindow(tk.Tk):
         if self.on_open_cut_editor_request:
             self.on_open_cut_editor_request()
 
-    def update_status(self, text: str):
-        self.properties.update_status(text)
+    def update_status(self, text: str, is_error: bool = False):
+        self.properties.update_status(text, is_error=is_error)
 
     def update_zoom_display(self, zoom_factor: float):
         zoom_pct = int(zoom_factor * 100)
@@ -482,9 +484,9 @@ class MainAppWindow(tk.Tk):
             self.btn_back.config(state=tk.DISABLED)
             self.lbl_breadcrumb.config(text="Root")
 
-    def set_canvas_image(self, img: Image.Image | None):
-        self.set_ui_interactive(img is not None)
-        self.canvas.set_background_image(img)
+    def set_canvas_image(self, img: Image.Image | None, unreachable: bool = False):
+        self.set_ui_interactive(img is not None, unreachable=unreachable)
+        self.canvas.set_background_image(img, unreachable=unreachable)
 
     def show_context_menu(self, x_root: int, y_root: int, items: list[dict]):
         """Builds and displays a context menu at the specified screen coordinates."""

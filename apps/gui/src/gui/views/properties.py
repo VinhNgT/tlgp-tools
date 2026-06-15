@@ -203,17 +203,21 @@ class ComponentPropertiesView(ttk.Frame):
         )
         self.txt_status.pack(side=tk.BOTTOM, anchor="se", pady=(20, 5), padx=(0, 5))
         self.txt_status.tag_configure("right", justify="right")
+        self.txt_status.tag_configure("error", foreground="#e74c3c", justify="right")
         self.update_status("Connecting...")
 
         self.disable_properties_fields()
 
-    def update_status(self, text: str):
+    def update_status(self, text: str, is_error: bool = False):
         if not hasattr(self, "txt_status"):
             return
         self.txt_status.config(state=tk.NORMAL)
         self.txt_status.delete("1.0", tk.END)
         self.txt_status.insert("1.0", text)
-        self.txt_status.tag_add("right", "1.0", "end")
+        if is_error:
+            self.txt_status.tag_add("error", "1.0", "end")
+        else:
+            self.txt_status.tag_add("right", "1.0", "end")
         self.txt_status.config(state=tk.DISABLED)
 
     def update_properties_panel(

@@ -67,7 +67,7 @@ class GestureHandler(Protocol):
 
 
 class WelcomeScreen(ttk.Frame):
-    def __init__(self, parent_canvas, on_import_zip, on_import_image, **kwargs):
+    def __init__(self, parent_canvas, on_import_zip, on_import_image, unreachable: bool = False, **kwargs):
         super().__init__(parent_canvas, padding=30, style="Card.TFrame", **kwargs)
         style = ttk.Style()
         style.configure(
@@ -84,6 +84,12 @@ class WelcomeScreen(ttk.Frame):
             "WelcomeDesc.TLabel",
             font=("", 10),
             foreground="#888888",
+            background="#1e1e1e",
+        )
+        style.configure(
+            "WelcomeError.TLabel",
+            font=("", 10, "bold"),
+            foreground="#e74c3c",
             background="#1e1e1e",
         )
         style.configure("WelcomeButton.TButton", font=("", 10, "bold"))
@@ -107,21 +113,48 @@ class WelcomeScreen(ttk.Frame):
         btn_frame = ttk.Frame(self, style="WelcomeContainer.TFrame")
         btn_frame.pack()
 
-        btn_zip = ttk.Button(
+        btn_state = tk.DISABLED if unreachable else tk.NORMAL
+
+        self.btn_zip = ttk.Button(
             btn_frame,
             text="Import Zip Project",
             style="WelcomeButton.TButton",
             command=on_import_zip,
+            state=btn_state,
         )
-        btn_zip.pack(side=tk.LEFT, padx=10)
+        self.btn_zip.pack(side=tk.LEFT, padx=10)
 
-        btn_img = ttk.Button(
+        self.btn_img = ttk.Button(
             btn_frame,
             text="Import Screenshot",
             style="WelcomeButton.TButton",
             command=on_import_image,
+            state=btn_state,
         )
-        btn_img.pack(side=tk.LEFT, padx=10)
+        self.btn_img.pack(side=tk.LEFT, padx=10)
+
+        self.lbl_status = ttk.Label(
+            self,
+            text="⚠️ Engine unreachable. Make sure the engine is running." if unreachable else "",
+            style="WelcomeError.TLabel" if unreachable else "WelcomeDesc.TLabel",
+            anchor="center",
+        )
+        self.lbl_status.pack(pady=(15, 0))
+
+    def set_interactive(self, enabled: bool, unreachable: bool = False):
+        btn_state = tk.NORMAL if enabled else tk.DISABLED
+        self.btn_zip.config(state=btn_state)
+        self.btn_img.config(state=btn_state)
+        if unreachable:
+            self.lbl_status.config(
+                text="⚠️ Engine unreachable. Make sure the engine is running.",
+                style="WelcomeError.TLabel",
+            )
+        else:
+            self.lbl_status.config(
+                text="",
+                style="WelcomeDesc.TLabel",
+            )
 
 
 class AnnotationCanvasView(tk.Canvas):
@@ -245,14 +278,14 @@ class AnnotationCanvasView(tk.Canvas):
         self.active_interaction = active_interaction
         self.draw_boxes()
 
-    def set_background_image(self, img: Image.Image | None):
+    def set_background_image(self, img: Image.Image | None, unreachable: bool = False):
         if img is None:
             self.full_pil_img = None
             self.current_pil_img = None
             if self.image_item_id is not None:
                 self.delete(self.image_item_id)
                 self.image_item_id = None
-            self.show_welcome_screen()
+            self.show_welcome_screen(unreachable=unreachable)
             return
 
         self.hide_welcome_screen()
@@ -267,7 +300,7 @@ class AnnotationCanvasView(tk.Canvas):
         self._last_pan_offset = (0.0, 0.0)
         self._last_workspace_revision = None
 
-    def show_welcome_screen(self):
+    def show_welcome_screen(self, unreachable: bool = False):
         self.delete("all")
         if self.welcome_screen:
             self.welcome_screen.destroy()
@@ -278,6 +311,7 @@ class AnnotationCanvasView(tk.Canvas):
             on_import_image=lambda: (
                 self.on_import_image() if self.on_import_image else None
             ),
+            unreachable=unreachable,
         )
         self.create_window(
             0, 0, window=self.welcome_screen, anchor="center", tags="welcome"
@@ -289,6 +323,10 @@ class AnnotationCanvasView(tk.Canvas):
             self.welcome_screen.destroy()
             self.welcome_screen = None
         self.delete("welcome")
+
+    def set_interactive(self, enabled: bool, unreachable: bool = False):
+        if self.welcome_screen:
+            self.welcome_screen.set_interactive(enabled, unreachable=unreachable)
 
     def fit_to_screen(self):
         if not self.full_pil_img:

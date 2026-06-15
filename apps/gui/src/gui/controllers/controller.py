@@ -116,13 +116,26 @@ class AppController:
     def _apply_state_sync(self):
         state = self.client.state
         if not state:
-            self.view.update_status(f"Connected to engine: {self.client.api_url}\nSession: Connecting...")
-            self.view.set_ui_interactive(False)
+            if self.client.connection_failed:
+                self.view.update_status(
+                    f"Engine unreachable: {self.client.api_url}\nRetrying...",
+                    is_error=True,
+                )
+                self.view.set_canvas_image(None, unreachable=True)
+            else:
+                self.view.update_status(
+                    f"Connected to engine: {self.client.api_url}\nSession: Connecting...",
+                    is_error=False,
+                )
+                self.view.set_canvas_image(None, unreachable=False)
             self._loaded_session_id = None
             self.store.update_state("workspace", workspace_state=None)
             return
 
-        self.view.update_status(f"Connected to engine: {self.client.api_url}\nSession: {state.sessionId}")
+        self.view.update_status(
+            f"Connected to engine: {self.client.api_url}\nSession: {state.sessionId}",
+            is_error=False,
+        )
 
         if state.image:
             current_session_id = str(state.sessionId) if state.sessionId else None

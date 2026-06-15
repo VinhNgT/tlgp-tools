@@ -77,6 +77,8 @@ class EngineClient:
         self._ws = None
         self._loop = None
         self._thread = None
+        self.connected = False
+        self.connection_failed = False
 
     def start(self):
         """Starts the background event loop and WebSocket connection task."""
@@ -117,6 +119,9 @@ class EngineClient:
                 async with websockets.connect(self.ws_url) as ws:
                     logger.info("Connected to Engine WebSocket")
                     self._ws = ws
+                    self.connected = True
+                    self.connection_failed = False
+                    self._trigger_update()
                     async for message in ws:
                         if self.on_log_message:
                             self.dispatch(lambda msg=message: self.on_log_message("Incoming WS", msg))
@@ -151,6 +156,8 @@ class EngineClient:
                 self._ws = None
                 self.state = None
                 self._state_dict = None
+                self.connected = False
+                self.connection_failed = True
                 self._trigger_update()
                 try:
                     await asyncio.sleep(2)

@@ -53,8 +53,12 @@ class MockCanvasView:
     def canvas_image(self, img):
         self._canvas_image = img
 
-    def set_background_image(self, img):
+    def set_background_image(self, img, unreachable: bool = False):
         self._canvas_image = img
+        self.canvas_unreachable = unreachable
+
+    def set_interactive(self, enabled: bool, unreachable: bool = False):
+        self.canvas_unreachable = unreachable
 
     @property
     def is_canvas_dragging(self) -> bool:
@@ -199,9 +203,13 @@ class MockAppWindow:
         self.on_escape_pressed = None
         self.context_menu_pos = None
         self.context_menu_items = None
+        self.ui_interactive_enabled = True
+        self.ui_interactive_unreachable = False
+        self.status_is_error = False
 
-    def update_status(self, text: str):
+    def update_status(self, text: str, is_error: bool = False):
         self.status_text = text
+        self.status_is_error = is_error
 
     def update_zoom_display(self, zoom_factor: float):
         zoom_pct = int(zoom_factor * 100)
@@ -213,11 +221,14 @@ class MockAppWindow:
         else:
             self.breadcrumbs_text = "Root"
 
-    def set_canvas_image(self, img):
+    def set_canvas_image(self, img, unreachable: bool = False):
         self.canvas.canvas_image = img
+        self.canvas.canvas_unreachable = unreachable
+        self.set_ui_interactive(img is not None, unreachable=unreachable)
 
-    def set_ui_interactive(self, enabled: bool):
-        pass
+    def set_ui_interactive(self, enabled: bool, unreachable: bool = False):
+        self.ui_interactive_enabled = enabled
+        self.ui_interactive_unreachable = unreachable
 
     def after(self, ms, func):
         func()
@@ -287,6 +298,8 @@ class MockEngineClient:
         self.exported = False
         self.updated_cut_lines = None
         self.updated_screen_info = None
+        self.connected = True
+        self.connection_failed = False
 
     def import_zip(self, path, on_complete):
         self.imported_zip = path
@@ -718,3 +731,27 @@ def test_controller_state_sync_triggers_updates():
 
     assert store.state.workspace_state is None
     assert controller._loaded_session_id is None
+
+
+def test_controller_engine_unreachable():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+    dialogs = MockDialogService()
+
+    # Configure client to be in an unreachable/failed connection state
+    client.state = None
+    client.connected = False
+    client.connection_failed = True
+
+    controller = AppController(client, store, view, dialogs)
+    controller._on_state_sync_received()
+
+    # Status should display unreachable text and be set as error
+    assert "Engine unreachable" in view.status_text
+    assert view.status_is_error is True
+    # Canvas image should be cleared and set to unreachable welcome screen
+    assert view.canvas.canvas_image is None
+    assert view.canvas.canvas_unreachable is True
+    assert view.ui_interactive_unreachable is True
+    assert view.ui_interactive_enabled is False
