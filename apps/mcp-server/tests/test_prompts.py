@@ -25,8 +25,6 @@ class TestSpecWorkflowPrompt:
     def test_references_current_tools(self):
         tools = [
             "launch_annotator",
-            "get_workspace_state",
-            "download_image",
             "download_workspace_assets",
             "generate_spec_doc",
         ]
@@ -43,6 +41,7 @@ class TestSpecWorkflowPrompt:
             "scaffold_analysis",
             "validate_analysis",
             "generate_docx",
+            "get_workspace_state",
         ]
         for tool in old_tools:
             assert tool not in SPEC_WORKFLOW_PROMPT, (
@@ -58,37 +57,24 @@ class TestSpecWorkflowPrompt:
         assert "{section_prefix}" not in formatted
 
     def test_has_all_steps(self):
-        """Verify the prompt covers the 3-step workflow."""
+        """Verify the prompt covers the high-level workflow."""
         assert "Step 1" in SPEC_WORKFLOW_PROMPT
         assert "Step 2" in SPEC_WORKFLOW_PROMPT
         assert "Step 3" in SPEC_WORKFLOW_PROMPT
+        assert "Step 4" in SPEC_WORKFLOW_PROMPT
 
-    def test_no_more_than_3_steps(self):
-        assert "Step 4" not in SPEC_WORKFLOW_PROMPT
+    def test_no_more_than_4_steps(self):
+        assert "Step 5" not in SPEC_WORKFLOW_PROMPT
 
-    def test_includes_schema_reference(self):
-        assert "sectionPrefix" in SPEC_WORKFLOW_PROMPT
-        assert "exportDir" in SPEC_WORKFLOW_PROMPT
-        assert "controlType" in SPEC_WORKFLOW_PROMPT
-
-    def test_includes_control_types_guide(self):
-        assert "Button" in SPEC_WORKFLOW_PROMPT
-        assert "TextField" in SPEC_WORKFLOW_PROMPT
-        assert "Classification Rules" in SPEC_WORKFLOW_PROMPT
-
-    def test_includes_annotation_format(self):
-        assert "raw.png" in SPEC_WORKFLOW_PROMPT
-        assert "exportDir" in SPEC_WORKFLOW_PROMPT
-        assert "sectionPrefix" in SPEC_WORKFLOW_PROMPT
-
-    def test_includes_example(self):
-        assert "Chi tiết sản phẩm" in SPEC_WORKFLOW_PROMPT
-        assert "Thanh tiêu đề" in SPEC_WORKFLOW_PROMPT
-
-    def test_source_priority_documented(self):
-        assert "Source Priority" in SPEC_WORKFLOW_PROMPT
-        assert "Screenshots" in SPEC_WORKFLOW_PROMPT
-        assert "Source code" in SPEC_WORKFLOW_PROMPT
+    def test_includes_resource_references(self):
+        resources = [
+            "tlgp://spec/classification-guide",
+            "tlgp://spec/schema",
+            "tlgp://spec/example-analysis",
+            "tlgp://workspace/state",
+        ]
+        for res in resources:
+            assert res in SPEC_WORKFLOW_PROMPT, f"Missing resource reference: {res}"
 
     def test_vietnamese_language_rule(self):
         assert "Vietnamese" in SPEC_WORKFLOW_PROMPT

@@ -8,6 +8,7 @@ import pytest
 from mcp_server.server import (
     get_component_image_resource,
     get_daemon_logs_resource,
+    get_daemon_status_resource,
     get_spec_classification_guide_resource,
     get_spec_example_analysis_resource,
     get_spec_schema_resource,
@@ -63,3 +64,18 @@ class TestMcpResources:
         result = get_spec_example_analysis_resource()
         assert "Example" in result
         assert "Chi tiết sản phẩm" in result
+
+    @pytest.mark.anyio
+    @patch("mcp_server.server.get_daemon_manager")
+    async def test_get_daemon_status_resource(self, mock_get_daemon_manager):
+        mock_manager = MagicMock()
+        mock_manager.get_status = AsyncMock(
+            return_value={"engine": {"running": True}, "gui": {"running": False}}
+        )
+        mock_get_daemon_manager.return_value = mock_manager
+
+        result = await get_daemon_status_resource()
+        assert "engine" in result
+        assert "running" in result
+        mock_manager.get_status.assert_called_once()
+

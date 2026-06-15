@@ -45,26 +45,8 @@ _ANNOTATION_JSON_EXAMPLE = """\
 
 
 def _build_prompt() -> str:
-    """Load the prompt markdown and assemble it with references and example."""
-    core_instructions = (_PROMPT_DIR / "spec_workflow.md").read_text(encoding="utf-8")
-    schema_ref = (_PROMPT_DIR / "schema_reference.md").read_text(encoding="utf-8")
-    class_guide = (_PROMPT_DIR / "classification_guide.md").read_text(encoding="utf-8")
-    example_json = (_PROMPT_DIR / "example_analysis.json").read_text(encoding="utf-8")
-
-    # Assemble the full prompt
-    prompt = (
-        core_instructions.strip()
-        + "\n\n---\n\n"
-        + schema_ref.strip()
-        + "\n\n---\n\n"
-        + class_guide.strip()
-        + "\n\n---\n\n"
-        + "## Example: Complete Analysis Dict\n\n```json\n"
-        + example_json.strip()
-        + "\n```"
-    )
-
-    return prompt.replace("{annotation_json_example}", _ANNOTATION_JSON_EXAMPLE)
+    """Load the prompt markdown containing workflow instructions."""
+    return (_PROMPT_DIR / "spec_workflow.md").read_text(encoding="utf-8").strip()
 
 
 def get_spec_workflow_prompt() -> str:

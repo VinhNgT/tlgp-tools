@@ -58,13 +58,18 @@ def get_spec_service() -> SpecGeneratorService:
 mcp = FastMCP(
     "tlgp-tools",
     instructions=(
-        "TLGP Tools MCP server. Provides tools for annotating screenshots "
-        "and generating .docx specification documents. "
-        "CRITICAL DIRECTIVE: You are in a strict Read-Only mode. You cannot "
-        "mutate the Engine state. Your role is to analyze the state and generate "
-        "specifications. Do NOT use terminal tools (like curl) to interact "
-        "with the Engine REST API. "
-        "Use the `spec_doc_workflow` prompt to get the full workflow guide."
+        "TLGP Tools MCP server. Provides tools for annotating screenshots and compiling .docx specification documents.\n\n"
+        "SYSTEM DIRECTIVES & BOUNDARIES:\n"
+        "1. STRICT ENGINE READ-ONLY MODE: You are strictly prohibited from mutating the Engine state directly (e.g. creating, moving, updating, deleting components, or undoing/redoing actions). All state changes must be performed by the user in the GUI.\n"
+        "2. NO REST API DIRECT BYPASS: Do NOT bypass the MCP server layer (e.g., using curl, terminal/shell commands, or custom Python scripts) to interact directly with the running Engine REST API.\n"
+        "3. VIETNAMESE LANGUAGE REQUIREMENT: All user-facing UI labels, component descriptions, screen descriptions, actions, reactions, and discrepancies written to the analysis data structure MUST be in Vietnamese.\n"
+        "4. PARAMETER PAYLOAD LIMITATION: Direct 'analysis' dictionary arguments to 'generate_spec_doc' must not exceed 10KB to prevent JSON-RPC transport corruption. For larger payloads, save the data using the 'write_analysis_json' tool first, and pass the resulting absolute path via 'analysis_path'.\n"
+        "5. STRICT VALIDATION PIPELINE: Always run 'generate_spec_doc(validate_only=True)' and review/resolve all validation warnings and errors before calling the tool with 'validate_only=False'.\n"
+        "6. REFERENCE GUIDES & DATA: Prior to performing any analysis or constructing parameters, read the resource guides:\n"
+        "   - 'tlgp://spec/schema' (JSON Schema structure)\n"
+        "   - 'tlgp://spec/classification-guide' (UI Control type rules)\n"
+        "   - 'tlgp://spec/example-analysis' (Complete example analysis data structure)\n"
+        "   - 'tlgp://workspace/state' (Active annotation hierarchy state)"
     ),
 )
 
@@ -96,6 +101,13 @@ def get_daemon_logs_resource(daemon_name: str) -> str:
     """
     res = get_daemon_manager().read_daemon_logs(daemon_name, lines=100)
     return res.get("logs", "")
+
+
+@mcp.resource("tlgp://daemons/status")
+async def get_daemon_status_resource() -> str:
+    """Read-only access to the running status of Engine and GUI daemons."""
+    status = await get_daemon_manager().get_status(client=get_client().client)
+    return json.dumps(status, indent=2, ensure_ascii=False)
 
 
 @mcp.resource("tlgp://spec/schema")
@@ -144,16 +156,6 @@ async def launch_annotator(
         workspace_zip=workspace_zip,
         client=get_client().client,
     )
-
-
-@mcp.tool()
-async def get_workspace_state() -> dict:
-    """Fetch the current flat-map JSON WorkspaceState from the running Engine.
-
-    Use this tool to read the latest annotation hierarchy automatically,
-    instead of relying on local JSON files.
-    """
-    return await get_client().get_workspace_state()
 
 
 @mcp.tool()
@@ -229,23 +231,17 @@ async def generate_spec_doc(
 ) -> dict:
     """Generate a TLGP specification document (.docx).
 
-    Takes completed analysis data and generates a formatted specification
-    document. The analysis dict must conform to the AnalysisData schema.
-
-    The tool validates all data and image references, generates the .docx,
-    and saves analysis.json alongside it for record-keeping.
+    CRITICAL REQUIREMENTS:
+    1. Vietnamese Translation: All component labels, descriptions, and outputs inside the analysis payload must be written in Vietnamese.
+    2. Parameter Payload Limitation: If the analysis dictionary is large (e.g., over 10KB), passing it directly via the 'analysis' parameter may corrupt the JSON-RPC transport middleware. You MUST call `write_analysis_json` first to save it to disk, and pass the resulting absolute path via the 'analysis_path' parameter.
+    3. Strict Validation Workflow: Always run `generate_spec_doc(validate_only=True)` first to validate the payload structure and component images. Address any warnings or errors before proceeding to document generation with `validate_only=False`.
+    4. Guidelines: Read resources `tlgp://spec/classification-guide` and `tlgp://spec/schema` before preparing the payload.
 
     Args:
-        analysis: Complete analysis data dict. Must include: sectionPrefix,
-            exportDir, components, screen, apis, and discrepancies.
-            exportDir must point to the annotation export directory
-            containing the annotated images.
-        analysis_path: Optional path to analysis JSON file.
-        output_path: Where to save the .docx. Defaults to
-            <screen_name>.docx in exportDir.
-        validate_only: If True, validate the data and check images
-            without generating the .docx. Use this to catch errors
-            before committing to generation.
+        analysis: Complete analysis data dict.
+        analysis_path: Path to saved analysis.json file (highly recommended for large payloads to bypass size limits).
+        output_path: Where to save the .docx. Defaults to <screen_name>.docx in exportDir.
+        validate_only: If True, validates structure and checks files without compiling.
 
     Returns:
         dict with valid, output_path, tables, images, warnings, errors.
@@ -300,7 +296,11 @@ async def spec_doc_workflow(section_prefix: str = "1.1") -> list:
 
 @mcp.tool()
 def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
-    """Safely write analysis data structure to analysis.json in the export directory.
+    """Safely write the analysis dictionary to a JSON file in the export directory.
+
+    This tool is the primary payload size limit bypass. If your analysis data is large 
+    (e.g., >10KB), call this tool first to persist the payload and get an absolute path, 
+    which you then pass to the generate/validate tool.
 
     Args:
         data: Complete analysis data dict.
@@ -310,26 +310,9 @@ def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
 
 
 @mcp.tool()
-async def get_daemon_status() -> dict:
-    """Get status of background annotation tool GUI and engine processes."""
-    return await get_daemon_manager().get_status(client=get_client().client)
-
-
-@mcp.tool()
 def kill_daemons() -> dict:
     """Cleanly terminate all background annotation GUI and engine processes."""
     return get_daemon_manager().kill_daemons()
-
-
-@mcp.tool()
-def read_daemon_logs(daemon: str = "engine", lines: int = 100) -> dict:
-    """Read the recent log lines from engine or gui daemon.
-
-    Args:
-        daemon: The daemon name ('engine' or 'gui').
-        lines: Max number of tailing log lines to retrieve (default 100).
-    """
-    return get_daemon_manager().read_daemon_logs(daemon, lines)
 
 
 @mcp.tool()
