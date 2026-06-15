@@ -170,4 +170,140 @@ def test_websocket_json_rpc():
         assert uuid.UUID(comp_id) in workspace.state.components
 
 
+def test_image_endpoint_hierarchy():
+    import io
+    from PIL import Image
+    from models import Component, Bounds, Style, Visibility
 
+    # Create a dummy 100x100 transparent image
+    img = Image.new("RGBA", (100, 100), (255, 255, 255, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    valid_png_bytes = buf.getvalue()
+
+    workspace = get_workspace()
+    workspace.raw_image_bytes = valid_png_bytes
+    workspace.state.image = ImageInfo(filename="test.png", width=100, height=100)
+    
+    # Create a hierarchy:
+    # Root Component (parent_id=None)
+    #   -> Child Component (Leaf)
+    
+    parent_id = uuid.uuid4()
+    child_id = uuid.uuid4()
+    
+    parent_comp = Component(
+        id=parent_id,
+        number="1",
+        label="Parent",
+        bounds=Bounds(x=10, y=10, w=80, h=80),
+        childrenIds=[child_id]
+    )
+    
+    child_comp = Component(
+        id=child_id,
+        number="1.1",
+        label="Child",
+        parentId=parent_id,
+        bounds=Bounds(x=20, y=20, w=40, h=40),
+        childrenIds=[]
+    )
+    
+    workspace.state.components[parent_id] = parent_comp
+    workspace.state.components[child_id] = child_comp
+    workspace.state.rootComponents = [parent_id]
+    
+    # 1. Test Root
+    response = client.get("/image/root")
+    assert response.status_code == 200
+    assert response.headers["content-type"] == "image/png"
+    
+    # Root with show_children
+    response = client.get("/image/root?show_children=true")
+    assert response.status_code == 200
+    
+    # 2. Test Parent Component
+    response = client.get(f"/image/{parent_id}")
+    assert response.status_code == 200
+    # Parent with show_children
+    response = client.get(f"/image/{parent_id}?show_children=true")
+    assert response.status_code == 200
+    
+    # 3. Test Leaf Component
+    response = client.get(f"/image/{child_id}")
+    assert response.status_code == 200
+    # Leaf with show_children
+    response = client.get(f"/image/{child_id}?show_children=true")
+    assert response.status_code == 200
+
+def test_image_endpoint_components():
+    import io
+    from PIL import Image
+    from models import Component, Bounds
+
+    # Create a 100x100 dummy image
+    img = Image.new("RGBA", (100, 100), (255, 255, 255, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    valid_png_bytes = buf.getvalue()
+
+    workspace = get_workspace()
+    workspace.raw_image_bytes = valid_png_bytes
+    workspace.state.image = ImageInfo(filename="test.png", width=100, height=100)
+    
+    # Create parent and leaf components
+    parent_id = uuid.uuid4()
+    leaf_id = uuid.uuid4()
+    
+    parent_comp = Component(
+        id=parent_id,
+        number="1",
+        label="Parent",
+        bounds=Bounds(x=10, y=10, w=50, h=50),
+        childrenIds=[leaf_id]
+    )
+    leaf_comp = Component(
+        id=leaf_id,
+        number="1.1",
+        label="Leaf",
+        parentId=parent_id,
+        bounds=Bounds(x=20, y=20, w=20, h=20)
+    )
+    
+    workspace.state.components[parent_id] = parent_comp
+    workspace.state.components[leaf_id] = leaf_comp
+    workspace.state.rootComponents = [parent_id]
+    
+    # 1. Test parent image (crop should be 50x50)
+    res_parent = client.get(f"/image/{parent_id}")
+    assert res_parent.status_code == 200
+    
+    # We can check the dimensions of the returned image
+    returned_img = Image.open(io.BytesIO(res_parent.content))
+    assert returned_img.width == 50
+    assert returned_img.height == 50
+    
+    # 2. Test leaf image (crop should be 20x20)
+    res_leaf = client.get(f"/image/{leaf_id}")
+    assert res_leaf.status_code == 200
+    
+    returned_leaf = Image.open(io.BytesIO(res_leaf.content))
+    assert returned_leaf.width == 20
+    assert returned_leaf.height == 20
+    
+    # 3. Test root image with show_children
+    res_root_children = client.get("/image/root?show_children=true")
+    assert res_root_children.status_code == 200
+    
+    res_root_no_children = client.get("/image/root?show_children=false")
+    assert res_root_no_children.status_code == 200
+    
+    # Verify the image bytes differ, meaning the rendering actually drew the annotations
+    assert res_root_children.content != res_root_no_children.content
+    
+    # 4. Test parent image with show_children
+    res_parent_children = client.get(f"/image/{parent_id}?show_children=true")
+    assert res_parent_children.status_code == 200
+    
+    # Verify parent image bytes also differ when drawing children
+    assert res_parent_children.content != res_parent.content

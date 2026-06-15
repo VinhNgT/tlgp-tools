@@ -14,9 +14,10 @@ from fastapi import (
     WebSocketDisconnect,
 )
 from fastapi.responses import Response
-from models import Bounds, Component, ImageInfo, Style, Visibility, WorkspaceState
+from models import Bounds, Component, ImageInfo, Style, Visibility, WorkspaceState, TreeUtils
 from PIL import Image
 from pydantic import BaseModel
+from rendering.renderer import draw_annotations_on_image
 from tlgp_logger import get_logger
 
 from .exceptions import (
@@ -187,34 +188,49 @@ async def get_state(workspace: WorkspaceDep):
 # ── Image Endpoints ────────────────────────────────────────────────────
 
 
-@router.get("/image/raw", tags=["Image"])
-async def get_raw_image(workspace: WorkspaceDep):
-    """Returns the raw unannotated image straight from RAM."""
-    if not workspace.raw_image_bytes:
-        raise ComponentNotFoundError(
-            "No image in workspace", session_id=str(workspace.state.sessionId)
-        )
-
-    return Response(content=workspace.raw_image_bytes, media_type="image/png")
-
-
-@router.get("/image/crop/{comp_id}", tags=["Image"])
-async def get_image_crop(
-    comp_id: uuid.UUID, workspace: WorkspaceDep
+@router.get("/image/{comp_id}", tags=["Image"])
+async def get_image(
+    comp_id: str,
+    workspace: WorkspaceDep,
+    show_children: bool = False,
 ):
-    """Returns a cropped unannotated image for a specific component straight from RAM."""
-    if comp_id not in workspace.state.components:
-        raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
-
+    """Returns an image crop for a specific component, or the full screenshot if comp_id is 'root'."""
     if not workspace.raw_image_bytes:
-        raise InvalidStateError("No image in RAM", component_id=str(comp_id))
+        raise InvalidStateError("No image in RAM", session_id=str(workspace.state.sessionId))
 
-    comp = workspace.state.components[comp_id]
+    if comp_id == "root":
+        bounds_left, bounds_top, bounds_right, bounds_bottom = 0, 0, workspace.state.image.width, workspace.state.image.height
+        parent_comp = None
+        children = TreeUtils.get_children(workspace.state, None) if show_children else []
+        offset_x, offset_y = 0, 0
+    else:
+        try:
+            comp_uuid = uuid.UUID(comp_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid component ID format")
 
-    # We use PIL to crop on the fly from RAM
-    with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
+        if comp_uuid not in workspace.state.components:
+            raise ComponentNotFoundError("Component not found", component_id=str(comp_uuid))
+        
+        comp = workspace.state.components[comp_uuid]
         bounds = comp.bounds
-        cropped = img.crop((bounds.left, bounds.top, bounds.right, bounds.bottom))
+        bounds_left, bounds_top, bounds_right, bounds_bottom = bounds.left, bounds.top, bounds.right, bounds.bottom
+        parent_comp = comp
+        children = TreeUtils.get_children(workspace.state, comp_uuid) if show_children else []
+        offset_x, offset_y = bounds.left, bounds.top
+
+    with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
+        cropped = img.crop((bounds_left, bounds_top, bounds_right, bounds_bottom))
+        
+        if show_children and children:
+            cropped = draw_annotations_on_image(
+                cropped,
+                children,
+                offset_x,
+                offset_y,
+                parent_comp,
+                workspace.state.image.width
+            )
 
         buf = io.BytesIO()
         cropped.save(buf, format="PNG")
