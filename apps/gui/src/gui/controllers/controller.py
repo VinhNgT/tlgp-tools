@@ -28,6 +28,7 @@ class AppController:
         self.view = view
         self.dialog_service = dialog_service
         self._loaded_session_id = None
+        self.pending_created_ids: set[UUID] = set()
 
         self.view.report_callback_exception = self._global_error_handler
 
@@ -188,7 +189,14 @@ class AppController:
 
         # Re-resolve selection bounds with updated components list
         canvas_sel = self.store.state.selected_component_ids
-        updated_sel = [uid for uid in canvas_sel if uid in state.components]
+        for uid in list(self.pending_created_ids):
+            if uid in state.components:
+                self.pending_created_ids.remove(uid)
+        updated_sel = [
+            uid
+            for uid in canvas_sel
+            if uid in state.components or uid in self.pending_created_ids
+        ]
         self.store.update_state("selection", selected_component_ids=updated_sel)
 
         # Notify workspace state observers
@@ -383,6 +391,7 @@ class AppController:
 
     def _on_soft_restart_request(self):
         self._loaded_session_id = None
+        self.pending_created_ids.clear()
         self.view.set_canvas_image(None)
         self.view.update_status("Reconnecting to engine...")
         self.view.set_ui_interactive(False)
@@ -661,7 +670,12 @@ class AppController:
         parent_id = (
             self.store.state.parent_stack[-1] if self.store.state.parent_stack else None
         )
-        self.client.add_component(label="Component", bounds=bounds, parent_id=parent_id)
+        comp_id = self.client.add_component(
+            label="Component", bounds=bounds, parent_id=parent_id
+        )
+        comp_uuid = UUID(comp_id)
+        self.pending_created_ids.add(comp_uuid)
+        self.store.update_state("selection", selected_component_ids=[comp_uuid])
         self.view.set_mode_str("select")
 
     def _on_canvas_context_menu(self, event, clicked: Component | None):

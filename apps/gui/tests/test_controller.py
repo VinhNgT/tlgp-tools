@@ -1,6 +1,6 @@
 import io
 from unittest.mock import MagicMock
-from uuid import uuid4
+from uuid import UUID, uuid4
 
 from gui.controllers.controller import AppController
 from gui.dialog_service import DialogService
@@ -320,6 +320,9 @@ class MockEngineClient:
 
     def update_screen_info(self, name, description):
         self.updated_screen_info = (name, description)
+
+    def add_component(self, label: str, bounds: dict, parent_id: str | None = None) -> str:
+        return str(uuid4())
 
     def move_component(self, comp_id, x, y):
         pass
@@ -755,3 +758,32 @@ def test_controller_engine_unreachable():
     assert view.canvas.canvas_unreachable is True
     assert view.ui_interactive_unreachable is True
     assert view.ui_interactive_enabled is False
+
+
+def test_controller_on_component_created():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+    dialogs = MockDialogService()
+
+    generated_uuid_str = None
+
+    def mock_add(label, bounds, parent_id=None):
+        nonlocal generated_uuid_str
+        generated_uuid_str = str(uuid4())
+        return generated_uuid_str
+
+    client.add_component = mock_add
+
+    controller = AppController(client, store, view, dialogs)
+
+    # Trigger component creation
+    bounds = {"x": 50, "y": 60, "w": 70, "h": 80}
+    controller._on_component_created(bounds)
+
+    # Verify the generated component is selected immediately
+    assert generated_uuid_str is not None
+    generated_uuid = UUID(generated_uuid_str)
+    assert store.state.selected_component_ids == [generated_uuid]
+    assert generated_uuid in controller.pending_created_ids
+    assert view.mode_str == "select"
