@@ -114,7 +114,6 @@ def _build_analysis(screen_dir: Path) -> dict:
             ],
             "interactions": [],
         },
-        "apis": [],
         "discrepancies": [],
     }
 

@@ -28,11 +28,13 @@ Before starting, read these resources to understand the component classification
 
 ### Step 3: Analyze
 1. **Vision analysis:** Inspect the screenshot and component images from the `./unannotated_assets` directory. Categorize components using the rules in `tlgp://spec/classification-guide`. Fill in component details, child control types, descriptions, and interactions.
-2. **Codebase analysis:** Search the codebase for APIs, DTOs, and navigation routes related to the screen. Fill in the APIs list. Log any conflicts between code and screenshots in `discrepancies`.
+2. **Codebase analysis:** Search the codebase for APIs, DTOs, and navigation routes related to the screen. Fill in the APIs list in each component and the screen. Be careful to place the API under the component that **uses** the API (displays its data or handles its response), not where it is called in code (such as screen controllers or coordinators). If an API is shared/used by multiple child components, place it in the closest common parent component (or the screen overview) that encompasses all of them to avoid duplication. Ensure no duplicate APIs are defined (each API must have a unique sequential number and unique method/url endpoint, belonging to exactly one component or screen). See Guideline 11. Log any conflicts between code and screenshots in `discrepancies`.
+3. **Guidance on mismatch:** You must always cross-reference the screenshot and components in the workspace with the target codebase. If the screenshot or components do not match the target codebase, you MUST stop and ask the user for guidance.
+
 
 ### Step 4: Validate & Generate
 1. **IDE Parameter Bypass:** If the analysis data is large (e.g., >10KB), you MUST call `write_analysis_json(data=...)` to save it to disk and retrieve the file path. Pass this path as `analysis_path` to `generate_spec_doc`.
 2. **Validate:** Run `generate_spec_doc(analysis_path=..., validate_only=True)`. Fix any warnings or errors returned.
 3. **Generate:** Run `generate_spec_doc(analysis_path=..., validate_only=False)`. This will generate the `.docx` document and automatically save/copy the final `analysis.json` and `workspace.zip` next to the `.docx` file for record-keeping.
-   *(Note: The document builder organizes the DOCX file in the following order: (1) Component sections (DFS order), (2) Screen overview section (containing the root/main screen image), and (3) API documentation.)*
+   *(Note: The document builder organizes the DOCX file by sections: first the non-leaf components (in DFS order), and then the screen overview section. Each component and screen section appends its own API documentation at the end.)*
 4. **Unlock Workspace:** Call `set_workspace_readonly(read_only=False)` to return edit control to the user.

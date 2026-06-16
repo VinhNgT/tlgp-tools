@@ -131,6 +131,7 @@ class MockPropertiesView:
         self.on_property_changed = None
         self.on_focus_changed = None
         self.properties_box_id = None
+        self._selected_box_id = None
         self.properties_label = None
         self.properties_x = None
         self.properties_y = None
@@ -158,6 +159,7 @@ class MockPropertiesView:
         pill_corner,
     ):
         self.properties_box_id = box_id
+        self._selected_box_id = box_id
         self.properties_label = label
         self.properties_x = x
         self.properties_y = y
@@ -176,6 +178,7 @@ class MockPropertiesView:
 
     def disable_properties_fields(self):
         self.properties_disabled = True
+        self._selected_box_id = None
 
 
 class MockAppWindow:
@@ -787,3 +790,141 @@ def test_controller_on_component_created():
     assert store.state.selected_component_ids == [generated_uuid]
     assert generated_uuid in controller.pending_created_ids
     assert view.mode_str == "select"
+
+
+def test_controller_forces_field_updates_on_box_switch():
+    store = UIStateStore()
+    client = MockEngineClient()
+    view = MockAppWindow()
+
+    controller = AppController(client, store, view, MockDialogService())
+
+    comp_id_1 = uuid4()
+    comp_1 = Component(
+        id=comp_id_1,
+        number="1",
+        label="Box 1",
+        bounds=Bounds(x=10, y=20, w=100, h=200),
+        style=Style(),
+        visibility=Visibility(),
+    )
+    comp_id_2 = uuid4()
+    comp_2 = Component(
+        id=comp_id_2,
+        number="2",
+        label="Box 2",
+        bounds=Bounds(x=30, y=40, w=150, h=250),
+        style=Style(),
+        visibility=Visibility(),
+    )
+    ws = WorkspaceState(sessionId=uuid4(), components={comp_id_1: comp_1, comp_id_2: comp_2})
+    client.state = ws
+    store.update_state("workspace", workspace_state=ws)
+
+    # Focus is on 'name'
+    view.properties.properties_focused_fields.add("name")
+    view.properties.properties_values["name"] = "User Typed In Box 1"
+
+    # Select Box 1
+    store.update_state("selection", selected_component_ids=[comp_id_1])
+    controller._on_selection_updated()
+
+    # The panel should show Box 1 name because we just selected it
+    assert view.properties.properties_values["name"] == "Box 1"
+
+    # Change User typed text (simulating focus is still on 'name')
+    view.properties.properties_values["name"] = "User Typed New Name"
+
+    # Switch selection to Box 2
+    store.update_state("selection", selected_component_ids=[comp_id_2])
+    controller._on_selection_updated()
+
+    # Since selection changed to a new box, 'name' should be force-updated to Box 2's name
+    # even though "name" was in properties_focused_fields
+    assert view.properties.properties_values["name"] == "Box 2"
+
+
+def test_properties_view_saves_on_box_switch():
+    import tkinter as tk
+    from unittest.mock import patch
+    root = tk.Tk()
+    try:
+        from gui.views.properties import ComponentPropertiesView
+        with patch("gui.views.properties.CornerSelector"):
+            properties_view = ComponentPropertiesView(root)
+
+        called_args = []
+        def on_property_changed(comp_id, **kwargs):
+            called_args.append((comp_id, kwargs))
+
+        properties_view.on_property_changed = on_property_changed
+
+        # Set initial box
+        properties_view.update_properties_panel(
+            box_id="box-1",
+            label="Initial Box 1",
+            x=10, y=20, w=100, h=200,
+            is_visible=True,
+            is_locked=False,
+            is_effectively_locked=False,
+            pill_corner="top_left"
+        )
+        # Manually set the Entry value
+        properties_view.entry_name.delete(0, tk.END)
+        properties_view.entry_name.insert(0, "Box 1 Edited Name")
+
+        # Now, select box 2
+        properties_view.update_properties_panel(
+            box_id="box-2",
+            label="Initial Box 2",
+            x=30, y=40, w=150, h=250,
+            is_visible=True,
+            is_locked=False,
+            is_effectively_locked=False,
+            pill_corner="top_left"
+        )
+
+        # It should have saved the edited name of box-1
+        assert len(called_args) == 1
+        assert called_args[0] == ("box-1", {"label": "Box 1 Edited Name"})
+    finally:
+        root.destroy()
+
+
+def test_properties_view_saves_on_disable():
+    import tkinter as tk
+    from unittest.mock import patch
+    root = tk.Tk()
+    try:
+        from gui.views.properties import ComponentPropertiesView
+        with patch("gui.views.properties.CornerSelector"):
+            properties_view = ComponentPropertiesView(root)
+
+        called_args = []
+        def on_property_changed(comp_id, **kwargs):
+            called_args.append((comp_id, kwargs))
+
+        properties_view.on_property_changed = on_property_changed
+
+        # Set initial box
+        properties_view.update_properties_panel(
+            box_id="box-1",
+            label="Initial Box 1",
+            x=10, y=20, w=100, h=200,
+            is_visible=True,
+            is_locked=False,
+            is_effectively_locked=False,
+            pill_corner="top_left"
+        )
+        # Manually set the Entry value
+        properties_view.entry_name.delete(0, tk.END)
+        properties_view.entry_name.insert(0, "Box 1 Edited Name")
+
+        # Disable properties fields (e.g. selection cleared)
+        properties_view.disable_properties_fields()
+
+        # It should have saved the edited name of box-1
+        assert len(called_args) == 1
+        assert called_args[0] == ("box-1", {"label": "Box 1 Edited Name"})
+    finally:
+        root.destroy()

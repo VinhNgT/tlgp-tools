@@ -116,6 +116,10 @@ def _add_component_section(
         )
         build_interaction_table(doc, component.interactions, style)
 
+    # Render APIs at the end of the component section
+    for idx, api in enumerate(component.apis):
+        _add_api_section(doc, api, style, idx + 1)
+
 
 def _add_screen_section(
     doc: Document,
@@ -153,11 +157,15 @@ def _add_screen_section(
         )
         build_interaction_table(doc, screen.interactions, style)
 
+    # Render APIs at the end of the screen section
+    for idx, api in enumerate(screen.apis):
+        _add_api_section(doc, api, style, idx + 1)
 
-def _add_api_section(doc: Document, api: Api, style: StyleConfig):
+
+def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int):
     """Build a single API documentation block."""
     # API title: bold normal text
-    _add_bold_text(doc, f"{api.number}. {api.method} {api.title}", style)
+    _add_bold_text(doc, f"{api_index}. {api.method} {api.title}", style)
 
     # API URL: plain normal text
     _add_normal_text(doc, f"URL: {api.url}", style)
@@ -234,9 +242,5 @@ def build_document(analysis: AnalysisData) -> Document:
     # Screen overview section
     screen_section_num = f"{analysis.sectionPrefix}.{len(non_leaf_components) + 1}"
     _add_screen_section(doc, analysis.screen, screen_section_num, analysis, style_config)
-
-    # API documentation
-    for api in analysis.apis:
-        _add_api_section(doc, api, style_config)
 
     return doc

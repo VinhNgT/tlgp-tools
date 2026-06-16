@@ -10,7 +10,6 @@ Every field maps to a specific location in the generated .docx document.
 | `exportDir` | `str` | Absolute path to the annotation export directory |
 | `components` | `list[Component]` | All annotated components. Must be sorted in post-order DFS sequence (child components first, parent components later) |
 | `screen` | `Screen` | Screen-level metadata |
-| `apis` | `list[Api]` | API documentation from codebase analysis |
 | `discrepancies` | `list[Discrepancy]` | Conflicts between screenshots and code |
 
 ### Component Fields
@@ -24,6 +23,7 @@ Every field maps to a specific location in the generated .docx document.
 | `imageFile` | `str?` | Filename of the component annotated image (e.g. `<uuid>.png`) |
 | `children` | `list[ChildElement]` | UI elements inside this component |
 | `interactions` | `list[Interaction]` | User action / system reaction pairs |
+| `apis` | `list[Api]` | API documentation used by this component (only for non-leaf components) |
 
 ### ChildElement Fields
 
@@ -53,6 +53,7 @@ Every field maps to a specific location in the generated .docx document.
 | `imageFiles` | `list[str]` | Root annotated image filenames |
 | `topLevelChildren` | `list[ChildElement]` | Top-level component summary |
 | `interactions` | `list[Interaction]` | Screen-level interactions |
+| `apis` | `list[Api]` | API documentation used directly by this screen overview |
 
 ### Api Fields
 

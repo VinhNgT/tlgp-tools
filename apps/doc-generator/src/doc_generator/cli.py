@@ -60,7 +60,7 @@ def _print_summary(analysis: AnalysisData):
     print(
         f"  Interactions:       {total_interactions} (components) + {screen_interactions} (screen)"
     )
-    print(f"  APIs:               {len(analysis.apis)}")
+    print(f"  APIs:               {len(analysis.all_apis)}")
     print()
 
     # Count images
@@ -96,7 +96,7 @@ def _print_summary(analysis: AnalysisData):
         table_count += 1
     if screen_interactions:
         table_count += 1
-    for api in analysis.apis:
+    for api in analysis.all_apis:
         if api.requestParams:
             table_count += 1
         if api.responseFields:

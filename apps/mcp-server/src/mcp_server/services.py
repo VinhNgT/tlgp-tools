@@ -189,7 +189,7 @@ class SpecGeneratorService:
         if empty_controls:
             warnings.append(f"{empty_controls} child element(s) have empty controlType")
 
-        if not data.apis:
+        if not data.all_apis:
             warnings.append("No APIs defined")
 
         for disc in data.discrepancies:
@@ -218,7 +218,7 @@ class SpecGeneratorService:
                 "non_leaf": len(non_leaf),
                 "ui_elements": sum(len(c.children) for c in non_leaf),
                 "interactions": sum(len(c.interactions) for c in non_leaf),
-                "apis": len(data.apis),
+                "apis": len(data.all_apis),
                 "images": image_count,
             }
 

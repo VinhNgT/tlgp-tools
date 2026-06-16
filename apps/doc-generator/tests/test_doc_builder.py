@@ -16,10 +16,13 @@ from PIL import Image
 
 def _minimal_analysis(tmp_path, **overrides) -> AnalysisData:
     """Create a minimal AnalysisData for testing."""
+    screen_apis = overrides.pop("apis", [])
+    screen_desc = overrides.pop("screen_description", "Test description")
+    screen_name = overrides.pop("screen_name", "Test Screen")
     defaults = {
         "sectionPrefix": "1.1",
         "exportDir": str(tmp_path),
-        "screen": Screen(name="Test Screen", description="Test description"),
+        "screen": Screen(name=screen_name, description=screen_desc, apis=screen_apis),
     }
     defaults.update(overrides)
     return AnalysisData(**defaults)
@@ -254,6 +257,25 @@ class TestBuildDocumentWithApis:
         text = "\n".join(p.text for p in doc.paragraphs)
         assert "Response (data = int)" in text
         assert "Tổng số items trong giỏ hàng" in text
+
+    def test_component_apis_under_component_section(self, tmp_path):
+        analysis = _minimal_analysis(
+            tmp_path,
+            components=[
+                Component(
+                    id=1,
+                    label="Header",
+                    description="Header component",
+                    apis=[
+                        Api(number=1, method="GET", title="Get Header Data", url="/api/header"),
+                    ]
+                )
+            ]
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Component Header" in text
+        assert "1. GET Get Header Data" in text
 
 
 class TestBuildDocumentWithImages:

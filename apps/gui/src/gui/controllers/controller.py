@@ -341,8 +341,12 @@ class AppController:
                 if active_interaction and comp_id in active_interaction:
                     bounds = active_interaction[comp_id]
 
+                prev_box_id = self.view.properties._selected_box_id
+                current_box_id = str(comp.id)
+                box_changed = prev_box_id != current_box_id
+
                 self.view.properties.update_properties_panel(
-                    box_id=str(comp.id),
+                    box_id=current_box_id,
                     label=comp.label,
                     x=int(bounds.x),
                     y=int(bounds.y),
@@ -353,10 +357,10 @@ class AppController:
                     is_effectively_locked=self._is_effectively_locked(comp.id),
                     pill_corner=getattr(comp.style, "pillCorner", "top_left"),
                 )
-                if not self.view.properties.is_field_focused("name"):
+                if box_changed or not self.view.properties.is_field_focused("name"):
                     self.view.properties.update_field_value("name", comp.label)
                 for key in ["x", "y", "w", "h"]:
-                    if not self.view.properties.is_field_focused(key):
+                    if box_changed or not self.view.properties.is_field_focused(key):
                         val = getattr(bounds, key, 0)
                         self.view.properties.update_field_value(key, str(int(val)))
                 return

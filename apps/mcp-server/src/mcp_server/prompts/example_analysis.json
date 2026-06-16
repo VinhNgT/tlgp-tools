@@ -74,40 +74,40 @@
         "action": "Mở màn hình",
         "reaction": "Hệ thống gọi API lấy chi tiết sản phẩm và hiển thị"
       }
+    ],
+    "apis": [
+      {
+        "number": 1,
+        "method": "GET",
+        "title": "Lấy chi tiết sản phẩm",
+        "url": "/api/v1/products/{id}",
+        "requestParams": [
+          {
+            "name": "id",
+            "meaning": "ID sản phẩm",
+            "required": "Có",
+            "dataType": "int",
+            "limit": "",
+            "defaultValue": ""
+          }
+        ],
+        "requestBodyType": "",
+        "requestDescription": "",
+        "responseType": "ProductDetailDto",
+        "responseFields": [
+          {
+            "name": "name",
+            "meaning": "Tên sản phẩm",
+            "required": "Có",
+            "dataType": "String",
+            "limit": "",
+            "defaultValue": ""
+          }
+        ],
+        "responseDescription": "",
+        "subDtos": []
+      }
     ]
   },
-  "apis": [
-    {
-      "number": 1,
-      "method": "GET",
-      "title": "Lấy chi tiết sản phẩm",
-      "url": "/api/v1/products/{id}",
-      "requestParams": [
-        {
-          "name": "id",
-          "meaning": "ID sản phẩm",
-          "required": "Có",
-          "dataType": "int",
-          "limit": "",
-          "defaultValue": ""
-        }
-      ],
-      "requestBodyType": "",
-      "requestDescription": "",
-      "responseType": "ProductDetailDto",
-      "responseFields": [
-        {
-          "name": "name",
-          "meaning": "Tên sản phẩm",
-          "required": "Có",
-          "dataType": "String",
-          "limit": "",
-          "defaultValue": ""
-        }
-      ],
-      "responseDescription": "",
-      "subDtos": []
-    }
-  ],
   "discrepancies": []
 }

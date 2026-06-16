@@ -116,91 +116,91 @@
     ],
     "interactions": [
       { "action": "Khởi động màn hình", "reaction": "Gọi API lấy thông tin chi tiết sản phẩm và hiển thị UI" }
+    ],
+    "apis": [
+      {
+        "number": 1,
+        "method": "GET",
+        "title": "Chi tiết sản phẩm",
+        "url": "/api/v1/products/{productID}",
+        "requestParams": [
+          {
+            "name": "merchant_id",
+            "meaning": "Mã đối tác",
+            "required": "Có",
+            "dataType": "String",
+            "limit": "",
+            "defaultValue": ""
+          },
+          {
+            "name": "product_id",
+            "meaning": "Mã sản phẩm",
+            "required": "Có",
+            "dataType": "String",
+            "limit": "",
+            "defaultValue": ""
+          }
+        ],
+        "responseType": "ProductDetailDTO",
+        "responseFields": [
+          {
+            "name": "product_id",
+            "meaning": "Mã sản phẩm",
+            "required": "",
+            "dataType": "String",
+            "limit": "",
+            "defaultValue": ""
+          },
+          {
+            "name": "product_name",
+            "meaning": "Tên sản phẩm",
+            "required": "",
+            "dataType": "String?",
+            "limit": "",
+            "defaultValue": ""
+          },
+          {
+            "name": "price",
+            "meaning": "Giá sản phẩm",
+            "required": "",
+            "dataType": "double",
+            "limit": "",
+            "defaultValue": ""
+          },
+          {
+            "name": "original_price",
+            "meaning": "Giá gốc",
+            "required": "",
+            "dataType": "double?",
+            "limit": "",
+            "defaultValue": ""
+          }
+        ],
+        "subDtos": [
+          {
+            "name": "PriceTiersDTO",
+            "fieldRef": "price_tiers",
+            "fields": [
+              {
+                "name": "min_quantity",
+                "meaning": "Số lượng tối thiểu",
+                "required": "",
+                "dataType": "int",
+                "limit": "",
+                "defaultValue": ""
+              },
+              {
+                "name": "price",
+                "meaning": "Giá tương ứng",
+                "required": "",
+                "dataType": "double",
+                "limit": "",
+                "defaultValue": ""
+              }
+            ]
+          }
+        ]
+      }
     ]
-  },
-  "apis": [
-    {
-      "number": 1,
-      "method": "GET",
-      "title": "Chi tiết sản phẩm",
-      "url": "/api/v1/products/{productID}",
-      "requestParams": [
-        {
-          "name": "merchant_id",
-          "meaning": "Mã đối tác",
-          "required": "Có",
-          "dataType": "String",
-          "limit": "",
-          "defaultValue": ""
-        },
-        {
-          "name": "product_id",
-          "meaning": "Mã sản phẩm",
-          "required": "Có",
-          "dataType": "String",
-          "limit": "",
-          "defaultValue": ""
-        }
-      ],
-      "responseType": "ProductDetailDTO",
-      "responseFields": [
-        {
-          "name": "product_id",
-          "meaning": "Mã sản phẩm",
-          "required": "",
-          "dataType": "String",
-          "limit": "",
-          "defaultValue": ""
-        },
-        {
-          "name": "product_name",
-          "meaning": "Tên sản phẩm",
-          "required": "",
-          "dataType": "String?",
-          "limit": "",
-          "defaultValue": ""
-        },
-        {
-          "name": "price",
-          "meaning": "Giá sản phẩm",
-          "required": "",
-          "dataType": "double",
-          "limit": "",
-          "defaultValue": ""
-        },
-        {
-          "name": "original_price",
-          "meaning": "Giá gốc",
-          "required": "",
-          "dataType": "double?",
-          "limit": "",
-          "defaultValue": ""
-        }
-      ],
-      "subDtos": [
-        {
-          "name": "PriceTiersDTO",
-          "fieldRef": "price_tiers",
-          "fields": [
-            {
-              "name": "min_quantity",
-              "meaning": "Số lượng tối thiểu",
-              "required": "",
-              "dataType": "int",
-              "limit": "",
-              "defaultValue": ""
-            },
-            {
-              "name": "price",
-              "meaning": "Giá tương ứng",
-              "required": "",
-              "dataType": "double",
-              "limit": "",
-              "defaultValue": ""
-            }
-          ]
-        }
-      ]
-    }
-  ]
+  }
 }

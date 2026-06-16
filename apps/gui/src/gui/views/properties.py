@@ -233,6 +233,9 @@ class ComponentPropertiesView(ttk.Frame):
         is_effectively_locked: bool,
         pill_corner: str,
     ):
+        if self._selected_box_id and self._selected_box_id != box_id:
+            self._save_name()
+
         self._selected_box_id = box_id
         self._current_label = label
         self._current_is_visible = is_visible
@@ -277,6 +280,8 @@ class ComponentPropertiesView(ttk.Frame):
                 entry.config(state="readonly")
 
     def disable_properties_fields(self):
+        if self._selected_box_id:
+            self._save_name()
         self._selected_box_id = None
         self._current_label = ""
         self._current_is_visible = True
@@ -319,6 +324,7 @@ class ComponentPropertiesView(ttk.Frame):
         if self._selected_box_id and self.on_property_changed:
             val = self.entry_name.get().strip()
             if val and val != self._current_label:
+                self._current_label = val
                 self.on_property_changed(self._selected_box_id, label=val)
         if event and event.keysym == "Return":
             self.focus_set()

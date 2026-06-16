@@ -74,6 +74,15 @@ class TestComponent:
         c = Component(id=1, label="Leaf", isLeaf=True)
         assert c.isLeaf is True
 
+    def test_leaf_component_with_apis_raises(self):
+        with pytest.raises(ValidationError, match="is a leaf component and cannot have API documentation"):
+            Component(
+                id=1,
+                label="Leaf",
+                isLeaf=True,
+                apis=[Api(number=1, method="GET", title="X", url="/x")]
+            )
+
 
 # ── ApiParam ──────────────────────────────────────────────────────────
 
@@ -211,7 +220,7 @@ class TestAnalysisData:
         )
         assert data.sectionPrefix == "1.1"
         assert data.components == []
-        assert data.apis == []
+        assert data.all_apis == []
         assert data.discrepancies == []
 
     def test_invalid_export_dir_raises(self):
@@ -250,6 +259,42 @@ class TestAnalysisData:
         assert len(data.discrepancies) == 1
         assert data.discrepancies[0].location == "Header"
 
+    def test_duplicate_api_number_raises(self, tmp_path):
+        with pytest.raises(ValidationError, match="API number 1 is defined in multiple places"):
+            AnalysisData(
+                exportDir=str(tmp_path),
+                screen=Screen(
+                    name="Test",
+                    apis=[Api(number=1, method="GET", title="X", url="/x")]
+                ),
+                components=[
+                    Component(
+                        id=1,
+                        label="Comp",
+                        isLeaf=False,
+                        apis=[Api(number=1, method="POST", title="Y", url="/y")]
+                    )
+                ]
+            )
+
+    def test_duplicate_api_endpoint_raises(self, tmp_path):
+        with pytest.raises(ValidationError, match="API GET /x is defined in multiple places"):
+            AnalysisData(
+                exportDir=str(tmp_path),
+                screen=Screen(
+                    name="Test",
+                    apis=[Api(number=1, method="GET", title="X", url="/x")]
+                ),
+                components=[
+                    Component(
+                        id=1,
+                        label="Comp",
+                        isLeaf=False,
+                        apis=[Api(number=2, method="get", title="Y", url=" /x ")]
+                    )
+                ]
+            )
+
 
 # ── JSON round-trip ───────────────────────────────────────────────────
 
@@ -271,14 +316,19 @@ class TestJsonRoundTrip:
         assert data.sectionPrefix == "1.1"
         assert data.screen.name == "Chi tiết sản phẩm"
         assert len(data.components) == 2
-        assert len(data.apis) == 1
-        assert data.apis[0].method == "GET"
+        assert len(data.all_apis) == 1
+        assert data.all_apis[0].method == "GET"
 
     def test_serialize_and_deserialize(self, tmp_path):
         data = AnalysisData(
             sectionPrefix="2.3",
             exportDir=str(tmp_path),
-            screen=Screen(name="Cart"),
+            screen=Screen(
+                name="Cart",
+                apis=[
+                    Api(number=1, method="POST", title="Add to cart", url="/api/cart"),
+                ],
+            ),
             components=[
                 Component(
                     id=1,
@@ -288,12 +338,10 @@ class TestJsonRoundTrip:
                     ],
                 ),
             ],
-            apis=[
-                Api(number=1, method="POST", title="Add to cart", url="/api/cart"),
-            ],
         )
         json_str = data.model_dump_json()
         restored = AnalysisData.model_validate_json(json_str)
         assert restored.screen.name == "Cart"
         assert len(restored.components) == 1
         assert restored.components[0].children[0].label == "Back"
+        assert len(restored.all_apis) == 1

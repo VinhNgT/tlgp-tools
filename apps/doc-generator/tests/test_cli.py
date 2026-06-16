@@ -63,7 +63,6 @@ class TestCliDryRun:
             "exportDir": str(tmp_path),
             "screen": {"name": "Test"},
             "components": [],
-            "apis": [],
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
@@ -84,7 +83,6 @@ class TestCliGeneration:
             "exportDir": str(tmp_path),
             "screen": {"name": "My Screen", "description": "D"},
             "components": [],
-            "apis": [],
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
