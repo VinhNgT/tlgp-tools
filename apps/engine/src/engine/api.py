@@ -295,8 +295,38 @@ async def export_batch(
 
         # 2. Root Image
         if req.include_root:
-            root_img = generate_image_bytes("root", workspace, req.show_root_children)
-            zf.writestr("raw.png", root_img)
+            if workspace.state.cutLines:
+                with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
+                    img_w, img_h = img.width, img.height
+                    boundaries = [0] + sorted(workspace.state.cutLines) + [img_h]
+                    for part_idx in range(len(boundaries) - 1):
+                        seg_y_start = boundaries[part_idx]
+                        seg_y_end = boundaries[part_idx + 1]
+                        if seg_y_end <= seg_y_start:
+                            continue
+                        cropped = img.crop((0, seg_y_start, img_w, seg_y_end))
+                        children = []
+                        if req.show_root_children:
+                            root_children = TreeUtils.get_children(workspace.state, None)
+                            for child in root_children:
+                                center_y = (child.bounds.top + child.bounds.bottom) / 2
+                                if seg_y_start <= center_y < seg_y_end:
+                                    children.append(child)
+                        if children:
+                            cropped = draw_annotations_on_image(
+                                cropped,
+                                children,
+                                0,
+                                seg_y_start,
+                                None,
+                                img_w,
+                            )
+                        buf_part = io.BytesIO()
+                        cropped.save(buf_part, format="PNG")
+                        zf.writestr(f"raw_part{part_idx + 1}.png", buf_part.getvalue())
+            else:
+                root_img = generate_image_bytes("root", workspace, req.show_root_children)
+                zf.writestr("raw.png", root_img)
 
         # 3. Component Images
         for item in req.components:

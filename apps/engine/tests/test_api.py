@@ -331,6 +331,7 @@ def test_export_batch():
     workspace = get_workspace()
     workspace.raw_image_bytes = valid_png_bytes
     workspace.state.image = ImageInfo(filename="test.png", width=100, height=100)
+    workspace.state.cutLines = []
 
     comp_id = uuid.uuid4()
     comp = Component(
@@ -363,6 +364,48 @@ def test_export_batch():
         assert "workspace.json" in namelist
         assert "raw.png" in namelist
         assert f"images/{comp_id}.png" in namelist
+
+
+def test_export_batch_with_cut_lines():
+    # Create a 100x100 dummy image
+    img = Image.new("RGBA", (100, 100), (255, 255, 255, 0))
+    buf = io.BytesIO()
+    img.save(buf, format="PNG")
+    valid_png_bytes = buf.getvalue()
+
+    workspace = get_workspace()
+    workspace.raw_image_bytes = valid_png_bytes
+    workspace.state.image = ImageInfo(filename="test.png", width=100, height=100)
+    workspace.state.cutLines = [40]
+
+    comp_id = uuid.uuid4()
+    comp = Component(
+        id=comp_id,
+        number="1",
+        label="Comp",
+        bounds=Bounds(x=10, y=10, w=50, h=20),
+        childrenIds=[]
+    )
+    workspace.state.components[comp_id] = comp
+    workspace.state.rootComponents = [comp_id]
+
+    payload = {
+        "include_state": True,
+        "include_root": True,
+        "show_root_children": True,
+        "components": []
+    }
+
+    response = client.post("/workspace/export-batch", json=payload)
+    assert response.status_code == 200
+
+    zip_buf = io.BytesIO(response.content)
+    with zipfile.ZipFile(zip_buf, "r") as zf:
+        namelist = zf.namelist()
+        assert "workspace.json" in namelist
+        assert "raw.png" not in namelist
+        assert "raw_part1.png" in namelist
+        assert "raw_part2.png" in namelist
 
 
 def test_workspace_readonly_mode():
