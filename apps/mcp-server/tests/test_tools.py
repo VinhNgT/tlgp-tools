@@ -432,21 +432,6 @@ class TestDaemonControl:
         assert res["line_count"] == 1
         assert res["logs"] == "line2\n"
 
-    def test_kill_daemons(self):
-        mock_proc = MagicMock()
-        mock_proc.poll.return_value = None
-        mock_proc.pid = 12345
-
-        manager = DaemonManager()
-        manager.active_processes.clear()
-        manager.active_processes.append(mock_proc)
-
-        res = manager.kill_daemons()
-        assert res["status"] == "success"
-        assert 12345 in res["terminated_pids"]
-        assert len(manager.active_processes) == 0
-        assert mock_proc.terminate.call_count == 1
-
     @pytest.mark.anyio
     async def test_set_workspace_readonly(self, monkeypatch):
         class MockAsyncClient:

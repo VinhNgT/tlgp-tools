@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import asyncio
-import atexit
 import os
 import shutil
 import subprocess
@@ -23,7 +22,7 @@ STDERR_LOCK = threading.Lock()
 class DaemonManager:
     """Manages the lifecycle, execution, status, and logging of background daemons.
 
-    Maintains in-memory log deques and ensures cleanup upon exit.
+    Maintains in-memory log deques.
     """
 
     def __init__(
@@ -59,10 +58,6 @@ class DaemonManager:
 
         # Active process tracking
         self.active_processes: list[subprocess.Popen] = []
-
-    def register_exit_handlers(self) -> None:
-        """Register process exit handlers to ensure cleanup upon system termination."""
-        atexit.register(self.kill_daemons)
 
     def _pipe_stream(self, stream, log_deque, dest_stream) -> None:
         """Pipe lines from stream to the log deque and write atomic output to dest_stream."""
@@ -125,37 +120,6 @@ class DaemonManager:
             }
         }
 
-    def kill_daemons(self) -> dict:
-        """Cleanly terminate all tracked running processes."""
-        terminated = []
-        killed = []
-
-        logger.info("Terminating all active daemon subprocesses...")
-        for proc in list(self.active_processes):
-            if proc.poll() is None:
-                pid = proc.pid
-                try:
-                    proc.terminate()
-                    proc.wait(timeout=1.0)
-                    terminated.append(pid)
-                    logger.info("Successfully terminated daemon process PID %s", pid)
-                except subprocess.TimeoutExpired:
-                    try:
-                        logger.warning("Daemon PID %s did not terminate in time. Killing it...", pid)
-                        proc.kill()
-                        proc.wait()
-                        killed.append(pid)
-                    except Exception as e:
-                        logger.error("Failed to kill process PID %s: %s", pid, e)
-                except Exception as e:
-                    logger.error("Failed to terminate process PID %s: %s", pid, e)
-
-        self.active_processes.clear()
-        return {
-            "status": "success",
-            "terminated_pids": terminated,
-            "killed_pids": killed,
-        }
 
     def read_daemon_logs(self, daemon: str = "engine", lines: int = 100) -> dict:
         """Read requested tailing lines from the selected daemon's log buffer."""

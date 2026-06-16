@@ -39,11 +39,10 @@ def get_client() -> WorkspaceClient:
 
 
 def get_daemon_manager() -> DaemonManager:
-    """Lazily construct and return the daemon manager, registering exit handlers."""
+    """Lazily construct and return the daemon manager."""
     global _daemon_manager
     if _daemon_manager is None:
         _daemon_manager = DaemonManager()
-        _daemon_manager.register_exit_handlers()
     return _daemon_manager
 
 
@@ -309,12 +308,6 @@ def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
         filename: Name of the output JSON file (defaults to "analysis.json").
     """
     return get_spec_service().write_analysis_json(data, filename)
-
-
-@mcp.tool()
-def kill_daemons() -> dict:
-    """Cleanly terminate all background annotation GUI and engine processes."""
-    return get_daemon_manager().kill_daemons()
 
 
 @mcp.tool()
