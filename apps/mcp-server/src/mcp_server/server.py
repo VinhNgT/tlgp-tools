@@ -318,3 +318,32 @@ async def set_workspace_readonly(read_only: bool) -> dict:
         read_only: True to lock workspace in read-only mode, False to allow edits.
     """
     return await get_client().set_workspace_readonly(read_only)
+
+
+@mcp.tool()
+async def clear_workspace() -> dict:
+    """Clear all components, cut lines, screen info, and background image from the current workspace, resetting it to an empty state."""
+    return await get_client().clear_workspace()
+
+
+@mcp.tool()
+async def import_image(screenshot_path: str) -> dict:
+    """Import a raw screenshot image into the workspace. This clears the workspace and sets the new image.
+
+    Args:
+        screenshot_path: Absolute path to the raw screenshot image file.
+    """
+    await get_client().import_image(screenshot_path)
+    return {"status": "success", "screenshot_path": screenshot_path}
+
+
+@mcp.tool()
+async def import_workspace(workspace_zip: str) -> dict:
+    """Import a workspace session from a .zip archive into the Engine.
+
+    Args:
+        workspace_zip: Absolute path to the workspace .zip archive.
+    """
+    await get_client().import_workspace(workspace_zip)
+    return {"status": "success", "workspace_zip": workspace_zip}
+

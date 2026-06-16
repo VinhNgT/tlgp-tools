@@ -406,3 +406,34 @@ def test_workspace_readonly_mode():
     assert response.status_code == 200
     assert response.json()["status"] == "added"
 
+
+def test_workspace_clear():
+    workspace = get_workspace()
+    # Setup some state
+    comp_uuid = uuid.uuid4()
+    workspace.state.image = ImageInfo(filename="test.png", width=800, height=600)
+    workspace.state.components = {
+        comp_uuid: Component(
+            id=comp_uuid,
+            number="1",
+            label="Dummy",
+            bounds=Bounds(x=10, y=10, w=100, h=100)
+        )
+    }
+    workspace.raw_image_bytes = b"fake_bytes"
+    workspace.state.cutLines = [150]
+    old_session_id = workspace.state.sessionId
+
+    # Call clear workspace API
+    response = client.post("/workspace/clear")
+    assert response.status_code == 200
+    assert response.json()["status"] == "success"
+    assert response.json()["sessionId"] != str(old_session_id)
+
+    # Check that state has been cleared
+    assert workspace.state.image is None
+    assert len(workspace.state.components) == 0
+    assert len(workspace.state.cutLines) == 0
+    assert workspace.raw_image_bytes == b""
+
+

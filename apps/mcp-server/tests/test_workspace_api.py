@@ -236,3 +236,82 @@ class TestWorkspaceApi:
         client = WorkspaceClient()
         res = await client.get_image_bytes("comp-uuid")
         assert res == b"raw_bytes"
+
+    @pytest.mark.anyio
+    async def test_clear_workspace_success(self, monkeypatch):
+        class MockResponse:
+            status_code = 200
+            def raise_for_status(self):
+                pass
+            def json(self):
+                return {"status": "success", "sessionId": "new-uuid"}
+
+        class MockAsyncClient:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def request(self, method, url, *args, **kwargs):
+                assert method == "POST"
+                assert "workspace/clear" in url
+                return MockResponse()
+
+        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+
+        client = WorkspaceClient()
+        res = await client.clear_workspace()
+        assert res["status"] == "success"
+        assert res["sessionId"] == "new-uuid"
+
+    @pytest.mark.anyio
+    async def test_import_image_success(self, tmp_path, monkeypatch):
+        class MockResponse:
+            status_code = 200
+            def raise_for_status(self):
+                pass
+
+        class MockAsyncClient:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def request(self, method, url, *args, **kwargs):
+                assert method == "POST"
+                assert "workspace/import-image" in url
+                assert "files" in kwargs
+                return MockResponse()
+
+        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+
+        dummy_img = tmp_path / "screenshot.png"
+        dummy_img.write_bytes(b"image_data")
+
+        client = WorkspaceClient()
+        await client.import_image(str(dummy_img))
+
+    @pytest.mark.anyio
+    async def test_import_workspace_success(self, tmp_path, monkeypatch):
+        class MockResponse:
+            status_code = 200
+            def raise_for_status(self):
+                pass
+
+        class MockAsyncClient:
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, exc_type, exc_val, exc_tb):
+                pass
+            async def request(self, method, url, *args, **kwargs):
+                assert method == "POST"
+                assert "workspace/import" in url
+                assert "files" in kwargs
+                return MockResponse()
+
+        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+
+        dummy_zip = tmp_path / "workspace.zip"
+        dummy_zip.write_bytes(b"zip_data")
+
+        client = WorkspaceClient()
+        await client.import_workspace(str(dummy_zip))
+

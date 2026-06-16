@@ -211,6 +211,14 @@ async def set_workspace_readonly(
     return {"status": "success", "read_only": workspace.state.readOnly}
 
 
+@router.post("/workspace/clear", tags=["State"])
+async def clear_workspace(workspace: WorkspaceDep):
+    """Clears the workspace, resetting it to an empty state."""
+    logger.info("Clearing workspace")
+    await workspace.clear_workspace(force=True)
+    return {"status": "success", "sessionId": str(workspace.state.sessionId)}
+
+
 # ── Image Endpoints ────────────────────────────────────────────────────
 
 

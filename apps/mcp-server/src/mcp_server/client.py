@@ -98,6 +98,11 @@ class WorkspaceClient:
         res = await self._request("PUT", "/workspace/readonly", json={"read_only": read_only})
         return res.json()
 
+    async def clear_workspace(self) -> dict:
+        """Clear all components, cut lines, and image from the workspace in the Engine."""
+        res = await self._request("POST", "/workspace/clear")
+        return res.json()
+
     async def export_workspace(self, output_path: str) -> dict:
         """Export the current workspace to a zip archive at output_path."""
         res = await self._request("GET", "/workspace/export")

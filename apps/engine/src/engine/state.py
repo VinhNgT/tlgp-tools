@@ -5,7 +5,7 @@ from typing import Annotated
 
 import jsonpatch
 from fastapi import Depends
-from models import Bounds, Component, Style, Visibility, WorkspaceState
+from models import Bounds, Component, ScreenInfo, Style, Visibility, WorkspaceState
 
 from .exceptions import ComponentNotFoundError, InvalidStateError, ParentNotFoundError
 from .tree_math import recalculate_tree
@@ -124,6 +124,19 @@ class WorkspaceManager:
 
             # Broadcast the deltas
             self.broadcast_patch(patch)
+
+    async def clear_workspace(self, force: bool = False):
+        """Clear all components, cut lines, screen info, and raw image data, resetting to empty."""
+        def mutate_fn(state: WorkspaceState):
+            state.sessionId = uuid.uuid4()
+            state.image = None
+            state.screen = ScreenInfo()
+            state.cutLines = []
+            state.rootComponents = []
+            state.components = {}
+            state.readOnly = False
+        self.raw_image_bytes = b""
+        await self.mutate(mutate_fn, force=force)
 
     async def undo(self, force: bool = False) -> bool:
         async with self._lock:

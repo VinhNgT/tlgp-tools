@@ -138,8 +138,13 @@ class AppController:
             is_error=False,
         )
 
+        current_session_id = str(state.sessionId) if state.sessionId else None
+        if self._loaded_session_id is not None and current_session_id != self._loaded_session_id:
+            self.store.update_state("selection", selected_component_ids=[], active_interaction=None)
+            self.store.update_state("viewport", parent_stack=[], zoom_factor=1.0, pan_offset=(0.0, 0.0))
+
+
         if state.image:
-            current_session_id = str(state.sessionId) if state.sessionId else None
             if (
                 current_session_id != self._loaded_session_id
                 or self.view.canvas.full_pil_img is None
@@ -160,7 +165,7 @@ class AppController:
                     )
         else:
             self.view.set_canvas_image(None)
-            self._loaded_session_id = None
+            self._loaded_session_id = current_session_id
 
         # Check and remove synchronized transient overrides from active_interaction
         active_interaction = self.store.state.active_interaction
