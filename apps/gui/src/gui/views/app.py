@@ -399,7 +399,7 @@ class MainAppWindow(tk.Tk):
         if self._space_release_timer is not None:
             self.after_cancel(self._space_release_timer)
             self._space_release_timer = None
-        else:
+        elif not self.canvas.space_pan_active:
             self._prev_mode_before_space = self.mode_var.get()
             self.mode_var.set("pan")
             self.canvas.start_space_pan()
@@ -410,7 +410,7 @@ class MainAppWindow(tk.Tk):
             return None
         if self._space_release_timer is not None:
             self.after_cancel(self._space_release_timer)
-        self._space_release_timer = self.after(20, self._execute_space_release)
+        self._space_release_timer = self.after(150, self._execute_space_release)
         return "break"
 
     def _execute_space_release(self):
