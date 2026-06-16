@@ -498,3 +498,36 @@ class TestGenerateSpecDocWrapper:
         assert analysis_json.exists()
         saved = json.loads(analysis_json.read_text(encoding="utf-8"))
         assert saved["components"][0]["description"] == "Elicited Header Description"
+
+    @pytest.mark.anyio
+    async def test_generate_spec_doc_exports_workspace_zip(self, tmp_path, monkeypatch):
+        screen_dir = _create_export_dir(tmp_path)
+        analysis = _build_analysis(screen_dir)
+
+        # Mock WorkspaceClient.export_workspace
+        async def mock_export_workspace(client_self, output_path: str):
+            Path(output_path).write_bytes(b"mock_zip_content")
+            return {"status": "success", "output_path": output_path}
+
+        monkeypatch.setattr(WorkspaceClient, "export_workspace", mock_export_workspace)
+
+        # Mock Context
+        ctx = MagicMock()
+        ctx.report_progress = AsyncMock()
+        ctx.log = AsyncMock()
+
+        # Call generate_spec_doc wrapper
+        out_docx = tmp_path / "out.docx"
+        result = await generate_spec_doc(
+            ctx=ctx,
+            analysis=analysis,
+            output_path=str(out_docx)
+        )
+
+        assert result["valid"] is True
+        assert out_docx.exists()
+
+        # Verify workspace.zip is exported next to out.docx
+        workspace_zip = tmp_path / "workspace.zip"
+        assert workspace_zip.exists()
+        assert workspace_zip.read_bytes() == b"mock_zip_content"

@@ -108,6 +108,23 @@ class SpecGeneratorService:
             validate_only=validate_only,
         )
 
+        if not validate_only and result.get("valid"):
+            docx_path = Path(result["output_path"])
+            workspace_zip_path = docx_path.parent / "workspace.zip"
+            if ctx:
+                await ctx.log("info", f"Exporting workspace state to {workspace_zip_path}...")
+            try:
+                from mcp_server.client import WorkspaceClient
+                client = WorkspaceClient()
+                try:
+                    await client.export_workspace(str(workspace_zip_path))
+                finally:
+                    await client.close()
+            except Exception as e:
+                logger.error("Failed to export workspace.zip next to docx: %s", e)
+                if ctx:
+                    await ctx.log("warning", f"Failed to export workspace.zip next to docx: {e}")
+
         if ctx:
             await ctx.report_progress(100, 100, "Spec generation complete.")
 
