@@ -166,3 +166,58 @@ def test_zoom_focus_target_empty_active_components_fallback():
 
     canvas.fit_to_screen.assert_called_once()
     canvas.on_viewport_change_request.assert_not_called()
+
+
+def test_parent_mask_with_cut_lines():
+    from gui.domain.transformer import ViewportTransformer
+    from PIL import Image
+
+    transformer = ViewportTransformer()
+    transformer.update_image_size(100, 200)
+
+    gestures = MagicMock()
+    canvas = AnnotationCanvasView(None, transformer, gestures)
+    canvas._w = "mock_canvas_w"
+    canvas.winfo_width = MagicMock(return_value=100)
+    canvas.winfo_height = MagicMock(return_value=220)
+
+    parent_id = uuid4()
+    parent_comp = Component(
+        id=parent_id,
+        number="1",
+        label="Parent",
+        bounds=Bounds(x=10, y=50, w=80, h=100),
+        style=Style(),
+        visibility=Visibility(),
+    )
+    canvas.workspace_state = WorkspaceState(
+        sessionId=uuid4(),
+        components={parent_id: parent_comp},
+        cutLines=[80]
+    )
+    canvas.parent_stack = [parent_id]
+
+    bg_img = Image.new("RGB", (100, 200), (255, 255, 255))
+    canvas.set_background_image(bg_img)
+    from unittest.mock import patch
+    with patch("PIL.ImageTk.PhotoImage", return_value=MagicMock()):
+        canvas.update_view()
+
+
+
+    mask = canvas._get_or_create_full_parent_mask()
+    assert mask is not None
+    assert mask.width == 100
+    assert mask.height == 220
+
+    # Under current code (without fix), the mask rectangle is drawn at absolute bounds (y=50 to y=150).
+    # With a gap at y=80, the parent content in the image starts at y=50 and ends at y=170.
+    # Therefore, y=165 (which is inside the parent) will be outside the mask bounds (165 > 150) and have value 80.
+    # Let's assert that the corrected behavior matches:
+    assert mask.getpixel((50, 45)) == 80
+    assert mask.getpixel((50, 55)) == 255
+    assert mask.getpixel((50, 165)) == 255
+    assert mask.getpixel((50, 175)) == 80
+
+
+

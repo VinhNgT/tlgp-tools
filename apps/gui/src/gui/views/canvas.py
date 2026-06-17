@@ -582,7 +582,9 @@ class AnnotationCanvasView(tk.Canvas):
 
         img_w = self.current_pil_img.width
         img_h = self.current_pil_img.height
-        mask_key = (parent_id, img_w, img_h)
+        cut_lines = state.cutLines if state else []
+        cut_lines_tuple = tuple(cut_lines) if cut_lines else ()
+        mask_key = (parent_id, img_w, img_h, cut_lines_tuple)
 
         if (
             mask_key != getattr(self, "_mask_cached_key", None)
@@ -591,11 +593,18 @@ class AnnotationCanvasView(tk.Canvas):
             mask = Image.new("L", (img_w, img_h), 80)
             draw = ImageDraw.Draw(mask)
             b = parent.bounds
-            draw.rectangle([b.left, b.top, b.right, b.bottom], fill=255)
+
+            # Map parent boundaries to the gap-shifted canvas coordinate system
+            has_cuts = self.transformer.has_active_cuts(parent_stack, cut_lines)
+            gap_top = self.transformer.gap_offset_for_y(b.top) if has_cuts else 0
+            gap_bottom = self.transformer.gap_offset_for_y(b.bottom) if has_cuts else 0
+
+            draw.rectangle([b.left, b.top + gap_top, b.right, b.bottom + gap_bottom], fill=255)
             self._mask_cached_img = mask
             self._mask_cached_key = mask_key
 
         return self._mask_cached_img
+
 
     def _apply_full_parent_mask(self, base_img: Image.Image) -> Image.Image:
         mask = self._get_or_create_full_parent_mask()
