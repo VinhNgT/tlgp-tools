@@ -58,12 +58,6 @@ _CURSOR_MAP = {
     "draw": Qt.CursorShape.CrossCursor,
     "pan_active": Qt.CursorShape.ClosedHandCursor,
     "pan_inactive": Qt.CursorShape.OpenHandCursor,
-    "resizetopleft": Qt.CursorShape.SizeFDiagCursor,
-    "resizebottomright": Qt.CursorShape.SizeFDiagCursor,
-    "resizetopright": Qt.CursorShape.SizeBDiagCursor,
-    "resizebottomleft": Qt.CursorShape.SizeBDiagCursor,
-    "resizeupdown": Qt.CursorShape.SizeVerCursor,
-    "resizeleftright": Qt.CursorShape.SizeHorCursor,
     "size_nw_se": Qt.CursorShape.SizeFDiagCursor,
     "size_ne_sw": Qt.CursorShape.SizeBDiagCursor,
     "size_ns": Qt.CursorShape.SizeVerCursor,
@@ -101,6 +95,7 @@ class AnnotationCanvasView(QWidget):
         self.current_mode: str = "select"
         self.active_interaction: dict[UUID, Any] | None = None
         self.space_pan_active: bool = False
+        self.show_labels: bool = True
 
         # ── Callbacks (set by controller) ─────────────────────────
         self.on_viewport_change_request = None
@@ -110,10 +105,8 @@ class AnnotationCanvasView(QWidget):
         self.on_component_created = None
         self.on_selection_ids_changed = None
         self.on_drill_into = None
-        self.on_right_click_request = None
         self.on_import_zip = None
         self.on_import_image = None
-        self.on_selection_changed = None
         self.on_drill_out = None
         self.on_request_context_menu = None
         self.on_canvas_mode_change_request = None
@@ -286,8 +279,9 @@ class AnnotationCanvasView(QWidget):
             self.on_viewport_change_request(new_zoom, (pad_x, pad_y))
 
     def toggle_labels_visibility(self):
-        """Toggle rendering of annotation labels (placeholder for future feature)."""
-        pass
+        """Toggle rendering of annotation labels."""
+        self.show_labels = not self.show_labels
+        self.update()
 
     def set_cursor(self, name: str):
         cursor = _CURSOR_MAP.get(name, Qt.CursorShape.ArrowCursor)
@@ -322,9 +316,7 @@ class AnnotationCanvasView(QWidget):
         """Clear text focus by moving focus to this canvas."""
         self.setFocus()
 
-    def trigger_request_context_menu(self, event: GestureEvent, clicked: Component | None):
-        if self.on_right_click_request:
-            self.on_right_click_request(event, clicked)
+
 
     def schedule_redraw(self):
         """Schedule a deferred repaint (coalesces rapid updates)."""
@@ -476,9 +468,56 @@ class AnnotationCanvasView(QWidget):
         pill_outline_pen = QPen(_BOX_COLOR, pill_outline_width)
         pill_text_pen = QPen(_BOX_COLOR)
 
-        for comp in active_comps:
-            if not comp.visibility.visible:
-                continue
+        non_selected = [comp for comp in active_comps if comp.id not in self.selected_component_ids]
+        selected = [comp for comp in active_comps if comp.id in self.selected_component_ids]
+        ordered_comps = non_selected + selected
+
+        if len(selected) == 1 and self.gestures.resize_handle and self.gestures.is_dragging:
+            comp = selected[0]
+            union = self.get_children_bounds_union(comp)
+            if union:
+                cx1, cy1, cx2, cy2 = union
+                gcx1, gcy1 = self.transformer.to_canvas(
+                    cx1, cy1, zoom, self.parent_stack, cut_lines,
+                    pan_offset=self.pan_offset,
+                )
+                gcx2, gcy2 = self.transformer.to_canvas(
+                    cx2, cy2, zoom, self.parent_stack, cut_lines,
+                    pan_offset=self.pan_offset,
+                )
+                dash_pen = QPen(QColor("#888888"), 2)
+                dash_pen.setStyle(Qt.PenStyle.DashLine)
+                p.setPen(dash_pen)
+                p.setBrush(Qt.BrushStyle.NoBrush)
+                p.drawRect(QRectF(gcx1, gcy1, gcx2 - gcx1, gcy2 - gcy1))
+
+                p.setFont(QFont("Arial", 9, QFont.Weight.Bold, italic=True))
+                p.setPen(QPen(QColor("#888888")))
+                p.drawText(QPointF(gcx1 + 4, gcy1 + 13), "Child Bounds")
+
+        for comp in ordered_comps:
+            is_selected = comp.id in self.selected_component_ids
+            is_visible = comp.visibility.visible
+            is_locked = comp.visibility.locked
+
+            if is_visible:
+                color_hex = "#0c8ce9" if is_selected else "#ff4444"
+                pill_fill_col = _PILL_FILL
+            else:
+                color_hex = "#88bbee" if is_selected else "#aaaaaa"
+                pill_fill_col = QColor("#f0f0f0")
+
+            comp_color = QColor(color_hex)
+            lw = border_width + 1 if is_selected else border_width
+            box_pen.setColor(comp_color)
+            box_pen.setWidth(lw)
+            if is_locked:
+                box_pen.setStyle(Qt.PenStyle.DashLine)
+            else:
+                box_pen.setStyle(Qt.PenStyle.SolidLine)
+
+            pill_outline_pen.setColor(comp_color)
+            pill_text_pen.setColor(comp_color)
 
             bounds = comp.bounds
             if self.active_interaction and comp.id in self.active_interaction:
@@ -516,7 +555,7 @@ class AnnotationCanvasView(QWidget):
             )
 
             p.setPen(pill_outline_pen)
-            p.setBrush(QBrush(_PILL_FILL))
+            p.setBrush(QBrush(pill_fill_col))
             p.drawRect(QRectF(pill_x, pill_y, pill_w, pill_h))
 
             # Pill text
@@ -526,8 +565,13 @@ class AnnotationCanvasView(QWidget):
             text_y = pill_y + scaled_pad_y / 2 + pill_ascent
             p.drawText(QPointF(text_x, text_y), num_str)
 
+            if self.show_labels and comp.label:
+                p.setFont(QFont("Arial", 9))
+                p.setPen(pill_text_pen)
+                p.drawText(QPointF(cx1, cy2 + 13), comp.label)
+
             # Selection handles
-            if comp.id in self.selected_component_ids:
+            if is_selected and not is_locked:
                 self._paint_handles(p, cx1, cy1, cx2, cy2)
 
     def _paint_handles(self, p: QPainter, cx1: float, cy1: float, cx2: float, cy2: float):
@@ -573,16 +617,14 @@ class AnnotationCanvasView(QWidget):
             ctrl=bool(mods & Qt.KeyboardModifier.ControlModifier),
         )
 
-    def _scene_coords(self, event: QMouseEvent) -> tuple[float, float]:
-        """Map widget coordinates to canvas-space coordinates (matching canvasx/canvasy)."""
-        return event.position().x(), event.position().y()
+
 
     def mousePressEvent(self, event: QMouseEvent):
         if not self.full_pil_img:
             return
 
         ge = self._make_gesture_event(event)
-        cx, cy = self._scene_coords(event)
+        cx, cy = ge.x, ge.y
 
         if event.button() == Qt.MouseButton.LeftButton:
             if ge.ctrl and not ge.shift:
@@ -599,7 +641,7 @@ class AnnotationCanvasView(QWidget):
             return
 
         ge = self._make_gesture_event(event)
-        cx, cy = self._scene_coords(event)
+        cx, cy = ge.x, ge.y
 
         if event.buttons() & Qt.MouseButton.LeftButton:
             self.gestures.on_drag(self, ge, cx, cy)
@@ -613,7 +655,7 @@ class AnnotationCanvasView(QWidget):
             return
 
         ge = self._make_gesture_event(event)
-        cx, cy = self._scene_coords(event)
+        cx, cy = ge.x, ge.y
 
         if event.button() == Qt.MouseButton.LeftButton:
             self.gestures.on_release(self, ge, cx, cy)

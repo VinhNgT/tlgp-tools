@@ -80,12 +80,10 @@ class AppController:
         self.view.on_enter_pressed = self._on_enter_pressed
         self.view.on_escape_pressed = self._on_escape_pressed
         self.view.on_arrow_key_pressed = self._on_arrow_key_pressed
-        self.view.on_soft_restart_request = self._on_soft_restart_request
 
         # Canvas callbacks
         self.view.canvas.on_import_zip = self._on_import_zip_request
         self.view.canvas.on_import_image = self._on_import_image_request
-        self.view.canvas.on_selection_changed = self._on_canvas_selection_changed
         self.view.canvas.on_drill_into = self._on_canvas_drill_into
         self.view.canvas.on_drill_out = self._on_canvas_drill_out
         self.view.canvas.on_component_moved = self._on_component_moved
@@ -227,7 +225,7 @@ class AppController:
         comp = state.components.get(comp_id)
         if not comp:
             return True
-        if not getattr(comp.visibility, "visible", True):
+        if not comp.visibility.visible:
             return False
         if comp.parentId:
             return self._is_effectively_visible(comp.parentId)
@@ -240,7 +238,7 @@ class AppController:
         comp = state.components.get(comp_id)
         if not comp:
             return False
-        if getattr(comp.visibility, "locked", False):
+        if comp.visibility.locked:
             return True
         if comp.parentId:
             return self._is_effectively_locked(comp.parentId)
@@ -259,8 +257,8 @@ class AppController:
             comp_id_str = str(comp.id)
             node_text = f"{comp.number} {comp.label}" if comp.number else comp.label
 
-            comp_visible = getattr(comp.visibility, "visible", True)
-            comp_locked = getattr(comp.visibility, "locked", False)
+            comp_visible = comp.visibility.visible
+            comp_locked = comp.visibility.locked
 
             is_effectively_visible = comp_visible and parent_visible
             is_effectively_locked = comp_locked or parent_locked
@@ -351,10 +349,10 @@ class AppController:
                     y=int(bounds.y),
                     w=int(bounds.w),
                     h=int(bounds.h),
-                    is_visible=getattr(comp.visibility, "visible", True),
-                    is_locked=getattr(comp.visibility, "locked", False),
+                    is_visible=comp.visibility.visible,
+                    is_locked=comp.visibility.locked,
                     is_effectively_locked=self._is_effectively_locked(comp.id),
-                    pill_corner=getattr(comp.style, "pillCorner", "top_left"),
+                    pill_corner=comp.style.pillCorner,
                 )
                 if box_changed or not self.view.properties.is_field_focused("name"):
                     self.view.properties.update_field_value("name", comp.label)
@@ -397,9 +395,6 @@ class AppController:
         self.store.update_state("selection", active_interaction=None)
         self.store.update_state("viewport", current_mode=mode)
 
-    def _on_soft_restart_request(self):
-        pass
-
     def _on_undo_request(self):
         if self.view.canvas.full_pil_img:
             self.store.update_state("selection", active_interaction=None)
@@ -430,8 +425,8 @@ class AppController:
         if not comp:
             return
 
-        is_visible = getattr(comp.visibility, "visible", True)
-        is_locked = getattr(comp.visibility, "locked", False)
+        is_visible = comp.visibility.visible
+        is_locked = comp.visibility.locked
 
         def toggle_visible():
             self.workspace.update_component(comp_id, visibility=Visibility(visible=not is_visible, locked=is_locked))
@@ -615,9 +610,6 @@ class AppController:
         if result is not None:
             self.workspace.update_screen_info(result["screen_name"], result["description"])
 
-    def _on_canvas_selection_changed(self, boxes: list[Component]):
-        pass
-
     def _on_canvas_drill_into(self, comp_id: UUID):
         stack = list(self.store.state.parent_stack)
         stack.append(comp_id)
@@ -694,7 +686,7 @@ class AppController:
                     "command": lambda: self.view.canvas.drill_into(clicked.id),
                 }
             )
-            is_visible = getattr(clicked.visibility, "visible", True)
+            is_visible = clicked.visibility.visible
             vis_label = "Hide Component" if is_visible else "Show Component"
             items.append(
                 {
@@ -703,12 +695,12 @@ class AppController:
                         clicked.id,
                         visibility=Visibility(
                             visible=not is_visible,
-                            locked=getattr(clicked.visibility, "locked", False),
+                            locked=clicked.visibility.locked,
                         ),
                     ),
                 }
             )
-            is_locked = getattr(clicked.visibility, "locked", False)
+            is_locked = clicked.visibility.locked
             lock_label = "Unlock Component" if is_locked else "Lock Component"
             items.append(
                 {
@@ -716,7 +708,7 @@ class AppController:
                     "command": lambda: self.workspace.update_component(
                         clicked.id,
                         visibility=Visibility(
-                            visible=getattr(clicked.visibility, "visible", True),
+                            visible=clicked.visibility.visible,
                             locked=not is_locked,
                         ),
                     ),

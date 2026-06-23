@@ -194,7 +194,6 @@ def recalculate_tree(state: WorkspaceState, changed_id: UUID | str | None = None
             sort_recursive(root.id)
 
     # 2. Numbering assignment step (top-down walk, always needed to keep numbers consistent)
-    # 2. Numbering assignment step (top-down walk, always needed to keep numbers consistent)
     def clear_numbers_recursive(comp_id: UUID):
         comp = state.components.get(comp_id)
         if not comp:
@@ -213,7 +212,7 @@ def recalculate_tree(state: WorkspaceState, changed_id: UUID | str | None = None
         for child_id in comp.childrenIds:
             child = state.components.get(child_id)
             if child:
-                if getattr(child.visibility, "visible", True):
+                if child.visibility.visible:
                     assign_numbers(child_id, str(visible_idx + 1))
                     visible_idx += 1
                 else:
@@ -226,7 +225,7 @@ def recalculate_tree(state: WorkspaceState, changed_id: UUID | str | None = None
     for root_id in state.rootComponents:
         root = state.components.get(root_id)
         if root:
-            if getattr(root.visibility, "visible", True):
+            if root.visibility.visible:
                 assign_numbers(root_id, str(visible_root_idx + 1))
                 visible_root_idx += 1
             else:

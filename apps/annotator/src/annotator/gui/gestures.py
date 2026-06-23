@@ -1,4 +1,3 @@
-import sys
 import time
 from dataclasses import dataclass
 from typing import Any
@@ -14,7 +13,7 @@ from .validation import BoundsValidator
 class GestureEvent:
     """Framework-agnostic wrapper for pointer events used by the gesture interpreter.
 
-    The hosting canvas widget translates native events (Tkinter, Qt, etc.)
+    The hosting canvas widget translates native events (Qt, etc.)
     into this portable representation before passing to GestureInterpreter.
     """
 
@@ -803,29 +802,16 @@ class GestureInterpreter:
                 state.pan_offset,
             )
             if handle:
-                if sys.platform == "darwin":
-                    # macOS Cocoa cursors matching the legacy tool definition
-                    cursors = {
-                        "nw": "resizetopleft",
-                        "se": "resizebottomright",
-                        "ne": "resizetopright",
-                        "sw": "resizebottomleft",
-                        "n": "resizeupdown",
-                        "s": "resizeupdown",
-                        "e": "resizeleftright",
-                        "w": "resizeleftright",
-                    }
-                else:
-                    cursors = {
-                        "nw": "size_nw_se",
-                        "se": "size_nw_se",
-                        "ne": "size_ne_sw",
-                        "sw": "size_ne_sw",
-                        "n": "size_ns",
-                        "s": "size_ns",
-                        "e": "size_we",
-                        "w": "size_we",
-                    }
+                cursors = {
+                    "nw": "size_nw_se",
+                    "se": "size_nw_se",
+                    "ne": "size_ne_sw",
+                    "sw": "size_ne_sw",
+                    "n": "size_ns",
+                    "s": "size_ns",
+                    "e": "size_we",
+                    "w": "size_we",
+                }
                 canvas.set_cursor(cursors.get(handle, ""))
                 return
 
@@ -893,7 +879,8 @@ class GestureInterpreter:
             state.pan_offset,
         )
 
-        canvas.trigger_request_context_menu(event, clicked)
+        if canvas.on_request_context_menu:
+            canvas.on_request_context_menu(event, clicked)
 
     def on_control_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Handles Control/Command click shortcuts to drill down into components."""

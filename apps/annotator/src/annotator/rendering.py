@@ -70,7 +70,7 @@ def get_text_dimensions(
 
     Uses draw.textbbox() when a draw context is available, otherwise
     falls back to font.getbbox() for callers that don't have a PIL ImageDraw
-    (e.g., the Tkinter canvas which only needs approximate dimensions).
+    (which only needs approximate dimensions).
     """
     if draw is not None:
         left, top, right, bottom = draw.textbbox((0, 0), text, font=font)

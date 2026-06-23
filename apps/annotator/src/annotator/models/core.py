@@ -1,4 +1,3 @@
-from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, Field
@@ -45,7 +44,7 @@ class Component(BaseModel):
     bounds: Bounds
     style: Style = Field(default_factory=Style)
     visibility: Visibility = Field(default_factory=Visibility)
-    metadata: dict[str, Any] = Field(default_factory=dict)
+
 
 
 class ScreenInfo(BaseModel):

@@ -48,7 +48,7 @@ class TestComponent:
         assert comp.style.pillCorner == "top_left"
         assert comp.visibility.visible is True
         assert comp.visibility.locked is False
-        assert comp.metadata == {}
+
 
     def test_custom_style_and_visibility(self):
         comp = Component(

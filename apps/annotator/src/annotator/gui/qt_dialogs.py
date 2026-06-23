@@ -1,6 +1,6 @@
 """Qt-based dialog service — production implementation of DialogService.
 
-Replaces tk_dialogs.py with PySide6 equivalents for file dialogs,
+Provides PySide6 implementations for file dialogs,
 message boxes, and custom modal dialogs.
 """
 
@@ -164,7 +164,7 @@ class QtDialogService(DialogService):
 
     @staticmethod
     def _filetypes_to_filter(filetypes: list[tuple[str, str]]) -> str:
-        """Convert Tkinter-style filetypes to Qt filter string."""
+        """Convert generic legacy filetypes list to Qt filter string."""
         parts = []
         for label, pattern in filetypes:
             parts.append(f"{label} ({pattern})")

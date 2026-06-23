@@ -5,7 +5,7 @@ All user interaction is delegated to the controller via callbacks.
 """
 
 
-from PySide6.QtCore import QPoint, QSize, Qt, QTimer
+from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtGui import QAction, QActionGroup, QKeySequence
 from PySide6.QtWidgets import (
     QLabel,
@@ -21,7 +21,6 @@ from PySide6.QtWidgets import (
 )
 
 from .canvas import AnnotationCanvasView
-from .debug import BackendDebugWindow
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
 from .transformer import ViewportTransformer
@@ -35,7 +34,6 @@ class WelcomeWidget(QWidget):
 
         self.on_import_zip = None
         self.on_import_image = None
-        self._unreachable = False
 
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -97,14 +95,7 @@ class WelcomeWidget(QWidget):
 
         self.setStyleSheet("background-color: #121212;")
 
-    def set_unreachable(self, unreachable: bool):
-        self._unreachable = unreachable
-        if unreachable:
-            self.desc_label.setText("Workspace file not found or unreachable.")
-            self.desc_label.setStyleSheet("font-size: 10pt; color: #e74c3c; border: none;")
-        else:
-            self.desc_label.setText("Open a workspace session or raw image to begin.")
-            self.desc_label.setStyleSheet("font-size: 10pt; color: #888888; border: none;")
+
 
     def _on_import_zip(self):
         if self.on_import_zip:
@@ -141,15 +132,13 @@ class MainAppWindow(QMainWindow):
         self.on_enter_pressed = None
         self.on_escape_pressed = None
         self.on_arrow_key_pressed = None
-        self.on_soft_restart_request = None
 
         # ── Build UI ──────────────────────────────────────────────
         self._build_menu_bar()
         self._build_toolbar()
         self._build_central_area(transformer)
 
-        # Debug window
-        self.debug_window = BackendDebugWindow(self)
+        self._build_central_area(transformer)
 
     def _build_menu_bar(self):
         menubar = self.menuBar()
@@ -199,12 +188,6 @@ class MainAppWindow(QMainWindow):
         act_delete.setShortcut(QKeySequence.StandardKey.Delete)
         act_delete.triggered.connect(lambda: self._fire(self.on_delete_request))
         edit_menu.addAction(act_delete)
-
-        view_menu = menubar.addMenu("&View")
-
-        act_debug = QAction("Backend Logs", self)
-        act_debug.triggered.connect(self._toggle_debug)
-        view_menu.addAction(act_debug)
 
     def _build_toolbar(self):
         tb = QToolBar("Main Toolbar")
@@ -293,10 +276,9 @@ class MainAppWindow(QMainWindow):
 
     # ── Public API (called by controller) ─────────────────────────────
 
-    def set_canvas_image(self, img, unreachable: bool = False):
+    def set_canvas_image(self, img):
         """Switch between welcome screen and annotation canvas."""
         if img is None:
-            self.welcome.set_unreachable(unreachable)
             self.canvas_stack.setCurrentWidget(self.welcome)
         else:
             self.canvas.set_background_image(img)
@@ -337,13 +319,7 @@ class MainAppWindow(QMainWindow):
         """Check if any text entry in properties is focused."""
         return self.properties.is_text_focused()
 
-    def invoke_on_main_thread(self, fn):
-        """Thread-safe: post a callable to the main thread event loop.
 
-        Uses QTimer.singleShot which is safe when called from the main thread.
-        For cross-thread dispatch, the caller should use the signal bridge.
-        """
-        QTimer.singleShot(0, fn)
 
     # ── Keyboard Handling ─────────────────────────────────────────────
 
@@ -422,11 +398,7 @@ class MainAppWindow(QMainWindow):
         if self.on_mode_change_request:
             self.on_mode_change_request(mode)
 
-    def _toggle_debug(self):
-        if self.debug_window.isVisible():
-            self.debug_window.hide_window()
-        else:
-            self.debug_window.show_window()
+
 
     @staticmethod
     def _fire(callback):
