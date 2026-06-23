@@ -5,8 +5,8 @@ from uuid import UUID
 
 from annotator.models import Bounds, Component
 
-from ..domain.transformer import ViewportTransformer
-from ..domain.validation import BoundsValidator
+from .transformer import ViewportTransformer
+from .validation import BoundsValidator
 
 
 class GestureInterpreter:

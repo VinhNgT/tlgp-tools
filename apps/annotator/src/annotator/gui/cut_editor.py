@@ -5,7 +5,7 @@ from tkinter import ttk
 from annotator.models import Component
 from PIL import Image, ImageDraw, ImageTk
 
-from .domain.validation import CutValidator
+from .validation import CutValidator
 
 MIN_CUT_GAP = 50
 SNAP_DISTANCE = 8

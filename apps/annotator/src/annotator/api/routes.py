@@ -1,6 +1,15 @@
+"""FastAPI routes and WebSocket broadcaster for the Annotator API.
+
+Routes are async and delegate sync workspace calls via asyncio.to_thread().
+The WebSocketBroadcaster bridges sync workspace mutations to async WS clients.
+"""
+
+from __future__ import annotations
+
 import asyncio
 import io
 import json
+import threading
 import uuid
 import zipfile
 
@@ -15,8 +24,8 @@ from annotator.workspace.errors import (
 )
 from fastapi import (
     APIRouter,
-    Depends,
     File,
+    Request,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
@@ -25,29 +34,23 @@ from fastapi.responses import Response
 from PIL import Image
 from pydantic import BaseModel
 
-from .app import get_workspace
+# ── WebSocket Broadcaster ─────────────────────────────────────────────
 
-router = APIRouter()
 
 class WebSocketBroadcaster:
-    def __init__(self):
-        self.active_connections: list[WebSocket] = []
-        self.loop = None
+    """Subscriber that bridges sync workspace mutations to async WS clients.
 
-    def set_loop(self, loop: asyncio.AbstractEventLoop):
-        self.loop = loop
+    Thread-safe: uses loop.call_soon_threadsafe() for cross-thread event posting.
+    """
 
-    async def connect(self, websocket: WebSocket):
-        await websocket.accept()
-        self.active_connections.append(websocket)
-
-    def disconnect(self, websocket: WebSocket):
-        if websocket in self.active_connections:
-            self.active_connections.remove(websocket)
+    def __init__(self, loop: asyncio.AbstractEventLoop):
+        self._loop = loop
+        self._clients: list[asyncio.Queue] = []
+        self._clients_lock = threading.Lock()
 
     def broadcast_sync(self, patch: list[dict], new_state: WorkspaceState):
-        """Called by WorkspaceManager on any mutation."""
-        if not self.loop or self.loop.is_closed():
+        """Called by WorkspaceManager on any mutation (from any thread)."""
+        if self._loop.is_closed():
             return
 
         if patch and patch[0].get("op") == "replace" and patch[0].get("path") == "":
@@ -55,51 +58,79 @@ class WebSocketBroadcaster:
         else:
             msg = {"type": "patch", "revision": new_state.revision, "patch": patch}
 
-        asyncio.run_coroutine_threadsafe(self._broadcast(msg), self.loop)
+        with self._clients_lock:
+            clients = list(self._clients)
+        for q in clients:
+            self._loop.call_soon_threadsafe(q.put_nowait, msg)
 
-    async def _broadcast(self, msg: dict):
-        for connection in list(self.active_connections):
-            try:
-                await connection.send_json(msg)
-            except Exception:
-                self.disconnect(connection)
+    def connect(self) -> asyncio.Queue:
+        """Register a new WS client and return its message queue."""
+        q: asyncio.Queue = asyncio.Queue(maxsize=64)
+        with self._clients_lock:
+            self._clients.append(q)
+        return q
 
-broadcaster = WebSocketBroadcaster()
+    def disconnect(self, q: asyncio.Queue):
+        """Unregister a WS client queue."""
+        with self._clients_lock:
+            if q in self._clients:
+                self._clients.remove(q)
 
-@router.on_event("startup")
-async def startup_event():
-    broadcaster.set_loop(asyncio.get_running_loop())
 
-@router.websocket("/ws")
-async def websocket_endpoint(websocket: WebSocket, workspace: WorkspaceManager = Depends(get_workspace)):
-    await broadcaster.connect(websocket)
-    try:
-        await websocket.send_json({"type": "full_sync", "state": workspace.state.model_dump(mode="json")})
+# ── Dependency ─────────────────────────────────────────────────────────
 
-        while True:
-            data_str = await websocket.receive_text()
-            try:
-                rpc_req = json.loads(data_str)
-                if not isinstance(rpc_req, dict) or rpc_req.get("jsonrpc") != "2.0":
-                    continue
-                req_id = rpc_req.get("id")
-                method = rpc_req.get("method")
-                params = rpc_req.get("params", {})
 
-                result = handle_json_rpc(method, params, workspace)
-                await websocket.send_json({"jsonrpc": "2.0", "result": result, "id": req_id})
+def get_workspace(request: Request) -> WorkspaceManager:
+    """FastAPI dependency that retrieves the workspace from app state."""
+    return request.app.state.workspace
 
-            except Exception as e:
-                error_msg = getattr(e, "message", str(e))
-                await websocket.send_json({
-                    "jsonrpc": "2.0",
-                    "error": {"code": -32603, "message": error_msg},
-                    "id": rpc_req.get("id") if "rpc_req" in locals() and isinstance(rpc_req, dict) else None,
-                })
-    except WebSocketDisconnect:
-        broadcaster.disconnect(websocket)
+
+# ── Request Models ─────────────────────────────────────────────────────
+
+
+class AddComponentRequest(BaseModel):
+    id: uuid.UUID | None = None
+    label: str
+    parentId: uuid.UUID | None = None
+    bounds: dict
+    style: dict | None = None
+    visibility: dict | None = None
+
+
+class MoveComponentRequest(BaseModel):
+    x: int
+    y: int
+
+
+class UpdateComponentRequest(BaseModel):
+    label: str | None = None
+    bounds: dict | None = None
+    parentId: uuid.UUID | None = None
+    style: dict | None = None
+    visibility: dict | None = None
+
+
+class SetReadOnlyRequest(BaseModel):
+    read_only: bool
+
+
+class BatchComponentItem(BaseModel):
+    id: uuid.UUID
+    show_children: bool = False
+
+
+class BatchExportRequest(BaseModel):
+    include_state: bool = True
+    include_root: bool = False
+    show_root_children: bool = False
+    components: list[BatchComponentItem] = []
+
+
+# ── JSON-RPC Handler ──────────────────────────────────────────────────
+
 
 def handle_json_rpc(method: str, params: dict, workspace: WorkspaceManager) -> dict:
+    """Dispatch a JSON-RPC method call to the workspace."""
     if method == "add_component":
         comp_id = uuid.UUID(params.get("id")) if params.get("id") else uuid.uuid4()
         workspace.add_component(
@@ -147,129 +178,19 @@ def handle_json_rpc(method: str, params: dict, workspace: WorkspaceManager) -> d
     else:
         raise ValueError(f"Method '{method}' not found")
 
-# ── Import / Export ────────────────────────────────────────────────────
 
-@router.post("/workspace/import", tags=["Import/Export"])
-def import_workspace(file: UploadFile = File(...), workspace: WorkspaceManager = Depends(get_workspace)):
-    file_bytes = file.file.read()
-    workspace.import_zip(file_bytes)
-    return {"status": "imported", "sessionId": workspace.state.sessionId}
+# ── Image Generation ──────────────────────────────────────────────────
 
-@router.post("/workspace/import-image", tags=["Import/Export"])
-def import_image(file: UploadFile = File(...), workspace: WorkspaceManager = Depends(get_workspace)):
-    file_bytes = file.file.read()
-    workspace.import_image(file_bytes, file.filename or "screenshot.png")
-    return {"status": "image_imported", "sessionId": workspace.state.sessionId}
 
-@router.get("/workspace/export")
-def export_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
-    zip_bytes = workspace.export_zip()
-    return Response(
-        content=zip_bytes,
-        media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=annotation_export.zip"},
-    )
-
-@router.get("/workspace/state", tags=["State"])
-def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
-    return workspace.state.model_dump(mode="json")
-
-class SetReadOnlyRequest(BaseModel):
-    read_only: bool
-
-@router.put("/workspace/readonly", tags=["State"])
-def set_workspace_readonly(req: SetReadOnlyRequest, workspace: WorkspaceManager = Depends(get_workspace)):
-    workspace.mutate(lambda s: setattr(s, "readOnly", req.read_only), force=True)
-    return {"status": "success", "read_only": workspace.state.readOnly}
-
-@router.post("/workspace/clear", tags=["State"])
-def clear_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
-    workspace.clear_workspace(force=True)
-    return {"status": "success", "sessionId": str(workspace.state.sessionId)}
-
-# ── Semantic REST Endpoints ────────────────────────────────────────────
-
-class AddComponentRequest(BaseModel):
-    id: uuid.UUID | None = None
-    label: str
-    parentId: uuid.UUID | None = None
-    bounds: dict
-    style: dict | None = None
-    visibility: dict | None = None
-
-@router.post("/components", tags=["Components"])
-def add_component(req: AddComponentRequest, workspace: WorkspaceManager = Depends(get_workspace)):
-    comp_id = req.id or uuid.uuid4()
-    workspace.add_component(
-        comp_id=comp_id,
-        label=req.label,
-        bounds=req.bounds,
-        parent_id=req.parentId,
-        style=Style(**req.style) if req.style else None,
-        visibility=Visibility(**req.visibility) if req.visibility else None,
-    )
-    return {"id": comp_id, "status": "added"}
-
-class MoveComponentRequest(BaseModel):
-    x: int
-    y: int
-
-@router.put("/components/{comp_id}/move", tags=["Components"])
-def move_component(comp_id: uuid.UUID, req: MoveComponentRequest, workspace: WorkspaceManager = Depends(get_workspace)):
-    workspace.move_component(comp_id, req.x, req.y)
-    return {"status": "moved"}
-
-class UpdateComponentRequest(BaseModel):
-    label: str | None = None
-    bounds: dict | None = None
-    parentId: uuid.UUID | None = None
-    style: dict | None = None
-    visibility: dict | None = None
-
-@router.put("/components/{comp_id}", tags=["Components"])
-def update_component(comp_id: uuid.UUID, req: UpdateComponentRequest, workspace: WorkspaceManager = Depends(get_workspace)):
-    workspace.update_component(
-        comp_id=comp_id,
-        label=req.label,
-        bounds=Bounds(**req.bounds) if req.bounds else None,
-        parent_id=req.parentId,
-        style=Style(**req.style) if req.style else None,
-        visibility=Visibility(**req.visibility) if req.visibility else None,
-    )
-    return {"status": "updated"}
-
-@router.delete("/components/{comp_id}", tags=["Components"])
-def delete_component(comp_id: uuid.UUID, workspace: WorkspaceManager = Depends(get_workspace)):
-    workspace.delete_component(comp_id)
-    return {"status": "deleted"}
-
-@router.post("/session/undo", tags=["Session"])
-def session_undo(workspace: WorkspaceManager = Depends(get_workspace)):
-    if not workspace.undo():
-        raise UndoRedoError("Cannot undo", session_id=str(workspace.state.sessionId))
-    return {"status": "undone"}
-
-@router.post("/session/redo", tags=["Session"])
-def session_redo(workspace: WorkspaceManager = Depends(get_workspace)):
-    if not workspace.redo():
-        raise UndoRedoError("Cannot redo", session_id=str(workspace.state.sessionId))
-    return {"status": "redone"}
-
-# ── Image Endpoints ────────────────────────────────────────────────────
-
-class BatchComponentItem(BaseModel):
-    id: uuid.UUID
-    show_children: bool = False
-
-class BatchExportRequest(BaseModel):
-    include_state: bool = True
-    include_root: bool = False
-    show_root_children: bool = False
-    components: list[BatchComponentItem] = []
-
-def generate_image_bytes(comp_id: str | uuid.UUID, workspace: WorkspaceManager, show_children: bool = False) -> bytes:
+def generate_image_bytes(
+    comp_id: str | uuid.UUID,
+    workspace: WorkspaceManager,
+    show_children: bool = False,
+) -> bytes:
+    """Generate a PNG image for a component or the root screenshot."""
     if comp_id == "root":
-        bounds_left, bounds_top, bounds_right, bounds_bottom = 0, 0, workspace.state.image.width, workspace.state.image.height
+        bounds_left, bounds_top = 0, 0
+        bounds_right, bounds_bottom = workspace.state.image.width, workspace.state.image.height
         parent_comp = None
         children = TreeUtils.get_children(workspace.state, None) if show_children else []
         offset_x, offset_y = 0, 0
@@ -279,7 +200,8 @@ def generate_image_bytes(comp_id: str | uuid.UUID, workspace: WorkspaceManager, 
             raise ComponentNotFoundError("Component not found", component_id=str(comp_uuid))
         comp = workspace.state.components[comp_uuid]
         bounds = comp.bounds
-        bounds_left, bounds_top, bounds_right, bounds_bottom = bounds.left, bounds.top, bounds.right, bounds.bottom
+        bounds_left, bounds_top = bounds.left, bounds.top
+        bounds_right, bounds_bottom = bounds.right, bounds.bottom
         parent_comp = comp
         children = TreeUtils.get_children(workspace.state, comp_uuid) if show_children else []
         offset_x, offset_y = bounds.left, bounds.top
@@ -292,51 +214,226 @@ def generate_image_bytes(comp_id: str | uuid.UUID, workspace: WorkspaceManager, 
         cropped.save(buf, format="PNG")
         return buf.getvalue()
 
-@router.post("/workspace/export-batch", tags=["Import/Export"])
-def export_batch(req: BatchExportRequest, workspace: WorkspaceManager = Depends(get_workspace)):
-    if not workspace.raw_image_bytes:
-        raise InvalidStateError("No image in RAM", session_id=str(workspace.state.sessionId))
 
-    buf = io.BytesIO()
-    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-        if req.include_state:
-            zf.writestr("workspace.json", workspace.state.model_dump_json(indent=2))
-        if req.include_root:
-            if workspace.state.cutLines:
-                with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
-                    img_w, img_h = img.width, img.height
-                    boundaries = [0] + sorted(workspace.state.cutLines) + [img_h]
-                    for part_idx in range(len(boundaries) - 1):
-                        seg_y_start = boundaries[part_idx]
-                        seg_y_end = boundaries[part_idx + 1]
-                        if seg_y_end <= seg_y_start:
+# ── Router Factory ────────────────────────────────────────────────────
+
+
+def create_router(
+    workspace: WorkspaceManager,
+    server_loop: asyncio.AbstractEventLoop,
+) -> tuple[APIRouter, WebSocketBroadcaster]:
+    """Create the API router and broadcaster.
+
+    Returns:
+        (router, broadcaster) tuple. The caller must subscribe
+        the broadcaster to the workspace.
+    """
+    router = APIRouter()
+    broadcaster = WebSocketBroadcaster(server_loop)
+
+    # ── WebSocket ──────────────────────────────────────────────────
+
+    @router.websocket("/ws")
+    async def websocket_endpoint(websocket: WebSocket):
+        await websocket.accept()
+        queue = broadcaster.connect()
+        try:
+            # Send initial full state
+            await websocket.send_json({
+                "type": "full_sync",
+                "state": workspace.state.model_dump(mode="json"),
+            })
+
+            # Process incoming JSON-RPC + relay outgoing broadcasts
+            import asyncio as _asyncio  # noqa: PLC0415
+
+            async def relay_broadcasts():
+                while True:
+                    msg = await queue.get()
+                    await websocket.send_json(msg)
+
+            async def process_rpc():
+                while True:
+                    data_str = await websocket.receive_text()
+                    try:
+                        rpc_req = json.loads(data_str)
+                        if not isinstance(rpc_req, dict) or rpc_req.get("jsonrpc") != "2.0":
                             continue
-                        cropped = img.crop((0, seg_y_start, img_w, seg_y_end))
-                        children = []
-                        if req.show_root_children:
-                            root_children = TreeUtils.get_children(workspace.state, None)
-                            for child in root_children:
-                                center_y = (child.bounds.top + child.bounds.bottom) / 2
-                                if seg_y_start <= center_y < seg_y_end:
-                                    children.append(child)
-                        if children:
-                            cropped = paint_annotations(cropped, children, 0, seg_y_start, None, img_w)
-                        buf_part = io.BytesIO()
-                        cropped.save(buf_part, format="PNG")
-                        zf.writestr(f"raw_part{part_idx + 1}.png", buf_part.getvalue())
-            else:
-                zf.writestr("raw.png", generate_image_bytes("root", workspace, req.show_root_children))
-        for item in req.components:
-            zf.writestr(f"images/{item.id}.png", generate_image_bytes(item.id, workspace, item.show_children))
+                        req_id = rpc_req.get("id")
+                        method = rpc_req.get("method")
+                        params = rpc_req.get("params", {})
 
-    return Response(
-        content=buf.getvalue(), media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=batch_export.zip"}
-    )
+                        result = await asyncio.to_thread(handle_json_rpc, method, params, workspace)
+                        await websocket.send_json({"jsonrpc": "2.0", "result": result, "id": req_id})
 
-@router.get("/images/{comp_id}", tags=["Image"])
-def get_image(comp_id: str, show_children: bool = False, workspace: WorkspaceManager = Depends(get_workspace)):
-    if not workspace.raw_image_bytes:
-        raise InvalidStateError("No image in RAM")
-    img_bytes = generate_image_bytes(comp_id, workspace, show_children)
-    return Response(content=img_bytes, media_type="image/png")
+                    except Exception as e:
+                        error_msg = getattr(e, "message", str(e))
+                        await websocket.send_json({
+                            "jsonrpc": "2.0",
+                            "error": {"code": -32603, "message": error_msg},
+                            "id": rpc_req.get("id") if "rpc_req" in dir() and isinstance(rpc_req, dict) else None,
+                        })
+
+            # Run both tasks concurrently; cancel on disconnect
+            relay_task = _asyncio.create_task(relay_broadcasts())
+            try:
+                await process_rpc()
+            finally:
+                relay_task.cancel()
+
+        except WebSocketDisconnect:
+            pass
+        finally:
+            broadcaster.disconnect(queue)
+
+    # ── State Routes ───────────────────────────────────────────────
+
+    @router.get("/workspace/state", tags=["State"])
+    async def get_state():
+        # workspace.state returns an immutable snapshot — safe without to_thread
+        return workspace.state.model_dump(mode="json")
+
+    @router.put("/workspace/readonly", tags=["State"])
+    async def set_workspace_readonly(req: SetReadOnlyRequest):
+        await asyncio.to_thread(
+            workspace.mutate, lambda s: setattr(s, "readOnly", req.read_only), True
+        )
+        return {"status": "success", "read_only": workspace.state.readOnly}
+
+    @router.post("/workspace/clear", tags=["State"])
+    async def clear_workspace():
+        await asyncio.to_thread(workspace.clear_workspace, True)
+        return {"status": "success", "sessionId": str(workspace.state.sessionId)}
+
+    # ── Import / Export ────────────────────────────────────────────
+
+    @router.post("/workspace/import", tags=["Import/Export"])
+    async def import_workspace(file: UploadFile = File(...)):
+        file_bytes = await file.read()
+        await asyncio.to_thread(workspace.import_zip, file_bytes)
+        return {"status": "imported", "sessionId": workspace.state.sessionId}
+
+    @router.post("/workspace/import-image", tags=["Import/Export"])
+    async def import_image(file: UploadFile = File(...)):
+        file_bytes = await file.read()
+        await asyncio.to_thread(workspace.import_image, file_bytes, file.filename or "screenshot.png")
+        return {"status": "image_imported", "sessionId": workspace.state.sessionId}
+
+    @router.get("/workspace/export")
+    async def export_workspace():
+        zip_bytes = await asyncio.to_thread(workspace.export_zip)
+        return Response(
+            content=zip_bytes,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=annotation_export.zip"},
+        )
+
+    # ── Component REST ─────────────────────────────────────────────
+
+    @router.post("/components", tags=["Components"])
+    async def add_component(req: AddComponentRequest):
+        comp_id = req.id or uuid.uuid4()
+        await asyncio.to_thread(
+            workspace.add_component,
+            comp_id=comp_id,
+            label=req.label,
+            bounds=req.bounds,
+            parent_id=req.parentId,
+            style=Style(**req.style) if req.style else None,
+            visibility=Visibility(**req.visibility) if req.visibility else None,
+        )
+        return {"id": comp_id, "status": "added"}
+
+    @router.put("/components/{comp_id}/move", tags=["Components"])
+    async def move_component(comp_id: uuid.UUID, req: MoveComponentRequest):
+        await asyncio.to_thread(workspace.move_component, comp_id, req.x, req.y)
+        return {"status": "moved"}
+
+    @router.put("/components/{comp_id}", tags=["Components"])
+    async def update_component(comp_id: uuid.UUID, req: UpdateComponentRequest):
+        await asyncio.to_thread(
+            workspace.update_component,
+            comp_id=comp_id,
+            label=req.label,
+            bounds=Bounds(**req.bounds) if req.bounds else None,
+            parent_id=req.parentId,
+            style=Style(**req.style) if req.style else None,
+            visibility=Visibility(**req.visibility) if req.visibility else None,
+        )
+        return {"status": "updated"}
+
+    @router.delete("/components/{comp_id}", tags=["Components"])
+    async def delete_component(comp_id: uuid.UUID):
+        await asyncio.to_thread(workspace.delete_component, comp_id)
+        return {"status": "deleted"}
+
+    @router.post("/session/undo", tags=["Session"])
+    async def session_undo():
+        success = await asyncio.to_thread(workspace.undo)
+        if not success:
+            raise UndoRedoError("Cannot undo", session_id=str(workspace.state.sessionId))
+        return {"status": "undone"}
+
+    @router.post("/session/redo", tags=["Session"])
+    async def session_redo():
+        success = await asyncio.to_thread(workspace.redo)
+        if not success:
+            raise UndoRedoError("Cannot redo", session_id=str(workspace.state.sessionId))
+        return {"status": "redone"}
+
+    # ── Image Endpoints ────────────────────────────────────────────
+
+    @router.get("/images/{comp_id}", tags=["Image"])
+    async def get_image(comp_id: str, show_children: bool = False):
+        if not workspace.raw_image_bytes:
+            raise InvalidStateError("No image in RAM")
+        img_bytes = await asyncio.to_thread(generate_image_bytes, comp_id, workspace, show_children)
+        return Response(content=img_bytes, media_type="image/png")
+
+    @router.post("/workspace/export-batch", tags=["Import/Export"])
+    async def export_batch(req: BatchExportRequest):
+        if not workspace.raw_image_bytes:
+            raise InvalidStateError("No image in RAM", session_id=str(workspace.state.sessionId))
+
+        def _build_batch_zip() -> bytes:
+            buf = io.BytesIO()
+            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+                if req.include_state:
+                    zf.writestr("workspace.json", workspace.state.model_dump_json(indent=2))
+                if req.include_root:
+                    if workspace.state.cutLines:
+                        with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
+                            img_w, img_h = img.width, img.height
+                            boundaries = [0] + sorted(workspace.state.cutLines) + [img_h]
+                            for part_idx in range(len(boundaries) - 1):
+                                seg_y_start = boundaries[part_idx]
+                                seg_y_end = boundaries[part_idx + 1]
+                                if seg_y_end <= seg_y_start:
+                                    continue
+                                cropped = img.crop((0, seg_y_start, img_w, seg_y_end))
+                                children = []
+                                if req.show_root_children:
+                                    root_children = TreeUtils.get_children(workspace.state, None)
+                                    for child in root_children:
+                                        center_y = (child.bounds.top + child.bounds.bottom) / 2
+                                        if seg_y_start <= center_y < seg_y_end:
+                                            children.append(child)
+                                if children:
+                                    cropped = paint_annotations(cropped, children, 0, seg_y_start, None, img_w)
+                                buf_part = io.BytesIO()
+                                cropped.save(buf_part, format="PNG")
+                                zf.writestr(f"raw_part{part_idx + 1}.png", buf_part.getvalue())
+                    else:
+                        zf.writestr("raw.png", generate_image_bytes("root", workspace, req.show_root_children))
+                for item in req.components:
+                    zf.writestr(f"images/{item.id}.png", generate_image_bytes(item.id, workspace, item.show_children))
+            return buf.getvalue()
+
+        zip_content = await asyncio.to_thread(_build_batch_zip)
+        return Response(
+            content=zip_content,
+            media_type="application/zip",
+            headers={"Content-Disposition": "attachment; filename=batch_export.zip"},
+        )
+
+    return router, broadcaster

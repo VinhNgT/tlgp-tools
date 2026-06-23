@@ -17,7 +17,7 @@ from annotator.rendering import (
 from PIL import Image, ImageDraw, ImageTk
 from tlgp_logger import get_logger
 
-from ..domain.transformer import CUT_GAP_PX, ViewportTransformer
+from .transformer import CUT_GAP_PX, ViewportTransformer
 
 logger = get_logger(__name__)
 

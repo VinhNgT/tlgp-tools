@@ -6,7 +6,7 @@ from PIL import Image
 
 from .cut_editor import CutEditorDialog
 from .dialog_service import DialogService, ProgressIndicator
-from .views.dialogs import ImportingDialog, ScreenInfoDialog
+from .tk_dialogs import ImportingDialog, ScreenInfoDialog
 
 
 class TkinterDialogService(DialogService):

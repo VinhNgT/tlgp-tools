@@ -7,6 +7,8 @@ This module is the single source of truth for:
 - Drawing annotation boxes + number pills onto a PIL Image
 """
 
+import functools
+
 from annotator.models import Component
 from PIL import Image, ImageDraw, ImageFont
 
@@ -33,67 +35,39 @@ BOX_BORDER_WIDTH = 5
 PILL_OUTLINE_WIDTH = 3
 
 
-# Font cache mapping size to ImageFont instances.
-_font_cache: dict[int, ImageFont.FreeTypeFont | ImageFont.ImageFont] = {}
+_FONT_CANDIDATES = (
+    "arialbd.ttf",  # Windows Arial Bold
+    "arial.ttf",  # Windows Arial Regular
+    "/Library/Fonts/Arial Bold.ttf",  # macOS Arial Bold
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",  # macOS Supplemental Arial Bold
+    "/Library/Fonts/Arial.ttf",  # macOS Arial Regular
+    "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS Supplemental Arial Regular
+    "/System/Library/Fonts/Helvetica.ttc",  # macOS Helvetica
+    "/System/Library/Fonts/HelveticaNeue.ttc",  # macOS Helvetica Neue
+    "Courier.dfont",  # macOS Courier
+)
 
 
-def get_font(size: int):
-    """Load a TrueType font with the given size, trying common Windows and macOS system paths."""
-    if size in _font_cache:
-        return _font_cache[size]
-
-    font_candidates = [
-        "arialbd.ttf",  # Windows Arial Bold
-        "arial.ttf",  # Windows Arial Regular
-        "/Library/Fonts/Arial Bold.ttf",  # macOS Arial Bold
-        "/System/Library/Fonts/Supplemental/Arial Bold.ttf",  # macOS Supplemental Arial Bold
-        "/Library/Fonts/Arial.ttf",  # macOS Arial Regular
-        "/System/Library/Fonts/Supplemental/Arial.ttf",  # macOS Supplemental Arial Regular
-        "/System/Library/Fonts/Helvetica.ttc",  # macOS Helvetica
-        "/System/Library/Fonts/HelveticaNeue.ttc",  # macOS Helvetica Neue
-        "Courier.dfont",  # macOS Courier
-    ]
-    for font_name in font_candidates:
+@functools.lru_cache(maxsize=32)
+def get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """Load a TrueType font with the given size, trying common system paths. Cached by size."""
+    for font_name in _FONT_CANDIDATES:
         try:
-            font = ImageFont.truetype(font_name, size)
-            _font_cache[size] = font
-            return font
+            return ImageFont.truetype(font_name, size)
         except OSError:
             continue
-    default_font = ImageFont.load_default()
-    _font_cache[size] = default_font
-    return default_font
+    return ImageFont.load_default()
 
 
 # ── Text Measurement ───────────────────────────────────────────────────
 
 
 def get_text_dimensions(
-    draw: ImageDraw.Draw | None, text: str, font
+    draw: ImageDraw.Draw, text: str, font
 ) -> tuple[int, int, int]:
-    """Safely get text width, height, and top offset across different Pillow versions.
-
-    If `draw` is None, falls back to font-based measurement or character estimation.
-    Returns (width, height, top_offset).
-    """
-    try:
-        if draw is not None and hasattr(draw, "textbbox"):
-            left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
-            return right - left, bottom - top, top
-        elif hasattr(font, "getbbox"):
-            left, top, right, bottom = font.getbbox(text)
-            return right - left, bottom - top, top
-        elif draw is not None and hasattr(draw, "textsize"):
-            tw, th = draw.textsize(text, font=font)
-            return tw, th, 0
-    except Exception:
-        pass
-
-    # Fallback: estimate based on font size
-    is_large = getattr(font, "size", 12) > 15
-    char_w = 11 if is_large else 8
-    char_h = 20 if is_large else 14
-    return len(text) * char_w, char_h, 0
+    """Get text (width, height, top_offset) using draw.textbbox(). Requires Pillow 8+."""
+    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    return right - left, bottom - top, top
 
 
 # ── Level Scaling ──────────────────────────────────────────────────────

@@ -1,11 +1,11 @@
 from tlgp_logger import get_logger
 
-from .controllers.controller import AppController
-from .domain.transformer import ViewportTransformer
+from .app import MainAppWindow
+from .controller import AppController
+from .gestures import GestureInterpreter
 from .state import UIStateStore
 from .tkinter_dialog_service import TkinterDialogService
-from .views.app import MainAppWindow
-from .views.gestures import GestureInterpreter
+from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)
 

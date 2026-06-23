@@ -1,5 +1,6 @@
 import io
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 
 from annotator.models import Bounds, Component, Style, Visibility
@@ -7,9 +8,9 @@ from annotator.workspace import WorkspaceManager
 from PIL import Image
 from tlgp_logger import get_logger
 
-from ..dialog_service import DialogService
-from ..state import UIStateStore
-from ..views.app import MainAppWindow
+from .app import MainAppWindow
+from .dialog_service import DialogService
+from .state import UIStateStore
 
 logger = get_logger(__name__)
 
@@ -30,6 +31,7 @@ class AppController:
         self.dialog_service = dialog_service
         self._loaded_session_id = None
         self.pending_created_ids: set[UUID] = set()
+        self._io_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="annotator-io")
 
         self.view.report_callback_exception = self._global_error_handler
 
@@ -476,17 +478,14 @@ class AppController:
             self.view, message="Importing workspace session..."
         )
 
-        try:
+        def do_import():
             with open(path, "rb") as f:
                 self.workspace.import_zip(f.read())
-            dialog.dismiss()
-        except Exception as e:
-            dialog.dismiss()
-            self.dialog_service.show_error(
-                self.view,
-                "Import Failed",
-                f"Failed to import workspace session:\n{e}",
-            )
+
+        future = self._io_pool.submit(do_import)
+        future.add_done_callback(
+            lambda f: self.view.after(0, lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import workspace session"))
+        )
 
     def _on_import_image_request(self):
         path = self.dialog_service.ask_open_filename(
@@ -500,17 +499,14 @@ class AppController:
             self.view, message="Importing raw image..."
         )
 
-        try:
+        def do_import():
             with open(path, "rb") as f:
                 self.workspace.import_image(f.read(), path)
-            dialog.dismiss()
-        except Exception as e:
-            dialog.dismiss()
-            self.dialog_service.show_error(
-                self.view,
-                "Import Failed",
-                f"Failed to import raw image:\n{e}",
-            )
+
+        future = self._io_pool.submit(do_import)
+        future.add_done_callback(
+            lambda f: self.view.after(0, lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import raw image"))
+        )
 
     def _on_export_zip_request(self):
         if not self.view.canvas.full_pil_img:
@@ -527,22 +523,36 @@ class AppController:
             self.view, message="Exporting workspace session..."
         )
 
-        try:
+        def do_export():
             zip_bytes = self.workspace.export_zip()
             with open(path, "wb") as f:
                 f.write(zip_bytes)
-            dialog.dismiss()
-            self.dialog_service.show_info(
-                self.view,
-                "Export Successful",
-                "Session zip exported successfully.",
-            )
-        except Exception as e:
-            dialog.dismiss()
+
+        future = self._io_pool.submit(do_export)
+        future.add_done_callback(
+            lambda f: self.view.after(0, lambda: self._handle_export_result(f, dialog))
+        )
+
+    def _handle_io_result(self, future, dialog, title, message_prefix):
+        """Handle the result of a background I/O operation."""
+        dialog.dismiss()
+        exc = future.exception()
+        if exc:
             self.dialog_service.show_error(
-                self.view,
-                "Export Failed",
-                f"Failed to export workspace session:\n{e}",
+                self.view, title, f"{message_prefix}:\n{exc}"
+            )
+
+    def _handle_export_result(self, future, dialog):
+        """Handle the result of a background export operation."""
+        dialog.dismiss()
+        exc = future.exception()
+        if exc:
+            self.dialog_service.show_error(
+                self.view, "Export Failed", f"Failed to export workspace session:\n{exc}"
+            )
+        else:
+            self.dialog_service.show_info(
+                self.view, "Export Successful", "Session zip exported successfully."
             )
 
     def _on_open_cut_editor_request(self):
