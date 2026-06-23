@@ -4,7 +4,7 @@ from .app import MainAppWindow
 from .controller import AppController
 from .gestures import GestureInterpreter
 from .state import UIStateStore
-from .tkinter_dialog_service import TkinterDialogService
+from .tk_dialogs import TkinterDialogService
 from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)

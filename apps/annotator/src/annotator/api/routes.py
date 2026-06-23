@@ -59,11 +59,14 @@ class WebSocketBroadcaster:
 
         with self._clients_lock:
             clients = list(self._clients)
-        for q in clients:
+        def _safe_put(q: asyncio.Queue, m: dict):
             try:
-                self._loop.call_soon_threadsafe(q.put_nowait, msg)
+                q.put_nowait(m)
             except asyncio.QueueFull:
-                pass  # Drop message for slow clients instead of crashing
+                pass
+
+        for q in clients:
+            self._loop.call_soon_threadsafe(_safe_put, q, msg)
 
     def connect(self) -> asyncio.Queue:
         """Register a new WS client and return its message queue."""
