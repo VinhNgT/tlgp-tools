@@ -55,4 +55,7 @@ project-includes = [
     "**/*.py*",
     "**/*.ipynb",
 ]
+project-excludes = [
+    "**/__pyrefly_virtual__/**",
+]
 check-unannotated-defs = true
