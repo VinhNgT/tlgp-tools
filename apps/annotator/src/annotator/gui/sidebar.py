@@ -1,99 +1,140 @@
-import tkinter as tk
-from tkinter import ttk
 from uuid import UUID
 
+from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
+from PySide6.QtWidgets import (
+    QAbstractItemView,
+    QLabel,
+    QLineEdit,
+    QTreeView,
+    QVBoxLayout,
+    QWidget,
+)
 
-class SidebarTreeView(ttk.Frame):
-    """Passive Treeview layer view component displaying component hierarchies with incremental syncs."""
 
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, padding=10, **kwargs)
+class SidebarTreeView(QWidget):
+    """Treeview layer displaying component hierarchies with incremental syncs."""
 
-        ttk.Label(self, text="COMPONENTS", font=("", 9, "bold")).pack(
-            anchor="w", pady=(0, 8)
-        )
+    def __init__(self, parent=None):
+        super().__init__(parent)
 
-        self.tree = ttk.Treeview(self, selectmode="browse", show="tree")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
 
-        tree_scroll = ttk.Scrollbar(self, orient=tk.VERTICAL, command=self.tree.yview)
-        tree_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        lbl = QLabel("COMPONENTS")
+        lbl.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        layout.addWidget(lbl)
 
-        self.tree.configure(yscrollcommand=tree_scroll.set)
-        self.tree.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.model = QStandardItemModel()
+        self.tree = QTreeView()
+        self.tree.setModel(self.model)
+        self.tree.setHeaderHidden(True)
+        self.tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
+        self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.tree.setAnimated(False)
+        self.tree.setIndentation(16)
+        self.tree.setStyleSheet("""
+            QTreeView::branch {
+                border-image: none;
+                image: none;
+            }
+        """)
+        layout.addWidget(self.tree)
 
-        self.tree.bind("<<TreeviewSelect>>", self._on_tree_select)
-        self.tree.tag_configure("hidden", foreground="#999999")
-
-        if self.tk.call('tk', 'windowingsystem') == 'aqua':
-            self.tree.bind("<Button-2>", self._on_right_click)
-            self.tree.bind("<Control-Button-1>", self._on_right_click)
-        else:
-            self.tree.bind("<Button-3>", self._on_right_click)
-
-        self.tree.bind("<Double-1>", self._on_double_click)
+        self.tree.selectionModel().selectionChanged.connect(self._on_tree_select)
+        self.tree.customContextMenuRequested.connect(self._on_right_click)
+        self.tree.doubleClicked.connect(self._on_double_click)
 
         self.on_component_selected = None
         self.on_context_menu_request = None
         self.on_rename_request = None
         self._is_programmatic = False
-        self._tree_nodes = {}
+        self._item_map: dict[str, QStandardItem] = {}
 
     def rebuild_tree(self, nodes: list[dict]):
-        """Diffs and rebuilds Treeview nodes incrementally based on updated layout tree data."""
-        synced_ids = set()
+        """Diffs and rebuilds tree nodes incrementally based on updated layout tree data."""
+        synced_ids: set[str] = set()
+        new_ids: set[str] = set()
 
-        def sync_node(parent_id: str, node_data: dict, index: int):
+        def sync_node(parent_item: QStandardItem | None, node_data: dict, index: int):
             node_id = node_data["id"]
             node_tags = node_data.get("tags", [])
             node_text = node_data["text"]
-            node_label = node_data.get("label", "")
             if "locked" in node_tags:
                 node_text = "🔒 " + node_text
 
             synced_ids.add(node_id)
 
-            cached = self._tree_nodes.get(node_id)
-            if cached is None:
-                self.tree.insert(parent_id, index, iid=node_id, text=node_text, open=True, tags=node_tags)
-                self._tree_nodes[node_id] = {
-                    "text": node_text,
-                    "label": node_label,
-                    "tags": node_tags,
-                    "parent": parent_id,
-                    "index": index,
-                }
-            else:
-                if cached["text"] != node_text or cached.get("tags") != node_tags or cached.get("label") != node_label:
-                    self.tree.item(node_id, text=node_text, tags=node_tags)
-                    cached["text"] = node_text
-                    cached["tags"] = node_tags
-                    cached["label"] = node_label
+            cached_item = self._item_map.get(node_id)
+            container = parent_item if parent_item is not None else self.model.invisibleRootItem()
 
-                if cached["parent"] != parent_id or cached["index"] != index:
-                    self.tree.move(node_id, parent_id, index)
-                    cached["parent"] = parent_id
-                    cached["index"] = index
+            if cached_item is None:
+                item = QStandardItem(node_text)
+                item.setData(node_id, Qt.ItemDataRole.UserRole)
+                item.setEditable(False)
+                self._apply_tags(item, node_tags)
+                container.insertRow(index, item)
+                self._item_map[node_id] = item
+                cached_item = item
+                new_ids.add(node_id)
+            else:
+                if cached_item.text() != node_text:
+                    cached_item.setText(node_text)
+                self._apply_tags(cached_item, node_tags)
+
+                # Re-parent if needed
+                actual_parent = cached_item.parent() or self.model.invisibleRootItem()
+                if actual_parent != container or actual_parent.index().internalId() != container.index().internalId() if parent_item else actual_parent != container:
+                    row = cached_item.row()
+                    taken = actual_parent.takeRow(row)
+                    if taken:
+                        container.insertRow(index, taken)
+                elif cached_item.row() != index:
+                    row = cached_item.row()
+                    taken = container.takeRow(row)
+                    if taken:
+                        container.insertRow(index, taken)
 
             for i, child_node in enumerate(node_data.get("children", [])):
-                sync_node(node_id, child_node, i)
+                sync_node(cached_item, child_node, i)
 
         for i, root_node in enumerate(nodes):
-            sync_node("", root_node, i)
+            sync_node(None, root_node, i)
 
-        to_delete = set(self._tree_nodes.keys()) - synced_ids
+        # Remove items not present in the new tree
+        to_delete = set(self._item_map.keys()) - synced_ids
         for item_id in to_delete:
-            if self.tree.exists(item_id):
-                self.tree.delete(item_id)
-            self._tree_nodes.pop(item_id, None)
+            item = self._item_map.pop(item_id, None)
+            if item:
+                parent = item.parent() or self.model.invisibleRootItem()
+                parent.removeRow(item.row())
+
+        # Only expand newly inserted items, preserving user's collapse state
+        for node_id in new_ids:
+            item = self._item_map.get(node_id)
+            if item:
+                self.tree.expand(item.index())
+
+    def _apply_tags(self, item: QStandardItem, tags: list[str]):
+        if "hidden" in tags:
+            item.setForeground(QColor("#999999"))
+        else:
+            item.setForeground(QColor("#e0e0e0"))
 
     def select_component(self, comp_id: UUID):
         """Highlights specific component node without triggering selection update feedback loops."""
         comp_id_str = str(comp_id)
-        if comp_id_str in self._tree_nodes:
+        item = self._item_map.get(comp_id_str)
+        if item:
             self._is_programmatic = True
             try:
-                self.tree.selection_set(comp_id_str)
-                self.tree.see(comp_id_str)
+                idx = item.index()
+                self.tree.selectionModel().select(
+                    idx,
+                    self.tree.selectionModel().SelectionFlag.ClearAndSelect,
+                )
+                self.tree.scrollTo(idx)
             except Exception:
                 pass
             finally:
@@ -103,69 +144,86 @@ class SidebarTreeView(ttk.Frame):
         """Clears node selection highlighting cleanly."""
         self._is_programmatic = True
         try:
-            self.tree.selection_set()
+            self.tree.selectionModel().clearSelection()
         except Exception:
             pass
         finally:
             self._is_programmatic = False
 
-    def _on_tree_select(self, event):
+    def _on_tree_select(self, selected, deselected):
         if self._is_programmatic:
             return
-        item = self.tree.selection()
-        if item and self.on_component_selected:
-            try:
-                comp_id = UUID(item[0])
-                self.on_component_selected(comp_id)
-            except ValueError:
-                pass
-
-    def _on_right_click(self, event):
-        item = self.tree.identify_row(event.y)
-        if item:
-            try:
-                comp_id = UUID(item)
-                self.select_component(comp_id)
-                if self.on_component_selected:
+        indexes = selected.indexes()
+        if indexes and self.on_component_selected:
+            item = self.model.itemFromIndex(indexes[0])
+            if item:
+                try:
+                    comp_id = UUID(item.data(Qt.ItemDataRole.UserRole))
                     self.on_component_selected(comp_id)
-                if self.on_context_menu_request:
-                    self.on_context_menu_request(comp_id, event.x_root, event.y_root)
-            except ValueError:
-                pass
+                except ValueError:
+                    pass
 
-    def _on_double_click(self, event):
-        item = self.tree.identify_row(event.y)
+    def _on_right_click(self, pos):
+        index = self.tree.indexAt(pos)
+        if not index.isValid():
+            return
+        item = self.model.itemFromIndex(index)
+        if not item:
+            return
+        try:
+            comp_id = UUID(item.data(Qt.ItemDataRole.UserRole))
+            self.select_component(comp_id)
+            if self.on_component_selected:
+                self.on_component_selected(comp_id)
+            if self.on_context_menu_request:
+                global_pos = self.tree.viewport().mapToGlobal(pos)
+                self.on_context_menu_request(comp_id, global_pos.x(), global_pos.y())
+        except ValueError:
+            pass
+
+    def _on_double_click(self, index: QModelIndex):
+        item = self.model.itemFromIndex(index)
         if not item:
             return
 
-        cached = self._tree_nodes.get(item)
-        if not cached:
+        node_id = item.data(Qt.ItemDataRole.UserRole)
+        if not node_id:
             return
 
-        try:
-            x, y, w, h = self.tree.bbox(item, "#0")
-        except Exception:
-            return
+        # Create inline editor
+        rect = self.tree.visualRect(index)
+        editor = QLineEdit(self.tree.viewport())
+        editor.setGeometry(rect)
+        editor.setText(item.text().lstrip("🔒 "))
+        editor.setFocus()
+        editor.show()
+        editor.selectAll()
 
-        entry = ttk.Entry(self.tree, font=("", 9))
-        entry.place(x=x, y=y, width=w, height=h)
-        entry.insert(0, cached.get("label", ""))
-        entry.focus_set()
+        def save_edit():
+            new_label = editor.text().strip()
+            if new_label and self.on_rename_request:
+                try:
+                    self.on_rename_request(UUID(node_id), new_label)
+                except ValueError:
+                    pass
+            editor.deleteLater()
 
-        def save_edit(e=None):
-            new_label = entry.get().strip()
-            if new_label and new_label != cached.get("label"):
-                if self.on_rename_request:
-                    try:
-                        self.on_rename_request(UUID(item), new_label)
-                    except ValueError:
-                        pass
-            entry.destroy()
+        def cancel_edit():
+            editor.deleteLater()
 
-        def cancel_edit(e=None):
-            entry.destroy()
+        editor.returnPressed.connect(save_edit)
+        editor.editingFinished.connect(save_edit)
 
-        entry.bind("<Return>", save_edit)
-        entry.bind("<FocusOut>", save_edit)
-        entry.bind("<Escape>", cancel_edit)
-        return "break"
+        def on_escape():
+            cancel_edit()
+
+        # Install escape key handler
+        original_key_press = editor.keyPressEvent
+
+        def key_press(event):
+            if event.key() == Qt.Key.Key_Escape:
+                on_escape()
+            else:
+                original_key_press(event)
+
+        editor.keyPressEvent = key_press

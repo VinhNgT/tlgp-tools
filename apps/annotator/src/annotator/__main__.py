@@ -1,6 +1,6 @@
 """Entry point for the Annotator application.
 
-Starts the FastAPI server on a background thread and the Tkinter GUI on
+Starts the FastAPI server on a background thread and the PySide6 GUI on
 the main thread. Both share a single WorkspaceManager instance.
 """
 

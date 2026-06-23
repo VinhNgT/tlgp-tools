@@ -1,22 +1,43 @@
-import tkinter as tk
-from tkinter import ttk
+from PySide6.QtCore import QEvent, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtWidgets import (
+    QCheckBox,
+    QGridLayout,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QTextEdit,
+    QVBoxLayout,
+    QWidget,
+)
+
+# ── Colour Constants ──────────────────────────────────────────────────
+
+_PRIMARY = QColor("#0c8ce9")
+_BG_ENABLED = QColor("#1e1e1e")
+_BG_DISABLED = QColor("#121212")
+_BORDER_ENABLED = QColor("#444444")
+_BORDER_DISABLED = QColor("#2c2c2c")
+_OUTLINE_ENABLED = QColor("#555555")
+_OUTLINE_DISABLED = QColor("#2c2c2c")
+_CROSSHAIR_ENABLED = QColor("#333333")
+_CROSSHAIR_DISABLED = QColor("#222222")
+_DOT_FILL_ENABLED = QColor("#444444")
+_DOT_FILL_DISABLED = QColor("#2c2c2c")
+_DOT_OUTLINE_ENABLED = QColor("#666666")
+_DOT_OUTLINE_DISABLED = QColor("#333333")
 
 
-class CornerSelector(tk.Canvas):
-    def __init__(self, parent, on_corner_selected_callback, **kwargs):
-        super().__init__(
-            parent,
-            width=64,
-            height=64,
-            highlightthickness=1,
-            bd=0,
-            bg="#1a1a1a",
-            highlightbackground="#333333",
-            **kwargs,
-        )
-        self.on_corner_selected = on_corner_selected_callback
+class CornerSelector(QWidget):
+    corner_selected = Signal(str)
+
+    def __init__(self, on_corner_selected_callback=None, parent=None):
+        super().__init__(parent)
+        self.setFixedSize(64, 64)
+        self._on_corner_selected = on_corner_selected_callback
         self.selected_corner = "top_left"
         self.enabled = True
+        self.setMouseTracking(True)
 
         self.x1, self.y1 = 10, 10
         self.x2, self.y2 = 54, 54
@@ -28,69 +49,61 @@ class CornerSelector(tk.Canvas):
             "bottom_right": (self.x2, self.y2),
         }
 
-        self.bind("<Button-1>", self.on_click)
-        self.bind("<Motion>", self.on_motion)
-        self.draw()
+        if on_corner_selected_callback:
+            self.corner_selected.connect(on_corner_selected_callback)
 
     def set_corner(self, corner: str):
         if corner in self.corners:
             self.selected_corner = corner
-            self.draw()
+            self.update()
 
     def set_state(self, state: str):
         self.enabled = state != "disabled"
-        self.draw()
+        self.update()
 
-    def draw(self):
-        self.delete("all")
-        primary = "#0c8ce9"
-        bg = "#1e1e1e" if self.enabled else "#121212"
-        border = "#444444" if self.enabled else "#2c2c2c"
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        self.configure(bg=bg, highlightbackground=border)
+        bg = _BG_ENABLED if self.enabled else _BG_DISABLED
+        border = _BORDER_ENABLED if self.enabled else _BORDER_DISABLED
 
-        self.create_rectangle(
-            self.x1,
-            self.y1,
-            self.x2,
-            self.y2,
-            outline="#555555" if self.enabled else "#2c2c2c",
-            dash=(2, 2),
-            width=1,
-        )
+        # Background
+        p.fillRect(self.rect(), bg)
+        p.setPen(QPen(border, 1))
+        p.drawRect(self.rect().adjusted(0, 0, -1, -1))
 
+        # Dashed rectangle
+        outline_color = _OUTLINE_ENABLED if self.enabled else _OUTLINE_DISABLED
+        pen = QPen(outline_color, 1, Qt.PenStyle.DashLine)
+        p.setPen(pen)
+        p.drawRect(self.x1, self.y1, self.x2 - self.x1, self.y2 - self.y1)
+
+        # Crosshairs
         cx = (self.x1 + self.x2) // 2
         cy = (self.y1 + self.y2) // 2
-        line_color = "#333333" if self.enabled else "#222222"
-        self.create_line(self.x1, cy, self.x2, cy, fill=line_color, dash=(1, 3))
-        self.create_line(cx, self.y1, cx, self.y2, fill=line_color, dash=(1, 3))
+        line_color = _CROSSHAIR_ENABLED if self.enabled else _CROSSHAIR_DISABLED
+        pen = QPen(line_color, 1, Qt.PenStyle.DotLine)
+        p.setPen(pen)
+        p.drawLine(self.x1, cy, self.x2, cy)
+        p.drawLine(cx, self.y1, cx, self.y2)
 
+        # Corner dots
         r = 5
         for name, (px, py) in self.corners.items():
             if self.enabled and self.selected_corner == name:
-                self.create_oval(
-                    px - r,
-                    py - r,
-                    px + r,
-                    py + r,
-                    fill=primary,
-                    outline="#ffffff",
-                    width=1.5,
-                )
+                p.setPen(QPen(Qt.GlobalColor.white, 1.5))
+                p.setBrush(_PRIMARY)
             else:
-                dot_fill = "#2c2c2c" if not self.enabled else "#444444"
-                dot_outline = "#333333" if not self.enabled else "#666666"
-                self.create_oval(
-                    px - r,
-                    py - r,
-                    px + r,
-                    py + r,
-                    fill=dot_fill,
-                    outline=dot_outline,
-                    width=1,
-                )
+                dot_fill = _DOT_FILL_DISABLED if not self.enabled else _DOT_FILL_ENABLED
+                dot_outline = _DOT_OUTLINE_DISABLED if not self.enabled else _DOT_OUTLINE_ENABLED
+                p.setPen(QPen(dot_outline, 1))
+                p.setBrush(dot_fill)
+            p.drawEllipse(px - r, py - r, r * 2, r * 2)
 
-    def get_closest_corner(self, mx: int, my: int) -> str | None:
+        p.end()
+
+    def _get_closest_corner(self, mx: int, my: int) -> str | None:
         best_corner = None
         min_dist = 18.0
         for name, (cx, cy) in self.corners.items():
@@ -100,125 +113,140 @@ class CornerSelector(tk.Canvas):
                 best_corner = name
         return best_corner
 
-    def on_click(self, event):
+    def mousePressEvent(self, event):
         if not self.enabled:
             return
-        clicked = self.get_closest_corner(event.x, event.y)
+        clicked = self._get_closest_corner(int(event.position().x()), int(event.position().y()))
         if clicked:
             self.set_corner(clicked)
-            if self.on_corner_selected:
-                self.on_corner_selected(clicked)
+            self.corner_selected.emit(clicked)
 
-    def on_motion(self, event):
+    def mouseMoveEvent(self, event):
         if not self.enabled:
-            self.configure(cursor="")
+            self.setCursor(Qt.CursorShape.ArrowCursor)
             return
-        hovered = self.get_closest_corner(event.x, event.y)
+        hovered = self._get_closest_corner(int(event.position().x()), int(event.position().y()))
         if hovered:
-            self.configure(cursor="hand2")
+            self.setCursor(Qt.CursorShape.PointingHandCursor)
         else:
-            self.configure(cursor="")
+            self.setCursor(Qt.CursorShape.ArrowCursor)
 
 
-class ComponentPropertiesView(ttk.Frame):
-    """Passive metadata editor properties panel. Fires changes to the controller via callbacks."""
+class ComponentPropertiesView(QWidget):
+    """Metadata editor properties panel. Fires changes to the controller via callbacks."""
 
-    def __init__(self, parent, **kwargs):
-        super().__init__(parent, padding=10, **kwargs)
+    def __init__(self, parent=None):
+        super().__init__(parent)
         self.on_property_changed = None
         self.on_focus_changed = None
         self._text_focused = False
 
-        self.visible_var = tk.BooleanVar(value=True)
-        self.locked_var = tk.BooleanVar(value=False)
         self._selected_box_id = None
         self._current_label = ""
         self._current_is_visible = True
         self._current_is_locked = False
         self._current_pill_corner = "top_left"
 
-        ttk.Label(self, text="PROPERTIES", font=("", 9, "bold")).pack(
-            anchor="w", pady=(0, 8)
-        )
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(10, 10, 10, 10)
 
-        name_frame = ttk.Frame(self)
-        name_frame.pack(fill=tk.X, pady=3)
-        ttk.Label(name_frame, text="Name:", font=("", 9), width=8, anchor="w").pack(
-            side=tk.LEFT
-        )
-        self.entry_name = ttk.Entry(name_frame, font=("", 9))
-        self.entry_name.pack(fill=tk.X, expand=True)
-        self.entry_name.bind("<Return>", self._save_name)
-        self.entry_name.bind("<FocusOut>", self._save_name)
-        self.entry_name.bind("<FocusIn>", lambda e: self._on_focus_in())
-        self.entry_name.bind("<FocusOut>", lambda e: self._on_focus_out(), add="+")
+        lbl_header = QLabel("PROPERTIES")
+        lbl_header.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        layout.addWidget(lbl_header)
 
-        coords_frame = ttk.Frame(self)
-        coords_frame.pack(fill=tk.X, pady=10)
+        # Name field
+        name_row = QHBoxLayout()
+        lbl_name = QLabel("Name:")
+        lbl_name.setFixedWidth(50)
+        lbl_name.setStyleSheet("font-size: 9pt;")
+        name_row.addWidget(lbl_name)
 
-        self.prop_entries = {}
+        self.entry_name = QLineEdit()
+        self.entry_name.setStyleSheet("font-size: 9pt;")
+        self.entry_name.returnPressed.connect(self._save_name)
+        self.entry_name.editingFinished.connect(self._save_name)
+        name_row.addWidget(self.entry_name)
+        layout.addLayout(name_row)
+
+        # Coordinate fields
+        coords_grid = QGridLayout()
+        coords_grid.setSpacing(4)
+        self.prop_entries: dict[str, QLineEdit] = {}
         for idx, (label, key) in enumerate(
             [("X", "x"), ("Y", "y"), ("W", "w"), ("H", "h")]
         ):
             row = idx // 2
             col = (idx % 2) * 2
-            ttk.Label(coords_frame, text=label, font=("", 8, "bold"), width=3).grid(
-                row=row, column=col, sticky="w", pady=2
-            )
-            entry = ttk.Entry(coords_frame, font=("", 9), width=8, justify="center", state="readonly")
-            entry.grid(row=row, column=col + 1, padx=(2, 8), pady=2)
+            lbl = QLabel(label)
+            lbl.setFixedWidth(20)
+            lbl.setStyleSheet("font-size: 8pt; font-weight: bold;")
+            coords_grid.addWidget(lbl, row, col)
+
+            entry = QLineEdit()
+            entry.setFixedWidth(70)
+            entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            entry.setReadOnly(True)
+            entry.setStyleSheet("font-size: 9pt;")
+            coords_grid.addWidget(entry, row, col + 1)
             self.prop_entries[key] = entry
 
-        visibility_frame = ttk.Frame(self)
-        visibility_frame.pack(fill=tk.X, pady=5)
-        self.chk_visible = ttk.Checkbutton(
-            visibility_frame,
-            text="Visible",
-            variable=self.visible_var,
-            command=self._save_visibility,
-        )
-        self.chk_visible.pack(side=tk.LEFT, padx=(0, 10))
-        self.chk_locked = ttk.Checkbutton(
-            visibility_frame,
-            text="Locked",
-            variable=self.locked_var,
-            command=self._save_visibility,
-        )
-        self.chk_locked.pack(side=tk.LEFT)
+        layout.addLayout(coords_grid)
 
-        self.pill_frame = ttk.Frame(self)
-        self.pill_frame.pack(fill=tk.X, pady=(15, 8))
-        ttk.Label(self.pill_frame, text="Pill Corner:", font=("", 9)).pack(
-            side=tk.LEFT, pady=10
-        )
+        # Visibility controls
+        vis_row = QHBoxLayout()
+        self.chk_visible = QCheckBox("Visible")
+        self.chk_visible.setChecked(True)
+        self.chk_visible.stateChanged.connect(self._save_visibility)
+        vis_row.addWidget(self.chk_visible)
+
+        self.chk_locked = QCheckBox("Locked")
+        self.chk_locked.setChecked(False)
+        self.chk_locked.stateChanged.connect(self._save_visibility)
+        vis_row.addWidget(self.chk_locked)
+        vis_row.addStretch()
+        layout.addLayout(vis_row)
+
+        # Pill corner selector
+        pill_row = QHBoxLayout()
+        lbl_pill = QLabel("Pill Corner:")
+        lbl_pill.setStyleSheet("font-size: 9pt;")
+        pill_row.addWidget(lbl_pill)
+
         self.corner_selector = CornerSelector(
-            self.pill_frame, on_corner_selected_callback=self._save_corner
+            on_corner_selected_callback=self._save_corner
         )
-        self.corner_selector.pack(side=tk.LEFT, padx=(10, 0), pady=10)
+        pill_row.addWidget(self.corner_selector)
+        pill_row.addStretch()
+        layout.addLayout(pill_row)
 
-        bg_color = self.tk.call("ttk::style", "lookup", "TFrame", "-background") or "#f0f0f0"
-        self.txt_status = tk.Text(
-            self, height=2, width=35, font=("", 8), foreground="#888888",
-            background=bg_color, bd=0, highlightthickness=0, relief="flat"
-        )
-        self.txt_status.pack(side=tk.BOTTOM, anchor="se", pady=(20, 5), padx=(0, 5))
-        self.txt_status.tag_configure("right", justify="right")
-        self.txt_status.tag_configure("error", foreground="#e74c3c", justify="right")
-        self.update_status("Connecting...")
+        layout.addStretch()
+
+        # Status text at the bottom
+        self.txt_status = QLabel("Connecting...")
+        self.txt_status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
+        self.txt_status.setStyleSheet("font-size: 8pt; color: #888888;")
+        self.txt_status.setWordWrap(True)
+        layout.addWidget(self.txt_status)
+
+        # Track focus changes
+        self.entry_name.installEventFilter(self)
+        for entry in self.prop_entries.values():
+            entry.installEventFilter(self)
 
         self.disable_properties_fields()
 
+    def eventFilter(self, obj, event):
+        if event.type() == QEvent.Type.FocusIn:
+            if isinstance(obj, (QLineEdit, QTextEdit)):
+                self._on_focus_in()
+        elif event.type() == QEvent.Type.FocusOut:
+            self._on_focus_out()
+        return super().eventFilter(obj, event)
+
     def update_status(self, text: str, is_error: bool = False):
-        if not hasattr(self, "txt_status"):
-            return
-        self.txt_status.config(state=tk.NORMAL)
-        self.txt_status.delete("1.0", tk.END)
-        self.txt_status.insert("1.0", text)
-        if is_error:
-            self.txt_status.tag_add("error", "1.0", "end")
-        else:
-            self.txt_status.tag_add("right", "1.0", "end")
-        self.txt_status.config(state=tk.DISABLED)
+        self.txt_status.setText(text)
+        color = "#e74c3c" if is_error else "#888888"
+        self.txt_status.setStyleSheet(f"font-size: 8pt; color: {color};")
 
     def update_properties_panel(
         self,
@@ -242,23 +270,30 @@ class ComponentPropertiesView(ttk.Frame):
         self._current_is_locked = is_locked
         self._current_pill_corner = pill_corner
 
-        self.chk_visible.config(state=tk.NORMAL)
-        self.chk_locked.config(state=tk.NORMAL)
-        self.visible_var.set(is_visible)
-        self.locked_var.set(is_locked)
+        self.chk_visible.setEnabled(True)
+        self.chk_locked.setEnabled(True)
 
-        entry_state = tk.DISABLED if is_effectively_locked else tk.NORMAL
+        # Block signals during programmatic update
+        self.chk_visible.blockSignals(True)
+        self.chk_locked.blockSignals(True)
+        self.chk_visible.setChecked(is_visible)
+        self.chk_locked.setChecked(is_locked)
+        self.chk_visible.blockSignals(False)
+        self.chk_locked.blockSignals(False)
 
-        self.entry_name.config(state=entry_state)
+        is_editable = not is_effectively_locked
+
+        self.entry_name.setEnabled(is_editable)
         for entry in self.prop_entries.values():
-            entry.config(state="readonly" if not is_effectively_locked else tk.DISABLED)
+            entry.setEnabled(True)
+            entry.setReadOnly(True)
 
-        self.corner_selector.set_state("disabled" if is_effectively_locked else "normal")
+        self.corner_selector.set_state("normal" if is_editable else "disabled")
         self.corner_selector.set_corner(pill_corner)
 
     def is_field_focused(self, field_name: str) -> bool:
         """Returns True if the specified field currently has keyboard focus."""
-        focused = self.focus_get()
+        focused = self.focusWidget()
         if field_name == "name":
             return focused == self.entry_name
         elif field_name in self.prop_entries:
@@ -268,16 +303,14 @@ class ComponentPropertiesView(ttk.Frame):
     def update_field_value(self, field_name: str, value: str):
         """Updates the text content of a properties field if it is not disabled."""
         if field_name == "name":
-            if self.entry_name["state"] != tk.DISABLED:
-                self.entry_name.delete(0, tk.END)
-                self.entry_name.insert(0, value)
+            if self.entry_name.isEnabled():
+                self.entry_name.setText(value)
         elif field_name in self.prop_entries:
             entry = self.prop_entries[field_name]
-            if entry["state"] != tk.DISABLED:
-                entry.config(state=tk.NORMAL)
-                entry.delete(0, tk.END)
-                entry.insert(0, value)
-                entry.config(state="readonly")
+            if entry.isEnabled():
+                entry.setReadOnly(False)
+                entry.setText(value)
+                entry.setReadOnly(True)
 
     def disable_properties_fields(self):
         if self._selected_box_id:
@@ -287,16 +320,19 @@ class ComponentPropertiesView(ttk.Frame):
         self._current_is_visible = True
         self._current_is_locked = False
         self._current_pill_corner = "top_left"
-        self.entry_name.delete(0, tk.END)
-        self.entry_name.config(state=tk.DISABLED)
+        self.entry_name.clear()
+        self.entry_name.setEnabled(False)
         for entry in self.prop_entries.values():
-            entry.config(state=tk.NORMAL)
-            entry.delete(0, tk.END)
-            entry.config(state=tk.DISABLED)
+            entry.setReadOnly(False)
+            entry.clear()
+            entry.setEnabled(False)
 
         self.corner_selector.set_state("disabled")
-        self.chk_visible.config(state=tk.DISABLED)
-        self.chk_locked.config(state=tk.DISABLED)
+        self.chk_visible.setEnabled(False)
+        self.chk_locked.setEnabled(False)
+
+    def is_text_focused(self) -> bool:
+        return self._text_focused
 
     def _on_focus_in(self):
         if not self._text_focused:
@@ -305,34 +341,27 @@ class ComponentPropertiesView(ttk.Frame):
                 self.on_focus_changed(True)
 
     def _on_focus_out(self):
-        self.after(50, self._check_focus_still_on_text)
+        QTimer.singleShot(50, self._check_focus_still_on_text)
 
     def _check_focus_still_on_text(self):
-        focused = self.focus_get()
-        still_focused = isinstance(
-            focused, (tk.Entry, tk.Text, ttk.Entry, ttk.Combobox)
-        )
+        focused = self.focusWidget()
+        still_focused = isinstance(focused, (QLineEdit, QTextEdit))
         if self._text_focused != still_focused:
             self._text_focused = still_focused
             if self.on_focus_changed:
                 self.on_focus_changed(still_focused)
 
-    def is_text_focused(self) -> bool:
-        return self._text_focused
-
-    def _save_name(self, event=None):
+    def _save_name(self):
         if self._selected_box_id and self.on_property_changed:
-            val = self.entry_name.get().strip()
+            val = self.entry_name.text().strip()
             if val and val != self._current_label:
                 self._current_label = val
                 self.on_property_changed(self._selected_box_id, label=val)
-        if event and event.keysym == "Return":
-            self.focus_set()
 
     def _save_visibility(self):
         if self._selected_box_id and self.on_property_changed:
-            visible = self.visible_var.get()
-            locked = self.locked_var.get()
+            visible = self.chk_visible.isChecked()
+            locked = self.chk_locked.isChecked()
             if visible != self._current_is_visible or locked != self._current_is_locked:
                 self.on_property_changed(
                     self._selected_box_id,

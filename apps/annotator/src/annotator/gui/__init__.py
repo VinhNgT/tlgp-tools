@@ -1,36 +1,57 @@
+import sys
+
+from PySide6.QtCore import QObject, Signal
+from PySide6.QtWidgets import QApplication
 from tlgp_logger import get_logger
 
 from .app import MainAppWindow
 from .controller import AppController
-from .gestures import GestureInterpreter
+from .qt_dialogs import QtDialogService
 from .state import UIStateStore
-from .tk_dialogs import TkinterDialogService
+from .theme import apply_dark_theme
 from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)
 
+
+class _WorkspaceSignalBridge(QObject):
+    """Thread-safe signal bridge for workspace change notifications.
+
+    Emitting from a worker thread queues the slot on the main thread's event loop.
+    """
+
+    workspace_changed = Signal()
+
+
 def start_gui(workspace_manager):
+    """Create the Qt application, wire all components, and run the event loop."""
+    app = QApplication.instance() or QApplication(sys.argv)
+    apply_dark_theme(app)
+
     # Create observable state store
     store = UIStateStore()
 
     # Create view state helper classes
     transformer = ViewportTransformer()
-    gestures = GestureInterpreter(transformer)
 
     # Create dialog service
-    dialog_service = TkinterDialogService()
+    dialog_service = QtDialogService()
 
-    # Create passive main window view
-    view = MainAppWindow(transformer, gestures)
+    # Create main window view
+    view = MainAppWindow(transformer)
 
     # Instantiate controller linking workspace, state store, and views
-    _controller = AppController(workspace_manager, store, view, dialog_service)
+    controller = AppController(workspace_manager, store, view, dialog_service)
 
-    # Wire workspace events to main thread
+    # Wire workspace events to main thread via signal bridge
+    bridge = _WorkspaceSignalBridge()
+    bridge.workspace_changed.connect(controller._apply_state_sync)  # noqa: SLF001
+
     def on_workspace_changed(patch, new_state):
-        view.after(0, lambda: _controller._apply_state_sync())  # noqa: SLF001
+        bridge.workspace_changed.emit()
 
     workspace_manager.subscribe(on_workspace_changed)
 
-    # Start GUI main loop
-    view.mainloop()
+    # Show and run
+    view.show()
+    sys.exit(app.exec())

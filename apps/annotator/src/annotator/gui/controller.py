@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 
 from PIL import Image
+from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from tlgp_logger import get_logger
 
 from annotator.models import Bounds, Component, Style, Visibility
@@ -14,6 +15,24 @@ from .dialog_service import DialogService
 from .state import UIStateStore
 
 logger = get_logger(__name__)
+
+
+class _MainThreadInvoker(QObject):
+    """Thread-safe bridge for posting callables from worker threads to the main thread."""
+
+    _call = Signal(object)
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self._call.connect(self._execute)
+
+    def invoke(self, fn):
+        """Emit fn to be executed on the main thread."""
+        self._call.emit(fn)
+
+    @Slot(object)
+    def _execute(self, fn):
+        fn()
 
 
 class AppController:
@@ -33,8 +52,7 @@ class AppController:
         self._loaded_session_id = None
         self.pending_created_ids: set[UUID] = set()
         self._io_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="annotator-io")
-
-        self.view.report_callback_exception = self._global_error_handler
+        self._invoker = _MainThreadInvoker(self.view)
 
         # Observable state subscriptions
         self.store.subscribe("workspace", self._on_workspace_updated)
@@ -136,7 +154,7 @@ class AppController:
                     self.view.set_canvas_image(img)
                     self._loaded_session_id = current_session_id
                     self.view.canvas.fit_to_screen()
-                    self.view.after(100, self.check_trigger_screen_info)
+                    QTimer.singleShot(100, self.check_trigger_screen_info)
                 except Exception as e:
                     logger.exception("Failed to load raw background image")
                     self.dialog_service.show_error(
@@ -485,7 +503,7 @@ class AppController:
 
         future = self._io_pool.submit(do_import)
         future.add_done_callback(
-            lambda f: self.view.after(0, lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import workspace session"))
+            lambda f: self._invoker.invoke(lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import workspace session"))
         )
 
     def _on_import_image_request(self):
@@ -506,7 +524,7 @@ class AppController:
 
         future = self._io_pool.submit(do_import)
         future.add_done_callback(
-            lambda f: self.view.after(0, lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import raw image"))
+            lambda f: self._invoker.invoke(lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import raw image"))
         )
 
     def _on_export_zip_request(self):
@@ -531,7 +549,7 @@ class AppController:
 
         future = self._io_pool.submit(do_export)
         future.add_done_callback(
-            lambda f: self.view.after(0, lambda: self._handle_export_result(f, dialog))
+            lambda f: self._invoker.invoke(lambda: self._handle_export_result(f, dialog))
         )
 
     def _handle_io_result(self, future, dialog, title, message_prefix):

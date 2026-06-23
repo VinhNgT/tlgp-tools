@@ -1,35 +1,133 @@
-import tkinter as tk
-from tkinter import ttk
+"""Main application window — PySide6 QMainWindow.
 
-from PIL import Image
-from tlgp_logger import get_logger
+Provides the toolbar, menu bar, sidebar splitter, and canvas area.
+All user interaction is delegated to the controller via callbacks.
+"""
+
+
+from PySide6.QtCore import QPoint, QSize, Qt, QTimer
+from PySide6.QtGui import QAction, QActionGroup, QKeySequence
+from PySide6.QtWidgets import (
+    QLabel,
+    QMainWindow,
+    QMenu,
+    QPushButton,
+    QSizePolicy,
+    QSplitter,
+    QStackedWidget,
+    QToolBar,
+    QVBoxLayout,
+    QWidget,
+)
 
 from .canvas import AnnotationCanvasView
 from .debug import BackendDebugWindow
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
+from .transformer import ViewportTransformer
 
-logger = get_logger(__name__)
+
+class WelcomeWidget(QWidget):
+    """Welcome screen displayed when no image is loaded."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+
+        self.on_import_zip = None
+        self.on_import_image = None
+        self._unreachable = False
+
+        layout = QVBoxLayout(self)
+        layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        card = QWidget()
+        card.setFixedSize(400, 220)
+        card.setStyleSheet("""
+            QWidget {
+                background-color: #1e1e1e;
+                border: 1px solid #333333;
+                border-radius: 12px;
+            }
+        """)
+        card_layout = QVBoxLayout(card)
+        card_layout.setContentsMargins(30, 25, 30, 25)
+        card_layout.setSpacing(10)
+
+        title = QLabel("Annotator")
+        title.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title.setStyleSheet("font-size: 18pt; font-weight: bold; color: white; border: none;")
+        card_layout.addWidget(title)
+
+        self.desc_label = QLabel("Open a workspace session or raw image to begin.")
+        self.desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.desc_label.setWordWrap(True)
+        self.desc_label.setStyleSheet("font-size: 10pt; color: #888888; border: none;")
+        card_layout.addWidget(self.desc_label)
+
+        card_layout.addSpacing(10)
+
+        btn_style = """
+            QPushButton {
+                background-color: #0c8ce9;
+                color: white;
+                border: none;
+                border-radius: 6px;
+                padding: 8px 20px;
+                font-size: 10pt;
+            }
+            QPushButton:hover {
+                background-color: #1a9cf5;
+            }
+            QPushButton:pressed {
+                background-color: #0a6fc0;
+            }
+        """
+
+        self.btn_zip = QPushButton("Import Workspace (.zip)")
+        self.btn_zip.setStyleSheet(btn_style)
+        self.btn_zip.clicked.connect(self._on_import_zip)
+        card_layout.addWidget(self.btn_zip)
+
+        self.btn_img = QPushButton("Import Raw Image")
+        self.btn_img.setStyleSheet(btn_style)
+        self.btn_img.clicked.connect(self._on_import_image)
+        card_layout.addWidget(self.btn_img)
+
+        layout.addWidget(card)
+
+        self.setStyleSheet("background-color: #121212;")
+
+    def set_unreachable(self, unreachable: bool):
+        self._unreachable = unreachable
+        if unreachable:
+            self.desc_label.setText("Workspace file not found or unreachable.")
+            self.desc_label.setStyleSheet("font-size: 10pt; color: #e74c3c; border: none;")
+        else:
+            self.desc_label.setText("Open a workspace session or raw image to begin.")
+            self.desc_label.setStyleSheet("font-size: 10pt; color: #888888; border: none;")
+
+    def _on_import_zip(self):
+        if self.on_import_zip:
+            self.on_import_zip()
+
+    def _on_import_image(self):
+        if self.on_import_image:
+            self.on_import_image()
 
 
-class MainAppWindow(tk.Tk):
-    """Passive main application window container. Delegates menus, shortcuts, and layout actions to controller."""
+class MainAppWindow(QMainWindow):
+    """Main application shell providing toolbar, sidebar, and canvas layout.
 
-    def __init__(self, transformer, gestures):
+    All user interactions are delegated to the controller via callback attributes.
+    """
+
+    def __init__(self, transformer: ViewportTransformer | None = None):
         super().__init__()
-        self.title("TLGP Annotation Client")
-        self.geometry("1200x800")
-        try:
-            self.state("zoomed")
-        except Exception:
-            pass
+        self.setWindowTitle("Annotator")
+        self.resize(1400, 900)
+        self.setMinimumSize(800, 600)
 
-        self.transformer = transformer
-        self.gestures = gestures
-
-        self._space_release_timer = None
-        self._prev_mode_before_space = None
-
+        # ── Callback attributes (set by controller) ───────────────
         self.on_mode_change_request = None
         self.on_undo_request = None
         self.on_redo_request = None
@@ -45,459 +143,290 @@ class MainAppWindow(tk.Tk):
         self.on_arrow_key_pressed = None
         self.on_soft_restart_request = None
 
-        self.mode_var = tk.StringVar(value="select")
+        # ── Build UI ──────────────────────────────────────────────
+        self._build_menu_bar()
+        self._build_toolbar()
+        self._build_central_area(transformer)
 
-        self.create_widgets()
-        self.create_menu_bar()
-        self.bind_shortcuts()
+        # Debug window
+        self.debug_window = BackendDebugWindow(self)
 
-    def create_widgets(self):
-        # Top toolbar
-        self.toolbar = ttk.Frame(self, padding=5)
-        self.toolbar.pack(fill=tk.X, side=tk.TOP)
+    def _build_menu_bar(self):
+        menubar = self.menuBar()
 
-        # Mode Selection
-        self.btn_mode_select = ttk.Radiobutton(
-            self.toolbar,
-            text="Select (V)",
-            value="select",
-            variable=self.mode_var,
-            command=self._update_tool_mode,
-            takefocus=False,
-        )
-        self.btn_mode_select.pack(side=tk.LEFT, padx=2)
+        file_menu = menubar.addMenu("&File")
 
-        self.btn_mode_draw = ttk.Radiobutton(
-            self.toolbar,
-            text="Draw (R)",
-            value="draw",
-            variable=self.mode_var,
-            command=self._update_tool_mode,
-            takefocus=False,
-        )
-        self.btn_mode_draw.pack(side=tk.LEFT, padx=2)
+        act_import_zip = QAction("Import Workspace (.zip)", self)
+        act_import_zip.setShortcut(QKeySequence("Ctrl+O"))
+        act_import_zip.triggered.connect(lambda: self._fire(self.on_import_zip_request))
+        file_menu.addAction(act_import_zip)
 
-        self.btn_mode_pan = ttk.Radiobutton(
-            self.toolbar,
-            text="Pan (H)",
-            value="pan",
-            variable=self.mode_var,
-            command=self._update_tool_mode,
-            takefocus=False,
-        )
-        self.btn_mode_pan.pack(side=tk.LEFT, padx=2)
+        act_import_img = QAction("Import Raw Image", self)
+        act_import_img.triggered.connect(lambda: self._fire(self.on_import_image_request))
+        file_menu.addAction(act_import_img)
 
-        ttk.Label(self.toolbar, text="|").pack(side=tk.LEFT, padx=5)
+        act_export = QAction("Export Session (.zip)", self)
+        act_export.setShortcut(QKeySequence("Ctrl+S"))
+        act_export.triggered.connect(lambda: self._fire(self.on_export_zip_request))
+        file_menu.addAction(act_export)
 
-        # Navigation controls
-        self.btn_back = ttk.Button(
-            self.toolbar,
-            text="← Back",
-            command=lambda: self.on_back_request() if self.on_back_request else None,
-            state=tk.DISABLED,
-            takefocus=False,
-        )
-        self.btn_back.pack(side=tk.LEFT, padx=2)
+        file_menu.addSeparator()
 
-        self.lbl_breadcrumb = ttk.Label(self.toolbar, text="Root", font=("", 9, "bold"))
-        self.lbl_breadcrumb.pack(side=tk.LEFT, padx=5)
+        act_screen_info = QAction("Screen Info…", self)
+        act_screen_info.triggered.connect(lambda: self._fire(self.on_open_screen_info_request))
+        file_menu.addAction(act_screen_info)
 
-        ttk.Label(self.toolbar, text="|").pack(side=tk.LEFT, padx=5)
+        act_cuts = QAction("Edit Cut Lines…", self)
+        act_cuts.setShortcut(QKeySequence("Ctrl+L"))
+        act_cuts.triggered.connect(lambda: self._fire(self.on_open_cut_editor_request))
+        file_menu.addAction(act_cuts)
 
-        # Zoom controls
-        self.lbl_zoom = ttk.Label(self.toolbar, text="100%", font=("", 9))
-        self.lbl_zoom.pack(side=tk.LEFT, padx=5)
+        edit_menu = menubar.addMenu("&Edit")
 
-        self.btn_zoom_out = ttk.Button(
-            self.toolbar,
-            text="-",
-            width=3,
-            command=lambda: self.canvas.zoom(-0.1),
-            takefocus=False,
-        )
-        self.btn_zoom_out.pack(side=tk.LEFT, padx=1)
+        act_undo = QAction("Undo", self)
+        act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        act_undo.triggered.connect(lambda: self._fire(self.on_undo_request))
+        edit_menu.addAction(act_undo)
 
-        self.btn_zoom_in = ttk.Button(
-            self.toolbar,
-            text="+",
-            width=3,
-            command=lambda: self.canvas.zoom(0.1),
-            takefocus=False,
-        )
-        self.btn_zoom_in.pack(side=tk.LEFT, padx=1)
+        act_redo = QAction("Redo", self)
+        act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        act_redo.triggered.connect(lambda: self._fire(self.on_redo_request))
+        edit_menu.addAction(act_redo)
 
-        self.btn_zoom_focus = ttk.Button(
-            self.toolbar,
-            text="Focus",
-            command=lambda: self.canvas.zoom_focus_target(),
-            takefocus=False,
-        )
-        self.btn_zoom_focus.pack(side=tk.LEFT, padx=2)
+        edit_menu.addSeparator()
 
-        ttk.Label(self.toolbar, text="|").pack(side=tk.LEFT, padx=5)
+        act_delete = QAction("Delete", self)
+        act_delete.setShortcut(QKeySequence.StandardKey.Delete)
+        act_delete.triggered.connect(lambda: self._fire(self.on_delete_request))
+        edit_menu.addAction(act_delete)
 
-        self.btn_cut_lines = ttk.Button(
-            self.toolbar,
-            text="Cut Lines (C)",
-            command=lambda: (
-                self.on_open_cut_editor_request()
-                if self.on_open_cut_editor_request
-                else None
-            ),
-            takefocus=False,
-        )
-        self.btn_cut_lines.pack(side=tk.LEFT, padx=2)
+        view_menu = menubar.addMenu("&View")
 
+        act_debug = QAction("Backend Logs", self)
+        act_debug.triggered.connect(self._toggle_debug)
+        view_menu.addAction(act_debug)
 
+    def _build_toolbar(self):
+        tb = QToolBar("Main Toolbar")
+        tb.setMovable(False)
+        tb.setIconSize(QSize(16, 16))
+        self.addToolBar(tb)
 
-        self.btn_screen_info = ttk.Button(
-            self.toolbar,
-            text="Screen Info",
-            command=lambda: (
-                self.on_open_screen_info_request()
-                if self.on_open_screen_info_request
-                else None
-            ),
-            takefocus=False,
-        )
-        self.btn_screen_info.pack(side=tk.RIGHT, padx=5)
+        # Mode selector
+        self.mode_group = QActionGroup(self)
+        self.mode_group.setExclusive(True)
 
-        # Main Layout (PanedWindow)
-        self.paned = ttk.PanedWindow(self, orient=tk.HORIZONTAL)
-        self.paned.pack(fill=tk.BOTH, expand=True)
+        modes = [
+            ("V", "select", "Select mode (V)"),
+            ("R", "draw", "Draw mode (R)"),
+            ("H", "pan", "Pan mode (H)"),
+        ]
+        self._mode_actions: dict[str, QAction] = {}
+        for key, mode, tooltip in modes:
+            action = QAction(key, self)
+            action.setCheckable(True)
+            action.setToolTip(tooltip)
+            action.setData(mode)
+            action.triggered.connect(lambda checked, m=mode: self._on_mode_toggled(m))
+            self.mode_group.addAction(action)
+            tb.addAction(action)
+            self._mode_actions[mode] = action
+        self._mode_actions["select"].setChecked(True)
 
-        # Left Sidebar (Treeview)
-        self.tree = SidebarTreeView(self.paned)
-        self.paned.add(self.tree, weight=1)
+        tb.addSeparator()
 
-        # Middle Area (Canvas)
-        middle_frame = ttk.Frame(self.paned)
-        self.paned.add(middle_frame, weight=3)
+        # Back button
+        self.btn_back = QAction("← Back", self)
+        self.btn_back.setToolTip("Go back (Escape)")
+        self.btn_back.triggered.connect(lambda: self._fire(self.on_back_request))
+        tb.addAction(self.btn_back)
 
-        self.canvas = AnnotationCanvasView(
-            middle_frame, self.transformer, self.gestures
-        )
-        self.canvas.pack(fill=tk.BOTH, expand=True)
+        # Breadcrumbs label
+        self.lbl_breadcrumbs = QLabel("Root")
+        self.lbl_breadcrumbs.setStyleSheet("color: #888888; padding: 0 8px;")
+        tb.addWidget(self.lbl_breadcrumbs)
 
-        # Right Sidebar (Properties Panel)
-        self.properties = ComponentPropertiesView(self.paned)
-        self.paned.add(self.properties, weight=0)
+        spacer = QWidget()
+        spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
+        tb.addWidget(spacer)
 
-        # Developer hidden debug window
-        self.debug = BackendDebugWindow(self)
+        # Zoom display
+        self.lbl_zoom = QLabel("100%")
+        self.lbl_zoom.setStyleSheet("color: #888888; padding: 0 8px;")
+        tb.addWidget(self.lbl_zoom)
 
-        # Callbacks are bound directly on components by the controller
+    def _build_central_area(self, transformer: ViewportTransformer | None):
+        splitter = QSplitter(Qt.Orientation.Horizontal)
+        self.setCentralWidget(splitter)
 
-    def create_menu_bar(self):
-        menu_bar = tk.Menu(self)
+        # Left: canvas stack (welcome or annotation)
+        self.canvas_stack = QStackedWidget()
+        self.welcome = WelcomeWidget()
+        self.canvas = AnnotationCanvasView(transformer=transformer)
+        self.canvas_stack.addWidget(self.welcome)
+        self.canvas_stack.addWidget(self.canvas)
+        self.canvas_stack.setCurrentWidget(self.welcome)
 
-        self.file_menu = tk.Menu(menu_bar, tearoff=0)
-        self.file_menu.add_command(
-            label="Import Session Zip...",
-            command=lambda: (
-                self.on_import_zip_request() if self.on_import_zip_request else None
-            ),
-        )
-        self.file_menu.add_command(
-            label="Import Image...",
-            command=lambda: (
-                self.on_import_image_request() if self.on_import_image_request else None
-            ),
-        )
-        self.file_menu.add_command(
-            label="Export Session Zip",
-            command=lambda: (
-                self.on_export_zip_request() if self.on_export_zip_request else None
-            ),
-        )
-        self.file_menu.add_separator()
-        self.file_menu.add_command(label="Quit", command=self.quit)
-        menu_bar.add_cascade(label="File", menu=self.file_menu)
+        splitter.addWidget(self.canvas_stack)
 
-        self.edit_menu = tk.Menu(menu_bar, tearoff=0)
-        self.edit_menu.add_command(
-            label="Undo (Ctrl+Z)",
-            command=lambda: self.on_undo_request() if self.on_undo_request else None,
-        )
-        self.edit_menu.add_command(
-            label="Redo (Ctrl+Y / Ctrl+Shift+Z)",
-            command=lambda: self.on_redo_request() if self.on_redo_request else None,
-        )
-        self.edit_menu.add_separator()
-        self.edit_menu.add_command(
-            label="Cut Lines (C)...",
-            command=lambda: (
-                self.on_open_cut_editor_request()
-                if self.on_open_cut_editor_request
-                else None
-            ),
-        )
-        self.edit_menu.add_separator()
-        self.edit_menu.add_command(
-            label="Screen Info...",
-            command=lambda: (
-                self.on_open_screen_info_request()
-                if self.on_open_screen_info_request
-                else None
-            ),
-        )
-        self.edit_menu.add_separator()
-        self.edit_menu.add_command(
-            label="Delete (Delete)",
-            command=lambda: (
-                self.on_delete_request() if self.on_delete_request else None
-            ),
-        )
-        menu_bar.add_cascade(label="Edit", menu=self.edit_menu)
+        # Right: sidebar + properties
+        right_panel = QWidget()
+        right_layout = QVBoxLayout(right_panel)
+        right_layout.setContentsMargins(0, 0, 0, 0)
+        right_layout.setSpacing(0)
 
-        self.developer_menu = tk.Menu(menu_bar, tearoff=0)
-        self.developer_menu.add_command(
-            label="Backend Logs...",
-            command=self.debug.show_window,
-        )
-        self.developer_menu.add_separator()
-        self.developer_menu.add_command(
-            label="Soft Restart",
-            command=lambda: (
-                self.on_soft_restart_request() if self.on_soft_restart_request else None
-            ),
-        )
-        menu_bar.add_cascade(label="Developer", menu=self.developer_menu)
+        right_splitter = QSplitter(Qt.Orientation.Vertical)
 
-        self.config(menu=menu_bar)
+        self.tree = SidebarTreeView()
+        right_splitter.addWidget(self.tree)
 
-    def bind_shortcut(self, sequence: str, func, needs_unfocused: bool = True):
-        """Binds a keyboard shortcut to the main window. If needs_unfocused is True,
-        the callback will be ignored if any text input widget has focus, allowing native entry behavior.
-        """
+        self.properties = ComponentPropertiesView()
+        right_splitter.addWidget(self.properties)
 
-        def wrapper(event):
-            if needs_unfocused and self.is_text_focused():
-                return None
-            return func(event)
+        right_splitter.setSizes([400, 300])
+        right_layout.addWidget(right_splitter)
 
-        self.bind(sequence, wrapper)
+        splitter.addWidget(right_panel)
+        splitter.setSizes([1000, 300])
 
-    def bind_shortcuts(self):
-        self.bind_shortcut(
-            "<Control-z>",
-            lambda e: self.on_undo_request() if self.on_undo_request else None,
-        )
-        self.bind_shortcut(
-            "<Control-Z>",
-            lambda e: self.on_undo_request() if self.on_undo_request else None,
-        )
-        self.bind_shortcut(
-            "<Control-y>",
-            lambda e: self.on_redo_request() if self.on_redo_request else None,
-        )
-        self.bind_shortcut(
-            "<Control-Y>",
-            lambda e: self.on_redo_request() if self.on_redo_request else None,
-        )
-        self.bind_shortcut(
-            "<Control-Shift-z>",
-            lambda e: self.on_redo_request() if self.on_redo_request else None,
-        )
-        self.bind_shortcut(
-            "<Control-Shift-Z>",
-            lambda e: self.on_redo_request() if self.on_redo_request else None,
-        )
+    # ── Public API (called by controller) ─────────────────────────────
 
-        self.bind_shortcut(
-            "<Delete>",
-            lambda e: self.on_delete_request() if self.on_delete_request else None,
-        )
-        self.bind_shortcut(
-            "<BackSpace>",
-            lambda e: self.on_delete_request() if self.on_delete_request else None,
-        )
-
-        self.bind_shortcut("<KeyPress-space>", self._on_space_press)
-        self.bind_shortcut("<KeyRelease-space>", self._on_space_release)
-
-        self.bind_shortcut("<v>", lambda e: self.set_mode_str("select"))
-        self.bind_shortcut("<V>", lambda e: self.set_mode_str("select"))
-        self.bind_shortcut("<r>", lambda e: self.set_mode_str("draw"))
-        self.bind_shortcut("<R>", lambda e: self.set_mode_str("draw"))
-        self.bind_shortcut("<h>", lambda e: self.set_mode_str("pan"))
-        self.bind_shortcut("<H>", lambda e: self.set_mode_str("pan"))
-        self.bind_shortcut("<f>", lambda e: self.canvas.zoom_focus_target())
-        self.bind_shortcut("<F>", lambda e: self.canvas.zoom_focus_target())
-        self.bind_shortcut("<t>", lambda e: self.canvas.toggle_labels_visibility())
-        self.bind_shortcut("<T>", lambda e: self.canvas.toggle_labels_visibility())
-        self.bind_shortcut("<c>", lambda e: self._hotkey_open_cut_editor())
-        self.bind_shortcut("<C>", lambda e: self._hotkey_open_cut_editor())
-
-        self.bind_shortcut("<Up>", lambda e: self._on_arrow_key(0, -1))
-        self.bind_shortcut("<Down>", lambda e: self._on_arrow_key(0, 1))
-        self.bind_shortcut("<Left>", lambda e: self._on_arrow_key(-1, 0))
-        self.bind_shortcut("<Right>", lambda e: self._on_arrow_key(1, 0))
-
-        self.bind_shortcut("<Shift-Up>", lambda e: self._on_arrow_key(0, -10))
-        self.bind_shortcut("<Shift-Down>", lambda e: self._on_arrow_key(0, 10))
-        self.bind_shortcut("<Shift-Left>", lambda e: self._on_arrow_key(-10, 0))
-        self.bind_shortcut("<Shift-Right>", lambda e: self._on_arrow_key(10, 0))
-
-        self.bind_shortcut("<Button-1>", self._on_window_click, needs_unfocused=False)
-        self.bind_shortcut("<Return>", self._on_key_enter, needs_unfocused=True)
-        self.bind_shortcut("<Escape>", self._on_key_escape, needs_unfocused=False)
-
-    def is_text_focused(self) -> bool:
-        return self.properties.is_text_focused()
-
-    def set_ui_interactive(self, enabled: bool, unreachable: bool = False):
-        state = tk.NORMAL if enabled else tk.DISABLED
-        self.btn_mode_select.config(state=state)
-        self.btn_mode_draw.config(state=state)
-        self.btn_mode_pan.config(state=state)
-        self.btn_zoom_out.config(state=state)
-        self.btn_zoom_in.config(state=state)
-        self.btn_zoom_focus.config(state=state)
-        self.btn_cut_lines.config(state=state)
-        self.btn_screen_info.config(state=state)
-
-        if not enabled:
-            self.btn_back.config(state=state)
-
-        try:
-            self.file_menu.entryconfig("Export Session Zip", state=state)
-        except Exception:
-            pass
-
-        for label in [
-            "Undo (Ctrl+Z)",
-            "Redo (Ctrl+Y / Ctrl+Shift+Z)",
-            "Cut Lines (C)...",
-            "Screen Info...",
-            "Delete (Delete)",
-        ]:
-            try:
-                self.edit_menu.entryconfig(label, state=state)
-            except Exception:
-                pass
-
-        self.canvas.set_interactive(enabled, unreachable=unreachable)
-
-    def _update_tool_mode(self):
-        mode = self.mode_var.get()
-        self.canvas.set_mode(mode)
-        if self.on_mode_change_request:
-            self.on_mode_change_request(mode)
+    def set_canvas_image(self, img, unreachable: bool = False):
+        """Switch between welcome screen and annotation canvas."""
+        if img is None:
+            self.welcome.set_unreachable(unreachable)
+            self.canvas_stack.setCurrentWidget(self.welcome)
+        else:
+            self.canvas.set_background_image(img)
+            self.canvas_stack.setCurrentWidget(self.canvas)
 
     def set_mode_str(self, mode: str):
-        if not self.canvas.full_pil_img:
-            return
-        self.mode_var.set(mode)
-        self.canvas.set_mode(mode)
-        if self.on_mode_change_request:
-            self.on_mode_change_request(mode)
-
-    def _on_space_press(self, event):
-        if self.is_text_focused():
-            return None
-        if self._space_release_timer is not None:
-            self.after_cancel(self._space_release_timer)
-            self._space_release_timer = None
-        elif not self.canvas.space_pan_active:
-            self._prev_mode_before_space = self.mode_var.get()
-            self.mode_var.set("pan")
-            self.canvas.start_space_pan()
-        return "break"
-
-    def _on_space_release(self, event):
-        if self.is_text_focused():
-            return None
-        if self._space_release_timer is not None:
-            self.after_cancel(self._space_release_timer)
-        self._space_release_timer = self.after(150, self._execute_space_release)
-        return "break"
-
-    def _execute_space_release(self):
-        self._space_release_timer = None
-        self.canvas.stop_space_pan()
-        if getattr(self, "_prev_mode_before_space", None) is not None:
-            self.mode_var.set(self._prev_mode_before_space)
-            self._prev_mode_before_space = None
-
-    def _on_key_enter(self, event):
-        if self.is_text_focused():
-            return None
-        if not self.canvas.full_pil_img:
-            return None
-        if self.on_enter_pressed:
-            return self.on_enter_pressed()
-        return None
-
-    def _on_key_escape(self, event):
-        if self.is_text_focused():
-            self.focus_set()
-            return "break"
-        if self.on_escape_pressed:
-            return self.on_escape_pressed()
-        return None
-
-    def _on_arrow_key(self, dx: int, dy: int):
-        if self.is_text_focused():
-            return None
-        if not self.canvas.full_pil_img:
-            return None
-        if self.on_arrow_key_pressed:
-            self.on_arrow_key_pressed(dx, dy)
-            return "break"
-        return None
-
-    def _on_window_click(self, event):
-        widget = event.widget
-        if not widget:
-            return
-        if isinstance(widget, str):
-            try:
-                widget = self.nametowidget(widget)
-            except Exception:
-                return
-        if isinstance(widget, (ttk.Entry, tk.Entry, tk.Text, ttk.Combobox)):
-            return
-        if self.is_text_focused():
-            self.focus_set()
-
-    def _hotkey_open_cut_editor(self):
-        if self.is_text_focused():
-            return
-        if not self.canvas.full_pil_img:
-            return
-        if self.on_open_cut_editor_request:
-            self.on_open_cut_editor_request()
+        """Update toolbar mode buttons to match the given mode."""
+        action = self._mode_actions.get(mode)
+        if action:
+            action.setChecked(True)
 
     def update_status(self, text: str, is_error: bool = False):
-        self.properties.update_status(text, is_error=is_error)
+        self.properties.update_status(text, is_error)
 
     def update_zoom_display(self, zoom_factor: float):
-        zoom_pct = int(zoom_factor * 100)
-        self.lbl_zoom.config(text=f"{zoom_pct}%")
+        pct = round(zoom_factor * 100)
+        self.lbl_zoom.setText(f"{pct}%")
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:
-            self.btn_back.config(state=tk.NORMAL)
-            self.lbl_breadcrumb.config(text=" / ".join(["Root"] + breadcrumbs))
+            path = " › ".join(["Root"] + breadcrumbs)
         else:
-            self.btn_back.config(state=tk.DISABLED)
-            self.lbl_breadcrumb.config(text="Root")
+            path = "Root"
+        self.lbl_breadcrumbs.setText(path)
 
-    def set_canvas_image(self, img: Image.Image | None, unreachable: bool = False):
-        self.set_ui_interactive(img is not None, unreachable=unreachable)
-        self.canvas.set_background_image(img, unreachable=unreachable)
-
-    def show_context_menu(self, x_root: int, y_root: int, items: list[dict]):
-        """Builds and displays a context menu at the specified screen coordinates."""
-        if not hasattr(self, "_context_menu"):
-            self._context_menu = tk.Menu(self, tearoff=0)
-        self._context_menu.delete(0, tk.END)
-        for item in items:
+    def show_context_menu(self, x: int, y: int, actions: list[dict]):
+        """Display a popup context menu at screen coordinates (x, y)."""
+        menu = QMenu(self)
+        for item in actions:
             if item.get("separator"):
-                self._context_menu.add_separator()
+                menu.addSeparator()
             else:
-                self._context_menu.add_command(
-                    label=item["label"], command=item["command"]
-                )
-        self._context_menu.post(x_root, y_root)
+                act = menu.addAction(item["label"])
+                act.triggered.connect(item["command"])
+        menu.exec(QPoint(x, y))
+
+    def is_text_focused(self) -> bool:
+        """Check if any text entry in properties is focused."""
+        return self.properties.is_text_focused()
+
+    def invoke_on_main_thread(self, fn):
+        """Thread-safe: post a callable to the main thread event loop.
+
+        Uses QTimer.singleShot which is safe when called from the main thread.
+        For cross-thread dispatch, the caller should use the signal bridge.
+        """
+        QTimer.singleShot(0, fn)
+
+    # ── Keyboard Handling ─────────────────────────────────────────────
+
+    def keyPressEvent(self, event):
+        key = event.key()
+        mods = event.modifiers()
+        has_ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
+
+        # Avoid intercepting shortcuts when text is focused
+        if self.properties.is_text_focused():
+            super().keyPressEvent(event)
+            return
+
+        # Mode shortcuts
+        if key == Qt.Key.Key_V and not has_ctrl:
+            self._on_mode_toggled("select")
+            self._mode_actions["select"].setChecked(True)
+            return
+        if key == Qt.Key.Key_R and not has_ctrl:
+            self._on_mode_toggled("draw")
+            self._mode_actions["draw"].setChecked(True)
+            return
+        if key == Qt.Key.Key_H and not has_ctrl:
+            self._on_mode_toggled("pan")
+            self._mode_actions["pan"].setChecked(True)
+            return
+
+        # Navigation
+        if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
+            if self.on_enter_pressed:
+                result = self.on_enter_pressed()
+                if result == "break":
+                    return
+
+        if key == Qt.Key.Key_Escape:
+            if self.on_escape_pressed:
+                result = self.on_escape_pressed()
+                if result == "break":
+                    return
+
+        # Arrow keys (nudge)
+        if key in (Qt.Key.Key_Left, Qt.Key.Key_Right, Qt.Key.Key_Up, Qt.Key.Key_Down):
+            dx, dy = 0, 0
+            if key == Qt.Key.Key_Left:
+                dx = -1
+            elif key == Qt.Key.Key_Right:
+                dx = 1
+            elif key == Qt.Key.Key_Up:
+                dy = -1
+            elif key == Qt.Key.Key_Down:
+                dy = 1
+            if self.on_arrow_key_pressed:
+                self.on_arrow_key_pressed(dx, dy)
+            return
+
+        # Canvas shortcuts
+        if key == Qt.Key.Key_F:
+            self.canvas.fit_to_screen()
+            return
+        if key == Qt.Key.Key_T:
+            self.canvas.toggle_labels_visibility()
+            return
+        if key == Qt.Key.Key_C:
+            self.canvas.zoom_focus_target()
+            return
+        if key == Qt.Key.Key_Backspace or key == Qt.Key.Key_Delete:
+            if self.on_delete_request:
+                self.on_delete_request()
+            return
+
+        super().keyPressEvent(event)
+
+    # ── Private ──────────────────────────────────────────────────────
+
+    def _on_mode_toggled(self, mode: str):
+        if self.on_mode_change_request:
+            self.on_mode_change_request(mode)
+
+    def _toggle_debug(self):
+        if self.debug_window.isVisible():
+            self.debug_window.hide_window()
+        else:
+            self.debug_window.show_window()
+
+    @staticmethod
+    def _fire(callback):
+        if callback:
+            callback()

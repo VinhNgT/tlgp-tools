@@ -1,5 +1,6 @@
 import sys
 import time
+from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
@@ -7,6 +8,22 @@ from annotator.models import Bounds, Component
 
 from .transformer import ViewportTransformer
 from .validation import BoundsValidator
+
+
+@dataclass
+class GestureEvent:
+    """Framework-agnostic wrapper for pointer events used by the gesture interpreter.
+
+    The hosting canvas widget translates native events (Tkinter, Qt, etc.)
+    into this portable representation before passing to GestureInterpreter.
+    """
+
+    x: float  # Widget-space x coordinate
+    y: float  # Widget-space y coordinate
+    x_root: int = 0  # Screen-space x coordinate (for context menus)
+    y_root: int = 0  # Screen-space y coordinate (for context menus)
+    shift: bool = False  # Shift modifier held
+    ctrl: bool = False  # Control/Command modifier held
 
 
 class GestureInterpreter:
@@ -30,7 +47,7 @@ class GestureInterpreter:
         # Drawing coordinates
         self.draw_start_x = 0.0
         self.draw_start_y = 0.0
-        self.temp_rect_id = None
+        self.has_temp_rect = False
 
         # Double-click interaction tracking
         self.last_click_time = 0.0
@@ -166,7 +183,7 @@ class GestureInterpreter:
         ordered = non_selected + selected
         return ordered[-1] if ordered else None
 
-    def on_click(self, canvas: Any, event, cx: float, cy: float):
+    def on_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Processes canvas click triggers, initiating moves, resizes, or workspace panning."""
         if not canvas.full_pil_img:
             return
@@ -189,7 +206,7 @@ class GestureInterpreter:
         ]
 
         now = time.time()
-        is_multi = (event.state & 0x0001) or (event.state & 0x0004)
+        is_multi = event.shift or event.ctrl
         active_comps = canvas.get_active_boxes()
         hit_boxes_at_click = self.get_hit_boxes(
             canvas,
@@ -331,7 +348,7 @@ class GestureInterpreter:
 
         if state.current_mode == "select":
             if clicked:
-                is_multi = (event.state & 0x0001) or (event.state & 0x0004)
+                is_multi = event.shift or event.ctrl
                 if is_multi:
                     new_sel = list(selected_boxes)
                     if clicked in new_sel:
@@ -375,31 +392,25 @@ class GestureInterpreter:
                     for child_id in clicked.childrenIds:
                         cache_descendants(child_id)
             else:
-                is_multi = (event.state & 0x0001) or (event.state & 0x0004)
+                is_multi = event.shift or event.ctrl
                 if not is_multi:
-                    parent_app = canvas.winfo_toplevel()
-                    if (
-                        hasattr(parent_app, "is_text_focused")
-                        and parent_app.is_text_focused()
-                    ):
-                        parent_app.focus_set()
+                    if canvas.is_text_focused():
+                        canvas.clear_text_focus()
                     else:
                         canvas.set_selection([])
 
                 self.draw_start_x = cx
                 self.draw_start_y = cy
-                self.temp_rect_id = canvas.create_rectangle(
-                    cx, cy, cx, cy, outline="#0c8ce9", dash=(2, 2)
-                )
+                canvas.set_temp_rect(cx, cy, cx, cy, color="#0c8ce9", dash=True)
+                self.has_temp_rect = True
 
         elif state.current_mode == "draw":
             self.draw_start_x = cx
             self.draw_start_y = cy
-            self.temp_rect_id = canvas.create_rectangle(
-                cx, cy, cx, cy, outline="#ff4444", width=2
-            )
+            canvas.set_temp_rect(cx, cy, cx, cy, color="#ff4444", dash=False, width=2)
+            self.has_temp_rect = True
 
-    def on_drag(self, canvas: Any, event, cx: float, cy: float):
+    def on_drag(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Manages viewport space shifts, vector bounds resizing, and element coordinate dragging."""
         if not canvas.full_pil_img:
             return
@@ -415,7 +426,7 @@ class GestureInterpreter:
                 )
             return
 
-        if self.temp_rect_id:
+        if self.has_temp_rect:
             state = canvas
             workspace = state.workspace_state
             parent_stack = state.parent_stack
@@ -470,7 +481,7 @@ class GestureInterpreter:
                 pan_offset=state.pan_offset,
             )
 
-            canvas.coords(self.temp_rect_id, gcx1, gcy1, gcx2, gcy2)
+            canvas.update_temp_rect(gcx1, gcy1, gcx2, gcy2)
             return
 
         state = canvas
@@ -568,9 +579,9 @@ class GestureInterpreter:
             if canvas.on_active_interaction_changed:
                 canvas.on_active_interaction_changed(active_int)
 
-        canvas.draw_boxes()
+        canvas.schedule_redraw()
 
-    def on_release(self, canvas: Any, event, cx: float, cy: float):
+    def on_release(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Concludes drawing operations, committing element shifts or selections to model layers."""
         if not canvas.full_pil_img:
             return
@@ -593,9 +604,9 @@ class GestureInterpreter:
         event_generated = False
 
         if state.current_mode == "select":
-            if self.temp_rect_id:
-                canvas.delete(self.temp_rect_id)
-                self.temp_rect_id = None
+            if self.has_temp_rect:
+                canvas.clear_temp_rect()
+                self.has_temp_rect = False
 
                 boundary = self._resolve_boundary(canvas)
                 bx1, by1, bx2, by2 = boundary
@@ -639,7 +650,7 @@ class GestureInterpreter:
                         ):
                             intersected.append(box)
 
-                    is_multi = (event.state & 0x0001) or (event.state & 0x0004)
+                    is_multi = event.shift or event.ctrl
                     if is_multi:
                         new_sel = list(selected_boxes)
                         for box in intersected:
@@ -684,9 +695,9 @@ class GestureInterpreter:
                             )
                         event_generated = True
 
-        elif state.current_mode == "draw" and self.temp_rect_id:
-            canvas.delete(self.temp_rect_id)
-            self.temp_rect_id = None
+        elif state.current_mode == "draw" and self.has_temp_rect:
+            canvas.clear_temp_rect()
+            self.has_temp_rect = False
 
             if abs(cx - self.draw_start_x) > 5 and abs(cy - self.draw_start_y) > 5:
                 boundary = self._resolve_boundary(canvas)
@@ -756,9 +767,9 @@ class GestureInterpreter:
                     active_int = None
                 if canvas.on_active_interaction_changed:
                     canvas.on_active_interaction_changed(active_int)
-            canvas.draw_boxes()
+            canvas.schedule_redraw()
 
-    def on_mouse_move(self, canvas: Any, event, cx: float, cy: float):
+    def on_mouse_move(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Adjusts visual cursors depending on mouse hover positions over resize handles."""
         if not canvas.full_pil_img:
             return
@@ -793,7 +804,7 @@ class GestureInterpreter:
             )
             if handle:
                 if sys.platform == "darwin":
-                    # macOS Cocoa cursors mapping matching the legacy tool definition
+                    # macOS Cocoa cursors matching the legacy tool definition
                     cursors = {
                         "nw": "resizetopleft",
                         "se": "resizebottomright",
@@ -824,7 +835,7 @@ class GestureInterpreter:
 
         canvas.set_cursor("default")
 
-    def on_middle_click(self, canvas: Any, event):
+    def on_middle_click(self, canvas: Any, event: GestureEvent):
         """Initiates viewport space panning via middle mouse press."""
         if not canvas.full_pil_img:
             return
@@ -833,7 +844,7 @@ class GestureInterpreter:
         self.pan_start_offset = canvas.pan_offset
         canvas.set_cursor("pan_active")
 
-    def on_middle_drag(self, canvas: Any, event):
+    def on_middle_drag(self, canvas: Any, event: GestureEvent):
         """Handles viewport space panning via middle mouse dragging."""
         if not canvas.full_pil_img:
             return
@@ -847,14 +858,14 @@ class GestureInterpreter:
                     canvas.zoom_factor, (new_pan_x, new_pan_y)
                 )
 
-    def on_middle_release(self, canvas: Any, event, cx: float, cy: float):
+    def on_middle_release(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Concludes viewport space panning via middle mouse release."""
         if not canvas.full_pil_img:
             return
         self.space_panning = False
         self.on_mouse_move(canvas, event, cx, cy)
 
-    def on_right_click(self, canvas: Any, event, cx: float, cy: float):
+    def on_right_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Identifies right-clicked component and triggers the context menu delegate."""
         if not canvas.full_pil_img:
             return
@@ -884,7 +895,7 @@ class GestureInterpreter:
 
         canvas.trigger_request_context_menu(event, clicked)
 
-    def on_control_click(self, canvas: Any, event, cx: float, cy: float):
+    def on_control_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         """Handles Control/Command click shortcuts to drill down into components."""
         if not canvas.full_pil_img:
             return
@@ -916,72 +927,49 @@ class GestureInterpreter:
             if canvas.on_drill_into:
                 canvas.on_drill_into(clicked.id)
 
-    def on_scroll(self, canvas: Any, event):
+    def on_scroll(self, canvas: Any, delta: float, mouse_x: float, mouse_y: float,
+                  shift: bool = False, ctrl: bool = False):
         """Translates wheel rotations to zoom scales or horizontal/vertical scrolls."""
         if not canvas.full_pil_img:
             return
 
-        is_control = (event.state & 0x0004) != 0
-        is_command = (event.state & 0x0008) != 0 or (event.state & 0x0010) != 0
-        is_shift = (event.state & 0x0001) != 0
-
         state = canvas
-        if is_control or is_command:
-            delta = 0.0
-            if event.num == 4:
-                delta = 0.1
-            elif event.num == 5:
-                delta = -0.1
-            else:
-                delta = event.delta / 1200.0
-            self.zoom(canvas, delta, (event.x, event.y))
+        if ctrl:
+            self.zoom(canvas, delta / 1200.0, (mouse_x, mouse_y))
         else:
             pan_x, pan_y = state.pan_offset
-            if event.num == 4:
-                pan_y += 40
-            elif event.num == 5:
-                pan_y -= 40
-            elif event.delta != 0:
-                if is_shift:
-                    pan_x += event.delta
-                else:
-                    pan_y += event.delta
+            if shift:
+                pan_x += delta
+            else:
+                pan_y += delta
 
             if canvas.on_viewport_change_request:
                 canvas.on_viewport_change_request(canvas.zoom_factor, (pan_x, pan_y))
 
-    def on_touchpad_scroll(self, canvas: Any, event):
-        """Processes trackpad inputs, supporting standard panning and control-key pinch-zooms."""
+    def on_trackpad_scroll(self, canvas: Any, delta_x: float, delta_y: float,
+                           mouse_x: float, mouse_y: float, ctrl: bool = False):
+        """Processes trackpad inputs, supporting standard panning and pinch-zooms."""
         if not canvas.full_pil_img:
-            return "break"
-        if str(event.widget) == str(canvas):
-            try:
-                delta_x, delta_y = canvas.PreciseScrollDeltas(event.delta)
-            except Exception:
-                return "break"
+            return
 
-            is_control = (event.state & 0x0004) != 0
-            is_command = (event.state & 0x0008) != 0 or (event.state & 0x0010) != 0
-
-            if is_control or is_command:
-                zoom_delta = delta_y * 0.01
-                self.zoom(canvas, zoom_delta, mouse_pos=(event.x, event.y))
-            else:
-                state = canvas
-                pan_x, pan_y = state.pan_offset
-                pan_x += delta_x
-                pan_y += delta_y
-                if canvas.on_viewport_change_request:
-                    canvas.on_viewport_change_request(
-                        canvas.zoom_factor, (pan_x, pan_y)
-                    )
-            return "break"
+        if ctrl:
+            zoom_delta = delta_y * 0.01
+            self.zoom(canvas, zoom_delta, mouse_pos=(mouse_x, mouse_y))
+        else:
+            state = canvas
+            pan_x, pan_y = state.pan_offset
+            pan_x += delta_x
+            pan_y += delta_y
+            if canvas.on_viewport_change_request:
+                canvas.on_viewport_change_request(
+                    canvas.zoom_factor, (pan_x, pan_y)
+                )
 
     def zoom(
         self,
         canvas: Any,
         delta: float,
-        mouse_pos: tuple[int, int] | None = None,
+        mouse_pos: tuple[float, float] | None = None,
     ):
         """Rescales the viewport zoom factor focusing around the target mouse position."""
         if not canvas.full_pil_img:
@@ -994,8 +982,8 @@ class GestureInterpreter:
         old_zoom = state.zoom_factor
         new_zoom = max(0.1, min(4.0, old_zoom + delta))
 
-        cw = canvas.winfo_width()
-        ch = canvas.winfo_height()
+        cw = canvas.width()
+        ch = canvas.height()
         mx, my = mouse_pos if mouse_pos else (cw / 2, ch / 2)
 
         pan_x, pan_y = state.pan_offset

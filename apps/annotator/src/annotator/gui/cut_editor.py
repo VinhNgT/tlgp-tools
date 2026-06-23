@@ -1,18 +1,264 @@
-import sys
-import tkinter as tk
-from tkinter import ttk
+"""Cut line editor dialog — Qt rewrite.
 
-from PIL import Image, ImageDraw, ImageTk
+Modal dialog for editing horizontal cut lines on the full screenshot.
+Uses a QWidget with QPainter for the canvas and a QListWidget for the
+coordinate list.
+"""
+
+from PIL import Image
+from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
+from PySide6.QtGui import (
+    QColor,
+    QFont,
+    QMouseEvent,
+    QPainter,
+    QPen,
+    QPixmap,
+    QWheelEvent,
+)
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
+)
 
 from annotator.models import Component
 
+from .image_utils import pil_to_qpixmap
 from .validation import CutValidator
 
 MIN_CUT_GAP = 50
 SNAP_DISTANCE = 8
 
+# ── Colour Constants ──────────────────────────────────────────────────
 
-class CutEditorDialog(tk.Toplevel):
+_BG_COLOR = QColor("#1a1a1a")
+_COMP_FILL = QColor(255, 0, 0, 40)
+_COMP_OUTLINE = QColor(255, 0, 0, 150)
+_CUT_SELECTED = QColor("#0c8ce9")
+_CUT_NORMAL = QColor("#ff4444")
+_CUT_LABEL_FONT = QFont("Arial", 8)
+_CUT_LABEL_FONT.setBold(True)
+
+
+class _CutCanvasWidget(QWidget):
+    """Internal canvas widget for the cut editor.
+
+    Stores a full-resolution QPixmap of the source image and uses QPainter
+    for zoom/scroll transforms and component overlay rectangles, avoiding
+    PIL resize and RGBA compositing per frame.
+    """
+
+    def __init__(self, dialog: CutEditorDialog, parent=None):
+        super().__init__(parent)
+        self.dialog = dialog
+        self.setMinimumSize(300, 200)
+        self.setMouseTracking(True)
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+
+        self._base_pixmap: QPixmap | None = None
+        self.zoom_factor: float = 1.0
+        self._scroll_offset: float = 0.0
+
+    def _to_canvas_y(self, img_y: int) -> float:
+        return img_y * self.zoom_factor - self._scroll_offset
+
+    def _to_img_y(self, canvas_y: float) -> int:
+        return round((canvas_y + self._scroll_offset) / self.zoom_factor)
+
+    def fit_and_render(self):
+        """Compute zoom and build the base QPixmap from the source image."""
+        if not self.dialog.source_image:
+            return
+        vw = self.width()
+        if vw <= 1:
+            vw = 700
+        img_w = self.dialog.source_image.width
+        self.zoom_factor = max(0.05, min(1.0, (vw - 20) / img_w))
+        self._base_pixmap = pil_to_qpixmap(self.dialog.source_image)
+        self.update()
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        p.fillRect(self.rect(), _BG_COLOR)
+
+        if not self._base_pixmap:
+            p.end()
+            return
+
+        zoom = self.zoom_factor
+        src_w = self._base_pixmap.width()
+        src_h = self._base_pixmap.height()
+
+        # Draw the source image scaled by zoom, offset by scroll
+        target = QRectF(0, -self._scroll_offset, src_w * zoom, src_h * zoom)
+        source = QRectF(0, 0, src_w, src_h)
+        p.drawPixmap(target, self._base_pixmap, source)
+
+        # Draw semi-transparent red overlays for existing components
+        comp_outline_pen = QPen(_COMP_OUTLINE, 1)
+        for comp in self.dialog.existing_components:
+            cx1 = comp.bounds.left * zoom
+            cy1 = self._to_canvas_y(comp.bounds.top)
+            cx2 = comp.bounds.right * zoom
+            cy2 = self._to_canvas_y(comp.bounds.bottom)
+            rect = QRectF(cx1, cy1, cx2 - cx1, cy2 - cy1)
+            p.fillRect(rect, _COMP_FILL)
+            p.setPen(comp_outline_pen)
+            p.setBrush(Qt.BrushStyle.NoBrush)
+            p.drawRect(rect)
+
+        # Draw cut lines
+        disp_w = src_w * zoom
+        for i, y in enumerate(self.dialog.cut_lines):
+            cy = self._to_canvas_y(y)
+            is_selected = i == self.dialog.selected_index
+            color = _CUT_SELECTED if is_selected else _CUT_NORMAL
+            width = 3 if is_selected else 2
+
+            pen = QPen(color, width, Qt.PenStyle.DashLine)
+            p.setPen(pen)
+            p.drawLine(QPointF(0, cy), QPointF(disp_w, cy))
+
+            p.setFont(_CUT_LABEL_FONT)
+            p.setPen(QPen(color))
+            p.drawText(QPointF(disp_w - 50, cy - 6), f"Y={y}")
+
+        p.end()
+
+    def mousePressEvent(self, event: QMouseEvent):
+        if event.button() != Qt.MouseButton.LeftButton:
+            return
+        canvas_y = event.position().y()
+        img_y = self._to_img_y(canvas_y)
+
+        if self.dialog.mode == "adding":
+            intersecting = CutValidator.get_intersecting_component(
+                img_y, self.dialog.existing_components
+            )
+            if intersecting:
+                self.dialog.status_label.setText(
+                    f"Blocked: intersects component '{intersecting.label}'"
+                )
+                return
+
+            if CutValidator.is_valid_position(
+                img_y, self.dialog.source_image.height, self.dialog.cut_lines, MIN_CUT_GAP
+            ):
+                self.dialog.cut_lines.append(img_y)
+                self.dialog.cut_lines.sort()
+                self.dialog.selected_index = self.dialog.cut_lines.index(img_y)
+                self.dialog.cancel_add_mode()
+                self.update()
+                self.dialog.refresh_listbox()
+            else:
+                self.dialog.status_label.setText("Blocked: invalid gap to adjacent cuts")
+            return
+
+        hit_index = self._hit_test_cut(canvas_y)
+        if hit_index >= 0:
+            self.dialog.selected_index = hit_index
+            self.dialog.mode = "dragging"
+            self.dialog.drag_index = hit_index
+            self.dialog.drag_start_y = img_y
+            self.dialog.last_valid_drag_y = self.dialog.cut_lines[hit_index]
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+        else:
+            self.dialog.selected_index = -1
+
+        self.update()
+        self.dialog.refresh_listbox()
+
+    def mouseMoveEvent(self, event: QMouseEvent):
+        canvas_y = event.position().y()
+
+        if self.dialog.mode == "dragging" and self.dialog.drag_index >= 0:
+            new_y = self._to_img_y(canvas_y)
+            new_y = max(MIN_CUT_GAP, min(self.dialog.source_image.height - MIN_CUT_GAP, new_y))
+
+            intersecting = CutValidator.get_intersecting_component(
+                new_y, self.dialog.existing_components
+            )
+            if intersecting:
+                self.dialog.status_label.setText(
+                    f"Blocked: intersects component '{intersecting.label}'"
+                )
+                new_y = self.dialog.last_valid_drag_y
+            else:
+                self.dialog.status_label.setText("")
+
+            if CutValidator.is_valid_position_for_drag(
+                new_y,
+                self.dialog.source_image.height,
+                self.dialog.cut_lines,
+                self.dialog.drag_index,
+                MIN_CUT_GAP,
+            ):
+                self.dialog.cut_lines[self.dialog.drag_index] = new_y
+                self.dialog.cut_lines.sort()
+                self.dialog.drag_index = self.dialog.cut_lines.index(new_y)
+                self.dialog.selected_index = self.dialog.drag_index
+                self.dialog.last_valid_drag_y = new_y
+            else:
+                self.dialog.cut_lines[self.dialog.drag_index] = self.dialog.last_valid_drag_y
+
+            self.update()
+            self.dialog.refresh_listbox()
+            return
+
+        if self.dialog.mode == "adding":
+            return
+
+        hit = self._hit_test_cut(canvas_y)
+        if hit >= 0:
+            self.setCursor(Qt.CursorShape.SizeVerCursor)
+        else:
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def mouseReleaseEvent(self, event: QMouseEvent):
+        if self.dialog.mode == "dragging":
+            self.dialog.mode = "idle"
+            self.dialog.drag_index = -1
+            self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def wheelEvent(self, event: QWheelEvent):
+        pixel_delta = event.pixelDelta()
+        if not pixel_delta.isNull():
+            self._scroll_offset -= pixel_delta.y()
+        else:
+            angle = event.angleDelta().y()
+            self._scroll_offset -= angle / 2.0
+
+        # Clamp scroll based on the scaled image height
+        if self._base_pixmap:
+            scaled_h = self._base_pixmap.height() * self.zoom_factor
+            max_scroll = max(0, scaled_h - self.height())
+            self._scroll_offset = max(0, min(max_scroll, self._scroll_offset))
+        else:
+            self._scroll_offset = max(0, self._scroll_offset)
+
+        self.update()
+        event.accept()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self.fit_and_render()
+
+    def _hit_test_cut(self, canvas_y: float) -> int:
+        for i, y in enumerate(self.dialog.cut_lines):
+            cy = self._to_canvas_y(y)
+            if abs(canvas_y - cy) <= SNAP_DISTANCE:
+                return i
+        return -1
+
+
+class CutEditorDialog(QDialog):
     """Modal dialog for editing horizontal cut lines on the full screenshot."""
 
     def __init__(
@@ -23,460 +269,147 @@ class CutEditorDialog(tk.Toplevel):
         components: list[Component],
     ):
         super().__init__(parent)
-        self.title("Edit Cut Lines")
-        self.geometry("900x700")
-        self.resizable(True, True)
-        self.transient(parent)
-        self.grab_set()
-
-        # Center relative to parent window
-        self.update_idletasks()
-        pw = parent.winfo_width()
-        ph = parent.winfo_height()
-        px = parent.winfo_rootx()
-        py = parent.winfo_rooty()
-        x = px + (pw - 900) // 2
-        y = py + (ph - 700) // 2
-        self.geometry(f"+{max(0, x)}+{max(0, y)}")
+        self.setWindowTitle("Edit Cut Lines")
+        self.resize(900, 700)
+        self.setModal(True)
 
         self.source_image = image
         self.cut_lines: list[int] = sorted(initial_cuts)
         self.existing_components = components
         self.result: list[int] | None = None
 
-        # Canvas state
-        self.zoom_factor: float = 1.0
-        self.tk_photo = None
-        self._prev_tk_photo = None
-        self.image_item_id = None
-
         # Interaction state
-        self._mode: str = "idle"  # "idle", "adding", "dragging"
-        self._drag_index: int = -1
-        self._drag_start_y: int = 0
-        self._last_valid_drag_y: int = 0
-        self._selected_index: int = -1
+        self.mode: str = "idle"
+        self.drag_index: int = -1
+        self.drag_start_y: int = 0
+        self.last_valid_drag_y: int = 0
+        self.selected_index: int = -1
 
         self._build_ui()
-        self._bind_events()
 
-        # Populate coordinates list
-        self._refresh_listbox()
-
-        # Initial fit render
-        self.after(50, self._fit_and_render)
-
-        self.protocol("WM_DELETE_WINDOW", self._on_cancel)
-        self.wait_window(self)
+        # Initial render after layout settles
+        QTimer.singleShot(50, self.canvas_widget.fit_and_render)
+        self.refresh_listbox()
 
     def _build_ui(self):
-        main = ttk.Frame(self)
-        main.pack(fill=tk.BOTH, expand=True)
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Left scrollable canvas
-        canvas_frame = ttk.Frame(main)
-        canvas_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        # Left: canvas
+        self.canvas_widget = _CutCanvasWidget(self)
+        layout.addWidget(self.canvas_widget, stretch=3)
 
-        vbar = ttk.Scrollbar(canvas_frame, orient=tk.VERTICAL)
-        vbar.pack(side=tk.RIGHT, fill=tk.Y)
+        # Right: controls
+        right = QWidget()
+        right.setFixedWidth(200)
+        right_layout = QVBoxLayout(right)
+        right_layout.setContentsMargins(10, 10, 10, 10)
 
-        self.canvas = tk.Canvas(
-            canvas_frame,
-            bg="#1a1a1a",
-            highlightthickness=0,
-            borderwidth=0,
-            yscrollcommand=vbar.set,
-            yscrollincrement=1,
-        )
-        self.canvas.pack(fill=tk.BOTH, expand=True)
-        vbar.config(command=self.canvas.yview)
+        lbl = QLabel("CUT LINES")
+        lbl.setStyleSheet("font-weight: bold; font-size: 10pt;")
+        right_layout.addWidget(lbl)
 
-        # Right control panel
-        right = ttk.Frame(main, padding=10, width=200)
-        right.pack(side=tk.RIGHT, fill=tk.Y)
-        right.pack_propagate(False)
+        self.listbox = QListWidget()
+        self.listbox.currentRowChanged.connect(self._on_listbox_select)
+        right_layout.addWidget(self.listbox, stretch=1)
 
-        ttk.Label(right, text="CUT LINES", font=("", 10, "bold")).pack(
-            anchor="w", pady=(0, 8)
-        )
+        # Action buttons
+        self.btn_add = QPushButton("Add Cut")
+        self.btn_add.clicked.connect(self._start_add_mode)
+        right_layout.addWidget(self.btn_add)
 
-        list_frame = ttk.Frame(right)
-        list_frame.pack(fill=tk.BOTH, expand=True, pady=(0, 10))
+        self.btn_remove = QPushButton("Remove")
+        self.btn_remove.setEnabled(False)
+        self.btn_remove.clicked.connect(self._remove_selected)
+        right_layout.addWidget(self.btn_remove)
 
-        self.listbox = tk.Listbox(
-            list_frame,
-            font=("", 9),
-            selectmode=tk.SINGLE,
-            bg="#2b2b2b",
-            fg="#ffffff",
-            selectbackground="#0c8ce9",
-            selectforeground="#ffffff",
-            highlightthickness=0,
-            borderwidth=1,
-            relief="flat",
-        )
-        self.listbox.pack(fill=tk.BOTH, expand=True)
-        self.listbox.bind("<<ListboxSelect>>", self._on_listbox_select)
+        self.btn_clear = QPushButton("Clear All")
+        self.btn_clear.clicked.connect(self._clear_all)
+        right_layout.addWidget(self.btn_clear)
 
-        # Action Buttons
-        btn_frame = ttk.Frame(right)
-        btn_frame.pack(fill=tk.X, pady=(0, 10))
+        self.status_label = QLabel("")
+        self.status_label.setStyleSheet("font-size: 8pt; color: #ff4444;")
+        self.status_label.setWordWrap(True)
+        right_layout.addWidget(self.status_label)
 
-        self.btn_add = ttk.Button(
-            btn_frame,
-            text="Add Cut",
-            command=self._start_add_mode,
-            width=12,
-        )
-        self.btn_add.pack(fill=tk.X, pady=2)
+        right_layout.addStretch()
 
-        self.btn_remove = ttk.Button(
-            btn_frame,
-            text="Remove",
-            command=self._remove_selected,
-            width=12,
-            state=tk.DISABLED,
-        )
-        self.btn_remove.pack(fill=tk.X, pady=2)
+        # OK / Cancel
+        btn_row = QHBoxLayout()
+        btn_row.addStretch()
+        btn_ok = QPushButton("OK")
+        btn_ok.setFixedWidth(80)
+        btn_ok.clicked.connect(self._on_ok)
+        btn_row.addWidget(btn_ok)
 
-        self.btn_clear = ttk.Button(
-            btn_frame,
-            text="Clear All",
-            command=self._clear_all,
-            width=12,
-        )
-        self.btn_clear.pack(fill=tk.X, pady=2)
+        btn_cancel = QPushButton("Cancel")
+        btn_cancel.setFixedWidth(80)
+        btn_cancel.clicked.connect(self._on_cancel)
+        btn_row.addWidget(btn_cancel)
+        right_layout.addLayout(btn_row)
 
-        # Status feedback label
-        self.status_label = ttk.Label(
-            right, text="", font=("", 8), foreground="#ff4444", wraplength=170
-        )
-        self.status_label.pack(fill=tk.X, pady=(0, 10))
+        layout.addWidget(right)
 
-        # OK Cancel action layout
-        ttk.Separator(right, orient="horizontal").pack(fill=tk.X, pady=5)
-
-        action_frame = ttk.Frame(right)
-        action_frame.pack(fill=tk.X, side=tk.BOTTOM)
-
-        ttk.Button(
-            action_frame,
-            text="Cancel",
-            command=self._on_cancel,
-            width=8,
-        ).pack(side=tk.RIGHT, padx=(5, 0))
-        ttk.Button(action_frame, text="OK", command=self._on_ok, width=8).pack(
-            side=tk.RIGHT
-        )
-
-    def _bind_events(self):
-        self.canvas.bind("<ButtonPress-1>", self._on_canvas_click)
-        self.canvas.bind("<B1-Motion>", self._on_canvas_drag)
-        self.canvas.bind("<ButtonRelease-1>", self._on_canvas_release)
-        self.canvas.bind("<Motion>", self._on_canvas_motion)
-        self.canvas.bind("<Configure>", self._on_canvas_resize)
-        self.canvas.bind("<MouseWheel>", self._on_canvas_scroll)
-
-        # Linux scrollwheel bindings
-        self.canvas.bind("<Button-4>", lambda e: self.canvas.yview_scroll(-60, "units"))
-        self.canvas.bind("<Button-5>", lambda e: self.canvas.yview_scroll(60, "units"))
-
-        if sys.platform == "darwin":
-            self.canvas.bind("<TouchpadScroll>", self._on_touchpad_scroll)
-
-        self.bind("<Escape>", self._on_escape)
-        self.bind("<Delete>", lambda e: self._remove_selected())
-        self.bind("<BackSpace>", lambda e: self._remove_selected())
-
-    def _on_canvas_scroll(self, event):
-        scroll_amount = -1 * (event.delta / 120) * 60
-        sr = self.canvas.cget("scrollregion")
-        if sr:
-            parts = sr.split()
-            total_h = float(parts[3]) - float(parts[1])
-            if total_h > 0:
-                frac = scroll_amount / total_h
-                current = self.canvas.yview()[0]
-                self.canvas.yview_moveto(current + frac)
-        return "break"
-
-    def _on_touchpad_scroll(self, event):
-        try:
-            res = self.tk.call("tk::PreciseScrollDeltas", event.delta)
-            deltas = self.tk.splitlist(res)
-            delta_y = float(deltas[1])
-        except Exception:
-            return "break"
-        if delta_y != 0:
-            self.canvas.yview_scroll(round(-delta_y), "units")
-        return "break"
-
-    def _to_canvas_y(self, img_y: int) -> float:
-        return img_y * self.zoom_factor
-
-    def _to_img_y(self, canvas_y: float) -> int:
-        return round(canvas_y / self.zoom_factor)
-
-    def _fit_and_render(self):
-        vw = self.canvas.winfo_width()
-        vh = self.canvas.winfo_height()
-        if vw <= 1 or vh <= 1:
-            vw, vh = 700, 650
-
-        img_w = self.source_image.width
-        self.zoom_factor = max(0.05, min(1.0, (vw - 20) / img_w))
-        self._render()
-
-    def _render(self):
-        img_w = self.source_image.width
-        img_h = self.source_image.height
-
-        disp_w = max(1, round(img_w * self.zoom_factor))
-        disp_h = max(1, round(img_h * self.zoom_factor))
-
-        resampler = (
-            Image.Resampling.BILINEAR
-            if self.zoom_factor > 1.0
-            else Image.Resampling.LANCZOS
-        )
-        resized = self.source_image.resize((disp_w, disp_h), resampler)
-
-        # Draw transparent component location boxes in red
-        draw_img = resized.convert("RGBA")
-        overlay = Image.new("RGBA", draw_img.size, (0, 0, 0, 0))
-        draw = ImageDraw.Draw(overlay)
-        for comp in self.existing_components:
-            cx1 = comp.bounds.left * self.zoom_factor
-            cy1 = comp.bounds.top * self.zoom_factor
-            cx2 = comp.bounds.right * self.zoom_factor
-            cy2 = comp.bounds.bottom * self.zoom_factor
-            draw.rectangle(
-                [cx1, cy1, cx2, cy2],
-                fill=(255, 0, 0, 40),
-                outline=(255, 0, 0, 150),
-                width=1,
-            )
-        composed = Image.alpha_composite(draw_img, overlay).convert("RGB")
-
-        self._prev_tk_photo = self.tk_photo
-        self.tk_photo = ImageTk.PhotoImage(composed)
-
-        if self.image_item_id is None:
-            self.image_item_id = self.canvas.create_image(
-                0, 0, anchor="nw", image=self.tk_photo
-            )
-        else:
-            self.canvas.itemconfig(self.image_item_id, image=self.tk_photo)
-            self.canvas.coords(self.image_item_id, 0, 0)
-
-        self.canvas.config(scrollregion=(0, 0, disp_w, disp_h))
-        self._draw_cut_lines()
-
-    def _draw_cut_lines(self):
-        self.canvas.delete("cut_line")
-
-        disp_w = max(1, round(self.source_image.width * self.zoom_factor))
-
-        for i, y in enumerate(self.cut_lines):
-            cy = self._to_canvas_y(y)
-            is_selected = i == self._selected_index
-            color = "#0c8ce9" if is_selected else "#ff4444"
-            width = 3 if is_selected else 2
-
-            self.canvas.create_line(
-                0, cy, disp_w, cy, fill=color, width=width, dash=(8, 4), tags="cut_line"
-            )
-
-            label_text = f"Y={y}"
-            self.canvas.create_text(
-                disp_w - 5,
-                cy - 8,
-                text=label_text,
-                anchor="ne",
-                fill=color,
-                font=("Arial", 8, "bold"),
-                tags="cut_line",
-            )
-
-        if self.image_item_id is not None:
-            self.canvas.tag_lower(self.image_item_id)
-
-    def _refresh_listbox(self):
-        self.listbox.delete(0, tk.END)
-        for i, y in enumerate(self.cut_lines):
-            self.listbox.insert(tk.END, f"Cut {i + 1}:  Y = {y}")
-
-        if 0 <= self._selected_index < len(self.cut_lines):
-            self.listbox.selection_set(self._selected_index)
-            self.listbox.see(self._selected_index)
-
-        self.btn_remove.config(
-            state=tk.NORMAL
-            if 0 <= self._selected_index < len(self.cut_lines)
-            else tk.DISABLED
-        )
+    def keyPressEvent(self, event):
+        if event.key() == Qt.Key.Key_Escape:
+            if self.mode == "adding":
+                self.cancel_add_mode()
+            else:
+                self._on_cancel()
+            return
+        if event.key() in (Qt.Key.Key_Delete, Qt.Key.Key_Backspace):
+            self._remove_selected()
+            return
+        super().keyPressEvent(event)
 
     def _start_add_mode(self):
-        self._mode = "adding"
-        self.canvas.config(cursor="crosshair")
-        self.status_label.config(
-            text="Click to add a horizontal cut line. Escape to cancel."
-        )
-        self.btn_add.config(state=tk.DISABLED)
+        self.mode = "adding"
+        self.canvas_widget.setCursor(Qt.CursorShape.CrossCursor)
+        self.status_label.setText("Click to add a horizontal cut line. Escape to cancel.")
+        self.btn_add.setEnabled(False)
 
-    def _cancel_add_mode(self):
-        self._mode = "idle"
-        self.canvas.config(cursor="")
-        self.status_label.config(text="")
-        self.btn_add.config(state=tk.NORMAL)
+    def cancel_add_mode(self):
+        self.mode = "idle"
+        self.canvas_widget.setCursor(Qt.CursorShape.ArrowCursor)
+        self.status_label.setText("")
+        self.btn_add.setEnabled(True)
 
-    def _on_canvas_click(self, event):
-        cy = self.canvas.canvasy(event.y)
-        img_y = self._to_img_y(cy)
-
-        if self._mode == "adding":
-            intersecting_comp = CutValidator.get_intersecting_component(
-                img_y, self.existing_components
-            )
-            if intersecting_comp:
-                self.status_label.config(
-                    text=f"Blocked: intersects component '{intersecting_comp.label}'"
-                )
-                return
-
-            if CutValidator.is_valid_position(
-                img_y, self.source_image.height, self.cut_lines, MIN_CUT_GAP
-            ):
-                self.cut_lines.append(img_y)
-                self.cut_lines.sort()
-                self._selected_index = self.cut_lines.index(img_y)
-                self._cancel_add_mode()
-                self._draw_cut_lines()
-                self._refresh_listbox()
-            else:
-                self.status_label.config(text="Blocked: invalid gap to adjacent cuts")
-            return
-
-        hit_index = self._hit_test_cut(cy)
-        if hit_index >= 0:
-            self._selected_index = hit_index
-            self._mode = "dragging"
-            self._drag_index = hit_index
-            self._drag_start_y = img_y
-            self._last_valid_drag_y = self.cut_lines[hit_index]
-            self.canvas.config(cursor="sb_v_double_arrow")
-        else:
-            self._selected_index = -1
-
-        self._draw_cut_lines()
-        self._refresh_listbox()
-
-    def _on_canvas_drag(self, event):
-        if self._mode != "dragging" or self._drag_index < 0:
-            return
-
-        cy = self.canvas.canvasy(event.y)
-        new_y = self._to_img_y(cy)
-        new_y = max(MIN_CUT_GAP, min(self.source_image.height - MIN_CUT_GAP, new_y))
-
-        intersecting_comp = CutValidator.get_intersecting_component(
-            new_y, self.existing_components
-        )
-        if intersecting_comp:
-            self.status_label.config(
-                text=f"Blocked: intersects component '{intersecting_comp.label}'"
-            )
-            new_y = self._last_valid_drag_y
-        else:
-            self.status_label.config(text="")
-
-        if CutValidator.is_valid_position_for_drag(
-            new_y,
-            self.source_image.height,
-            self.cut_lines,
-            self._drag_index,
-            MIN_CUT_GAP,
-        ):
-            self.cut_lines[self._drag_index] = new_y
-            self.cut_lines.sort()
-            self._drag_index = self.cut_lines.index(new_y)
-            self._selected_index = self._drag_index
-            self._last_valid_drag_y = new_y
-        else:
-            self.cut_lines[self._drag_index] = self._last_valid_drag_y
-
-        self._draw_cut_lines()
-        self._refresh_listbox()
-
-    def _on_canvas_release(self, event):
-        if self._mode == "dragging":
-            self._mode = "idle"
-            self._drag_index = -1
-            self.canvas.config(cursor="")
-
-    def _on_canvas_motion(self, event):
-        if self._mode == "adding":
-            return
-        if self._mode == "dragging":
-            return
-
-        cy = self.canvas.canvasy(event.y)
-        hit = self._hit_test_cut(cy)
-        if hit >= 0:
-            self.canvas.config(cursor="sb_v_double_arrow")
-        else:
-            self.canvas.config(cursor="")
-
-    def _on_canvas_resize(self, event):
-        self._fit_and_render()
-
-    def _on_escape(self, event):
-        if self._mode == "adding":
-            self._cancel_add_mode()
-        else:
-            self._on_cancel()
-
-    def _hit_test_cut(self, canvas_y: float) -> int:
+    def refresh_listbox(self):
+        self.listbox.blockSignals(True)
+        self.listbox.clear()
         for i, y in enumerate(self.cut_lines):
-            cy = self._to_canvas_y(y)
-            if abs(canvas_y - cy) <= SNAP_DISTANCE:
-                return i
-        return -1
+            self.listbox.addItem(f"Cut {i + 1}:  Y = {y}")
 
-    def _on_listbox_select(self, event):
-        sel = self.listbox.curselection()
-        if sel:
-            self._selected_index = sel[0]
-        else:
-            self._selected_index = -1
-        self._draw_cut_lines()
-        self.btn_remove.config(
-            state=tk.NORMAL
-            if 0 <= self._selected_index < len(self.cut_lines)
-            else tk.DISABLED
-        )
+        if 0 <= self.selected_index < len(self.cut_lines):
+            self.listbox.setCurrentRow(self.selected_index)
+        self.listbox.blockSignals(False)
+
+        self.btn_remove.setEnabled(0 <= self.selected_index < len(self.cut_lines))
+
+    def _on_listbox_select(self, row):
+        self.selected_index = row
+        self.canvas_widget.update()
+        self.btn_remove.setEnabled(0 <= self.selected_index < len(self.cut_lines))
 
     def _remove_selected(self):
-        if 0 <= self._selected_index < len(self.cut_lines):
-            self.cut_lines.pop(self._selected_index)
-            self._selected_index = min(self._selected_index, len(self.cut_lines) - 1)
-            self._draw_cut_lines()
-            self._refresh_listbox()
+        if 0 <= self.selected_index < len(self.cut_lines):
+            self.cut_lines.pop(self.selected_index)
+            self.selected_index = min(self.selected_index, len(self.cut_lines) - 1)
+            self.canvas_widget.update()
+            self.refresh_listbox()
 
     def _clear_all(self):
         if not self.cut_lines:
             return
         self.cut_lines.clear()
-        self._selected_index = -1
-        self._draw_cut_lines()
-        self._refresh_listbox()
+        self.selected_index = -1
+        self.canvas_widget.update()
+        self.refresh_listbox()
 
     def _on_ok(self):
         self.result = sorted(self.cut_lines)
-        self.grab_release()
-        self.destroy()
+        self.accept()
 
     def _on_cancel(self):
         self.result = None
-        self.grab_release()
-        self.destroy()
+        self.reject()

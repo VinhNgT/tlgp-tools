@@ -1,42 +1,49 @@
 import json
-import tkinter as tk
 from datetime import datetime
-from tkinter import ttk
+
+from PySide6.QtCore import Qt
+from PySide6.QtWidgets import (
+    QDialog,
+    QHBoxLayout,
+    QLabel,
+    QPlainTextEdit,
+    QPushButton,
+    QVBoxLayout,
+)
 
 
-class BackendDebugWindow(tk.Toplevel):
+class BackendDebugWindow(QDialog):
     """Developer window that logs outgoing and incoming messages from the backend."""
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.title("Backend Logs")
-        self.geometry("600x400")
-        self.protocol("WM_DELETE_WINDOW", self.hide_window)
-        self.transient(parent)
-        self.withdraw()
+        self.setWindowTitle("Backend Logs")
+        self.resize(600, 400)
+        self.setWindowFlag(Qt.WindowType.Tool)
 
-        header = ttk.Frame(self)
-        header.pack(side=tk.TOP, fill=tk.X, padx=5, pady=5)
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(5, 5, 5, 5)
 
-        lbl = ttk.Label(header, text="Backend Logs", font=("", 9, "bold"))
-        lbl.pack(side=tk.LEFT)
+        header = QHBoxLayout()
+        lbl = QLabel("Backend Logs")
+        lbl.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        header.addWidget(lbl)
+        header.addStretch()
 
-        self.btn_clear = ttk.Button(header, text="Clear", command=self.clear_logs, width=6)
-        self.btn_clear.pack(side=tk.RIGHT)
+        btn_clear = QPushButton("Clear")
+        btn_clear.setFixedWidth(60)
+        btn_clear.clicked.connect(self.clear_logs)
+        header.addWidget(btn_clear)
+        layout.addLayout(header)
 
-        text_frame = ttk.Frame(self)
-        text_frame.pack(side=tk.TOP, fill=tk.BOTH, expand=True)
-
-        self.text_area = tk.Text(text_frame, wrap=tk.WORD, state=tk.DISABLED, width=40, height=10)
-
-        scroll = ttk.Scrollbar(text_frame, command=self.text_area.yview)
-        self.text_area.configure(yscrollcommand=scroll.set)
-
-        scroll.pack(side=tk.RIGHT, fill=tk.Y)
-        self.text_area.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        self.text_area = QPlainTextEdit()
+        self.text_area.setReadOnly(True)
+        self.text_area.setStyleSheet(
+            "font-family: 'Menlo', 'Consolas', monospace; font-size: 9pt;"
+        )
+        layout.addWidget(self.text_area)
 
     def log_message(self, direction: str, message: dict | str):
-        self.text_area.configure(state=tk.NORMAL)
         if isinstance(message, dict):
             try:
                 msg_str = json.dumps(message, indent=2)
@@ -50,19 +57,17 @@ class BackendDebugWindow(tk.Toplevel):
                 msg_str = str(message)
 
         now_str = datetime.now().strftime("%H:%M:%S.%f")[:-3]
-        self.text_area.insert(tk.END, f"[{now_str}] [{direction}]\n{msg_str}\n{'-'*40}\n")
-        self.text_area.see(tk.END)
-        self.text_area.configure(state=tk.DISABLED)
+        self.text_area.appendPlainText(
+            f"[{now_str}] [{direction}]\n{msg_str}\n{'-' * 40}"
+        )
 
     def clear_logs(self):
-        self.text_area.configure(state=tk.NORMAL)
-        self.text_area.delete("1.0", tk.END)
-        self.text_area.configure(state=tk.DISABLED)
+        self.text_area.clear()
 
     def show_window(self):
-        self.deiconify()
-        self.lift()
-        self.focus_force()
+        self.show()
+        self.raise_()
+        self.activateWindow()
 
     def hide_window(self):
-        self.withdraw()
+        self.hide()
