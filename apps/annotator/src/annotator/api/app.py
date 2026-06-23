@@ -8,6 +8,9 @@ from __future__ import annotations
 
 import asyncio
 
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
+
 from annotator.workspace import WorkspaceManager
 from annotator.workspace.errors import (
     BoundaryViolationError,
@@ -20,8 +23,6 @@ from annotator.workspace.errors import (
     UndoRedoError,
     WorkspaceError,
 )
-from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 
 # Centralized error → HTTP status mapping.
 # Eliminates per-route try/except boilerplate.

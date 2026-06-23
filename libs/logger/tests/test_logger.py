@@ -62,8 +62,8 @@ def test_excepthook_interception():
         with capture_logs() as captured:
             try:
                 raise ValueError("unhandled error test")
-            except ValueError:
-                sys.excepthook(*sys.exc_info())
+            except ValueError as e:
+                sys.excepthook(type(e), e, e.__traceback__)
 
         assert len(captured) == 1
         log_data = captured[0]

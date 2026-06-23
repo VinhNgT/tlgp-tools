@@ -20,9 +20,9 @@ class TestBounds:
 
     def test_minimum_size_constraint(self):
         with pytest.raises(pydantic.ValidationError):
-            Bounds(x=0, y=0, w=3, h=10)
+            Bounds(**{"x": 0, "y": 0, "w": 3, "h": 10})
         with pytest.raises(pydantic.ValidationError):
-            Bounds(x=0, y=0, w=10, h=3)
+            Bounds(**{"x": 0, "y": 0, "w": 10, "h": 3})
 
     def test_serialization_roundtrip(self):
         b = Bounds(x=5, y=10, w=100, h=200)

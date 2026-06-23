@@ -46,7 +46,7 @@ class TestInteraction:
 
     def test_missing_required_field_raises(self):
         with pytest.raises(ValidationError):
-            Interaction(action="Click")  # missing reaction
+            Interaction.model_validate({"action": "Click"})  # missing reaction
 
 
 # ── Component ─────────────────────────────────────────────────────────
@@ -187,7 +187,7 @@ class TestDiscrepancy:
 
     def test_missing_required_raises(self):
         with pytest.raises(ValidationError):
-            Discrepancy(location="X")  # missing observations
+            Discrepancy.model_validate({"location": "X"})  # missing observations
 
 
 # ── Screen ────────────────────────────────────────────────────────────
@@ -242,7 +242,7 @@ class TestAnalysisData:
 
     def test_missing_screen_raises(self):
         with pytest.raises(ValidationError):
-            AnalysisData(exportDir="/tmp")  # missing screen
+            AnalysisData.model_validate({"exportDir": "/tmp"})  # missing screen
 
     def test_with_discrepancies(self, tmp_path):
         data = AnalysisData(

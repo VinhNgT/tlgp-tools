@@ -5,7 +5,6 @@ import uuid
 from annotator.gui.validation import BoundsValidator, CutValidator
 from annotator.models import Bounds, Component
 
-
 # ── BoundsValidator.clamp_val ─────────────────────────────────────────
 
 

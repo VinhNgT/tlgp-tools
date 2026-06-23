@@ -12,7 +12,6 @@ import pytest
 from annotator.api.routes import WebSocketBroadcaster
 from annotator.models import WorkspaceState
 
-
 # ── Helpers ────────────────────────────────────────────────────────────
 
 

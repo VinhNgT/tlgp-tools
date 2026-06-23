@@ -6,7 +6,7 @@ from doc_generator.models import (
     ChildElement,
     Interaction,
 )
-from doc_generator.style_constants import load_default_style
+from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
     build_api_table,
     build_info_table,
@@ -18,14 +18,13 @@ from docx import Document
 from docx.oxml.ns import qn
 from docx.shared import Pt
 
-style = None
+style: StyleConfig
 
 
 @pytest.fixture(autouse=True, scope="module")
 def setup_style():
     global style
-    if style is None:
-        style = load_default_style()
+    style = load_default_style()
 
 
 def _get_cell_shading(cell) -> str | None:

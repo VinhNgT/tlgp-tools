@@ -10,10 +10,11 @@ import sys
 import threading
 
 import uvicorn
+from tlgp_logger import get_logger, setup_excepthook, setup_logging
+
 from annotator.api.app import create_app
 from annotator.gui import start_gui
 from annotator.workspace import WorkspaceManager
-from tlgp_logger import get_logger, setup_excepthook, setup_logging
 
 logger = get_logger(__name__)
 

@@ -82,6 +82,7 @@ class TestWorkspaceApi:
 
         err = exc_info.value
         assert err.status_code == 404
+        assert err.url is not None
         assert "localhost/state" in err.url
         assert err.method == "GET"
         assert err.backend_detail == "Not found details"
@@ -107,6 +108,7 @@ class TestWorkspaceApi:
         err = exc_info.value
         assert "Connection refused" in err.message
         assert err.status_code is None
+        assert err.url is not None
         assert "localhost/state" in err.url
 
     @pytest.mark.anyio

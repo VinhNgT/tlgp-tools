@@ -4,6 +4,9 @@ from tkinter import ttk
 from typing import Any, Protocol
 from uuid import UUID
 
+from PIL import Image, ImageDraw, ImageTk
+from tlgp_logger import get_logger
+
 from annotator.models import Component
 from annotator.rendering import (
     composite_gapped_image,
@@ -14,8 +17,6 @@ from annotator.rendering import (
     get_pill_coords,
     get_text_dimensions,
 )
-from PIL import Image, ImageDraw, ImageTk
-from tlgp_logger import get_logger
 
 from .transformer import CUT_GAP_PX, ViewportTransformer
 

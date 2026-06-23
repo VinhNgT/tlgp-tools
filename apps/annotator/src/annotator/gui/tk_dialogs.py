@@ -1,8 +1,9 @@
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 
-from annotator.models import Component
 from PIL import Image
+
+from annotator.models import Component
 
 from .cut_editor import CutEditorDialog
 from .dialog_service import DialogService, ProgressIndicator

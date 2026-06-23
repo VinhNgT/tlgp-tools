@@ -2,8 +2,9 @@ import sys
 import tkinter as tk
 from tkinter import ttk
 
-from annotator.models import Component
 from PIL import Image, ImageDraw, ImageTk
+
+from annotator.models import Component
 
 from .validation import CutValidator
 

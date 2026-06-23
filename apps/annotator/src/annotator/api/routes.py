@@ -13,15 +13,6 @@ import threading
 import uuid
 import zipfile
 
-from annotator.models import Bounds, Style, Visibility, WorkspaceState
-from annotator.models.tree import TreeUtils
-from annotator.rendering import paint_annotations
-from annotator.workspace import WorkspaceManager
-from annotator.workspace.errors import (
-    ComponentNotFoundError,
-    InvalidStateError,
-    UndoRedoError,
-)
 from fastapi import (
     APIRouter,
     File,
@@ -32,6 +23,16 @@ from fastapi import (
 from fastapi.responses import Response
 from PIL import Image
 from pydantic import BaseModel
+
+from annotator.models import Bounds, Style, Visibility, WorkspaceState
+from annotator.models.tree import TreeUtils
+from annotator.rendering import paint_annotations
+from annotator.workspace import WorkspaceManager
+from annotator.workspace.errors import (
+    ComponentNotFoundError,
+    InvalidStateError,
+    UndoRedoError,
+)
 
 # ── WebSocket Broadcaster ─────────────────────────────────────────────
 

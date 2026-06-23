@@ -9,16 +9,12 @@ import uuid
 
 from annotator.models import Bounds, Component, Style
 from annotator.rendering import (
-    compute_border_widths,
-    compute_pill_font_size,
+    MIN_FONT_SIZE,
     composite_gapped_image,
-    get_font,
-    get_pill_coords,
-    get_text_dimensions,
+    compute_pill_font_size,
     paint_annotations,
 )
 from PIL import Image
-
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
@@ -62,14 +58,14 @@ class TestPaintIdempotency:
         img2 = Image.new("RGB", (img_w, img_h), (255, 255, 255))
         result2 = paint_annotations(img2, children, 0, 0, None, img_w)
 
-        assert list(result1.getdata()) == list(result2.getdata())
+        assert result1.tobytes() == result2.tobytes()
 
     def test_no_children_returns_original(self):
         """paint_annotations with empty children returns the input image unmodified."""
         img = Image.new("RGB", (200, 200), (128, 128, 128))
-        original_data = list(img.getdata())
+        original_bytes = img.tobytes()
         result = paint_annotations(img, [], 0, 0, None, 200)
-        assert list(result.getdata()) == original_data
+        assert result.tobytes() == original_bytes
 
 
 # ── Offset Consistency ────────────────────────────────────────────────
@@ -95,7 +91,7 @@ class TestOffsetConsistency:
         result2 = paint_annotations(img2, [child], 50, 50, None, img_w)
 
         # The two images must differ (annotations are in different positions)
-        assert list(result1.getdata()) != list(result2.getdata())
+        assert result1.tobytes() != result2.tobytes()
 
 
 # ── Pill Corner Consistency ───────────────────────────────────────────
@@ -119,7 +115,7 @@ class TestPillCornerConsistency:
             )
             img = Image.new("RGB", (img_w, img_h), (255, 255, 255))
             result = paint_annotations(img, [child], 0, 0, None, img_w)
-            results[corner] = list(result.getdata())
+            results[corner] = result.tobytes()
 
         # At least top_left vs bottom_right should differ
         assert results["top_left"] != results["bottom_right"]
@@ -155,7 +151,7 @@ class TestVisibilityFiltering:
         result_one = paint_annotations(img_one, [visible], 0, 0, None, img_w)
 
         # Hidden component should not affect output
-        assert list(result_both.getdata()) == list(result_one.getdata())
+        assert result_both.tobytes() == result_one.tobytes()
 
 
 # ── Font Sizing Consistency Across Levels ─────────────────────────────
@@ -176,7 +172,6 @@ class TestFontSizingLevels:
 
     def test_font_at_deep_nesting_has_floor(self):
         """Even at very deep nesting, font size must not go below MIN_FONT_SIZE."""
-        from annotator.rendering import MIN_FONT_SIZE
 
         tiny_parent = Component(
             id=uuid.uuid4(),

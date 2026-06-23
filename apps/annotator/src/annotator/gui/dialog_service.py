@@ -1,8 +1,9 @@
 from abc import ABC, abstractmethod
 from typing import Any, Protocol
 
-from annotator.models import Component
 from PIL import Image
+
+from annotator.models import Component
 
 
 class ProgressIndicator(Protocol):

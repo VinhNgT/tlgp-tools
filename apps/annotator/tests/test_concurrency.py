@@ -7,12 +7,9 @@ that threading.Lock correctly prevents data corruption and race conditions.
 import threading
 import uuid
 
-import pytest
 from annotator.models import Bounds
-from annotator.workspace import WorkspaceManager
 
-from .conftest import create_test_image, workspace_with_image
-
+from .conftest import workspace_with_image
 
 # ── Helpers ────────────────────────────────────────────────────────────
 
@@ -51,7 +48,7 @@ class TestConcurrentMutations:
                 ws.add_component(cid, f"T{thread_idx}_{i}", Bounds(x=x, y=0, w=8, h=8))
 
         thread_count = 4
-        
+
         errors = []
         threads = []
         for t_idx in range(thread_count):

@@ -9,8 +9,9 @@ This module is the single source of truth for:
 
 import functools
 
-from annotator.models import Component
 from PIL import Image, ImageDraw, ImageFont
+
+from annotator.models import Component
 
 # ── Constants ──────────────────────────────────────────────────────────
 

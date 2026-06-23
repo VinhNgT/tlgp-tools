@@ -2,7 +2,6 @@
 
 from annotator.gui.transformer import CUT_GAP_PX, ViewportTransformer
 
-
 # ── Construction & Image Size ──────────────────────────────────────────
 
 

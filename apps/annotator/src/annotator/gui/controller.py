@@ -3,10 +3,11 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor
 from uuid import UUID
 
-from annotator.models import Bounds, Component, Style, Visibility
-from annotator.workspace import WorkspaceManager
 from PIL import Image
 from tlgp_logger import get_logger
+
+from annotator.models import Bounds, Component, Style, Visibility
+from annotator.workspace import WorkspaceManager
 
 from .app import MainAppWindow
 from .dialog_service import DialogService

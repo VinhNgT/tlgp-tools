@@ -5,6 +5,8 @@ import zipfile
 from collections.abc import Callable
 
 import jsonpatch
+from PIL import Image
+
 from annotator.models import (
     Bounds,
     Component,
@@ -14,7 +16,6 @@ from annotator.models import (
     Visibility,
     WorkspaceState,
 )
-from PIL import Image
 
 from .errors import (
     ComponentNotFoundError,
