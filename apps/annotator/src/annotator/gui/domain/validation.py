@@ -1,0 +1,126 @@
+from annotator.models import Component
+
+
+class BoundsValidator:
+    """Pure domain service encapsulating component coordinate boundary validation and clamping math."""
+
+    @staticmethod
+    def clamp_val(val: int, lo: int, hi: int) -> int:
+        """Clamps a value within lower and upper bounds."""
+        return max(lo, min(hi, val))
+
+    @staticmethod
+    def clamp_box_position(
+        ox1: int,
+        oy1: int,
+        w: int,
+        h: int,
+        dx: int,
+        dy: int,
+        bx1: int,
+        by1: int,
+        bx2: int,
+        by2: int,
+    ) -> tuple[int, int]:
+        """Calculates and clamps the new top-left coordinates for a box of width w and height h moving by (dx, dy)."""
+        rx1 = max(bx1, min(bx2 - w, ox1 + dx))
+        ry1 = max(by1, min(by2 - h, oy1 + dy))
+        return rx1, ry1
+
+    @staticmethod
+    def clamp_resize(
+        ox1: int,
+        oy1: int,
+        ox2: int,
+        oy2: int,
+        dx: int,
+        dy: int,
+        handle: str,
+        bx1: int,
+        by1: int,
+        bx2: int,
+        by2: int,
+        min_size: int = 4,
+        children_union: tuple[int, int, int, int] | None = None,
+    ) -> tuple[int, int, int, int]:
+        """Calculates and clamps the new coordinates (rx1, ry1, rx2, ry2) during resizing."""
+        rx1, ry1, rx2, ry2 = ox1, oy1, ox2, oy2
+
+        if "w" in handle:
+            rx1 = max(bx1, min(bx2, ox1 + dx))
+        if "e" in handle:
+            rx2 = max(bx1, min(bx2, ox2 + dx))
+        if "n" in handle:
+            ry1 = max(by1, min(by2, oy1 + dy))
+        if "s" in handle:
+            ry2 = max(by1, min(by2, oy2 + dy))
+
+        # Enforce minimum size constraint
+        if rx2 - rx1 < min_size:
+            if "w" in handle:
+                rx1 = rx2 - min_size
+            else:
+                rx2 = rx1 + min_size
+        if ry2 - ry1 < min_size:
+            if "n" in handle:
+                ry1 = ry2 - min_size
+            else:
+                ry2 = ry1 + min_size
+
+        # Enforce children bounds union constraint (box cannot shrink past its children's union)
+        if children_union:
+            cx1, cy1, cx2, cy2 = children_union
+            if rx1 > cx1:
+                rx1 = cx1
+            if rx2 < cx2:
+                rx2 = cx2
+            if ry1 > cy1:
+                ry1 = cy1
+            if ry2 < cy2:
+                ry2 = cy2
+
+        return rx1, ry1, rx2, ry2
+
+
+class CutValidator:
+    """Pure domain service encapsulating cut line coordinate constraints and collision checks."""
+
+    @staticmethod
+    def get_intersecting_component(
+        img_y: int, components: list[Component]
+    ) -> Component | None:
+        """Determines if a horizontal coordinate intersects with any component bounds."""
+        for comp in components:
+            if comp.bounds.top <= img_y <= comp.bounds.bottom:
+                return comp
+        return None
+
+    @staticmethod
+    def is_valid_position(
+        img_y: int, image_height: int, cut_lines: list[int], min_gap: int
+    ) -> bool:
+        """Verifies if a coordinate satisfies top/bottom margins and gap constraints."""
+        if img_y < min_gap or img_y > image_height - min_gap:
+            return False
+        for existing_y in cut_lines:
+            if abs(img_y - existing_y) < min_gap:
+                return False
+        return True
+
+    @staticmethod
+    def is_valid_position_for_drag(
+        img_y: int,
+        image_height: int,
+        cut_lines: list[int],
+        exclude_index: int,
+        min_gap: int,
+    ) -> bool:
+        """Verifies if a coordinate satisfies gap constraints excluding a specific cut line index."""
+        if img_y < min_gap or img_y > image_height - min_gap:
+            return False
+        for i, existing_y in enumerate(cut_lines):
+            if i == exclude_index:
+                continue
+            if abs(img_y - existing_y) < min_gap:
+                return False
+        return True

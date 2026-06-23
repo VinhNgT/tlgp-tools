@@ -1,4 +1,4 @@
-"""Manager for background daemon processes (engine and gui)."""
+"""Manager for background daemon processes (annotator)."""
 
 from __future__ import annotations
 
@@ -53,8 +53,7 @@ class DaemonManager:
         logger.info("DaemonManager initialized with workspace root: %s", self.workspace_root)
 
         # In-memory log buffers
-        self.engine_logs: deque[str] = deque(maxlen=log_maxlen)
-        self.gui_logs: deque[str] = deque(maxlen=log_maxlen)
+        self.annotator_logs: deque[str] = deque(maxlen=log_maxlen)
 
         # Active process tracking
         self.active_processes: list[subprocess.Popen] = []
@@ -77,9 +76,8 @@ class DaemonManager:
                 pass
 
     async def get_status(self, client: httpx.AsyncClient | None = None) -> dict:
-        """Retrieve the running status of engine and GUI processes."""
+        """Retrieve the running status of the annotator process."""
         engine_running = False
-        gui_running = False
         engine_ready = False
 
         # 1. Check process list status
@@ -87,10 +85,8 @@ class DaemonManager:
             if proc.poll() is None:
                 cmd = proc.args
                 cmd_str = " ".join(cmd) if isinstance(cmd, list) else str(cmd)
-                if "engine" in cmd_str:
+                if "annotator" in cmd_str:
                     engine_running = True
-                elif "gui" in cmd_str:
-                    gui_running = True
 
         # 2. Check engine HTTP readiness
         # If client is passed, use it, otherwise instantiate a short-lived client
@@ -116,19 +112,15 @@ class DaemonManager:
                 "ready": engine_ready,
             },
             "gui": {
-                "running": gui_running,
+                "running": engine_running,  # Since it's a monolithic app
             }
         }
 
 
     def read_daemon_logs(self, daemon: str = "engine", lines: int = 100) -> dict:
         """Read requested tailing lines from the selected daemon's log buffer."""
-        if daemon == "engine":
-            buf = self.engine_logs
-        elif daemon == "gui":
-            buf = self.gui_logs
-        else:
-            raise ValueError(f"Unknown daemon: '{daemon}'. Must be 'engine' or 'gui'.")
+        # Both map to annotator_logs now
+        buf = self.annotator_logs
 
         snapshot = list(buf)
         requested_logs = snapshot[-lines:] if lines > 0 else snapshot
@@ -145,7 +137,7 @@ class DaemonManager:
         workspace_zip: str | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> dict:
-        """Spawn the annotation tool engine and GUI as background subprocesses."""
+        """Spawn the monolithic annotation tool as a background subprocess."""
         if screenshot_path and workspace_zip:
             raise ValueError("screenshot_path and workspace_zip are mutually exclusive")
 
@@ -154,14 +146,13 @@ class DaemonManager:
 
         env = os.environ.copy()
 
-        engine_dir = os.path.join(self.workspace_root, "apps", "engine")
-        gui_dir = os.path.join(self.workspace_root, "apps", "gui")
+        annotator_dir = os.path.join(self.workspace_root, "apps", "annotator")
 
-        logger.info("Spawning engine daemon under Cwd: %s", engine_dir)
-        engine_cmd = [self.uv_bin, "run", "python", "-m", "engine"]
-        engine_proc = subprocess.Popen(
-            engine_cmd,
-            cwd=engine_dir,
+        logger.info("Spawning annotator daemon under Cwd: %s", annotator_dir)
+        annotator_cmd = [self.uv_bin, "run", "python", "-m", "annotator"]
+        annotator_proc = subprocess.Popen(
+            annotator_cmd,
+            cwd=annotator_dir,
             env=env,
             stdin=subprocess.DEVNULL,
             stdout=subprocess.PIPE,
@@ -169,40 +160,17 @@ class DaemonManager:
             start_new_session=True,
         )
 
-        logger.info("Spawning GUI daemon under Cwd: %s", gui_dir)
-        gui_cmd = [self.uv_bin, "run", "python", "-m", "gui"]
-        gui_proc = subprocess.Popen(
-            gui_cmd,
-            cwd=gui_dir,
-            env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            start_new_session=True,
-        )
-
-        self.active_processes.append(engine_proc)
-        self.active_processes.append(gui_proc)
+        self.active_processes.append(annotator_proc)
 
         # Start background stream pipe threads
         threading.Thread(
             target=self._pipe_stream,
-            args=(engine_proc.stdout, self.engine_logs, sys.stderr),
+            args=(annotator_proc.stdout, self.annotator_logs, sys.stderr),
             daemon=True,
         ).start()
         threading.Thread(
             target=self._pipe_stream,
-            args=(engine_proc.stderr, self.engine_logs, sys.stderr),
-            daemon=True,
-        ).start()
-        threading.Thread(
-            target=self._pipe_stream,
-            args=(gui_proc.stdout, self.gui_logs, sys.stderr),
-            daemon=True,
-        ).start()
-        threading.Thread(
-            target=self._pipe_stream,
-            args=(gui_proc.stderr, self.gui_logs, sys.stderr),
+            args=(annotator_proc.stderr, self.annotator_logs, sys.stderr),
             daemon=True,
         ).start()
 
@@ -230,9 +198,9 @@ class DaemonManager:
                 engine_ready = await poll_readiness(c)
 
         if not engine_ready:
-            logger.error("Engine failed to become ready after 3 seconds.")
+            logger.error("Annotator failed to become ready after 3 seconds.")
         else:
-            logger.info("Engine HTTP API ready. Importing initial assets...")
+            logger.info("Annotator HTTP API ready. Importing initial assets...")
             if screenshot_path:
                 abs_screenshot = os.path.abspath(screenshot_path)
                 with open(abs_screenshot, "rb") as f:
@@ -251,7 +219,7 @@ class DaemonManager:
                             await c.post(f"{engine_url}/workspace/import", files={"file": f})
 
         return {
-            "engine_pid": engine_proc.pid,
-            "gui_pid": gui_proc.pid,
+            "engine_pid": annotator_proc.pid,
+            "gui_pid": annotator_proc.pid,
             "engine_ready": engine_ready,
         }

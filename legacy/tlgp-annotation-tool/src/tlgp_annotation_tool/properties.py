@@ -260,7 +260,7 @@ class PropertiesPanel(tb.Frame):
                 pass
 
     def _on_selection_change(
-        self, nav: "NavigationContext", boxes: list[AnnotationBox]
+        self, nav: NavigationContext, boxes: list[AnnotationBox]
     ):
         self._save_pending_name()
         self.selected_boxes = boxes

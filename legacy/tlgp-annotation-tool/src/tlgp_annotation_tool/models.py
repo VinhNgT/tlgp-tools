@@ -15,7 +15,7 @@ class AnnotationBox:
     y1: int
     x2: int
     y2: int
-    children: list["AnnotationBox"] = field(default_factory=list)
+    children: list[AnnotationBox] = field(default_factory=list)
     pill_corner: str = "top_left"
 
     @property

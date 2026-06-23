@@ -10,8 +10,7 @@ The monorepo is structured into applications (`apps/`) and shared libraries (`li
 
 | Path | Name | Description |
 |:---|:---|:---|
-| [`apps/gui`](file:///E:/tlgp-tools/apps/gui) | `gui` | Tkinter desktop GUI for drawing bounding boxes, setting cut lines, and marking component hierarchy. |
-| [`apps/engine`](file:///E:/tlgp-tools/apps/engine) | `engine` | FastAPI backend service that manages collaborative state synchronization (via WebSockets/JSON Patches) and tree math. |
+| [`apps/annotator`](file:///E:/tlgp-tools/apps/annotator) | `annotator` | Monolithic desktop application containing a Tkinter GUI for drawing bounding boxes and marking component hierarchy, with an embedded FastAPI backend service for state synchronization and tool control via HTTP/WebSockets. |
 | [`apps/doc-generator`](file:///E:/tlgp-tools/apps/doc-generator) | `doc-generator` | Command-line utility to compile structured analysis data (`analysis.json`) into fully-formatted `.docx` specification documents. |
 | [`apps/mcp-server`](file:///E:/tlgp-tools/apps/mcp-server) | `mcp-server` | Model Context Protocol (MCP) server wrapping the toolchain (annotator launch & document generator) for AI agents. |
 
@@ -19,8 +18,6 @@ The monorepo is structured into applications (`apps/`) and shared libraries (`li
 
 | Path | Name | Description |
 |:---|:---|:---|
-| [`libs/models`](file:///E:/tlgp-tools/libs/models) | `models` | Pydantic schemas representing screen annotations, workspace states, and spatial tree traversal utilities (`TreeUtils`). |
-| [`libs/rendering`](file:///E:/tlgp-tools/libs/rendering) | `rendering` | Drawing engine that renders annotation rectangles, custom number pills, and composite gapped images onto screenshots. |
 | [`libs/logger`](file:///E:/tlgp-tools/libs/logger) | `tlgp-logger` | Centralized structured logger using `structlog` with automated formatting (JSON/Console) and unhandled exception hooks. |
 
 ---
@@ -38,14 +35,10 @@ uv sync
 ## Usage
 
 ### 1. Launch the Annotation Tool
-To use the interactive annotator, you need to start both the backend API engine and the GUI frontend client:
+Start the interactive annotator. This launches a monolithic process that runs both the backend API engine (on a background thread) and the Tkinter GUI frontend:
 
 ```bash
-# Start the backend API service (runs on port 8000 by default)
-uv run python -m engine
-
-# In a separate terminal, launch the desktop GUI app
-uv run python -m gui
+uv run python -m annotator
 ```
 
 ### 2. Generate Specification Documents

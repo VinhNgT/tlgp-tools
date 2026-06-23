@@ -114,7 +114,7 @@ class SpecGeneratorService:
             if ctx:
                 await ctx.log("info", f"Exporting workspace state to {workspace_zip_path}...")
             try:
-                from mcp_server.client import WorkspaceClient
+                from mcp_server.client import WorkspaceClient  # noqa: PLC0415
                 client = WorkspaceClient()
                 try:
                     await client.export_workspace(str(workspace_zip_path))

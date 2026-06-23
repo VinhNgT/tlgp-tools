@@ -348,7 +348,7 @@ class TestLaunchAnnotator:
         assert result["engine_pid"] == 12345
         assert result["gui_pid"] == 12345
         assert result["engine_ready"] is True
-        assert mock_popen.call_count == 2
+        assert mock_popen.call_count == 1
 
         # Verify uv run is used instead of sys.executable
         for call in mock_popen.call_args_list:
@@ -416,15 +416,14 @@ class TestDaemonControl:
 
         status = await manager.get_status()
         assert status["engine"]["running"] is True
-        assert status["gui"]["running"] is False
+        assert status["gui"]["running"] is True
 
     def test_read_daemon_logs(self):
         manager = DaemonManager()
-        manager.engine_logs.clear()
-        manager.gui_logs.clear()
+        manager.annotator_logs.clear()
 
-        manager.engine_logs.append("line1\n")
-        manager.engine_logs.append("line2\n")
+        manager.annotator_logs.append("line1\n")
+        manager.annotator_logs.append("line2\n")
 
         res = manager.read_daemon_logs("engine", lines=1)
         assert res["daemon"] == "engine"

@@ -1406,7 +1406,7 @@ class AnnotationCanvas(tk.Canvas):
         self.update_view()
 
     def _on_selection_change(
-        self, nav: "NavigationContext", boxes: list[AnnotationBox]
+        self, nav: NavigationContext, boxes: list[AnnotationBox]
     ):
         self.selected_boxes = boxes
         self.draw_boxes()

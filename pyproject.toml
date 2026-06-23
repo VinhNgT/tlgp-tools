@@ -3,10 +3,7 @@ members = [
     "legacy/tlgp-annotation-tool",
     "apps/mcp-server",
     "apps/doc-generator",
-    "apps/engine",
-    "apps/gui",
-    "libs/models",
-    "libs/rendering",
+    "apps/annotator",
     "libs/logger"
 ]
 

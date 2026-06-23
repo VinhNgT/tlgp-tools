@@ -30,7 +30,7 @@ class NavigationContext:
             return "Root"
         return " › ".join(b.label for b in self.parent_stack)
 
-    def copy(self) -> "NavigationContext":
+    def copy(self) -> NavigationContext:
         return NavigationContext(parent_stack=list(self.parent_stack))
 
 

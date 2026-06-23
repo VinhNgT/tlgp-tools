@@ -299,8 +299,8 @@ async def spec_doc_workflow(section_prefix: str = "1.1") -> list:
 def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
     """Safely write the analysis dictionary to a JSON file in the export directory.
 
-    This tool is the primary payload size limit bypass. If your analysis data is large 
-    (e.g., >10KB), call this tool first to persist the payload and get an absolute path, 
+    This tool is the primary payload size limit bypass. If your analysis data is large
+    (e.g., >10KB), call this tool first to persist the payload and get an absolute path,
     which you then pass to the generate/validate tool.
 
     Args:
