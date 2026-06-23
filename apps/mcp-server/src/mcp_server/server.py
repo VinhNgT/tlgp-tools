@@ -88,16 +88,16 @@ async def get_workspace_state_resource() -> str:
 
 @mcp.resource("tlgp://workspace/components/{comp_id}/image")
 async def get_component_image_resource(comp_id: str) -> bytes:
-    """Fetch the raw image bytes for a specific component from the Engine."""
+    """Fetch the raw image bytes for a specific component from the Annotator."""
     return await get_client().get_image_bytes(comp_id)
 
 
 @mcp.resource("tlgp://daemons/logs/{daemon_name}")
 def get_daemon_logs_resource(daemon_name: str) -> str:
-    """Read the recent log lines from engine or gui daemon.
+    """Read the recent log lines from the annotator daemon.
 
     Args:
-        daemon_name: The daemon name ('engine' or 'gui').
+        daemon_name: The daemon name (e.g., 'annotator').
     """
     res = get_daemon_manager().read_daemon_logs(daemon_name, lines=100)
     return res.get("logs", "")
@@ -105,7 +105,7 @@ def get_daemon_logs_resource(daemon_name: str) -> str:
 
 @mcp.resource("tlgp://daemons/status")
 async def get_daemon_status_resource() -> str:
-    """Read-only access to the running status of Engine and GUI daemons."""
+    """Read-only access to the running status of the Annotator daemon."""
     status = await get_daemon_manager().get_status(client=get_client().client)
     return json.dumps(status, indent=2, ensure_ascii=False)
 
@@ -149,7 +149,7 @@ async def launch_annotator(
         workspace_zip: Optional path to a previously exported .zip workspace.
 
     Returns:
-        dict with engine_pid and gui_pid.
+        dict with annotator_pid and annotator_ready.
     """
     return await get_daemon_manager().launch_annotator(
         screenshot_path=screenshot_path,
@@ -164,7 +164,7 @@ async def download_image(
     comp_id: str = "root",
     show_children: bool = False,
 ) -> dict:
-    """Download the full root screenshot image or a specific component image from the Engine.
+    """Download the full root screenshot image or a specific component image from the Annotator.
 
     Args:
         output_path: Path where the image should be saved.
@@ -207,7 +207,7 @@ async def download_workspace_assets(
 
 @mcp.tool()
 async def export_workspace(output_path: str) -> dict:
-    """Export the current Engine workspace to a .zip file.
+    """Export the current Annotator workspace to a .zip file.
 
     Packs the WorkspaceState and the current image into a .zip archive
     that can be re-imported later.
@@ -312,7 +312,7 @@ def write_analysis_json(data: dict, filename: str = "analysis.json") -> dict:
 
 @mcp.tool()
 async def set_workspace_readonly(read_only: bool) -> dict:
-    """Toggle the engine workspace read-only mode to prevent or allow mutations.
+    """Toggle the annotator workspace read-only mode to prevent or allow mutations.
 
     Args:
         read_only: True to lock workspace in read-only mode, False to allow edits.
@@ -339,7 +339,7 @@ async def import_image(screenshot_path: str) -> dict:
 
 @mcp.tool()
 async def import_workspace(workspace_zip: str) -> dict:
-    """Import a workspace session from a .zip archive into the Engine.
+    """Import a workspace session from a .zip archive into the Annotator.
 
     Args:
         workspace_zip: Absolute path to the workspace .zip archive.

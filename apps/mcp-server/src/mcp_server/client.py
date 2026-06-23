@@ -1,4 +1,4 @@
-"""Client for communicating with the TLGP Engine API."""
+"""Client for communicating with the TLGP Annotator API."""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ logger = get_logger(__name__)
 
 
 class WorkspaceClient:
-    """A thread-safe API client for communicating with the TLGP Engine REST API.
+    """A thread-safe API client for communicating with the TLGP Annotator REST API.
 
     Shares a single, reusable httpx.AsyncClient instance.
     """
@@ -24,12 +24,12 @@ class WorkspaceClient:
         """Initialize the client.
 
         Args:
-            base_url: Base URL of the Engine API. If not set, checks the TLGP_ENGINE_URL
+            base_url: Base URL of the Annotator API. If not set, checks the TLGP_ANNOTATOR_URL
                 environment variable, falling back to 'http://127.0.0.1:8000'.
             client: An optional pre-configured AsyncClient. If None, an AsyncClient is
                 instantiated lazily.
         """
-        self.base_url = (base_url or os.environ.get("TLGP_ENGINE_URL", "http://127.0.0.1:8000")).rstrip("/")
+        self.base_url = (base_url or os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000")).rstrip("/")
         self._client = client
         self._owns_client = client is None
 
@@ -72,7 +72,7 @@ class WorkspaceClient:
             ) from e
 
     async def get_workspace_state(self) -> dict:
-        """Fetch the current flat-map JSON WorkspaceState from the running Engine."""
+        """Fetch the current flat-map JSON WorkspaceState from the running Annotator."""
         res = await self._request("GET", "/workspace/state")
         return res.json()
 
@@ -89,17 +89,17 @@ class WorkspaceClient:
         }
 
     async def get_image_bytes(self, comp_id: str, show_children: bool = False) -> bytes:
-        """Fetch the raw image bytes for a component from the Engine."""
+        """Fetch the raw image bytes for a component from the Annotator."""
         res = await self._request("GET", f"/images/{comp_id}", params={"show_children": show_children})
         return res.content
 
     async def set_workspace_readonly(self, read_only: bool) -> dict:
-        """Toggle the workspace read-only mode in the Engine."""
+        """Toggle the workspace read-only mode in the Annotator."""
         res = await self._request("PUT", "/workspace/readonly", json={"read_only": read_only})
         return res.json()
 
     async def clear_workspace(self) -> dict:
-        """Clear all components, cut lines, and image from the workspace in the Engine."""
+        """Clear all components, cut lines, and image from the workspace in the Annotator."""
         res = await self._request("POST", "/workspace/clear")
         return res.json()
 
@@ -122,7 +122,7 @@ class WorkspaceClient:
             await self._request("POST", "/workspace/import-image", files={"file": f})
 
     async def import_workspace(self, workspace_zip: str) -> None:
-        """Import a workspace zip archive into the Engine."""
+        """Import a workspace zip archive into the Annotator."""
         out_path = os.path.abspath(workspace_zip)
         with open(out_path, "rb") as f:
             await self._request("POST", "/workspace/import", files={"file": f})

@@ -345,9 +345,8 @@ class TestLaunchAnnotator:
 
         manager = DaemonManager()
         result = await manager.launch_annotator(screenshot_path=str(screenshot))
-        assert result["engine_pid"] == 12345
-        assert result["gui_pid"] == 12345
-        assert result["engine_ready"] is True
+        assert result["annotator_pid"] == 12345
+        assert result["annotator_ready"] is True
         assert mock_popen.call_count == 1
 
         # Verify uv run is used instead of sys.executable
@@ -415,8 +414,7 @@ class TestDaemonControl:
         monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
 
         status = await manager.get_status()
-        assert status["engine"]["running"] is True
-        assert status["gui"]["running"] is True
+        assert status["annotator"]["running"] is True
 
     def test_read_daemon_logs(self):
         manager = DaemonManager()
@@ -425,8 +423,8 @@ class TestDaemonControl:
         manager.annotator_logs.append("line1\n")
         manager.annotator_logs.append("line2\n")
 
-        res = manager.read_daemon_logs("engine", lines=1)
-        assert res["daemon"] == "engine"
+        res = manager.read_daemon_logs("annotator", lines=1)
+        assert res["daemon"] == "annotator"
         assert res["line_count"] == 1
         assert res["logs"] == "line2\n"
 

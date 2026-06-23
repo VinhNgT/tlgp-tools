@@ -1,6 +1,6 @@
 1. **Vietnamese Translation Rule:** All component labels, UI descriptions, actions, reactions, and discrepancies written into the analysis JSON structure must be in Vietnamese.
-2. **Strict Read-Only Mode:** You are strictly prohibited from mutating the Engine state directly. All active mutations must be performed by the user in the GUI.
-3. **No Direct REST API Bypass:** Do NOT bypass the MCP server layer (e.g. using curl, terminal/shell commands, or custom scripts) to interact directly with the running Engine REST API.
+2. **Strict Read-Only Mode:** You are strictly prohibited from mutating the Annotator state directly. All active mutations must be performed by the user in the GUI.
+3. **No Direct REST API Bypass:** Do NOT bypass the MCP server layer (e.g. using curl, terminal/shell commands, or custom scripts) to interact directly with the running Annotator REST API.
 4. **Parameter Payload Limitation:** Direct `analysis` dictionary arguments to `generate_spec_doc` must not exceed 10KB to prevent JSON-RPC transport middleware corruption. For larger payloads, save the data using the `write_analysis_json` tool first, and pass the resulting absolute path via `analysis_path`.
 5. **Strict Validation Pipeline:** Always run `generate_spec_doc(validate_only=True)` and review/resolve all validation warnings and errors before calling the tool with `validate_only=False`.
 6. **Analysis JSON and Workspace Archive Record-Keeping:** When compiling a specification document (`validate_only=False`), the tool automatically saves the final analysis JSON data as `analysis.json` and exports the current workspace backup as `workspace.zip` in the same directory as the generated `.docx` file.

@@ -77,8 +77,8 @@ class DaemonManager:
 
     async def get_status(self, client: httpx.AsyncClient | None = None) -> dict:
         """Retrieve the running status of the annotator process."""
-        engine_running = False
-        engine_ready = False
+        annotator_running = False
+        annotator_ready = False
 
         # 1. Check process list status
         for proc in list(self.active_processes):
@@ -86,38 +86,35 @@ class DaemonManager:
                 cmd = proc.args
                 cmd_str = " ".join(cmd) if isinstance(cmd, list) else str(cmd)
                 if "annotator" in cmd_str:
-                    engine_running = True
+                    annotator_running = True
 
-        # 2. Check engine HTTP readiness
+        # 2. Check annotator HTTP readiness
         # If client is passed, use it, otherwise instantiate a short-lived client
-        engine_url = os.environ.get("TLGP_ENGINE_URL", "http://127.0.0.1:8000").rstrip("/")
+        annotator_url = os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000").rstrip("/")
         try:
             if client is not None:
-                res = await client.get(f"{engine_url}/workspace/state", timeout=0.5)
+                res = await client.get(f"{annotator_url}/workspace/state", timeout=0.5)
                 if res.status_code == 200:
-                    engine_ready = True
-                    engine_running = True
+                    annotator_ready = True
+                    annotator_running = True
             else:
                 async with httpx.AsyncClient() as c:
-                    res = await c.get(f"{engine_url}/workspace/state", timeout=0.5)
+                    res = await c.get(f"{annotator_url}/workspace/state", timeout=0.5)
                     if res.status_code == 200:
-                        engine_ready = True
-                        engine_running = True
+                        annotator_ready = True
+                        annotator_running = True
         except Exception:
             pass
 
         return {
-            "engine": {
-                "running": engine_running,
-                "ready": engine_ready,
-            },
-            "gui": {
-                "running": engine_running,  # Since it's a monolithic app
+            "annotator": {
+                "running": annotator_running,
+                "ready": annotator_ready,
             }
         }
 
 
-    def read_daemon_logs(self, daemon: str = "engine", lines: int = 100) -> dict:
+    def read_daemon_logs(self, daemon: str = "annotator", lines: int = 100) -> dict:
         """Read requested tailing lines from the selected daemon's log buffer."""
         # Both map to annotator_logs now
         buf = self.annotator_logs
@@ -174,16 +171,16 @@ class DaemonManager:
             daemon=True,
         ).start()
 
-        # Wait for the Engine's HTTP API to become ready
-        engine_ready = False
-        engine_url = os.environ.get("TLGP_ENGINE_URL", "http://127.0.0.1:8000").rstrip("/")
+        # Wait for the Annotator's HTTP API to become ready
+        annotator_ready = False
+        annotator_url = os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000").rstrip("/")
 
-        logger.info("Polling Engine HTTP readiness at %s...", engine_url)
+        logger.info("Polling Annotator HTTP readiness at %s...", annotator_url)
         # Use provided client or short-lived client
         async def poll_readiness(c: httpx.AsyncClient) -> bool:
             for _ in range(30):
                 try:
-                    res = await c.get(f"{engine_url}/workspace/state")
+                    res = await c.get(f"{annotator_url}/workspace/state")
                     if res.status_code == 200:
                         return True
                 except Exception:
@@ -192,12 +189,12 @@ class DaemonManager:
             return False
 
         if client is not None:
-            engine_ready = await poll_readiness(client)
+            annotator_ready = await poll_readiness(client)
         else:
             async with httpx.AsyncClient() as c:
-                engine_ready = await poll_readiness(c)
+                annotator_ready = await poll_readiness(c)
 
-        if not engine_ready:
+        if not annotator_ready:
             logger.error("Annotator failed to become ready after 3 seconds.")
         else:
             logger.info("Annotator HTTP API ready. Importing initial assets...")
@@ -205,21 +202,20 @@ class DaemonManager:
                 abs_screenshot = os.path.abspath(screenshot_path)
                 with open(abs_screenshot, "rb") as f:
                     if client is not None:
-                        await client.post(f"{engine_url}/workspace/import-image", files={"file": f})
+                        await client.post(f"{annotator_url}/workspace/import-image", files={"file": f})
                     else:
                         async with httpx.AsyncClient() as c:
-                            await c.post(f"{engine_url}/workspace/import-image", files={"file": f})
+                            await c.post(f"{annotator_url}/workspace/import-image", files={"file": f})
             elif workspace_zip:
                 abs_zip = os.path.abspath(workspace_zip)
                 with open(abs_zip, "rb") as f:
                     if client is not None:
-                        await client.post(f"{engine_url}/workspace/import", files={"file": f})
+                        await client.post(f"{annotator_url}/workspace/import", files={"file": f})
                     else:
                         async with httpx.AsyncClient() as c:
-                            await c.post(f"{engine_url}/workspace/import", files={"file": f})
+                            await c.post(f"{annotator_url}/workspace/import", files={"file": f})
 
         return {
-            "engine_pid": annotator_proc.pid,
-            "gui_pid": annotator_proc.pid,
-            "engine_ready": engine_ready,
+            "annotator_pid": annotator_proc.pid,
+            "annotator_ready": annotator_ready,
         }

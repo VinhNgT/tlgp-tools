@@ -28,7 +28,7 @@ async def test_launch_annotator_timeout_failure(monkeypatch):
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
         async def get(self, url, *args, **kwargs):
-            raise httpx.RequestError("Engine not ready")
+            raise httpx.RequestError("Annotator not ready")
 
     monkeypatch.setattr(
         "mcp_server.manager.httpx.AsyncClient",
@@ -37,9 +37,8 @@ async def test_launch_annotator_timeout_failure(monkeypatch):
 
     manager = DaemonManager()
     result = await manager.launch_annotator()
-    assert result["engine_pid"] == 9999
-    assert result["gui_pid"] == 9999
-    assert result["engine_ready"] is False
+    assert result["annotator_pid"] == 9999
+    assert result["annotator_ready"] is False
 
 
 @pytest.mark.anyio
@@ -82,8 +81,8 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
 
     manager = DaemonManager()
     result = await manager.launch_annotator(screenshot_path=str(dummy_screenshot))
-    assert result["engine_pid"] == 1111
-    assert result["engine_ready"] is True
+    assert result["annotator_pid"] == 1111
+    assert result["annotator_ready"] is True
     assert "http://127.0.0.1:8000/workspace/import-image" in posted_urls
 
 
@@ -127,6 +126,6 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
 
     manager = DaemonManager()
     result = await manager.launch_annotator(workspace_zip=str(dummy_zip))
-    assert result["engine_pid"] == 2222
-    assert result["engine_ready"] is True
+    assert result["annotator_pid"] == 2222
+    assert result["annotator_ready"] is True
     assert "http://127.0.0.1:8000/workspace/import" in posted_urls

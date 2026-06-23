@@ -46,9 +46,9 @@ class TestMcpResources:
         mock_manager.read_daemon_logs.return_value = {"logs": "log line 1\nlog line 2\n"}
         mock_get_daemon_manager.return_value = mock_manager
 
-        result = get_daemon_logs_resource("engine")
+        result = get_daemon_logs_resource("annotator")
         assert "log line 1" in result
-        mock_manager.read_daemon_logs.assert_called_once_with("engine", lines=100)
+        mock_manager.read_daemon_logs.assert_called_once_with("annotator", lines=100)
 
     def test_get_spec_schema_resource(self):
         result = get_spec_schema_resource()
@@ -70,12 +70,12 @@ class TestMcpResources:
     async def test_get_daemon_status_resource(self, mock_get_daemon_manager):
         mock_manager = MagicMock()
         mock_manager.get_status = AsyncMock(
-            return_value={"engine": {"running": True}, "gui": {"running": False}}
+            return_value={"annotator": {"running": True}}
         )
         mock_get_daemon_manager.return_value = mock_manager
 
         result = await get_daemon_status_resource()
-        assert "engine" in result
+        assert "annotator" in result
         assert "running" in result
         mock_manager.get_status.assert_called_once()
 
