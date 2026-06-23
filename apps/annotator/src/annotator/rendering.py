@@ -63,10 +63,18 @@ def get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
 
 
 def get_text_dimensions(
-    draw: ImageDraw.Draw, text: str, font
+    draw: ImageDraw.Draw | None, text: str, font
 ) -> tuple[int, int, int]:
-    """Get text (width, height, top_offset) using draw.textbbox(). Requires Pillow 8+."""
-    left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    """Get text (width, height, top_offset).
+
+    Uses draw.textbbox() when a draw context is available, otherwise
+    falls back to font.getbbox() for callers that don't have a PIL ImageDraw
+    (e.g., the Tkinter canvas which only needs approximate dimensions).
+    """
+    if draw is not None:
+        left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
+    else:
+        left, top, right, bottom = font.getbbox(text)
     return right - left, bottom - top, top
 
 

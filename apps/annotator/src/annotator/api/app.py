@@ -10,6 +10,7 @@ import asyncio
 
 from annotator.workspace import WorkspaceManager
 from annotator.workspace.errors import (
+    BoundaryViolationError,
     ComponentNotFoundError,
     InvalidArchiveError,
     InvalidImageError,
@@ -32,6 +33,7 @@ _ERROR_STATUS_MAP: dict[type[WorkspaceError], int] = {
     InvalidStateError: 409,
     UndoRedoError: 409,
     ReadOnlyError: 403,
+    BoundaryViolationError: 400,
 }
 
 
@@ -71,8 +73,3 @@ def create_app(
     workspace.subscribe(broadcaster.broadcast_sync)
 
     return app
-
-
-def get_workspace(request: Request) -> WorkspaceManager:
-    """FastAPI dependency that retrieves the workspace from app state."""
-    return request.app.state.workspace

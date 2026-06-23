@@ -25,7 +25,6 @@ from annotator.workspace.errors import (
 from fastapi import (
     APIRouter,
     File,
-    Request,
     UploadFile,
     WebSocket,
     WebSocketDisconnect,
@@ -61,7 +60,10 @@ class WebSocketBroadcaster:
         with self._clients_lock:
             clients = list(self._clients)
         for q in clients:
-            self._loop.call_soon_threadsafe(q.put_nowait, msg)
+            try:
+                self._loop.call_soon_threadsafe(q.put_nowait, msg)
+            except asyncio.QueueFull:
+                pass  # Drop message for slow clients instead of crashing
 
     def connect(self) -> asyncio.Queue:
         """Register a new WS client and return its message queue."""
@@ -76,13 +78,6 @@ class WebSocketBroadcaster:
             if q in self._clients:
                 self._clients.remove(q)
 
-
-# ── Dependency ─────────────────────────────────────────────────────────
-
-
-def get_workspace(request: Request) -> WorkspaceManager:
-    """FastAPI dependency that retrieves the workspace from app state."""
-    return request.app.state.workspace
 
 
 # ── Request Models ─────────────────────────────────────────────────────
@@ -245,7 +240,6 @@ def create_router(
             })
 
             # Process incoming JSON-RPC + relay outgoing broadcasts
-            import asyncio as _asyncio  # noqa: PLC0415
 
             async def relay_broadcasts():
                 while True:
@@ -255,6 +249,7 @@ def create_router(
             async def process_rpc():
                 while True:
                     data_str = await websocket.receive_text()
+                    req_id = None
                     try:
                         rpc_req = json.loads(data_str)
                         if not isinstance(rpc_req, dict) or rpc_req.get("jsonrpc") != "2.0":
@@ -271,11 +266,11 @@ def create_router(
                         await websocket.send_json({
                             "jsonrpc": "2.0",
                             "error": {"code": -32603, "message": error_msg},
-                            "id": rpc_req.get("id") if "rpc_req" in dir() and isinstance(rpc_req, dict) else None,
+                            "id": req_id,
                         })
 
             # Run both tasks concurrently; cancel on disconnect
-            relay_task = _asyncio.create_task(relay_broadcasts())
+            relay_task = asyncio.create_task(relay_broadcasts())
             try:
                 await process_rpc()
             finally:
