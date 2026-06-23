@@ -154,7 +154,7 @@ class AnnotationCanvasView(QWidget):
                 ]
         return [
             ws.components[cid]
-            for cid in ws.rootComponentIds
+            for cid in ws.rootComponents
             if cid in ws.components
         ]
 

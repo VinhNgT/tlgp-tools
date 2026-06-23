@@ -262,6 +262,8 @@ class MainAppWindow(QMainWindow):
         # Left: canvas stack (welcome or annotation)
         self.canvas_stack = QStackedWidget()
         self.welcome = WelcomeWidget()
+        self.welcome.on_import_zip = lambda: self._fire(self.on_import_zip_request)
+        self.welcome.on_import_image = lambda: self._fire(self.on_import_image_request)
         self.canvas = AnnotationCanvasView(transformer=transformer)
         self.canvas_stack.addWidget(self.welcome)
         self.canvas_stack.addWidget(self.canvas)
