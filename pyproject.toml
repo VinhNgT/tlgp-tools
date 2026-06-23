@@ -13,11 +13,13 @@ members = [
 [dependency-groups]
 dev = [
     "ruff>=0.15.17",
+    "pyrefly",
+    "pytest>=8.0",
 ]
 
 [tool.ruff]
 line-length = 88
-target-version = "py312"
+target-version = "py314"
 
 [tool.ruff.lint]
 select = [
@@ -56,3 +58,4 @@ project-includes = [
     "**/*.py*",
     "**/*.ipynb",
 ]
+check-unannotated-defs = true

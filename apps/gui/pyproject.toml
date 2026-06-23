@@ -1,9 +1,12 @@
 [project]
 name = "gui"
 version = "0.1.0"
-description = "Add your description here"
+description = "Tkinter desktop GUI for drawing bounding boxes, setting cut lines, and marking component hierarchy"
 readme = "README.md"
-requires-python = ">=3.11"
+authors = [
+    { name = "VinhNgT", email = "victorpublic0000@gmail.com" }
+]
+requires-python = ">=3.14"
 dependencies = [
     "jsonpatch>=1.33",
     "models",

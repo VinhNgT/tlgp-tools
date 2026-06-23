@@ -3,7 +3,10 @@ name = "mcp-server"
 version = "0.1.0"
 description = "MCP server exposing the TLGP annotation + doc generation toolchain"
 readme = "README.md"
-requires-python = ">=3.11"
+authors = [
+    { name = "VinhNgT", email = "victorpublic0000@gmail.com" }
+]
+requires-python = ">=3.14"
 dependencies = [
     "mcp[cli]>=1.0",
     "doc-generator",
@@ -13,9 +16,6 @@ dependencies = [
 
 [project.scripts]
 mcp-server-cmd = "mcp_server.__main__:main"
-
-[dependency-groups]
-dev = ["pytest>=8.0"]
 
 [tool.uv.sources]
 doc-generator = { workspace = true }

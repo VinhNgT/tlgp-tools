@@ -1,25 +1,23 @@
 [project]
 name = "rendering"
 version = "0.1.0"
-description = "Add your description here"
+description = "Drawing engine that renders annotation rectangles, custom number pills, and composite gapped images onto screenshots"
 readme = "README.md"
 authors = [
     { name = "VinhNgT", email = "victorpublic0000@gmail.com" }
 ]
-requires-python = ">=3.11"
+requires-python = ">=3.14"
 dependencies = [
     "models",
     "pillow>=12.2.0",
 ]
 
 [build-system]
-requires = ["uv_build>=0.11.8,<0.12.0"]
-build-backend = "uv_build"
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/rendering"]
 
 [tool.uv.sources]
 models = { workspace = true }
-
-[dependency-groups]
-dev = [
-    "pytest>=8.0",
-]

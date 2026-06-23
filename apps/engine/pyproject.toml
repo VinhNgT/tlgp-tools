@@ -1,9 +1,12 @@
 [project]
 name = "engine"
 version = "0.1.0"
-description = "Add your description here"
+description = "FastAPI backend service that manages collaborative state synchronization (via WebSockets/JSON Patches) and tree math"
 readme = "README.md"
-requires-python = ">=3.11"
+authors = [
+    { name = "VinhNgT", email = "victorpublic0000@gmail.com" }
+]
+requires-python = ">=3.14"
 dependencies = [
     "fastapi>=0.136.3",
     "jsonpatch>=1.33",

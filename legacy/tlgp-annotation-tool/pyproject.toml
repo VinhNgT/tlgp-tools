@@ -3,18 +3,18 @@ name = "tlgp-annotation-tool"
 version = "0.1.0"
 description = "Hierarchical screenshot annotator for TLGP screen specs"
 readme = "README.md"
-requires-python = ">=3.11"
+authors = [
+    { name = "VinhNgT", email = "victorpublic0000@gmail.com" }
+]
+requires-python = ">=3.14"
 dependencies = [
-    "pillow>=10.0.0",
+    "pillow>=12.2.0",
     "tkinterdnd2>=0.5.0",
     "ttkbootstrap>=1.10.1",
 ]
 
 [project.scripts]
 tlgp-annotation-tool = "tlgp_annotation_tool.__main__:main"
-
-[dependency-groups]
-dev = ["pytest>=8.0"]
 
 [build-system]
 requires = ["hatchling"]
