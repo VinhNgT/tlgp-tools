@@ -306,6 +306,7 @@ class AppController:
         st = self.store.state
         self._sync_breadcrumbs()
         self.view.update_zoom_display(st.zoom_factor)
+        self.view.btn_back.setEnabled(bool(st.parent_stack))
         self.view.canvas.set_viewport_state(
             zoom_factor=st.zoom_factor,
             pan_offset=st.pan_offset,

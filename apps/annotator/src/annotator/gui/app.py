@@ -158,40 +158,46 @@ class MainAppWindow(QMainWindow):
         act_import_img.triggered.connect(lambda: self._fire(self.on_import_image_request))
         file_menu.addAction(act_import_img)
 
-        act_export = QAction("Export Session (.zip)", self)
-        act_export.setShortcut(QKeySequence("Ctrl+S"))
-        act_export.triggered.connect(lambda: self._fire(self.on_export_zip_request))
-        file_menu.addAction(act_export)
+        self.act_export = QAction("Export Session (.zip)", self)
+        self.act_export.setShortcut(QKeySequence("Ctrl+S"))
+        self.act_export.setEnabled(False)
+        self.act_export.triggered.connect(lambda: self._fire(self.on_export_zip_request))
+        file_menu.addAction(self.act_export)
 
         file_menu.addSeparator()
 
-        act_screen_info = QAction("Screen Info…", self)
-        act_screen_info.triggered.connect(lambda: self._fire(self.on_open_screen_info_request))
-        file_menu.addAction(act_screen_info)
+        self.act_screen_info = QAction("Screen Info…", self)
+        self.act_screen_info.setEnabled(False)
+        self.act_screen_info.triggered.connect(lambda: self._fire(self.on_open_screen_info_request))
+        file_menu.addAction(self.act_screen_info)
 
-        act_cuts = QAction("Edit Cut Lines…", self)
-        act_cuts.setShortcut(QKeySequence("Ctrl+L"))
-        act_cuts.triggered.connect(lambda: self._fire(self.on_open_cut_editor_request))
-        file_menu.addAction(act_cuts)
+        self.act_cuts = QAction("Edit Cut Lines…", self)
+        self.act_cuts.setShortcut(QKeySequence("Ctrl+L"))
+        self.act_cuts.setEnabled(False)
+        self.act_cuts.triggered.connect(lambda: self._fire(self.on_open_cut_editor_request))
+        file_menu.addAction(self.act_cuts)
 
         edit_menu = menubar.addMenu("&Edit")
 
-        act_undo = QAction("Undo", self)
-        act_undo.setShortcut(QKeySequence.StandardKey.Undo)
-        act_undo.triggered.connect(lambda: self._fire(self.on_undo_request))
-        edit_menu.addAction(act_undo)
+        self.act_undo = QAction("Undo", self)
+        self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
+        self.act_undo.setEnabled(False)
+        self.act_undo.triggered.connect(lambda: self._fire(self.on_undo_request))
+        edit_menu.addAction(self.act_undo)
 
-        act_redo = QAction("Redo", self)
-        act_redo.setShortcut(QKeySequence.StandardKey.Redo)
-        act_redo.triggered.connect(lambda: self._fire(self.on_redo_request))
-        edit_menu.addAction(act_redo)
+        self.act_redo = QAction("Redo", self)
+        self.act_redo.setShortcut(QKeySequence.StandardKey.Redo)
+        self.act_redo.setEnabled(False)
+        self.act_redo.triggered.connect(lambda: self._fire(self.on_redo_request))
+        edit_menu.addAction(self.act_redo)
 
         edit_menu.addSeparator()
 
-        act_delete = QAction("Delete", self)
-        act_delete.setShortcut(QKeySequence.StandardKey.Delete)
-        act_delete.triggered.connect(lambda: self._fire(self.on_delete_request))
-        edit_menu.addAction(act_delete)
+        self.act_delete = QAction("Delete", self)
+        self.act_delete.setShortcut(QKeySequence.StandardKey.Delete)
+        self.act_delete.setEnabled(False)
+        self.act_delete.triggered.connect(lambda: self._fire(self.on_delete_request))
+        edit_menu.addAction(self.act_delete)
 
     def _build_toolbar(self):
         tb = QToolBar("Main Toolbar")
@@ -214,6 +220,7 @@ class MainAppWindow(QMainWindow):
             action.setCheckable(True)
             action.setToolTip(tooltip)
             action.setData(mode)
+            action.setEnabled(False)
             action.triggered.connect(lambda checked, m=mode: self._on_mode_toggled(m))
             self.mode_group.addAction(action)
             tb.addAction(action)
@@ -225,6 +232,7 @@ class MainAppWindow(QMainWindow):
         # Back button
         self.btn_back = QAction("← Back", self)
         self.btn_back.setToolTip("Go back (Escape)")
+        self.btn_back.setEnabled(False)
         self.btn_back.triggered.connect(lambda: self._fire(self.on_back_request))
         tb.addAction(self.btn_back)
 
@@ -292,10 +300,28 @@ class MainAppWindow(QMainWindow):
         if img is None:
             self.canvas_stack.setCurrentWidget(self.welcome)
             self.btn_cut_lines.setEnabled(False)
+            self.btn_back.setEnabled(False)
+            self.canvas.set_background_image(None)
+            for action in self._mode_actions.values():
+                action.setEnabled(False)
+            self.act_export.setEnabled(False)
+            self.act_screen_info.setEnabled(False)
+            self.act_cuts.setEnabled(False)
+            self.act_undo.setEnabled(False)
+            self.act_redo.setEnabled(False)
+            self.act_delete.setEnabled(False)
         else:
             self.canvas.set_background_image(img)
             self.canvas_stack.setCurrentWidget(self.canvas)
             self.btn_cut_lines.setEnabled(True)
+            for action in self._mode_actions.values():
+                action.setEnabled(True)
+            self.act_export.setEnabled(True)
+            self.act_screen_info.setEnabled(True)
+            self.act_cuts.setEnabled(True)
+            self.act_undo.setEnabled(True)
+            self.act_redo.setEnabled(True)
+            self.act_delete.setEnabled(True)
 
     def set_mode_str(self, mode: str):
         """Update toolbar mode buttons to match the given mode."""
@@ -343,6 +369,11 @@ class MainAppWindow(QMainWindow):
 
         # Avoid intercepting shortcuts when text is focused
         if self.properties.is_text_focused():
+            super().keyPressEvent(event)
+            return
+
+        # Avoid intercepting shortcuts if no image is loaded
+        if not self.canvas.full_pil_img:
             super().keyPressEvent(event)
             return
 
