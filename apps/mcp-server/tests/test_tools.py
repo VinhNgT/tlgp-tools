@@ -433,32 +433,7 @@ class TestDaemonControl:
         assert res["line_count"] == 1
         assert res["logs"] == "line2\n"
 
-    @pytest.mark.anyio
-    async def test_set_workspace_readonly(self, monkeypatch):
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                assert method == "PUT"
-                mock_res = MagicMock()
-                mock_res.status_code = 200
-                json_data = kwargs.get("json", {})
-                mock_res.json.return_value = {
-                    "status": "success",
-                    "read_only": json_data.get("read_only"),
-                }
-                return mock_res
-
-        monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
-
-        client = WorkspaceClient()
-        res = await client.set_workspace_readonly(True)
-        assert res["status"] == "success"
-        assert res["read_only"] is True
 
 
 class TestGenerateSpecDocWrapper:

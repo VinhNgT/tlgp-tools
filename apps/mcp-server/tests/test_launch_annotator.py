@@ -56,9 +56,7 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
         lambda name: "/usr/bin/uv",
     )
 
-    posted_urls = []
-
-    # Mock AsyncClient to succeed on get and capture post
+    # Mock AsyncClient to succeed on get
     class MockAsyncClient:
         async def __aenter__(self):
             return self
@@ -67,12 +65,6 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
             pass
 
         async def get(self, url, *args, **kwargs):
-            mock_res = MagicMock()
-            mock_res.status_code = 200
-            return mock_res
-
-        async def post(self, url, *args, **kwargs):
-            posted_urls.append(url)
             mock_res = MagicMock()
             mock_res.status_code = 200
             return mock_res
@@ -89,7 +81,10 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
     result = await manager.launch_annotator(screenshot_path=str(dummy_screenshot))
     assert result["annotator_pid"] == 1111
     assert result["annotator_ready"] is True
-    assert "http://127.0.0.1:8000/workspace/import-image" in posted_urls
+
+    # Verify Popen args contains the screenshot path
+    args = mock_popen.call_args[0][0]
+    assert str(dummy_screenshot.resolve()) in args
 
 
 @pytest.mark.anyio
@@ -105,9 +100,7 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
         lambda name: "/usr/bin/uv",
     )
 
-    posted_urls = []
-
-    # Mock AsyncClient to succeed on get and capture post
+    # Mock AsyncClient to succeed on get
     class MockAsyncClient:
         async def __aenter__(self):
             return self
@@ -116,12 +109,6 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
             pass
 
         async def get(self, url, *args, **kwargs):
-            mock_res = MagicMock()
-            mock_res.status_code = 200
-            return mock_res
-
-        async def post(self, url, *args, **kwargs):
-            posted_urls.append(url)
             mock_res = MagicMock()
             mock_res.status_code = 200
             return mock_res
@@ -138,4 +125,7 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
     result = await manager.launch_annotator(workspace_zip=str(dummy_zip))
     assert result["annotator_pid"] == 2222
     assert result["annotator_ready"] is True
-    assert "http://127.0.0.1:8000/workspace/import" in posted_urls
+
+    # Verify Popen args contains the workspace zip path
+    args = mock_popen.call_args[0][0]
+    assert str(dummy_zip.resolve()) in args

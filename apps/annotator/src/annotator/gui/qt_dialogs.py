@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
     QLabel,
     QLineEdit,
     QMessageBox,
+    QRadioButton,
     QTextEdit,
     QVBoxLayout,
     QWidget,
@@ -112,6 +113,41 @@ class _ScreenInfoDialog(QDialog):
         self.accept()
 
 
+class _ExportImagesDialog(QDialog):
+    """Dialog to choose the export mode for component images."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent, Qt.WindowType.Tool)
+        self.setWindowTitle("Export Images")
+        self.resize(350, 150)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(15, 15, 15, 15)
+
+        lbl = QLabel("Select Export Mode:")
+        layout.addWidget(lbl)
+
+        self.rad_with_ann = QRadioButton("Annotated (skips leaves, paints child annotations)")
+        self.rad_with_ann.setChecked(True)
+        layout.addWidget(self.rad_with_ann)
+
+        self.rad_without_ann = QRadioButton("Raw (includes leaves, no annotations)")
+        layout.addWidget(self.rad_without_ann)
+
+        button_box = QDialogButtonBox(
+            QDialogButtonBox.StandardButton.Ok
+            | QDialogButtonBox.StandardButton.Cancel
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def get_mode(self) -> str:
+        if self.rad_with_ann.isChecked():
+            return "with_annotations"
+        return "without_annotations"
+
+
 class QtDialogService(DialogService):
     """Production implementation of DialogService using PySide6 dialogs."""
 
@@ -176,6 +212,15 @@ class QtDialogService(DialogService):
         )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.accepted.connect(lambda: on_save(dialog.info_result))
+        dialog.show()
+
+    def ask_export_images_mode(
+        self, parent: QWidget, on_mode_selected: Callable[[str | None], None]
+    ) -> None:
+        dialog = _ExportImagesDialog(parent)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.accepted.connect(lambda: on_mode_selected(dialog.get_mode()))
+        dialog.rejected.connect(lambda: on_mode_selected(None))
         dialog.show()
 
     @staticmethod

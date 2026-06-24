@@ -81,3 +81,13 @@ class DialogService(ABC):
     ) -> None:
         """Opens the screen info editor dialog."""
         pass
+
+    @abstractmethod
+    def ask_export_images_mode(
+        self, parent: Any, on_mode_selected: Callable[[str | None], None]
+    ) -> None:
+        """Prompts the user to select an export mode.
+
+        Calls on_mode_selected with 'with_annotations', 'without_annotations', or None if cancelled.
+        """
+        pass

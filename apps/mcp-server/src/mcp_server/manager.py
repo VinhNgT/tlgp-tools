@@ -150,6 +150,11 @@ class DaemonManager:
 
         logger.info("Spawning annotator daemon under Cwd: %s", annotator_dir)
         annotator_cmd = [self.uv_bin, "run", "annotator"]
+        if screenshot_path:
+            annotator_cmd.append(os.path.abspath(screenshot_path))
+        elif workspace_zip:
+            annotator_cmd.append(os.path.abspath(workspace_zip))
+
         annotator_proc = subprocess.Popen(
             annotator_cmd,
             cwd=annotator_dir,
@@ -203,32 +208,7 @@ class DaemonManager:
         if not annotator_ready:
             logger.error("Annotator failed to become ready after 3 seconds.")
         else:
-            logger.info("Annotator HTTP API ready. Importing initial assets...")
-            if screenshot_path:
-                abs_screenshot = os.path.abspath(screenshot_path)
-                with open(abs_screenshot, "rb") as f:
-                    if client is not None:
-                        await client.post(
-                            f"{annotator_url}/workspace/import-image", files={"file": f}
-                        )
-                    else:
-                        async with httpx.AsyncClient() as c:
-                            await c.post(
-                                f"{annotator_url}/workspace/import-image",
-                                files={"file": f},
-                            )
-            elif workspace_zip:
-                abs_zip = os.path.abspath(workspace_zip)
-                with open(abs_zip, "rb") as f:
-                    if client is not None:
-                        await client.post(
-                            f"{annotator_url}/workspace/import", files={"file": f}
-                        )
-                    else:
-                        async with httpx.AsyncClient() as c:
-                            await c.post(
-                                f"{annotator_url}/workspace/import", files={"file": f}
-                            )
+            logger.info("Annotator HTTP API ready.")
 
         return {
             "annotator_pid": annotator_proc.pid,

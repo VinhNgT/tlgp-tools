@@ -32,6 +32,7 @@ class AppCallbacks:
         self.on_import_zip_request: Callable[[], None] | None = None
         self.on_import_image_request: Callable[[], None] | None = None
         self.on_export_zip_request: Callable[[], None] | None = None
+        self.on_export_images_request: Callable[[], None] | None = None
         self.on_open_cut_editor_request: Callable[[], None] | None = None
         self.on_open_screen_info_request: Callable[[], None] | None = None
         self.on_enter_pressed: Callable[[], str | None] | None = None

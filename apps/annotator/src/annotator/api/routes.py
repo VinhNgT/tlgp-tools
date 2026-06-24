@@ -7,13 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import io
+from typing import Literal
 import uuid
 import zipfile
 
 from fastapi import (
     APIRouter,
-    File,
-    UploadFile,
 )
 from fastapi.responses import Response
 from PIL import Image
@@ -30,30 +29,6 @@ from annotator.workspace.errors import (
 )
 
 # ── Request Models ─────────────────────────────────────────────────────
-
-
-class AddComponentRequest(BaseModel):
-    id: uuid.UUID | None = None
-    label: str
-    parentId: uuid.UUID | None = None
-    bounds: Bounds
-    style: Style | None = None
-
-
-class MoveComponentRequest(BaseModel):
-    x: int
-    y: int
-
-
-class UpdateComponentRequest(BaseModel):
-    label: str | None = None
-    bounds: Bounds | None = None
-    parentId: uuid.UUID | None = None
-    style: Style | None = None
-
-
-class SetReadOnlyRequest(BaseModel):
-    read_only: bool
 
 
 class BatchComponentItem(BaseModel):
@@ -139,35 +114,7 @@ def create_router(
         # workspace.state returns an immutable snapshot — safe without to_thread
         return workspace.state.model_dump(mode="json")
 
-    @router.put("/workspace/readonly", tags=["State"])
-    async def set_workspace_readonly(req: SetReadOnlyRequest):
-        await asyncio.to_thread(
-            workspace.mutate, lambda s: setattr(s, "readOnly", req.read_only), True
-        )
-        return {"status": "success", "read_only": workspace.state.readOnly}
-
-    @router.post("/workspace/clear", tags=["State"])
-    async def clear_workspace():
-        await asyncio.to_thread(workspace.clear_workspace, True)
-        return {"status": "success", "workspaceId": str(workspace.state.workspaceId)}
-
-    # ── Import / Export ────────────────────────────────────────────
-
-    @router.post("/workspace/import", tags=["Import/Export"])
-    async def import_workspace(file: UploadFile = File(...)):
-        file_bytes = await file.read()
-        await asyncio.to_thread(workspace.import_zip, file_bytes)
-        return {"status": "imported", "workspaceId": workspace.state.workspaceId}
-
-    @router.post("/workspace/import-image", tags=["Import/Export"])
-    async def import_image(file: UploadFile = File(...)):
-        file_bytes = await file.read()
-        await asyncio.to_thread(
-            workspace.import_image, file_bytes, file.filename or "screenshot.png"
-        )
-        return {"status": "image_imported", "workspaceId": workspace.state.workspaceId}
-
-    @router.get("/workspace/export")
+    @router.get("/workspace/export", tags=["Import/Export"])
     async def export_workspace():
         zip_bytes = await asyncio.to_thread(workspace.export_zip)
         return Response(
@@ -178,60 +125,20 @@ def create_router(
             },
         )
 
-    # ── Component REST ─────────────────────────────────────────────
-
-    @router.post("/components", tags=["Components"])
-    async def add_component(req: AddComponentRequest):
-        comp_id = req.id or uuid.uuid4()
-        await asyncio.to_thread(
-            workspace.add_component,
-            comp_id=comp_id,
-            label=req.label,
-            bounds=req.bounds,
-            parent_id=req.parentId,
-            style=req.style,
+    @router.get("/workspace/export-images", tags=["Import/Export"])
+    async def export_images(
+        mode: Literal["with_annotations", "without_annotations"] = "with_annotations"
+    ):
+        if not workspace.raw_image_bytes:
+            raise InvalidStateError("No image in workspace")
+        zip_bytes = await asyncio.to_thread(workspace.export_images, mode)
+        return Response(
+            content=zip_bytes,
+            media_type="application/zip",
+            headers={
+                "Content-Disposition": f"attachment; filename=component_images_{mode}.zip"
+            },
         )
-        return {"id": comp_id, "status": "added"}
-
-    @router.put("/components/{comp_id}/move", tags=["Components"])
-    async def move_component(comp_id: uuid.UUID, req: MoveComponentRequest):
-        await asyncio.to_thread(workspace.move_component, comp_id, req.x, req.y)
-        return {"status": "moved"}
-
-    @router.put("/components/{comp_id}", tags=["Components"])
-    async def update_component(comp_id: uuid.UUID, req: UpdateComponentRequest):
-        await asyncio.to_thread(
-            workspace.update_component,
-            comp_id=comp_id,
-            label=req.label,
-            bounds=req.bounds,
-            parent_id=req.parentId,
-            style=req.style,
-        )
-        return {"status": "updated"}
-
-    @router.delete("/components/{comp_id}", tags=["Components"])
-    async def delete_component(comp_id: uuid.UUID):
-        await asyncio.to_thread(workspace.delete_component, comp_id)
-        return {"status": "deleted"}
-
-    @router.post("/workspace/undo", tags=["State"])
-    async def workspace_undo():
-        success = await asyncio.to_thread(workspace.undo)
-        if not success:
-            raise UndoRedoError(
-                "Cannot undo", workspace_id=str(workspace.state.workspaceId)
-            )
-        return {"status": "undone"}
-
-    @router.post("/workspace/redo", tags=["State"])
-    async def workspace_redo():
-        success = await asyncio.to_thread(workspace.redo)
-        if not success:
-            raise UndoRedoError(
-                "Cannot redo", workspace_id=str(workspace.state.workspaceId)
-            )
-        return {"status": "redone"}
 
     # ── Image Endpoints ────────────────────────────────────────────
 

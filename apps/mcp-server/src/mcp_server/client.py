@@ -106,18 +106,6 @@ class WorkspaceClient:
         )
         return res.content
 
-    async def set_workspace_readonly(self, read_only: bool) -> dict:
-        """Toggle the workspace read-only mode in the Annotator."""
-        res = await self._request(
-            "PUT", "/workspace/readonly", json={"read_only": read_only}
-        )
-        return res.json()
-
-    async def clear_workspace(self) -> dict:
-        """Clear all components, cut lines, and image from the workspace in the Annotator."""
-        res = await self._request("POST", "/workspace/clear")
-        return res.json()
-
     async def export_workspace(self, output_path: str) -> dict:
         """Export the current workspace to a zip archive at output_path."""
         res = await self._request("GET", "/workspace/export")
@@ -126,18 +114,6 @@ class WorkspaceClient:
         with open(out_path, "wb") as f:
             f.write(res.content)
         return {"status": "success", "output_path": out_path}
-
-    async def import_image(self, screenshot_path: str) -> None:
-        """Import a screenshot into the workspace."""
-        out_path = os.path.abspath(screenshot_path)
-        with open(out_path, "rb") as f:
-            await self._request("POST", "/workspace/import-image", files={"file": f})
-
-    async def import_workspace(self, workspace_zip: str) -> None:
-        """Import a workspace zip archive into the Annotator."""
-        out_path = os.path.abspath(workspace_zip)
-        with open(out_path, "rb") as f:
-            await self._request("POST", "/workspace/import", files={"file": f})
 
     async def download_workspace_assets(
         self,

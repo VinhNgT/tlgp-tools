@@ -372,6 +372,39 @@ class TestExportZip:
             ws.export_zip()
 
 
+class TestExportImages:
+    def test_export_images_with_annotations(self):
+        ws = _workspace_with_image()
+        parent_id = uuid.uuid4()
+        child_id = uuid.uuid4()
+        ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
+        ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+
+        zip_bytes = ws.export_images("with_annotations")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            assert any("Parent_Box" in name for name in names)
+            assert not any("Child_Box" in name for name in names)
+
+    def test_export_images_without_annotations(self):
+        ws = _workspace_with_image()
+        parent_id = uuid.uuid4()
+        child_id = uuid.uuid4()
+        ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
+        ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+
+        zip_bytes = ws.export_images("without_annotations")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            assert any("Parent_Box" in name for name in names)
+            assert any("Child_Box" in name for name in names)
+
+    def test_export_images_without_image_raises(self):
+        ws = WorkspaceManager()
+        with pytest.raises(InvalidStateError):
+            ws.export_images("with_annotations")
+
+
 # ── Subscriber Notifications ──────────────────────────────────────────
 
 

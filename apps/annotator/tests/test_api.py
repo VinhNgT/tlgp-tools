@@ -5,6 +5,7 @@ Uses httpx.ASGITransport for testing without spawning a server.
 
 import io
 import uuid
+import zipfile
 
 import httpx
 import pytest
@@ -52,101 +53,10 @@ class TestStateRoutes:
         assert "workspaceId" in data
         assert "components" in data
 
-    @pytest.mark.anyio()
-    async def test_set_readonly(self, client, workspace):
-        resp = await client.put("/workspace/readonly", json={"read_only": True})
-        assert resp.status_code == 200
-        assert workspace.state.readOnly is True
-
-    @pytest.mark.anyio()
-    async def test_clear_workspace(self, client, workspace):
-        resp = await client.post("/workspace/clear")
-        assert resp.status_code == 200
-        assert workspace.state.image is None
-
-
-# ── Component Routes ──────────────────────────────────────────────────
-
-
-class TestComponentRoutes:
-    @pytest.mark.anyio()
-    async def test_add_component(self, client, workspace):
-        comp_id = str(uuid.uuid4())
-        resp = await client.post(
-            "/components",
-            json={
-                "id": comp_id,
-                "label": "Button",
-                "bounds": {"x": 10, "y": 10, "w": 50, "h": 30},
-            },
-        )
-        assert resp.status_code == 200
-        assert uuid.UUID(comp_id) in workspace.state.components
-
-    @pytest.mark.anyio()
-    async def test_delete_component(self, client, workspace):
-        comp_id = uuid.uuid4()
-        workspace.add_component(comp_id, "X", Bounds(x=0, y=0, w=50, h=50))
-        resp = await client.delete(f"/components/{comp_id}")
-        assert resp.status_code == 200
-        assert comp_id not in workspace.state.components
-
-    @pytest.mark.anyio()
-    async def test_delete_nonexistent_returns_404(self, client):
-        fake_id = uuid.uuid4()
-        resp = await client.delete(f"/components/{fake_id}")
-        assert resp.status_code == 404
-
-    @pytest.mark.anyio()
-    async def test_move_component(self, client, workspace):
-        comp_id = uuid.uuid4()
-        workspace.add_component(comp_id, "Box", Bounds(x=10, y=10, w=50, h=50))
-        resp = await client.put(
-            f"/components/{comp_id}/move", json={"x": 100, "y": 100}
-        )
-        assert resp.status_code == 200
-        assert workspace.state.components[comp_id].bounds.x == 100
-
-
-# ── Undo/Redo Routes ──────────────────────────────────────────────────
-
-
-class TestUndoRedoRoutes:
-    @pytest.mark.anyio()
-    async def test_undo_redo_cycle(self, client, workspace):
-        comp_id = uuid.uuid4()
-        workspace.add_component(comp_id, "X", Bounds(x=0, y=0, w=50, h=50))
-
-        resp = await client.post("/workspace/undo")
-        assert resp.status_code == 200
-        assert comp_id not in workspace.state.components
-
-        resp = await client.post("/workspace/redo")
-        assert resp.status_code == 200
-        assert comp_id in workspace.state.components
-
-    @pytest.mark.anyio()
-    async def test_undo_at_beginning_returns_409(self, client):
-        resp = await client.post("/workspace/undo")
-        assert resp.status_code == 409
-
-
 # ── Import/Export Routes ──────────────────────────────────────────────
 
 
 class TestImportExportRoutes:
-    @pytest.mark.anyio()
-    async def test_import_image(self, client, workspace):
-        old_workspace_id = workspace.state.workspaceId
-        img_bytes = _create_test_image(320, 240)
-        resp = await client.post(
-            "/workspace/import-image",
-            files={"file": ("test.png", img_bytes, "image/png")},
-        )
-        assert resp.status_code == 200
-        assert workspace.state.image.width == 320
-        assert workspace.state.workspaceId != old_workspace_id
-
     @pytest.mark.anyio()
     async def test_export_zip(self, client, workspace):
         resp = await client.get("/workspace/export")
@@ -154,19 +64,36 @@ class TestImportExportRoutes:
         assert resp.headers["content-type"] == "application/zip"
 
     @pytest.mark.anyio()
-    async def test_import_zip_roundtrip(self, client, workspace):
-        comp_id = uuid.uuid4()
-        workspace.add_component(comp_id, "Box", Bounds(x=10, y=10, w=50, h=50))
-        export_resp = await client.get("/workspace/export")
-        assert export_resp.status_code == 200
+    async def test_export_images_with_annotations(self, client, workspace):
+        parent_id = uuid.uuid4()
+        child_id = uuid.uuid4()
+        workspace.add_component(parent_id, "Parent", Bounds(x=10, y=10, w=100, h=100))
+        workspace.add_component(child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
 
-        # Import into a fresh workspace
-        resp = await client.post(
-            "/workspace/import",
-            files={"file": ("export.zip", export_resp.content, "application/zip")},
-        )
+        resp = await client.get("/workspace/export-images?mode=with_annotations")
         assert resp.status_code == 200
-        assert comp_id in workspace.state.components
+        assert resp.headers["content-type"] == "application/zip"
+
+        with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:
+            names = zf.namelist()
+            assert any("Parent" in name for name in names)
+            assert not any("Child" in name for name in names)
+
+    @pytest.mark.anyio()
+    async def test_export_images_without_annotations(self, client, workspace):
+        parent_id = uuid.uuid4()
+        child_id = uuid.uuid4()
+        workspace.add_component(parent_id, "Parent", Bounds(x=10, y=10, w=100, h=100))
+        workspace.add_component(child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+
+        resp = await client.get("/workspace/export-images?mode=without_annotations")
+        assert resp.status_code == 200
+        assert resp.headers["content-type"] == "application/zip"
+
+        with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:
+            names = zf.namelist()
+            assert any("Parent" in name for name in names)
+            assert any("Child" in name for name in names)
 
 
 # ── Image Route ───────────────────────────────────────────────────────
@@ -194,19 +121,4 @@ class TestImageRoute:
         assert resp.status_code == 404
 
 
-# ── Exception Handler ─────────────────────────────────────────────────
 
-
-class TestExceptionHandler:
-    @pytest.mark.anyio()
-    async def test_readonly_returns_403(self, client, workspace):
-        workspace.mutate(lambda s: setattr(s, "readOnly", True), force=True)
-        resp = await client.post(
-            "/components",
-            json={
-                "label": "X",
-                "bounds": {"x": 0, "y": 0, "w": 10, "h": 10},
-            },
-        )
-        assert resp.status_code == 403
-        assert "detail" in resp.json()

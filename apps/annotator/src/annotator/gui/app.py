@@ -178,6 +178,13 @@ class MainAppWindow(QMainWindow):
         )
         file_menu.addAction(self.act_export)
 
+        self.act_export_images = QAction("Export Images…", self)
+        self.act_export_images.setEnabled(False)
+        self.act_export_images.triggered.connect(
+            lambda: self._fire(self.callbacks.on_export_images_request)
+        )
+        file_menu.addAction(self.act_export_images)
+
         file_menu.addSeparator()
 
         self.act_screen_info = QAction("Screen Info…", self)
@@ -365,6 +372,7 @@ class MainAppWindow(QMainWindow):
             action.setEnabled(has_img)
 
         self.act_export.setEnabled(has_img)
+        self.act_export_images.setEnabled(has_img)
         self.act_screen_info.setEnabled(has_img)
         self.act_cuts.setEnabled(has_img)
         self.act_undo.setEnabled(has_img)

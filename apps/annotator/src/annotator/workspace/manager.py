@@ -3,6 +3,7 @@ import threading
 import uuid
 import zipfile
 from collections.abc import Callable
+from typing import Literal
 
 import jsonpatch
 from PIL import Image
@@ -497,5 +498,95 @@ class WorkspaceManager:
             state_json = state_snapshot.model_dump_json(indent=2)
             zf.writestr("workspace.json", state_json)
             zf.writestr(state_snapshot.image.filename, image_bytes)
+
+        return buf.getvalue()
+
+    def export_images(
+        self, mode: Literal["with_annotations", "without_annotations"]
+    ) -> bytes:
+        """Export component cropped images as a ZIP file.
+
+        - with_annotations: Crop non-leaf components and draw children on them. Won't export leaves.
+        - without_annotations: Crop all components. Do not draw children. Includes leaves.
+        """
+        with self._lock:
+            state_snapshot = self._state.model_copy(deep=True)
+            image_bytes = self.raw_image_bytes
+
+        if not state_snapshot.image or not state_snapshot.image.filename:
+            raise InvalidStateError("No image in workspace")
+
+        if not image_bytes:
+            raise InvalidStateError("No image bytes in RAM")
+
+        from typing import Literal
+        from annotator.rendering import paint_annotations
+        from annotator.models.tree import TreeUtils
+        import re
+
+        def sanitize_filename(name: str) -> str:
+            # Replace invalid filename characters with underscores
+            cleaned = re.sub(r'[\\/*?:"<>|]', "_", name)
+            return cleaned.strip()
+
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            with Image.open(io.BytesIO(image_bytes)) as img:
+                def get_export_nodes():
+                    # Yield root node
+                    root_children = TreeUtils.get_children(state_snapshot, None)
+                    root_base = state_snapshot.image.filename.rsplit('.', 1)[0] if state_snapshot.image.filename else "root"
+                    yield {
+                        "is_leaf": len(root_children) == 0,
+                        "bounds": (0, 0, state_snapshot.image.width, state_snapshot.image.height),
+                        "children": root_children,
+                        "parent_comp": None,
+                        "filename": f"root_{sanitize_filename(root_base)}.png"
+                    }
+
+                    # Yield component nodes
+                    for comp_id, comp in state_snapshot.components.items():
+                        children = TreeUtils.get_children(state_snapshot, comp_id)
+                        name_parts = []
+                        if comp.number:
+                            name_parts.append(sanitize_filename(comp.number))
+                        if comp.label:
+                            name_parts.append(sanitize_filename(comp.label))
+                        name_parts.append(comp.id.hex[:8])
+
+                        yield {
+                            "is_leaf": len(children) == 0,
+                            "bounds": (comp.bounds.left, comp.bounds.top, comp.bounds.right, comp.bounds.bottom),
+                            "children": children,
+                            "parent_comp": comp,
+                            "filename": f"{'_'.join(name_parts)}.png"
+                        }
+
+                exported_count = 0
+                for node in get_export_nodes():
+                    if mode == "with_annotations" and node["is_leaf"]:
+                        continue
+
+                    # Crop bounds
+                    cropped = img.crop(node["bounds"])
+
+                    if mode == "with_annotations" and node["children"]:
+                        cropped = paint_annotations(
+                            img=cropped,
+                            children=node["children"],
+                            offset_x=node["bounds"][0],
+                            offset_y=node["bounds"][1],
+                            parent_comp=node["parent_comp"],
+                            full_img_width=state_snapshot.image.width,
+                        )
+
+                    # Write to zip
+                    img_buf = io.BytesIO()
+                    cropped.save(img_buf, format="PNG")
+                    zf.writestr(node["filename"], img_buf.getvalue())
+                    exported_count += 1
+
+                if exported_count == 0:
+                    raise InvalidStateError("No images to export under the selected mode (e.g. no annotations found).")
 
         return buf.getvalue()

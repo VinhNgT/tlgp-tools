@@ -117,6 +117,45 @@ class IOCommandHandler:
             )
         )
 
+    def handle_export_images(self):
+        if not self.view.canvas.full_pil_img:
+            return
+
+        def on_mode_selected(mode: str | None):
+            if not mode:
+                return
+            path = self.dialog_service.ask_save_as_filename(
+                self.view,
+                title="Save component images",
+                filetypes=[("Zip files", "*.zip")],
+                defaultextension=".zip",
+            )
+            if not path:
+                return
+            dialog = self.dialog_service.show_importing_dialog(
+                self.view, message="Exporting component images..."
+            )
+
+            def do_export():
+                zip_bytes = self.workspace.export_images(mode)
+                with open(path, "wb") as f:
+                    f.write(zip_bytes)
+
+            future = self._io_pool.submit(do_export)
+            future.add_done_callback(
+                lambda f: self._invoker.invoke(
+                    lambda: self._handle_io_result(
+                        f,
+                        dialog,
+                        "Export Failed",
+                        "Failed to export component images",
+                        success_msg="Component images exported successfully.",
+                    )
+                )
+            )
+
+        self.dialog_service.ask_export_images_mode(self.view, on_mode_selected)
+
     def _handle_io_result(
         self, future, dialog, error_title, error_prefix, success_msg=None
     ):
