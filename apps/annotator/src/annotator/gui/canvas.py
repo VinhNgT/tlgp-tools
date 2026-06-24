@@ -199,6 +199,32 @@ class AnnotationCanvasView(QWidget):
             return None
         return int(min_x), int(min_y), int(max_x), int(max_y)
 
+    def resolve_boundary(self) -> tuple[float, float, float, float]:
+        """Resolves the boundaries for component drawing/movement/resizing."""
+        ws = self.workspace_state
+        if ws:
+            # If we are NOT currently drawing a new box, check the selected component's parent
+            if not (hasattr(self, "gestures") and self.gestures.state.has_temp_rect):
+                selected = self.get_selected_components()
+                if len(selected) == 1:
+                    parent_id = selected[0].parentId
+                    if parent_id and parent_id in ws.components:
+                        p = ws.components[parent_id].bounds
+                        return float(p.left), float(p.top), float(p.right), float(p.bottom)
+
+            # Fallback to the active parent component boundary if one is entered (in the stack)
+            if self.parent_stack:
+                active_parent_id = self.parent_stack[-1]
+                if active_parent_id in ws.components:
+                    p = ws.components[active_parent_id].bounds
+                    return float(p.left), float(p.top), float(p.right), float(p.bottom)
+
+        # Fallback to full image boundary if available
+        if self.full_pil_img:
+            return 0.0, 0.0, float(self.full_pil_img.width), float(self.full_pil_img.height)
+
+        return 0.0, 0.0, float("inf"), float("inf")
+
     def set_selection(self, boxes: list[Component]):
         ids = [b.id for b in boxes]
         if ids != self.selected_component_ids:

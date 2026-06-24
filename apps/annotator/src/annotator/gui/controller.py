@@ -578,7 +578,6 @@ class AppController:
             ancestors = self.get_ancestor_chain(comp_id)
             self.store.update_state("viewport", parent_stack=ancestors)
             self.store.update_state("selection", selected_component_ids=[comp_id])
-            self.view.canvas.zoom_focus_target()
 
     def _on_property_changed(self, comp_id: str, **kwargs):
         # Translate simple kwargs to Style/Visibility updates

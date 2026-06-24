@@ -82,6 +82,12 @@ class BoundsValidator:
             if ry2 < cy2:
                 ry2 = cy2
 
+        # Final safety clamp to guarantee coordinates never violate the boundary box
+        rx1 = max(bx1, min(bx2, rx1))
+        rx2 = max(bx1, min(bx2, rx2))
+        ry1 = max(by1, min(by2, ry1))
+        ry2 = max(by1, min(by2, ry2))
+
         return rx1, ry1, rx2, ry2
 
 

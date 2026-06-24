@@ -742,6 +742,93 @@ def test_drag_snap_on_winning_deadzone(qapp):
     QApplication.sendEvent(canvas, release_event)
 
 
+def test_parent_boundary_enforced_on_drag(qapp):
+    ws = WorkspaceManager()
+    ws.import_image(create_test_image(800, 600))
+
+    parent_id = uuid.uuid4()
+    child_id = uuid.uuid4()
+
+    ws.add_component(comp_id=parent_id, label="parent", bounds=Bounds(x=50, y=50, w=200, h=200))
+    ws.add_component(comp_id=child_id, label="child", bounds=Bounds(x=100, y=100, w=50, h=50), parent_id=parent_id)
+
+    store = UIStateStore()
+    dialog_service = QtDialogService()
+    view = MainAppWindow()
+    controller = AppController(ws, store, view, dialog_service)
+    canvas = view.canvas
+
+    canvas.resize(800, 600)
+    canvas.fit_to_screen()
+    # Drill into parent
+    controller._on_canvas_drill_into(parent_id)
+    # Now select child
+    store.update_state("selection", selected_component_ids=[child_id])
+    controller._on_selection_updated()
+
+    canvas.deadzone_enabled = False
+
+    cx, cy = canvas.transformer.to_canvas(125, 125, canvas.zoom_factor, [], [], canvas.pan_offset)
+    
+    pos_press = QPointF(cx, cy)
+    press_event = QMouseEvent(
+        QEvent.Type.MouseButtonPress,
+        pos_press,
+        pos_press,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, press_event)
+    
+    # Drag far to the right (e.g., cx + 500)
+    pos_drag = QPointF(cx + 500, cy)
+    drag_event = QMouseEvent(
+        QEvent.Type.MouseMove,
+        pos_drag,
+        pos_drag,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, drag_event)
+    
+    assert canvas.active_interaction is not None
+    assert child_id in canvas.active_interaction
+    bounds = canvas.active_interaction[child_id]
+    
+    # It must be clamped exactly to the parent bounds: x + w <= 250 -> x <= 200
+    assert bounds.x == 200
+    
+    # Also test dragging left past parent left boundary (x=50)
+    pos_drag_left = QPointF(cx - 500, cy)
+    drag_event_left = QMouseEvent(
+        QEvent.Type.MouseMove,
+        pos_drag_left,
+        pos_drag_left,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, drag_event_left)
+    
+    bounds_left = canvas.active_interaction[child_id]
+    # It must be clamped exactly to parent left boundary: x >= 50
+    assert bounds_left.x == 50
+
+    # Release mouse to clean up
+    release_event = QMouseEvent(
+        QEvent.Type.MouseButtonRelease,
+        pos_drag_left,
+        pos_drag_left,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, release_event)
+
+
+
 
 
 
