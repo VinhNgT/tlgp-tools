@@ -5,6 +5,7 @@ the main thread. Both share a single WorkspaceManager instance.
 """
 
 import asyncio
+import ctypes
 import os
 import sys
 import threading
@@ -24,6 +25,18 @@ _SERVER_STARTUP_TIMEOUT = 5  # seconds
 def main():
     setup_logging(json_format=(os.environ.get("TLGP_ENV") == "prod"))
     setup_excepthook()
+
+    # When executed under the IDE's agent runtime sandbox, the thread starts
+    # on a custom hidden desktop (e.g. 'agy-...'). On Windows, we dynamically
+    # switch the thread desktop to 'WinSta0\Default' so that the Qt GUI window
+    # is displayed on the user's interactive monitor.
+    if sys.platform == "win32":
+        hdesk = ctypes.windll.user32.OpenDesktopW("Default", 0, True, 0x01FF)
+        if hdesk:
+            ctypes.windll.user32.SetThreadDesktop(hdesk)
+            logger.info("Switched main thread desktop to WinSta0\\Default")
+        else:
+            logger.warning("Failed to open WinSta0\\Default desktop")
 
     # Single domain instance shared by GUI + API
     workspace = WorkspaceManager()
