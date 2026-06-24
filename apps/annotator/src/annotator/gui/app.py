@@ -6,9 +6,11 @@ All user interaction is delegated to the controller via callbacks.
 
 import os
 
-from PySide6.QtCore import QPoint, QSize, Qt
+from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
 from PySide6.QtWidgets import (
+    QApplication,
+    QCheckBox,
     QFrame,
     QLabel,
     QMainWindow,
@@ -16,7 +18,6 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSplitter,
-    QStackedWidget,
     QToolBar,
     QVBoxLayout,
     QWidget,
@@ -33,6 +34,7 @@ class WelcomeWidget(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.setObjectName("WelcomeScreen")
 
         self.on_import_zip = None
         self.on_import_image = None
@@ -56,7 +58,7 @@ class WelcomeWidget(QWidget):
         title.setFont(font)
         card_layout.addWidget(title)
 
-        self.desc_label = QLabel("Open a workspace session or raw image to begin.")
+        self.desc_label = QLabel("Open a workspace or raw image to begin.")
         self.desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.desc_label.setWordWrap(True)
         card_layout.addWidget(self.desc_label)
@@ -80,6 +82,45 @@ class WelcomeWidget(QWidget):
     def _on_import_image(self):
         if self.on_import_image:
             self.on_import_image()
+
+
+class GlobalFocusAndSelectionFilter(QObject):
+    """Universal event filter that clears input focus and label text selections
+    when clicking outside of them anywhere in the application.
+    """
+
+    def eventFilter(self, obj: QObject, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.MouseButtonPress:
+            is_widget = isinstance(obj, QWidget)
+
+            # 1. Unfocus any active text input widget on outside click
+            focused = QApplication.focusWidget()
+            if focused and focused.__class__.__name__ in (
+                "QLineEdit",
+                "QTextEdit",
+                "QPlainTextEdit",
+            ):
+                if not is_widget or obj != focused:
+                    try:
+                        if not is_widget or not focused.isAncestorOf(obj):
+                            focused.clearFocus()
+                    except TypeError:
+                        focused.clearFocus()
+
+            # 2. Deselect/clear highlight on any selectable QLabels on outside click
+            main_win = self.parent()
+            if main_win:
+                for label in main_win.findChildren(QLabel):
+                    if (
+                        label.textInteractionFlags()
+                        & Qt.TextInteractionFlag.TextSelectableByMouse
+                    ):
+                        if not is_widget or (
+                            obj != label and not label.isAncestorOf(obj)
+                        ):
+                            label.setSelection(0, 0)
+
+        return super().eventFilter(obj, event)
 
 
 class MainAppWindow(QMainWindow):
@@ -113,6 +154,10 @@ class MainAppWindow(QMainWindow):
         self.on_escape_pressed = None
         self.on_arrow_key_pressed = None
 
+        # Install global focus-out event filter to unfocus inputs on click outside
+        self.focus_filter = GlobalFocusAndSelectionFilter(self)
+        QApplication.instance().installEventFilter(self.focus_filter)
+
         # ── Build UI ──────────────────────────────────────────────
         self._build_menu_bar()
         self._build_toolbar()
@@ -134,7 +179,7 @@ class MainAppWindow(QMainWindow):
         )
         file_menu.addAction(act_import_img)
 
-        self.act_export = QAction("Export Session (.zip)", self)
+        self.act_export = QAction("Export Workspace (.zip)", self)
         self.act_export.setShortcut(QKeySequence("Ctrl+S"))
         self.act_export.setEnabled(False)
         self.act_export.triggered.connect(
@@ -192,9 +237,9 @@ class MainAppWindow(QMainWindow):
         self.mode_group.setExclusive(True)
 
         modes = [
-            ("V", "select", "Select mode (V)"),
-            ("R", "draw", "Draw mode (R)"),
-            ("H", "pan", "Pan mode (H)"),
+            ("Select (V)", "select", "Select mode (V)"),
+            ("Draw (R)", "draw", "Draw mode (R)"),
+            ("Pan (H)", "pan", "Pan mode (H)"),
         ]
         self._mode_actions: dict[str, QAction] = {}
         for key, mode, tooltip in modes:
@@ -211,6 +256,13 @@ class MainAppWindow(QMainWindow):
 
         tb.addSeparator()
 
+        # Fit button
+        self.btn_fit = QAction("Fit", self)
+        self.btn_fit.setToolTip("Fit active container to screen (F)")
+        self.btn_fit.setEnabled(False)
+        self.btn_fit.triggered.connect(lambda: self.canvas.fit_to_screen())
+        tb.addAction(self.btn_fit)
+
         # Back button
         self.btn_back = QAction("← Back", self)
         self.btn_back.setToolTip("Go back (Escape)")
@@ -218,14 +270,10 @@ class MainAppWindow(QMainWindow):
         self.btn_back.triggered.connect(lambda: self._fire(self.on_back_request))
         tb.addAction(self.btn_back)
 
-        # Cut Lines button
-        self.btn_cut_lines = QAction("Cut Lines (C)", self)
-        self.btn_cut_lines.setToolTip("Edit Cut Lines (C / Ctrl+L)")
-        self.btn_cut_lines.setEnabled(False)
-        self.btn_cut_lines.triggered.connect(
-            lambda: self._fire(self.on_open_cut_editor_request)
-        )
-        tb.addAction(self.btn_cut_lines)
+        # Spacing
+        back_spacer = QWidget()
+        back_spacer.setFixedWidth(6)
+        tb.addWidget(back_spacer)
 
         # Breadcrumbs label
         self.lbl_breadcrumbs = QLabel("Root")
@@ -235,9 +283,33 @@ class MainAppWindow(QMainWindow):
         spacer.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
         tb.addWidget(spacer)
 
-        # Zoom display
-        self.lbl_zoom = QLabel("100%")
-        tb.addWidget(self.lbl_zoom)
+        # Show Labels checkbox
+        self.chk_show_labels = QCheckBox("Show Labels")
+        self.chk_show_labels.setToolTip("Toggle Labels (T)")
+        self.chk_show_labels.setChecked(True)
+        self.chk_show_labels.setEnabled(False)
+        self.chk_show_labels.toggled.connect(self._on_show_labels_toggled)
+        tb.addWidget(self.chk_show_labels)
+
+        tb.addSeparator()
+
+        # Cut Lines button
+        self.btn_cut_lines = QAction("Cut Lines", self)
+        self.btn_cut_lines.setToolTip("Edit Cut Lines (Ctrl+L)")
+        self.btn_cut_lines.setEnabled(False)
+        self.btn_cut_lines.triggered.connect(
+            lambda: self._fire(self.on_open_cut_editor_request)
+        )
+        tb.addAction(self.btn_cut_lines)
+
+        # Screen Info button
+        self.btn_screen_info = QAction("Screen Info", self)
+        self.btn_screen_info.setToolTip("View/Edit Screen Info")
+        self.btn_screen_info.setEnabled(False)
+        self.btn_screen_info.triggered.connect(
+            lambda: self._fire(self.on_open_screen_info_request)
+        )
+        tb.addAction(self.btn_screen_info)
 
     def _build_central_area(self, transformer: ViewportTransformer | None):
         splitter = QSplitter(Qt.Orientation.Horizontal)
@@ -247,17 +319,18 @@ class MainAppWindow(QMainWindow):
         self.tree = SidebarTreeView()
         splitter.addWidget(self.tree)
 
-        # 2. Center: Canvas stack (welcome or annotation)
-        self.canvas_stack = QStackedWidget()
-        self.welcome = WelcomeWidget()
+        # 2. Center: Canvas with overlay welcome widget
+        self.canvas = AnnotationCanvasView(transformer=transformer)
+
+        self.welcome = WelcomeWidget(self.canvas)
         self.welcome.on_import_zip = lambda: self._fire(self.on_import_zip_request)
         self.welcome.on_import_image = lambda: self._fire(self.on_import_image_request)
-        self.canvas = AnnotationCanvasView(transformer=transformer)
-        self.canvas_stack.addWidget(self.welcome)
-        self.canvas_stack.addWidget(self.canvas)
-        self.canvas_stack.setCurrentWidget(self.welcome)
 
-        splitter.addWidget(self.canvas_stack)
+        canvas_layout = QVBoxLayout(self.canvas)
+        canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        canvas_layout.addWidget(self.welcome)
+
+        splitter.addWidget(self.canvas)
 
         # 3. Right: Properties
         self.properties = ComponentPropertiesView()
@@ -269,11 +342,14 @@ class MainAppWindow(QMainWindow):
     # ── Public API (called by controller) ─────────────────────────────
 
     def set_canvas_image(self, img):
-        """Switch between welcome screen and annotation canvas."""
+        """Toggle between welcome screen and annotation canvas."""
         if img is None:
-            self.canvas_stack.setCurrentWidget(self.welcome)
+            self.welcome.show()
             self.btn_cut_lines.setEnabled(False)
+            self.chk_show_labels.setEnabled(False)
+            self.btn_screen_info.setEnabled(False)
             self.btn_back.setEnabled(False)
+            self.btn_fit.setEnabled(False)
             self.canvas.set_background_image(None)
             for action in self._mode_actions.values():
                 action.setEnabled(False)
@@ -284,9 +360,12 @@ class MainAppWindow(QMainWindow):
             self.act_redo.setEnabled(False)
             self.act_delete.setEnabled(False)
         else:
+            self.welcome.hide()
             self.canvas.set_background_image(img)
-            self.canvas_stack.setCurrentWidget(self.canvas)
             self.btn_cut_lines.setEnabled(True)
+            self.chk_show_labels.setEnabled(True)
+            self.btn_screen_info.setEnabled(True)
+            self.btn_fit.setEnabled(True)
             for action in self._mode_actions.values():
                 action.setEnabled(True)
             self.act_export.setEnabled(True)
@@ -306,8 +385,7 @@ class MainAppWindow(QMainWindow):
         self.properties.update_status(text, is_error)
 
     def update_zoom_display(self, zoom_factor: float):
-        pct = round(zoom_factor * 100)
-        self.lbl_zoom.setText(f"{pct}%")
+        pass
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:
@@ -346,6 +424,10 @@ class MainAppWindow(QMainWindow):
         # Avoid intercepting shortcuts if no image is loaded
         if not self.canvas.full_pil_img:
             super().keyPressEvent(event)
+            return
+
+        if key == Qt.Key.Key_Space and not event.isAutoRepeat():
+            self.canvas.keyPressEvent(event)
             return
 
         # Mode shortcuts
@@ -399,9 +481,7 @@ class MainAppWindow(QMainWindow):
             return
         if key == Qt.Key.Key_T:
             self.canvas.toggle_labels_visibility()
-            return
-        if key == Qt.Key.Key_C:
-            self._fire(self.on_open_cut_editor_request)
+            self.chk_show_labels.setChecked(self.canvas.show_labels)
             return
         if key == Qt.Key.Key_Backspace or key == Qt.Key.Key_Delete:
             if self.on_delete_request:
@@ -410,11 +490,22 @@ class MainAppWindow(QMainWindow):
 
         super().keyPressEvent(event)
 
+    def keyReleaseEvent(self, event):
+        if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
+            if not self.properties.is_text_focused() and self.canvas.full_pil_img:
+                self.canvas.keyReleaseEvent(event)
+                return
+        super().keyReleaseEvent(event)
+
     # ── Private ──────────────────────────────────────────────────────
 
     def _on_mode_toggled(self, mode: str):
         if self.on_mode_change_request:
             self.on_mode_change_request(mode)
+
+    def _on_show_labels_toggled(self, checked: bool):
+        if self.canvas.show_labels != checked:
+            self.canvas.toggle_labels_visibility()
 
     @staticmethod
     def _fire(callback):

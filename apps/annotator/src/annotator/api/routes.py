@@ -19,7 +19,7 @@ from fastapi.responses import Response
 from PIL import Image
 from pydantic import BaseModel
 
-from annotator.models import Bounds, Style, Visibility
+from annotator.models import Bounds, Style
 from annotator.models.tree import TreeUtils
 from annotator.rendering import paint_annotations
 from annotator.workspace import WorkspaceManager
@@ -38,7 +38,6 @@ class AddComponentRequest(BaseModel):
     parentId: uuid.UUID | None = None
     bounds: dict
     style: dict | None = None
-    visibility: dict | None = None
 
 
 class MoveComponentRequest(BaseModel):
@@ -51,7 +50,6 @@ class UpdateComponentRequest(BaseModel):
     bounds: dict | None = None
     parentId: uuid.UUID | None = None
     style: dict | None = None
-    visibility: dict | None = None
 
 
 class SetReadOnlyRequest(BaseModel):
@@ -151,7 +149,7 @@ def create_router(
     @router.post("/workspace/clear", tags=["State"])
     async def clear_workspace():
         await asyncio.to_thread(workspace.clear_workspace, True)
-        return {"status": "success", "sessionId": str(workspace.state.sessionId)}
+        return {"status": "success", "workspaceId": str(workspace.state.workspaceId)}
 
     # ── Import / Export ────────────────────────────────────────────
 
@@ -159,7 +157,7 @@ def create_router(
     async def import_workspace(file: UploadFile = File(...)):
         file_bytes = await file.read()
         await asyncio.to_thread(workspace.import_zip, file_bytes)
-        return {"status": "imported", "sessionId": workspace.state.sessionId}
+        return {"status": "imported", "workspaceId": workspace.state.workspaceId}
 
     @router.post("/workspace/import-image", tags=["Import/Export"])
     async def import_image(file: UploadFile = File(...)):
@@ -167,7 +165,7 @@ def create_router(
         await asyncio.to_thread(
             workspace.import_image, file_bytes, file.filename or "screenshot.png"
         )
-        return {"status": "image_imported", "sessionId": workspace.state.sessionId}
+        return {"status": "image_imported", "workspaceId": workspace.state.workspaceId}
 
     @router.get("/workspace/export")
     async def export_workspace():
@@ -192,7 +190,6 @@ def create_router(
             bounds=req.bounds,
             parent_id=req.parentId,
             style=Style(**req.style) if req.style else None,
-            visibility=Visibility(**req.visibility) if req.visibility else None,
         )
         return {"id": comp_id, "status": "added"}
 
@@ -210,7 +207,6 @@ def create_router(
             bounds=Bounds(**req.bounds) if req.bounds else None,
             parent_id=req.parentId,
             style=Style(**req.style) if req.style else None,
-            visibility=Visibility(**req.visibility) if req.visibility else None,
         )
         return {"status": "updated"}
 
@@ -219,21 +215,21 @@ def create_router(
         await asyncio.to_thread(workspace.delete_component, comp_id)
         return {"status": "deleted"}
 
-    @router.post("/session/undo", tags=["Session"])
-    async def session_undo():
+    @router.post("/workspace/undo", tags=["State"])
+    async def workspace_undo():
         success = await asyncio.to_thread(workspace.undo)
         if not success:
             raise UndoRedoError(
-                "Cannot undo", session_id=str(workspace.state.sessionId)
+                "Cannot undo", workspace_id=str(workspace.state.workspaceId)
             )
         return {"status": "undone"}
 
-    @router.post("/session/redo", tags=["Session"])
-    async def session_redo():
+    @router.post("/workspace/redo", tags=["State"])
+    async def workspace_redo():
         success = await asyncio.to_thread(workspace.redo)
         if not success:
             raise UndoRedoError(
-                "Cannot redo", session_id=str(workspace.state.sessionId)
+                "Cannot redo", workspace_id=str(workspace.state.workspaceId)
             )
         return {"status": "redone"}
 
@@ -252,7 +248,7 @@ def create_router(
     async def export_batch(req: BatchExportRequest):
         if not workspace.raw_image_bytes:
             raise InvalidStateError(
-                "No image in RAM", session_id=str(workspace.state.sessionId)
+                "No image in RAM", workspace_id=str(workspace.state.workspaceId)
             )
 
         def _build_batch_zip() -> bytes:

@@ -1,7 +1,6 @@
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
-from PySide6.QtGui import QPainter, QPalette, QPen
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
-    QCheckBox,
     QGridLayout,
     QHBoxLayout,
     QLabel,
@@ -10,8 +9,6 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
-
-
 
 
 class CornerSelector(QWidget):
@@ -38,8 +35,8 @@ class CornerSelector(QWidget):
         if on_corner_selected_callback:
             self.corner_selected.connect(on_corner_selected_callback)
 
-    def set_corner(self, corner: str):
-        if corner in self.corners:
+    def set_corner(self, corner: str | None):
+        if corner is None or corner in self.corners:
             self.selected_corner = corner
             self.update()
 
@@ -51,13 +48,16 @@ class CornerSelector(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        palette = self.palette()
-        cg = (
-            QPalette.ColorGroup.Active if self.enabled else QPalette.ColorGroup.Disabled
-        )
-
-        bg = palette.color(cg, QPalette.ColorRole.Window)
-        border = palette.color(cg, QPalette.ColorRole.Mid)
+        if self.enabled:
+            bg = QColor("#1E1E1E")
+            border = QColor("#5A5A5C")
+            dashed_rect_color = QColor("#8C8C8C")
+            crosshairs_color = QColor("#4F4F4F")
+        else:
+            bg = QColor("#222223")
+            border = QColor("#383839")
+            dashed_rect_color = QColor("#505052")
+            crosshairs_color = QColor("#38383A")
 
         # Background
         p.fillRect(self.rect(), bg)
@@ -65,16 +65,14 @@ class CornerSelector(QWidget):
         p.drawRect(self.rect().adjusted(0, 0, -1, -1))
 
         # Dashed rectangle
-        outline_color = palette.color(cg, QPalette.ColorRole.Dark)
-        pen = QPen(outline_color, 1, Qt.PenStyle.DashLine)
+        pen = QPen(dashed_rect_color, 1, Qt.PenStyle.DashLine)
         p.setPen(pen)
         p.drawRect(self.x1, self.y1, self.x2 - self.x1, self.y2 - self.y1)
 
         # Crosshairs
         cx = (self.x1 + self.x2) // 2
         cy = (self.y1 + self.y2) // 2
-        line_color = palette.color(cg, QPalette.ColorRole.Midlight)
-        pen = QPen(line_color, 1, Qt.PenStyle.DotLine)
+        pen = QPen(crosshairs_color, 1, Qt.PenStyle.DotLine)
         p.setPen(pen)
         p.drawLine(self.x1, cy, self.x2, cy)
         p.drawLine(cx, self.y1, cx, self.y2)
@@ -82,14 +80,24 @@ class CornerSelector(QWidget):
         # Corner dots
         r = 5
         for name, (px, py) in self.corners.items():
-            if self.enabled and self.selected_corner == name:
-                p.setPen(QPen(Qt.GlobalColor.white, 1.5))
-                p.setBrush(palette.color(QPalette.ColorRole.Highlight))
+            if self.enabled:
+                if self.selected_corner == name:
+                    # Active selected dot: Figma blue with white border
+                    p.setPen(QPen(QColor("#FFFFFF"), 1.5))
+                    p.setBrush(QColor("#18A0FB"))
+                else:
+                    # Active unselected dot: dark gray fill with subtle border
+                    p.setPen(QPen(QColor("#8C8C8C"), 1))
+                    p.setBrush(QColor("#2C2D2E"))
             else:
-                dot_fill = palette.color(cg, QPalette.ColorRole.Button)
-                dot_outline = palette.color(cg, QPalette.ColorRole.Dark)
-                p.setPen(QPen(dot_outline, 1))
-                p.setBrush(dot_fill)
+                if self.selected_corner == name:
+                    # Disabled selected dot: muted highlight color (medium gray) with darker border
+                    p.setPen(QPen(QColor("#303030"), 1.5))
+                    p.setBrush(QColor("#707070"))
+                else:
+                    # Disabled unselected dot: muted gray fill and border
+                    p.setPen(QPen(QColor("#444444"), 1))
+                    p.setBrush(QColor("#2C2D2E"))
             p.drawEllipse(px - r, py - r, r * 2, r * 2)
 
         p.end()
@@ -138,22 +146,25 @@ class ComponentPropertiesView(QWidget):
 
         self._selected_box_id = None
         self._current_label = ""
-        self._current_is_visible = True
-        self._current_is_locked = False
         self._current_pill_corner = "top_left"
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(8)
 
         lbl_header = QLabel("PROPERTIES")
         header_font = lbl_header.font()
         header_font.setBold(True)
+        header_font.setPointSize(9)
         lbl_header.setFont(header_font)
+        lbl_header.setStyleSheet("color: #B0B0B0; padding-bottom: 4px;")
         layout.addWidget(lbl_header)
 
         # Name field
         name_row = QHBoxLayout()
         lbl_name = QLabel("Name")
         lbl_name.setFixedWidth(50)
+        lbl_name.setStyleSheet("color: #C5C5C5;")
         name_row.addWidget(lbl_name)
 
         self.entry_name = QLineEdit()
@@ -171,10 +182,11 @@ class ComponentPropertiesView(QWidget):
         ):
             row = idx // 2
             col = (idx % 2) * 2
-            
+
             # Label
             lbl = QLabel(label)
             lbl.setFixedWidth(20)
+            lbl.setStyleSheet("color: #C5C5C5;")
             coords_grid.addWidget(lbl, row, col)
 
             # Input
@@ -187,23 +199,10 @@ class ComponentPropertiesView(QWidget):
 
         layout.addLayout(coords_grid)
 
-        # Visibility controls
-        vis_row = QHBoxLayout()
-        self.chk_visible = QCheckBox("Visible")
-        self.chk_visible.setChecked(True)
-        self.chk_visible.stateChanged.connect(self._save_visibility)
-        vis_row.addWidget(self.chk_visible)
-
-        self.chk_locked = QCheckBox("Locked")
-        self.chk_locked.setChecked(False)
-        self.chk_locked.stateChanged.connect(self._save_visibility)
-        vis_row.addWidget(self.chk_locked)
-        vis_row.addStretch()
-        layout.addLayout(vis_row)
-
         # Pill corner selector
         pill_row = QHBoxLayout()
         lbl_pill = QLabel("Pill Corner:")
+        lbl_pill.setStyleSheet("color: #C5C5C5;")
         pill_row.addWidget(lbl_pill)
 
         self.corner_selector = CornerSelector(
@@ -216,11 +215,14 @@ class ComponentPropertiesView(QWidget):
         layout.addStretch()
 
         # Status text at the bottom
-        self.txt_status = QLabel("Connecting...")
+        self.txt_status = QLabel("")
         self.txt_status.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom
         )
         self.txt_status.setWordWrap(True)
+        self.txt_status.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
         layout.addWidget(self.txt_status)
 
         # Track focus changes
@@ -240,10 +242,10 @@ class ComponentPropertiesView(QWidget):
 
     def update_status(self, text: str, is_error: bool = False):
         self.txt_status.setText(text)
-        palette = self.txt_status.palette()
-        color = Qt.GlobalColor.red if is_error else Qt.GlobalColor.gray
-        palette.setColor(self.txt_status.foregroundRole(), color)
-        self.txt_status.setPalette(palette)
+        if is_error:
+            self.txt_status.setStyleSheet("color: #FF6B6B;")
+        else:
+            self.txt_status.setStyleSheet("color: rgba(165, 165, 165, 0.4);")
 
     def update_properties_panel(
         self,
@@ -253,9 +255,6 @@ class ComponentPropertiesView(QWidget):
         y: int,
         w: int,
         h: int,
-        is_visible: bool,
-        is_locked: bool,
-        is_effectively_locked: bool,
         pill_corner: str,
     ):
         if self._selected_box_id and self._selected_box_id != box_id:
@@ -263,29 +262,14 @@ class ComponentPropertiesView(QWidget):
 
         self._selected_box_id = box_id
         self._current_label = label
-        self._current_is_visible = is_visible
-        self._current_is_locked = is_locked
         self._current_pill_corner = pill_corner
 
-        self.chk_visible.setEnabled(True)
-        self.chk_locked.setEnabled(True)
-
-        # Block signals during programmatic update
-        self.chk_visible.blockSignals(True)
-        self.chk_locked.blockSignals(True)
-        self.chk_visible.setChecked(is_visible)
-        self.chk_locked.setChecked(is_locked)
-        self.chk_visible.blockSignals(False)
-        self.chk_locked.blockSignals(False)
-
-        is_editable = not is_effectively_locked
-
-        self.entry_name.setEnabled(is_editable)
+        self.entry_name.setEnabled(True)
         for entry in self.prop_entries.values():
             entry.setEnabled(True)
             entry.setReadOnly(True)
 
-        self.corner_selector.set_state("normal" if is_editable else "disabled")
+        self.corner_selector.set_state("normal")
         self.corner_selector.set_corner(pill_corner)
 
     def is_field_focused(self, field_name: str) -> bool:
@@ -314,19 +298,15 @@ class ComponentPropertiesView(QWidget):
             self._save_name()
         self._selected_box_id = None
         self._current_label = ""
-        self._current_is_visible = True
-        self._current_is_locked = False
-        self._current_pill_corner = "top_left"
-        self.entry_name.clear()
+        self._current_pill_corner = None
         self.entry_name.setEnabled(False)
+        self.entry_name.clear()
         for entry in self.prop_entries.values():
-            entry.setReadOnly(False)
-            entry.clear()
             entry.setEnabled(False)
+            entry.clear()
 
         self.corner_selector.set_state("disabled")
-        self.chk_visible.setEnabled(False)
-        self.chk_locked.setEnabled(False)
+        self.corner_selector.set_corner(None)
 
     def is_text_focused(self) -> bool:
         return self._text_focused
@@ -355,19 +335,7 @@ class ComponentPropertiesView(QWidget):
                 self._current_label = val
                 self.on_property_changed(self._selected_box_id, label=val)
 
-    def _save_visibility(self):
-        if self._selected_box_id and self.on_property_changed:
-            visible = self.chk_visible.isChecked()
-            locked = self.chk_locked.isChecked()
-            if visible != self._current_is_visible or locked != self._current_is_locked:
-                self.on_property_changed(
-                    self._selected_box_id,
-                    visibility={"visible": visible, "locked": locked},
-                )
-
     def _save_corner(self, corner: str):
         if self._selected_box_id and self.on_property_changed:
             if corner != self._current_pill_corner:
-                self.on_property_changed(
-                    self._selected_box_id, style={"pillCorner": corner}
-                )
+                self.on_property_changed(self._selected_box_id, pillCorner=corner)

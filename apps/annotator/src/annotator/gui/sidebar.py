@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from PySide6.QtCore import QModelIndex, Qt
-from PySide6.QtGui import QPalette, QStandardItem, QStandardItemModel
+from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QLabel,
@@ -12,8 +12,6 @@ from PySide6.QtWidgets import (
 )
 
 
-
-
 class SidebarTreeView(QWidget):
     """Treeview layer displaying component hierarchies with incremental syncs."""
 
@@ -21,12 +19,16 @@ class SidebarTreeView(QWidget):
         super().__init__(parent)
 
         layout = QVBoxLayout(self)
+        layout.setContentsMargins(8, 8, 8, 8)
+        layout.setSpacing(4)
 
         lbl = QLabel("LAYERS")
         font = lbl.font()
         font.setBold(True)
+        font.setPointSize(9)
         lbl.setFont(font)
-        
+        lbl.setStyleSheet("color: #888888; padding-bottom: 4px;")
+
         layout.addWidget(lbl)
 
         self.model = QStandardItemModel()
@@ -57,10 +59,7 @@ class SidebarTreeView(QWidget):
 
         def sync_node(parent_item: QStandardItem | None, node_data: dict, index: int):
             node_id = node_data["id"]
-            node_tags = node_data.get("tags", [])
             node_text = node_data["text"]
-            if "locked" in node_tags:
-                node_text = "🔒 " + node_text
 
             synced_ids.add(node_id)
 
@@ -74,8 +73,8 @@ class SidebarTreeView(QWidget):
             if cached_item is None:
                 item = QStandardItem(node_text)
                 item.setData(node_id, Qt.ItemDataRole.UserRole)
+                item.setData(node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1)
                 item.setEditable(False)
-                self._apply_tags(item, node_tags)
                 container.insertRow(index, item)
                 self._item_map[node_id] = item
                 cached_item = item
@@ -83,7 +82,9 @@ class SidebarTreeView(QWidget):
             else:
                 if cached_item.text() != node_text:
                     cached_item.setText(node_text)
-                self._apply_tags(cached_item, node_tags)
+                cached_item.setData(
+                    node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1
+                )
 
                 # Re-parent if needed
                 actual_parent = cached_item.parent() or self.model.invisibleRootItem()
@@ -115,21 +116,20 @@ class SidebarTreeView(QWidget):
         for item_id in to_delete:
             item = self._item_map.pop(item_id, None)
             if item:
-                parent = item.parent() or self.model.invisibleRootItem()
-                parent.removeRow(item.row())
+                try:
+                    parent = item.parent() or self.model.invisibleRootItem()
+                    parent.removeRow(item.row())
+                except RuntimeError:
+                    pass
 
         # Only expand newly inserted items, preserving user's collapse state
         for node_id in new_ids:
             item = self._item_map.get(node_id)
             if item:
-                self.tree.expand(item.index())
-
-    def _apply_tags(self, item: QStandardItem, tags: list[str]):
-        if "hidden" in tags:
-            palette = self.tree.palette()
-            item.setForeground(palette.color(QPalette.ColorRole.PlaceholderText))
-        else:
-            item.setData(None, Qt.ItemDataRole.ForegroundRole)
+                try:
+                    self.tree.expand(item.index())
+                except RuntimeError:
+                    pass
 
     def select_component(self, comp_id: UUID):
         """Highlights specific component node without triggering selection update feedback loops."""
@@ -203,12 +203,21 @@ class SidebarTreeView(QWidget):
         rect = self.tree.visualRect(index)
         editor = QLineEdit(self.tree.viewport())
         editor.setGeometry(rect)
-        editor.setText(item.text().lstrip("🔒 "))
+        label = item.data(Qt.ItemDataRole.UserRole + 1)
+        if not isinstance(label, str):
+            label = item.text().lstrip("🔒 ")
+        editor.setText(label)
         editor.setFocus()
         editor.show()
         editor.selectAll()
 
+        is_saving = False
+
         def save_edit():
+            nonlocal is_saving
+            if is_saving:
+                return
+            is_saving = True
             new_label = editor.text().strip()
             if new_label and self.on_rename_request:
                 try:
@@ -218,6 +227,8 @@ class SidebarTreeView(QWidget):
             editor.deleteLater()
 
         def cancel_edit():
+            nonlocal is_saving
+            is_saving = True
             editor.deleteLater()
 
         editor.returnPressed.connect(save_edit)

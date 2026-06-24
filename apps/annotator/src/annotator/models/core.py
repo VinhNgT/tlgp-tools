@@ -30,9 +30,6 @@ class Style(BaseModel):
     pillCorner: str = "top_left"
 
 
-class Visibility(BaseModel):
-    visible: bool = True
-    locked: bool = False
 
 
 class Component(BaseModel):
@@ -43,7 +40,7 @@ class Component(BaseModel):
     childrenIds: list[UUID] = Field(default_factory=list)
     bounds: Bounds
     style: Style = Field(default_factory=Style)
-    visibility: Visibility = Field(default_factory=Visibility)
+
 
 
 class ScreenInfo(BaseModel):
@@ -59,7 +56,7 @@ class ImageInfo(BaseModel):
 
 class WorkspaceState(BaseModel):
     version: int = 1
-    sessionId: UUID
+    workspaceId: UUID
     revision: int = 0
     readOnly: bool = False
     screen: ScreenInfo = Field(default_factory=ScreenInfo)

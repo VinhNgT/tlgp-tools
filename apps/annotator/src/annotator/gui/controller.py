@@ -8,7 +8,7 @@ from PIL import Image
 from PySide6.QtCore import QObject, QTimer, Signal, Slot
 from tlgp_logger import get_logger
 
-from annotator.models import Bounds, Component, Style, Visibility
+from annotator.models import Bounds, Component, Style
 from annotator.workspace import WorkspaceManager
 
 from .app import MainAppWindow
@@ -50,7 +50,7 @@ class AppController:
         self.store = store
         self.view = view
         self.dialog_service = dialog_service
-        self._loaded_session_id = None
+        self._loaded_workspace_id = None
         self.pending_created_ids: set[UUID] = set()
         self._io_pool = ThreadPoolExecutor(
             max_workers=1, thread_name_prefix="annotator-io"
@@ -136,14 +136,14 @@ class AppController:
             return
 
         self.view.update_status(
-            f"Local workspace | Session: {state.sessionId}",
+            f"Workspace: {state.workspaceId}",
             is_error=False,
         )
 
-        current_session_id = str(state.sessionId) if state.sessionId else None
+        current_workspace_id = str(state.workspaceId) if state.workspaceId else None
         if (
-            self._loaded_session_id is not None
-            and current_session_id != self._loaded_session_id
+            self._loaded_workspace_id is not None
+            and current_workspace_id != self._loaded_workspace_id
         ):
             self.store.update_state(
                 "selection", selected_component_ids=[], active_interaction=None
@@ -154,13 +154,13 @@ class AppController:
 
         if state.image:
             if (
-                current_session_id != self._loaded_session_id
+                current_workspace_id != self._loaded_workspace_id
                 or self.view.canvas.full_pil_img is None
             ):
                 try:
                     img = Image.open(io.BytesIO(self.workspace.raw_image_bytes))
                     self.view.set_canvas_image(img)
-                    self._loaded_session_id = current_session_id
+                    self._loaded_workspace_id = current_workspace_id
                     self.view.canvas.fit_to_screen()
                     QTimer.singleShot(100, self.check_trigger_screen_info)
                 except Exception as e:
@@ -172,7 +172,7 @@ class AppController:
                     )
         else:
             self.view.set_canvas_image(None)
-            self._loaded_session_id = current_session_id
+            self._loaded_workspace_id = current_workspace_id
 
         # Check and remove synchronized transient overrides from active_interaction
         active_interaction = self.store.state.active_interaction
@@ -228,40 +228,12 @@ class AppController:
             self.store.state.active_interaction,
         )
 
-    def _is_effectively_visible(self, comp_id: UUID) -> bool:
-        state = self.store.state.workspace_state
-        if not state:
-            return True
-        comp = state.components.get(comp_id)
-        if not comp:
-            return True
-        if not comp.visibility.visible:
-            return False
-        if comp.parentId:
-            return self._is_effectively_visible(comp.parentId)
-        return True
-
-    def _is_effectively_locked(self, comp_id: UUID) -> bool:
-        state = self.store.state.workspace_state
-        if not state:
-            return False
-        comp = state.components.get(comp_id)
-        if not comp:
-            return False
-        if comp.visibility.locked:
-            return True
-        if comp.parentId:
-            return self._is_effectively_locked(comp.parentId)
-        return False
-
     def _build_tree_nodes(self) -> list[dict]:
         state = self.store.state.workspace_state
         if not state:
             return []
 
-        def build_node(
-            comp_uuid: UUID, parent_visible: bool = True, parent_locked: bool = False
-        ) -> dict | None:
+        def build_node(comp_uuid: UUID) -> dict | None:
             comp = state.components.get(comp_uuid)
             if not comp:
                 return None
@@ -269,23 +241,9 @@ class AppController:
             comp_id_str = str(comp.id)
             node_text = f"{comp.number} {comp.label}" if comp.number else comp.label
 
-            comp_visible = comp.visibility.visible
-            comp_locked = comp.visibility.locked
-
-            is_effectively_visible = comp_visible and parent_visible
-            is_effectively_locked = comp_locked or parent_locked
-
-            tags = []
-            if not is_effectively_visible:
-                tags.append("hidden")
-            if is_effectively_locked:
-                tags.append("locked")
-
             children = []
             for child_uuid in comp.childrenIds:
-                child_node = build_node(
-                    child_uuid, is_effectively_visible, is_effectively_locked
-                )
+                child_node = build_node(child_uuid)
                 if child_node:
                     children.append(child_node)
 
@@ -293,7 +251,6 @@ class AppController:
                 "id": comp_id_str,
                 "text": node_text,
                 "label": comp.label,
-                "tags": tags,
                 "children": children,
             }
 
@@ -321,6 +278,7 @@ class AppController:
         self._sync_breadcrumbs()
         self.view.update_zoom_display(st.zoom_factor)
         self.view.btn_back.setEnabled(bool(st.parent_stack))
+        self.view.set_mode_str(st.current_mode)
         self.view.canvas.set_viewport_state(
             zoom_factor=st.zoom_factor,
             pan_offset=st.pan_offset,
@@ -364,9 +322,6 @@ class AppController:
                     y=bounds.y,
                     w=bounds.w,
                     h=bounds.h,
-                    is_visible=comp.visibility.visible,
-                    is_locked=comp.visibility.locked,
-                    is_effectively_locked=self._is_effectively_locked(comp.id),
                     pill_corner=comp.style.pillCorner,
                 )
                 if box_changed or not self.view.properties.is_field_focused("name"):
@@ -429,7 +384,9 @@ class AppController:
         selected_ids = self.store.state.selected_component_ids
         if selected_ids:
             for comp_id in list(selected_ids):
-                self.workspace.delete_component(comp_id)
+                state = self.store.state.workspace_state
+                if state and comp_id in state.components:
+                    self.workspace.delete_component(comp_id)
             self.store.update_state("selection", selected_component_ids=[])
 
     def _on_sidebar_context_menu(self, comp_id: UUID, x_root: int, y_root: int):
@@ -440,26 +397,10 @@ class AppController:
         if not comp:
             return
 
-        is_visible = comp.visibility.visible
-        is_locked = comp.visibility.locked
-
-        def toggle_visible():
-            self.workspace.update_component(
-                comp_id, visibility=Visibility(visible=not is_visible, locked=is_locked)
-            )
-
-        def toggle_lock():
-            self.workspace.update_component(
-                comp_id, visibility=Visibility(visible=is_visible, locked=not is_locked)
-            )
-
         def delete_comp():
             self.workspace.delete_component(comp_id)
 
         actions = [
-            {"label": "Hide" if is_visible else "Show", "command": toggle_visible},
-            {"label": "Unlock" if is_locked else "Lock", "command": toggle_lock},
-            {"separator": True},
             {"label": "Delete", "command": delete_comp},
         ]
         self.view.show_context_menu(x_root, y_root, actions)
@@ -496,19 +437,19 @@ class AppController:
 
         for comp_id in selected_ids:
             comp = state.components.get(comp_id)
-            if comp and not self._is_effectively_locked(comp_id):
+            if comp:
                 new_x = comp.bounds.x + dx
                 new_y = comp.bounds.y + dy
                 self.workspace.move_component(comp_id, new_x, new_y)
 
     def _on_import_zip_request(self):
         path = self.dialog_service.ask_open_filename(
-            self.view, title="Select session zip", filetypes=[("Zip files", "*.zip")]
+            self.view, title="Select workspace zip", filetypes=[("Zip files", "*.zip")]
         )
         if not path:
             return
         dialog = self.dialog_service.show_importing_dialog(
-            self.view, message="Importing workspace session..."
+            self.view, message="Importing workspace..."
         )
 
         def do_import():
@@ -519,7 +460,7 @@ class AppController:
         future.add_done_callback(
             lambda f: self._invoker.invoke(
                 lambda: self._handle_io_result(
-                    f, dialog, "Import Failed", "Failed to import workspace session"
+                    f, dialog, "Import Failed", "Failed to import workspace"
                 )
             )
         )
@@ -554,14 +495,14 @@ class AppController:
             return
         path = self.dialog_service.ask_save_as_filename(
             self.view,
-            title="Save session zip",
+            title="Save workspace zip",
             filetypes=[("Zip files", "*.zip")],
             defaultextension=".zip",
         )
         if not path:
             return
         dialog = self.dialog_service.show_importing_dialog(
-            self.view, message="Exporting workspace session..."
+            self.view, message="Exporting workspace..."
         )
 
         def do_export():
@@ -593,11 +534,11 @@ class AppController:
             self.dialog_service.show_error(
                 self.view,
                 "Export Failed",
-                f"Failed to export workspace session:\n{exc}",
+                f"Failed to export workspace:\n{exc}",
             )
         else:
             self.dialog_service.show_info(
-                self.view, "Export Successful", "Session zip exported successfully."
+                self.view, "Export Successful", "Workspace zip exported successfully."
             )
 
     def _on_open_cut_editor_request(self):
@@ -702,7 +643,7 @@ class AppController:
         )
         self.pending_created_ids.add(comp_id)
         self.store.update_state("selection", selected_component_ids=[comp_id])
-        self.view.set_mode_str("select")
+        self.store.update_state("viewport", current_mode="select")
 
     def _on_canvas_context_menu(self, event, clicked: Component | None):
         if not self.view.canvas.full_pil_img:
@@ -717,34 +658,6 @@ class AppController:
                 {
                     "label": f"Drill into Component {num_str}",
                     "command": lambda: self.view.canvas.drill_into(clicked.id),
-                }
-            )
-            is_visible = clicked.visibility.visible
-            vis_label = "Hide Component" if is_visible else "Show Component"
-            items.append(
-                {
-                    "label": vis_label,
-                    "command": lambda: self.workspace.update_component(
-                        clicked.id,
-                        visibility=Visibility(
-                            visible=not is_visible,
-                            locked=clicked.visibility.locked,
-                        ),
-                    ),
-                }
-            )
-            is_locked = clicked.visibility.locked
-            lock_label = "Unlock Component" if is_locked else "Lock Component"
-            items.append(
-                {
-                    "label": lock_label,
-                    "command": lambda: self.workspace.update_component(
-                        clicked.id,
-                        visibility=Visibility(
-                            visible=clicked.visibility.visible,
-                            locked=not is_locked,
-                        ),
-                    ),
                 }
             )
             items.append(
@@ -778,6 +691,7 @@ class AppController:
             ancestors = self.get_ancestor_chain(comp_id)
             self.store.update_state("viewport", parent_stack=ancestors)
             self.store.update_state("selection", selected_component_ids=[comp_id])
+            self.view.canvas.zoom_focus_target()
 
     def _on_property_changed(self, comp_id: str, **kwargs):
         # Translate simple kwargs to Style/Visibility updates
@@ -792,13 +706,15 @@ class AppController:
             style = comp.style.model_copy() if comp.style else Style()
             style.pillCorner = kwargs["pillCorner"]
             update_kwargs["style"] = style
-        if "visible" in kwargs or "locked" in kwargs:
-            vis = comp.visibility.model_copy() if comp.visibility else Visibility()
-            if "visible" in kwargs:
-                vis.visible = kwargs["visible"]
-            if "locked" in kwargs:
-                vis.locked = kwargs["locked"]
-            update_kwargs["visibility"] = vis
+        elif "style" in kwargs:
+            style_val = kwargs["style"]
+            if isinstance(style_val, dict):
+                style = comp.style.model_copy() if comp.style else Style()
+                if "pillCorner" in style_val:
+                    style.pillCorner = style_val["pillCorner"]
+                update_kwargs["style"] = style
+            elif isinstance(style_val, Style):
+                update_kwargs["style"] = style_val
 
         # properties sends x, y, w, h
         x = kwargs.get("x")

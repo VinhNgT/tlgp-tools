@@ -46,9 +46,9 @@ class TestWorkspaceInit:
         assert ws.state.rootComponents == []
         assert ws.raw_image_bytes == b""
 
-    def test_fresh_workspace_has_session_id(self):
+    def test_fresh_workspace_has_workspace_id(self):
         ws = WorkspaceManager()
-        assert ws.state.sessionId is not None
+        assert ws.state.workspaceId is not None
 
 
 # ── Import ─────────────────────────────────────────────────────────────
@@ -64,9 +64,9 @@ class TestImportImage:
 
     def test_import_image_resets_workspace(self):
         ws = _workspace_with_image()
-        old_session = ws.state.sessionId
+        old_workspace_id = ws.state.workspaceId
         ws.import_image(_create_test_image(100, 100))
-        assert ws.state.sessionId != old_session
+        assert ws.state.workspaceId != old_workspace_id
         assert ws.state.components == {}
 
     def test_import_invalid_image_raises(self):

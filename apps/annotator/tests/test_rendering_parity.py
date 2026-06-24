@@ -117,37 +117,6 @@ class TestPillCornerConsistency:
         assert results["top_left"] != results["bottom_right"]
 
 
-# ── Visibility Filtering ─────────────────────────────────────────────
-
-
-class TestVisibilityFiltering:
-    def test_hidden_components_not_drawn(self):
-        """Components with visible=False should not appear in the output."""
-        img_w, img_h = 200, 200
-        visible = Component(
-            id=uuid.uuid4(),
-            number="1",
-            label="Visible",
-            bounds=Bounds(x=10, y=10, w=50, h=50),
-        )
-        hidden = Component(
-            id=uuid.uuid4(),
-            number="2",
-            label="Hidden",
-            bounds=Bounds(x=80, y=10, w=50, h=50),
-        )
-        hidden.visibility.visible = False
-
-        # Draw with both
-        img_both = Image.new("RGB", (img_w, img_h), (255, 255, 255))
-        result_both = paint_annotations(img_both, [visible, hidden], 0, 0, None, img_w)
-
-        # Draw with only visible
-        img_one = Image.new("RGB", (img_w, img_h), (255, 255, 255))
-        result_one = paint_annotations(img_one, [visible], 0, 0, None, img_w)
-
-        # Hidden component should not affect output
-        assert result_both.tobytes() == result_one.tobytes()
 
 
 # ── Font Sizing Consistency Across Levels ─────────────────────────────

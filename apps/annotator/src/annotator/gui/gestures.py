@@ -5,7 +5,6 @@ from uuid import UUID
 
 from annotator.models import Bounds, Component
 
-
 from .transformer import ViewportTransformer
 from .validation import BoundsValidator
 
@@ -88,8 +87,6 @@ class GestureInterpreter:
         if len(selected_boxes) != 1:
             return None
         box = selected_boxes[0]
-        if canvas.is_effectively_locked(box):
-            return None
 
         cx1, cy1 = self.transformer.to_canvas(
             box.bounds.left,
@@ -282,38 +279,37 @@ class GestureInterpreter:
                     new_box = self.cycle_components[self.last_cycle_index]
                     canvas.set_selection([new_box])
 
-                    if not canvas.is_effectively_locked(new_box):
-                        self.is_dragging = True
-                        self.drag_mouse_start_abs = self.transformer.to_abs(
-                            cx,
-                            cy,
-                            state.zoom_factor,
-                            parent_stack,
-                            cut_lines,
-                            pan_offset=state.pan_offset,
-                        )
-                        self.drag_orig_bounds = (
-                            new_box.bounds.left,
-                            new_box.bounds.top,
-                            new_box.bounds.right,
-                            new_box.bounds.bottom,
-                        )
-                        self.drag_orig_descendants = {}
+                    self.is_dragging = True
+                    self.drag_mouse_start_abs = self.transformer.to_abs(
+                        cx,
+                        cy,
+                        state.zoom_factor,
+                        parent_stack,
+                        cut_lines,
+                        pan_offset=state.pan_offset,
+                    )
+                    self.drag_orig_bounds = (
+                        new_box.bounds.left,
+                        new_box.bounds.top,
+                        new_box.bounds.right,
+                        new_box.bounds.bottom,
+                    )
+                    self.drag_orig_descendants = {}
 
-                        def cache_descendants(c_id: UUID):
-                            comp = workspace.components.get(c_id)
-                            if comp:
-                                self.drag_orig_descendants[c_id] = (
-                                    comp.bounds.left,
-                                    comp.bounds.top,
-                                    comp.bounds.right,
-                                    comp.bounds.bottom,
-                                )
-                                for child_id in comp.childrenIds:
-                                    cache_descendants(child_id)
+                    def cache_descendants(c_id: UUID):
+                        comp = workspace.components.get(c_id)
+                        if comp:
+                            self.drag_orig_descendants[c_id] = (
+                                comp.bounds.left,
+                                comp.bounds.top,
+                                comp.bounds.right,
+                                comp.bounds.bottom,
+                            )
+                            for child_id in comp.childrenIds:
+                                cache_descendants(child_id)
 
-                        for child_id in new_box.childrenIds:
-                            cache_descendants(child_id)
+                    for child_id in new_box.childrenIds:
+                        cache_descendants(child_id)
                     return
 
         handle = self.hit_handle(
@@ -359,38 +355,37 @@ class GestureInterpreter:
                 else:
                     canvas.set_selection([clicked])
 
-                if not canvas.is_effectively_locked(clicked):
-                    self.is_dragging = True
-                    self.drag_mouse_start_abs = self.transformer.to_abs(
-                        cx,
-                        cy,
-                        state.zoom_factor,
-                        parent_stack,
-                        cut_lines,
-                        pan_offset=state.pan_offset,
-                    )
-                    self.drag_orig_bounds = (
-                        clicked.bounds.left,
-                        clicked.bounds.top,
-                        clicked.bounds.right,
-                        clicked.bounds.bottom,
-                    )
-                    self.drag_orig_descendants = {}
+                self.is_dragging = True
+                self.drag_mouse_start_abs = self.transformer.to_abs(
+                    cx,
+                    cy,
+                    state.zoom_factor,
+                    parent_stack,
+                    cut_lines,
+                    pan_offset=state.pan_offset,
+                )
+                self.drag_orig_bounds = (
+                    clicked.bounds.left,
+                    clicked.bounds.top,
+                    clicked.bounds.right,
+                    clicked.bounds.bottom,
+                )
+                self.drag_orig_descendants = {}
 
-                    def cache_descendants(c_id: UUID):
-                        comp = workspace.components.get(c_id)
-                        if comp:
-                            self.drag_orig_descendants[c_id] = (
-                                comp.bounds.left,
-                                comp.bounds.top,
-                                comp.bounds.right,
-                                comp.bounds.bottom,
-                            )
-                            for child_id in comp.childrenIds:
-                                cache_descendants(child_id)
+                def cache_descendants(c_id: UUID):
+                    comp = workspace.components.get(c_id)
+                    if comp:
+                        self.drag_orig_descendants[c_id] = (
+                            comp.bounds.left,
+                            comp.bounds.top,
+                            comp.bounds.right,
+                            comp.bounds.bottom,
+                        )
+                        for child_id in comp.childrenIds:
+                            cache_descendants(child_id)
 
-                    for child_id in clicked.childrenIds:
-                        cache_descendants(child_id)
+                for child_id in clicked.childrenIds:
+                    cache_descendants(child_id)
             else:
                 is_multi = event.shift or event.ctrl
                 if not is_multi:
@@ -401,9 +396,7 @@ class GestureInterpreter:
 
                 self.draw_start_x = cx
                 self.draw_start_y = cy
-                canvas.set_temp_rect(
-                    cx, cy, cx, cy, color="#0000FF", dash=True
-                )
+                canvas.set_temp_rect(cx, cy, cx, cy, color="#0c8ce9", dash=True)
                 self.has_temp_rect = True
 
         elif state.current_mode == "draw":
@@ -414,7 +407,7 @@ class GestureInterpreter:
                 cy,
                 cx,
                 cy,
-                color="#A9A9A9",
+                color="#ff4444",
                 dash=False,
                 width=2,
             )
@@ -892,10 +885,10 @@ class GestureInterpreter:
         if canvas.on_request_context_menu:
             canvas.on_request_context_menu(event, clicked)
 
-    def on_control_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
+    def on_control_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float) -> bool:
         """Handles Control/Command click shortcuts to drill down into components."""
         if not canvas.full_pil_img:
-            return
+            return False
 
         state = canvas
         workspace = state.workspace_state
@@ -923,6 +916,8 @@ class GestureInterpreter:
         if clicked:
             if canvas.on_drill_into:
                 canvas.on_drill_into(clicked.id)
+            return True
+        return False
 
     def on_scroll(
         self,
@@ -942,10 +937,11 @@ class GestureInterpreter:
             self.zoom(canvas, delta / 1200.0, (mouse_x, mouse_y))
         else:
             pan_x, pan_y = state.pan_offset
+            scroll_scale = 0.25
             if shift:
-                pan_x += delta
+                pan_x += delta * scroll_scale
             else:
-                pan_y += delta
+                pan_y += delta * scroll_scale
 
             if canvas.on_viewport_change_request:
                 canvas.on_viewport_change_request(canvas.zoom_factor, (pan_x, pan_y))
@@ -989,7 +985,7 @@ class GestureInterpreter:
         cut_lines = workspace.cutLines if workspace else []
 
         old_zoom = state.zoom_factor
-        new_zoom = max(0.1, min(4.0, old_zoom + delta))
+        new_zoom = max(0.1, min(4.0, old_zoom * (1.0 + delta)))
 
         cw = canvas.width()
         ch = canvas.height()

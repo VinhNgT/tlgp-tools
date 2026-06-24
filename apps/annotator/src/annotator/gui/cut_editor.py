@@ -29,7 +29,6 @@ from PySide6.QtWidgets import (
 from annotator.models import Component
 
 from .image_utils import pil_to_qpixmap
-
 from .validation import CutValidator
 
 MIN_CUT_GAP = 50

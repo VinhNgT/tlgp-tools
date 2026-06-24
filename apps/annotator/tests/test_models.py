@@ -4,7 +4,7 @@ import uuid
 
 import pydantic
 import pytest
-from annotator.models import Bounds, Component, Style, Visibility, WorkspaceState
+from annotator.models import Bounds, Component, Style, WorkspaceState
 from annotator.models.tree import TreeUtils
 
 # ── Bounds ─────────────────────────────────────────────────────────────
@@ -46,21 +46,16 @@ class TestComponent:
         assert comp.parentId is None
         assert comp.childrenIds == []
         assert comp.style.pillCorner == "top_left"
-        assert comp.visibility.visible is True
-        assert comp.visibility.locked is False
 
-    def test_custom_style_and_visibility(self):
+    def test_custom_style(self):
         comp = Component(
             id=uuid.uuid4(),
             number="2",
             label="Styled",
             bounds=Bounds(x=0, y=0, w=50, h=50),
             style=Style(pillCorner="bottom_right"),
-            visibility=Visibility(visible=False, locked=True),
         )
         assert comp.style.pillCorner == "bottom_right"
-        assert comp.visibility.visible is False
-        assert comp.visibility.locked is True
 
 
 # ── WorkspaceState ─────────────────────────────────────────────────────
@@ -69,7 +64,7 @@ class TestComponent:
 class TestWorkspaceState:
     def test_default_state(self):
         sid = uuid.uuid4()
-        state = WorkspaceState(sessionId=sid)
+        state = WorkspaceState(workspaceId=sid)
         assert state.version == 1
         assert state.revision == 0
         assert state.readOnly is False
@@ -82,7 +77,7 @@ class TestWorkspaceState:
         sid = uuid.uuid4()
         comp_id = uuid.uuid4()
         state = WorkspaceState(
-            sessionId=sid,
+            workspaceId=sid,
             components={
                 comp_id: Component(
                     id=comp_id,
@@ -95,7 +90,7 @@ class TestWorkspaceState:
         )
         data = state.model_dump(mode="json")
         restored = WorkspaceState.model_validate(data)
-        assert restored.sessionId == sid
+        assert restored.workspaceId == sid
         assert comp_id in restored.components
         assert restored.components[comp_id].label == "Root"
 
@@ -134,7 +129,7 @@ class TestTreeUtils:
         )
 
         state = WorkspaceState(
-            sessionId=uuid.uuid4(),
+            workspaceId=uuid.uuid4(),
             components={root_id: root, child_id: child, grandchild_id: grandchild},
             rootComponents=[root_id],
         )

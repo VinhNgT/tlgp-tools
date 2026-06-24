@@ -4,7 +4,6 @@ from .core import (
     ImageInfo,
     ScreenInfo,
     Style,
-    Visibility,
     WorkspaceState,
 )
 from .tree import TreeUtils
@@ -16,6 +15,5 @@ __all__ = [
     "ScreenInfo",
     "Style",
     "TreeUtils",
-    "Visibility",
     "WorkspaceState",
 ]

@@ -19,15 +19,15 @@ from annotator.models import Component
 # At sub-levels, this is scaled down by (parent_width / full_image_width) so that
 # when the cropped sub-level image is upscaled back to the full document width,
 # the pills appear the same physical size as root-level pills.
-BASE_FONT_SIZE = 30
+BASE_FONT_SIZE = 24
 
 # Minimum font size floor to keep pills legible even at deep nesting levels.
 MIN_FONT_SIZE = 12
 
 # Pill padding ratios relative to font size.
 # At BASE_FONT_SIZE (30), these produce proportional padding.
-PILL_PAD_X_RATIO = 0.7  # total horizontal padding = font_size * 0.7
-PILL_PAD_Y_RATIO = 0.4  # total vertical padding  = font_size * 0.4
+PILL_PAD_X_RATIO = 0.3  # total horizontal padding = font_size * 0.3
+PILL_PAD_Y_RATIO = 0.15  # total vertical padding  = font_size * 0.15
 
 # Box border thickness (in image pixels).
 BOX_BORDER_WIDTH = 5
@@ -138,8 +138,8 @@ def compute_pill_padding(font_size: int) -> tuple[int, int]:
 
     Returns (pad_x, pad_y).
     """
-    pad_x = max(4, round(font_size * PILL_PAD_X_RATIO))
-    pad_y = max(2, round(font_size * PILL_PAD_Y_RATIO))
+    pad_x = max(2, round(font_size * PILL_PAD_X_RATIO))
+    pad_y = max(1, round(font_size * PILL_PAD_Y_RATIO))
     return pad_x, pad_y
 
 
@@ -213,9 +213,6 @@ def paint_annotations(
     box_border_w, pill_outline_w = compute_border_widths(parent_comp, full_img_width)
 
     for comp in children:
-        if not comp.visibility.visible:
-            continue
-
         # Use bounds
         bx1 = comp.bounds.left - offset_x
         by1 = comp.bounds.top - offset_y
@@ -228,11 +225,12 @@ def paint_annotations(
 
         # Number pill (use string number like "1.1")
         num_str = comp.number
-        tw, th, top = get_text_dimensions(draw, num_str, font)
+        ref_tw, ref_th, ref_top = get_text_dimensions(draw, "99", font)
         pad_x, pad_y = compute_pill_padding(font_size)
 
-        pill_w = tw + pad_x
-        pill_h = th + pad_y
+        pill_size = max(ref_tw + pad_x, ref_th + pad_y)
+        pill_w = pill_size
+        pill_h = pill_size
 
         pill_corner = comp.style.pillCorner
         pill_x1, pill_y1 = get_pill_coords(
@@ -247,10 +245,11 @@ def paint_annotations(
             width=pill_outline_w,
         )
         draw.text(
-            (pill_x1 + pad_x // 2, pill_y1 + pad_y // 2 - top),
+            (pill_x1 + pill_w / 2, pill_y1 + pill_h / 2),
             num_str,
             fill="red",
             font=font,
+            anchor="mm",
         )
 
     return img

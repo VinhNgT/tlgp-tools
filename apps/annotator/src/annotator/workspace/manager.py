@@ -13,7 +13,6 @@ from annotator.models import (
     ImageInfo,
     ScreenInfo,
     Style,
-    Visibility,
     WorkspaceState,
 )
 
@@ -40,7 +39,7 @@ class WorkspaceManager:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._state = WorkspaceState(sessionId=uuid.uuid4())
+        self._state = WorkspaceState(workspaceId=uuid.uuid4())
         self.raw_image_bytes: bytes = b""
         self._history: list[dict] = []
         self._pointer: int = -1
@@ -73,17 +72,17 @@ class WorkspaceManager:
         with self._lock:
             if self._state.readOnly and not force:
                 raise ReadOnlyError(
-                    "Workspace is read-only", session_id=str(self._state.sessionId)
+                    "Workspace is read-only", workspace_id=str(self._state.workspaceId)
                 )
 
             old_state = self._state
             old_dump = old_state.model_dump(mode="json")
-            old_session_id = old_state.sessionId
+            old_workspace_id = old_state.workspaceId
 
             new_state = old_state.model_copy(deep=True)
             fn(new_state)
 
-            if new_state.sessionId != old_session_id:
+            if new_state.workspaceId != old_workspace_id:
                 self._history = []
                 self._pointer = -1
                 new_state.revision = 0
@@ -124,7 +123,6 @@ class WorkspaceManager:
         bounds: dict | Bounds,
         parent_id: uuid.UUID | None = None,
         style: Style | None = None,
-        visibility: Visibility | None = None,
     ):
         if not self.state.image:
             raise InvalidStateError("No screenshot/image loaded in workspace")
@@ -143,7 +141,6 @@ class WorkspaceManager:
                 parentId=parent_id,
                 bounds=bounds if isinstance(bounds, Bounds) else Bounds(**bounds),
                 style=style or Style(),
-                visibility=visibility or Visibility(),
             )
             state.components[comp_id] = new_comp
             if parent_id:
@@ -181,7 +178,6 @@ class WorkspaceManager:
         bounds: Bounds | None = None,
         parent_id: uuid.UUID | None = None,
         style: Style | None = None,
-        visibility: Visibility | None = None,
     ):
         if not self.state.image:
             raise InvalidStateError("No screenshot/image loaded in workspace")
@@ -200,8 +196,6 @@ class WorkspaceManager:
                 comp.bounds = bounds
             if style is not None:
                 comp.style = style
-            if visibility is not None:
-                comp.visibility = visibility
 
             if parent_id is not None and parent_id != comp.parentId:
                 if comp.parentId:
@@ -289,7 +283,7 @@ class WorkspaceManager:
 
     def clear_workspace(self, force: bool = False):
         def mutation(state: WorkspaceState):
-            state.sessionId = uuid.uuid4()
+            state.workspaceId = uuid.uuid4()
             state.image = None
             state.screen = ScreenInfo()
             state.cutLines = []
@@ -305,7 +299,7 @@ class WorkspaceManager:
         with self._lock:
             if self._state.readOnly and not force:
                 raise ReadOnlyError(
-                    "Workspace is read-only", session_id=str(self._state.sessionId)
+                    "Workspace is read-only", workspace_id=str(self._state.workspaceId)
                 )
             if self._pointer > 0:
                 old_dump = self._state.model_dump(mode="json")
@@ -328,7 +322,7 @@ class WorkspaceManager:
         with self._lock:
             if self._state.readOnly and not force:
                 raise ReadOnlyError(
-                    "Workspace is read-only", session_id=str(self._state.sessionId)
+                    "Workspace is read-only", workspace_id=str(self._state.workspaceId)
                 )
             if self._pointer < len(self._history) - 1:
                 old_dump = self._state.model_dump(mode="json")
@@ -369,7 +363,7 @@ class WorkspaceManager:
                     self.raw_image_bytes = b""
 
         def mutation(state: WorkspaceState):
-            state.sessionId = uuid.uuid4()
+            state.workspaceId = uuid.uuid4()
             state.screen = new_state.screen
             state.image = new_state.image
             state.cutLines = new_state.cutLines
@@ -392,7 +386,7 @@ class WorkspaceManager:
             ) from e
 
         def mutation(state: WorkspaceState):
-            state.sessionId = uuid.uuid4()
+            state.workspaceId = uuid.uuid4()
             state.image = ImageInfo(filename=filename, width=width, height=height)
             state.cutLines = []
             state.rootComponents = []

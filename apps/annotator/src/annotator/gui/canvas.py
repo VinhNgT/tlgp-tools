@@ -12,6 +12,7 @@ from typing import Any
 from uuid import UUID
 
 from PIL import Image
+import math
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import (
     QBrush,
@@ -33,9 +34,7 @@ from annotator.rendering import (
     compute_border_widths,
     compute_pill_font_size,
     compute_pill_padding,
-    get_font,
     get_pill_coords,
-    get_text_dimensions,
 )
 
 from .gestures import GestureEvent, GestureInterpreter
@@ -69,12 +68,25 @@ class AnnotationCanvasView(QWidget):
         transformer: ViewportTransformer | None = None,
     ):
         super().__init__(parent)
+        self.setObjectName("AnnotationCanvas")
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
         self.setMinimumSize(200, 200)
 
         self.transformer = transformer or ViewportTransformer()
         self.gestures = GestureInterpreter(self.transformer)
+
+        # ── Mouse deadzone and hold configuration ───────────────
+        self.deadzone_radius: float = 5.0
+        self.deadzone_enabled: bool = True
+        self.hold_timeout_ms: int = 300
+
+        self._press_pos: QPointF | None = None
+        self._deadzone_bypassed: bool = False
+
+        self._hold_timer: QTimer = QTimer(self)
+        self._hold_timer.setSingleShot(True)
+        self._hold_timer.timeout.connect(self._on_hold_timer_timeout)
 
         # ── State (read by gestures via canvas.*) ──────────────────
         self.full_pil_img: Image.Image | None = None
@@ -87,6 +99,7 @@ class AnnotationCanvasView(QWidget):
         self.active_interaction: dict[UUID, Any] | None = None
         self.space_pan_active: bool = False
         self.show_labels: bool = True
+        self._needs_fit: bool = False
 
         # ── Callbacks (set by controller) ─────────────────────────
         self.on_viewport_change_request = None
@@ -107,7 +120,6 @@ class AnnotationCanvasView(QWidget):
         # Full-resolution QPixmap (rebuilt only on image/cut-line changes)
         self._base_pixmap: QPixmap | None = None
         self._base_cache_key: tuple | None = None
-        self._redraw_pending = False
 
         # ── Temporary rect for draw/select gesture ────────────────
         self._temp_rect: tuple[float, float, float, float, str, bool, int] | None = None
@@ -121,6 +133,7 @@ class AnnotationCanvasView(QWidget):
         self._base_pixmap = None
         if pil_img:
             self.transformer.update_image_size(pil_img.width, pil_img.height)
+            self._needs_fit = True
         self.schedule_redraw()
 
     def get_active_boxes(self) -> list[Component]:
@@ -137,30 +150,6 @@ class AnnotationCanvasView(QWidget):
                     if cid in ws.components
                 ]
         return [ws.components[cid] for cid in ws.rootComponents if cid in ws.components]
-
-    def is_effectively_locked(self, comp: Component) -> bool:
-        ws = self.workspace_state
-        if not ws:
-            return False
-        if comp.visibility.locked:
-            return True
-        for pid in self.parent_stack:
-            p = ws.components.get(pid)
-            if p and p.visibility.locked:
-                return True
-        return False
-
-    def is_effectively_visible(self, comp: Component) -> bool:
-        if not comp.visibility.visible:
-            return False
-        ws = self.workspace_state
-        if not ws:
-            return True
-        for pid in self.parent_stack:
-            p = ws.components.get(pid)
-            if p and not p.visibility.visible:
-                return False
-        return True
 
     def get_children_bounds_union(
         self, comp: Component
@@ -213,28 +202,79 @@ class AnnotationCanvasView(QWidget):
         active_interaction=None,
     ):
         """Update viewport parameters from controller."""
+        viewport_changed = (zoom_factor != self.zoom_factor) or (
+            pan_offset != self.pan_offset
+        )
         self.zoom_factor = zoom_factor
         self.pan_offset = pan_offset
         self.parent_stack = parent_stack
+        if (
+            hasattr(self, "space_pan_active")
+            and self.space_pan_active
+            and current_mode != "pan"
+        ):
+            self.mode_before_space = current_mode
         self.current_mode = current_mode
         self.active_interaction = active_interaction
+        if viewport_changed and not getattr(self, "_is_fitting", False):
+            self._needs_fit = False
         self.schedule_redraw()
 
     def fit_to_screen(self):
-        """Adjust zoom and pan to fit the full image in the viewport."""
+        """Adjust zoom and pan to fit the active container (selected box, parent component, or full image) in the viewport."""
         if not self.full_pil_img:
             return
+        self._needs_fit = True
         vw, vh = self.width(), self.height()
         if vw <= 1 or vh <= 1:
             vw, vh = 800, 600
-        img_w, img_h = self.full_pil_img.width, self.full_pil_img.height
-        zoom_x = (vw - 40) / img_w
-        zoom_y = (vh - 40) / img_h
-        new_zoom = max(0.1, min(1.0, min(zoom_x, zoom_y)))
-        pad_x = (vw - img_w * new_zoom) / 2
-        pad_y = (vh - img_h * new_zoom) / 2
-        if self.on_viewport_change_request:
-            self.on_viewport_change_request(new_zoom, (pad_x, pad_y))
+
+        ws = self.workspace_state
+        target_comp = None
+        if ws:
+            if self.selected_component_ids:
+                target_comp = ws.components.get(self.selected_component_ids[-1])
+            if not target_comp and self.parent_stack:
+                target_comp = ws.components.get(self.parent_stack[-1])
+
+        if target_comp:
+            # Fit the target component (selected or parent component)
+            bw = target_comp.bounds.w
+            cut_lines = ws.cutLines if ws else []
+            has_cuts = self.transformer.has_active_cuts(self.parent_stack, cut_lines)
+            gap_top = self.transformer.gap_offset_for_y(target_comp.bounds.top) if has_cuts else 0
+            gap_bottom = self.transformer.gap_offset_for_y(target_comp.bounds.bottom) if has_cuts else 0
+            
+            visual_top = target_comp.bounds.top + gap_top
+            visual_bottom = target_comp.bounds.bottom + gap_bottom
+            visual_h = visual_bottom - visual_top
+            
+            zoom_x = (vw - 120) / bw if bw > 0 else 1.0
+            zoom_y = (vh - 120) / visual_h if visual_h > 0 else 1.0
+            new_zoom = max(0.1, min(4.0, min(zoom_x, zoom_y)))
+            pad_x = (vw / 2) - (target_comp.bounds.left + bw / 2) * new_zoom
+            pad_y = (vh / 2) - ((visual_top + visual_bottom) / 2) * new_zoom
+        else:
+            # Fit the full image
+            cut_lines = ws.cutLines if ws else []
+            has_cuts = self.transformer.has_active_cuts(self.parent_stack, cut_lines)
+            img_w = self.full_pil_img.width
+            num_cuts = len(cut_lines)
+            img_h = self.full_pil_img.height + num_cuts * self.transformer.cut_gap_px if has_cuts else self.full_pil_img.height
+            
+            zoom_x = (vw - 40) / img_w
+            zoom_y = (vh - 40) / img_h
+            # Cap zoom at 1.0 for the root image to avoid pixelation
+            new_zoom = max(0.1, min(1.0, min(zoom_x, zoom_y)))
+            pad_x = (vw - img_w * new_zoom) / 2
+            pad_y = (vh - img_h * new_zoom) / 2
+
+        self._is_fitting = True
+        try:
+            if self.on_viewport_change_request:
+                self.on_viewport_change_request(new_zoom, (pad_x, pad_y))
+        finally:
+            self._is_fitting = False
 
     def drill_into(self, comp_id: UUID):
         """Drill into a component (delegate to controller via callback)."""
@@ -258,12 +298,22 @@ class AnnotationCanvasView(QWidget):
             return
         vw, vh = self.width(), self.height()
         bw = comp.bounds.w
-        bh = comp.bounds.h
-        zoom_x = (vw - 40) / bw if bw > 0 else 1.0
-        zoom_y = (vh - 40) / bh if bh > 0 else 1.0
+        
+        # Calculate visual bounds with cuts/gaps
+        cut_lines = ws.cutLines if ws else []
+        has_cuts = self.transformer.has_active_cuts(self.parent_stack, cut_lines)
+        gap_top = self.transformer.gap_offset_for_y(comp.bounds.top) if has_cuts else 0
+        gap_bottom = self.transformer.gap_offset_for_y(comp.bounds.bottom) if has_cuts else 0
+        
+        visual_top = comp.bounds.top + gap_top
+        visual_bottom = comp.bounds.bottom + gap_bottom
+        visual_h = visual_bottom - visual_top
+        
+        zoom_x = (vw - 120) / bw if bw > 0 else 1.0
+        zoom_y = (vh - 120) / visual_h if visual_h > 0 else 1.0
         new_zoom = max(0.1, min(4.0, min(zoom_x, zoom_y)))
         pad_x = (vw / 2) - (comp.bounds.left + bw / 2) * new_zoom
-        pad_y = (vh / 2) - (comp.bounds.top + bh / 2) * new_zoom
+        pad_y = (vh / 2) - ((visual_top + visual_bottom) / 2) * new_zoom
         if self.on_viewport_change_request:
             self.on_viewport_change_request(new_zoom, (pad_x, pad_y))
 
@@ -313,14 +363,7 @@ class AnnotationCanvasView(QWidget):
         self.setFocus()
 
     def schedule_redraw(self):
-        """Schedule a deferred repaint (coalesces rapid updates)."""
-        if not self._redraw_pending:
-            self._redraw_pending = True
-            QTimer.singleShot(16, self._execute_redraw)
-
-    def _execute_redraw(self):
-        self._redraw_pending = False
-        self._rebuild_base_pixmap()
+        """Schedule a repaint (relying on Qt's native coalescing)."""
         self.update()
 
     # ── Rendering Pipeline ────────────────────────────────────────────
@@ -361,6 +404,8 @@ class AnnotationCanvasView(QWidget):
         self._base_pixmap = pil_to_qpixmap(composited)
 
     def paintEvent(self, event):
+        self._rebuild_base_pixmap()
+
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
@@ -447,23 +492,24 @@ class AnnotationCanvasView(QWidget):
         abs_box_border, abs_pill_outline = compute_border_widths(
             parent_comp, full_img_width
         )
-        pad_x, pad_y = compute_pill_padding(font_size)
 
-        # PIL font for text measurement
-        pil_font = get_font(font_size)
-
-        # QFont + metrics created once for the entire level (not per component)
-        pill_font_size = max(4, min(72, round(font_size * zoom)))
+        # QFont created once for the entire level (not per component)
+        pill_font_size = max(4, round(font_size * zoom))
         qfont = self.font()
-        qfont.setPointSize(pill_font_size)
+        qfont.setPixelSize(pill_font_size)
         qfont.setBold(True)
-        pill_ascent = QFontMetrics(qfont).ascent()
+        fm = QFontMetrics(qfont)
+
+        # Scaled padding calculated via pill_font_size
+        scaled_pad_x, scaled_pad_y = compute_pill_padding(pill_font_size)
 
         border_width = max(1, round(abs_box_border * zoom))
         pill_outline_width = max(1, round(abs_pill_outline * zoom))
         inactive_color = Qt.GlobalColor.darkGray
         box_pen = QPen(inactive_color, border_width)
+        box_pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         pill_outline_pen = QPen(inactive_color, pill_outline_width)
+        pill_outline_pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         pill_text_pen = QPen(inactive_color)
 
         non_selected = [
@@ -515,31 +561,14 @@ class AnnotationCanvasView(QWidget):
 
         for comp in ordered_comps:
             is_selected = comp.id in self.selected_component_ids
-            is_visible = comp.visibility.visible
-            is_locked = comp.visibility.locked
 
-            if is_visible:
-                comp_color = (
-                    QColor(Qt.GlobalColor.blue)
-                    if is_selected
-                    else QColor(Qt.GlobalColor.darkGray)
-                )
-                pill_fill_col = QColor(Qt.GlobalColor.white)
-            else:
-                comp_color = (
-                    QColor(0, 0, 255, 120)
-                    if is_selected
-                    else QColor(169, 169, 169, 120)
-                )
-                pill_fill_col = QColor(Qt.GlobalColor.lightGray)
+            comp_color = QColor("#0c8ce9") if is_selected else QColor("#ff4444")
+            pill_fill_col = QColor("#FFFFFF")
 
             lw = border_width + 1 if is_selected else border_width
             box_pen.setColor(comp_color)
             box_pen.setWidth(lw)
-            if is_locked:
-                box_pen.setStyle(Qt.PenStyle.DashLine)
-            else:
-                box_pen.setStyle(Qt.PenStyle.SolidLine)
+            box_pen.setStyle(Qt.PenStyle.SolidLine)
 
             pill_outline_pen.setColor(comp_color)
             pill_text_pen.setColor(comp_color)
@@ -572,15 +601,12 @@ class AnnotationCanvasView(QWidget):
 
             # Number pill
             num_str = comp.number
-            tw, th, _top_offset = get_text_dimensions(None, num_str, pil_font)
+            ref_tw = fm.horizontalAdvance("99")
+            ref_th = fm.height()
 
-            scaled_tw = tw * zoom
-            scaled_th = th * zoom
-            scaled_pad_x = pad_x * zoom
-            scaled_pad_y = pad_y * zoom
-
-            pill_w = scaled_tw + scaled_pad_x
-            pill_h = scaled_th + scaled_pad_y
+            pill_size = max(ref_tw + scaled_pad_x, ref_th + scaled_pad_y)
+            pill_w = pill_size
+            pill_h = pill_size
 
             pill_corner = comp.style.pillCorner
             pill_x, pill_y = get_pill_coords(
@@ -594,18 +620,20 @@ class AnnotationCanvasView(QWidget):
             # Pill text
             p.setFont(qfont)
             p.setPen(pill_text_pen)
-            text_x = pill_x + scaled_pad_x / 2
-            text_y = pill_y + scaled_pad_y / 2 + pill_ascent
-            p.drawText(QPointF(text_x, text_y), num_str)
+            p.drawText(
+                QRectF(pill_x, pill_y, pill_w, pill_h),
+                Qt.AlignmentFlag.AlignCenter,
+                num_str,
+            )
 
             if self.show_labels and comp.label:
                 font = self.font()
                 p.setFont(font)
-                p.setPen(pill_text_pen)
+                p.setPen(QPen(comp_color))
                 p.drawText(QPointF(cx1, cy2 + 13), comp.label)
 
             # Selection handles
-            if is_selected and not is_locked:
+            if is_selected:
                 self._paint_handles(p, cx1, cy1, cx2, cy2)
 
     def _paint_handles(
@@ -614,7 +642,7 @@ class AnnotationCanvasView(QWidget):
         """Paint resize handles around a selected component."""
         mx = (cx1 + cx2) / 2
         my = (cy1 + cy2) / 2
-        hs = 4
+        hs = 5
 
         handles = [
             (cx1, cy1),
@@ -629,7 +657,7 @@ class AnnotationCanvasView(QWidget):
 
         palette = self.palette()
         p.setPen(QPen(palette.color(QPalette.ColorRole.Highlight), 1))
-        p.setBrush(QBrush(palette.color(QPalette.ColorRole.Base)))
+        p.setBrush(QBrush(QColor("#FFFFFF")))
         for hx, hy in handles:
             p.drawRect(QRectF(hx - hs, hy - hs, hs * 2, hs * 2))
 
@@ -639,6 +667,7 @@ class AnnotationCanvasView(QWidget):
             return
         x1, y1, x2, y2, color, dash, width = self._temp_rect
         pen = QPen(QColor(color), width)
+        pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         if dash:
             pen.setStyle(Qt.PenStyle.DashLine)
         p.setPen(pen)
@@ -661,21 +690,39 @@ class AnnotationCanvasView(QWidget):
             ctrl=bool(mods & Qt.KeyboardModifier.ControlModifier),
         )
 
+    def reset_mouse_state(self):
+        """Cancel the hold timer and reset press states."""
+        if hasattr(self, "_hold_timer") and self._hold_timer is not None:
+            self._hold_timer.stop()
+        self._press_pos = None
+        self._deadzone_bypassed = False
+
+    def _on_hold_timer_timeout(self):
+        """Timer callback when mouse is held down for long enough to bypass deadzone."""
+        self._deadzone_bypassed = True
+
     def mousePressEvent(self, event: QMouseEvent):
         if not self.full_pil_img:
             return
 
         ge = self._make_gesture_event(event)
         cx, cy = ge.x, ge.y
+        button = event.button()
 
-        if event.button() == Qt.MouseButton.LeftButton:
+        if button in (Qt.MouseButton.LeftButton, Qt.MouseButton.MiddleButton):
+            self.reset_mouse_state()
+            self._press_pos = event.position()
+            self._hold_timer.start(self.hold_timeout_ms)
+
+        if button == Qt.MouseButton.LeftButton:
             if ge.ctrl and not ge.shift:
-                self.gestures.on_control_click(self, ge, cx, cy)
+                if not self.gestures.on_control_click(self, ge, cx, cy):
+                    self.gestures.on_click(self, ge, cx, cy)
             else:
                 self.gestures.on_click(self, ge, cx, cy)
-        elif event.button() == Qt.MouseButton.MiddleButton:
+        elif button == Qt.MouseButton.MiddleButton:
             self.gestures.on_middle_click(self, ge)
-        elif event.button() == Qt.MouseButton.RightButton:
+        elif button == Qt.MouseButton.RightButton:
             self.gestures.on_right_click(self, ge, cx, cy)
 
     def mouseMoveEvent(self, event: QMouseEvent):
@@ -685,10 +732,36 @@ class AnnotationCanvasView(QWidget):
         ge = self._make_gesture_event(event)
         cx, cy = ge.x, ge.y
 
-        if event.buttons() & Qt.MouseButton.LeftButton:
-            self.gestures.on_drag(self, ge, cx, cy)
-        elif event.buttons() & Qt.MouseButton.MiddleButton:
-            self.gestures.on_middle_drag(self, ge)
+        if self._press_pos is not None:
+            is_drag_allowed = not self.deadzone_enabled or self._deadzone_bypassed
+            if not is_drag_allowed:
+                dx = event.position().x() - self._press_pos.x()
+                dy = event.position().y() - self._press_pos.y()
+                dist = math.hypot(dx, dy)
+                if dist >= self.deadzone_radius:
+                    is_drag_allowed = True
+                    self._deadzone_bypassed = True
+                    self._hold_timer.stop()
+
+                    # Align starting coordinates in gestures to prevent the visual start jump
+                    workspace = self.workspace_state
+                    parent_stack = self.parent_stack
+                    cut_lines = workspace.cutLines if workspace else []
+                    self.gestures.drag_mouse_start_abs = self.transformer.to_abs(
+                        cx,
+                        cy,
+                        self.zoom_factor,
+                        parent_stack,
+                        cut_lines,
+                        pan_offset=self.pan_offset,
+                    )
+                    self.gestures.pan_start_mouse = (cx, cy)
+
+            if is_drag_allowed:
+                if event.buttons() & Qt.MouseButton.LeftButton:
+                    self.gestures.on_drag(self, ge, cx, cy)
+                elif event.buttons() & Qt.MouseButton.MiddleButton:
+                    self.gestures.on_middle_drag(self, ge)
         else:
             self.gestures.on_mouse_move(self, ge, cx, cy)
 
@@ -698,10 +771,13 @@ class AnnotationCanvasView(QWidget):
 
         ge = self._make_gesture_event(event)
         cx, cy = ge.x, ge.y
+        button = event.button()
 
-        if event.button() == Qt.MouseButton.LeftButton:
+        self.reset_mouse_state()
+
+        if button == Qt.MouseButton.LeftButton:
             self.gestures.on_release(self, ge, cx, cy)
-        elif event.button() == Qt.MouseButton.MiddleButton:
+        elif button == Qt.MouseButton.MiddleButton:
             self.gestures.on_middle_release(self, ge, cx, cy)
 
     def wheelEvent(self, event: QWheelEvent):
@@ -741,20 +817,33 @@ class AnnotationCanvasView(QWidget):
         super().resizeEvent(event)
         if self.on_viewport_size_changed:
             self.on_viewport_size_changed(self.width(), self.height())
+        if self._needs_fit and self.width() > 1 and self.height() > 1:
+            self.fit_to_screen()
         self.schedule_redraw()
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
-            self.space_pan_active = True
-            self.set_cursor("pan_inactive")
-            event.accept()
-            return
+            if not self.is_text_focused():
+                self.space_pan_active = True
+                self.mode_before_space = self.current_mode
+                self.set_cursor("pan_inactive")
+                if self.on_canvas_mode_change_request:
+                    self.on_canvas_mode_change_request("pan")
+                event.accept()
+                return
         super().keyPressEvent(event)
 
     def keyReleaseEvent(self, event):
         if event.key() == Qt.Key.Key_Space and not event.isAutoRepeat():
-            self.space_pan_active = False
-            self.set_cursor("default")
-            event.accept()
-            return
+            if not self.is_text_focused():
+                self.space_pan_active = False
+                mode_to_restore = getattr(self, "mode_before_space", "select")
+                if hasattr(self, "mode_before_space"):
+                    delattr(self, "mode_before_space")
+                cursor_name = "draw" if mode_to_restore == "draw" else "default"
+                self.set_cursor(cursor_name)
+                if self.on_canvas_mode_change_request:
+                    self.on_canvas_mode_change_request(mode_to_restore)
+                event.accept()
+                return
         super().keyReleaseEvent(event)

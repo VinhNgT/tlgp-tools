@@ -80,6 +80,24 @@ def main():
 
     logger.info("FastAPI server ready on http://127.0.0.1:8000")
 
+    # Load workspace session or raw image on startup if passed as CLI argument
+    if len(sys.argv) > 1:
+        path = sys.argv[1]
+        if os.path.exists(path):
+            try:
+                with open(path, "rb") as f:
+                    file_bytes = f.read()
+                if path.lower().endswith(".zip"):
+                    workspace.import_zip(file_bytes)
+                    logger.info("Loaded workspace session from %s", path)
+                else:
+                    workspace.import_image(file_bytes, os.path.basename(path))
+                    logger.info("Loaded background image from %s", path)
+            except Exception as e:
+                logger.error("Failed to load startup path %s: %s", path, e)
+        else:
+            logger.error("Startup path does not exist: %s", path)
+
     # GUI on main thread — server is guaranteed running
     start_gui(workspace)
 

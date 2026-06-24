@@ -49,7 +49,7 @@ class TestStateRoutes:
         resp = await client.get("/workspace/state")
         assert resp.status_code == 200
         data = resp.json()
-        assert "sessionId" in data
+        assert "workspaceId" in data
         assert "components" in data
 
     @pytest.mark.anyio()
@@ -117,17 +117,17 @@ class TestUndoRedoRoutes:
         comp_id = uuid.uuid4()
         workspace.add_component(comp_id, "X", Bounds(x=0, y=0, w=50, h=50))
 
-        resp = await client.post("/session/undo")
+        resp = await client.post("/workspace/undo")
         assert resp.status_code == 200
         assert comp_id not in workspace.state.components
 
-        resp = await client.post("/session/redo")
+        resp = await client.post("/workspace/redo")
         assert resp.status_code == 200
         assert comp_id in workspace.state.components
 
     @pytest.mark.anyio()
     async def test_undo_at_beginning_returns_409(self, client):
-        resp = await client.post("/session/undo")
+        resp = await client.post("/workspace/undo")
         assert resp.status_code == 409
 
 
@@ -137,7 +137,7 @@ class TestUndoRedoRoutes:
 class TestImportExportRoutes:
     @pytest.mark.anyio()
     async def test_import_image(self, client, workspace):
-        old_session = workspace.state.sessionId
+        old_workspace_id = workspace.state.workspaceId
         img_bytes = _create_test_image(320, 240)
         resp = await client.post(
             "/workspace/import-image",
@@ -145,7 +145,7 @@ class TestImportExportRoutes:
         )
         assert resp.status_code == 200
         assert workspace.state.image.width == 320
-        assert workspace.state.sessionId != old_session
+        assert workspace.state.workspaceId != old_workspace_id
 
     @pytest.mark.anyio()
     async def test_export_zip(self, client, workspace):

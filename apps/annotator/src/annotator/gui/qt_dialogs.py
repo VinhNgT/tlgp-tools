@@ -24,7 +24,6 @@ from .cut_editor import CutEditorDialog
 from .dialog_service import DialogService, ProgressIndicator
 
 
-
 class _QtProgressIndicator:
     """Wraps a QDialog that acts as a progress indicator."""
 

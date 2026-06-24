@@ -11,6 +11,7 @@ from .app import MainAppWindow
 from .controller import AppController
 from .qt_dialogs import QtDialogService
 from .state import UIStateStore
+from .theme import FIGMA_THEME
 from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)
@@ -37,6 +38,10 @@ def start_gui(workspace_manager):
             pass
 
     app = QApplication.instance() or QApplication(sys.argv)
+
+    # Apply Figma UI/UX theme
+    if isinstance(app, QApplication):
+        app.setStyleSheet(FIGMA_THEME)
 
     if isinstance(app, QApplication):
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -68,5 +73,5 @@ def start_gui(workspace_manager):
     workspace_manager.subscribe(on_workspace_changed)
 
     # Show and run
-    view.show()
+    view.showMaximized()
     sys.exit(app.exec())

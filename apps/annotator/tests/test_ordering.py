@@ -104,7 +104,7 @@ class TestSortReadingOrder:
 class TestRecalculateTree:
     def _build_state(self, root_bounds_list: list[tuple[int, int, int, int]]):
         """Build a simple WorkspaceState with N root components at given bounds."""
-        state = WorkspaceState(sessionId=uuid.uuid4())
+        state = WorkspaceState(workspaceId=uuid.uuid4())
         for x, y, w, h in root_bounds_list:
             comp = Component(
                 id=uuid.uuid4(),
@@ -129,13 +129,6 @@ class TestRecalculateTree:
         assert labels[0] == "comp_0_0"
         assert labels[1] == "comp_200_0"
 
-    def test_hidden_component_gets_no_number(self):
-        state = self._build_state([(0, 0, 50, 50)])
-        root_id = state.rootComponents[0]
-        state.components[root_id].visibility.visible = False
-        recalculate_tree(state)
-        assert state.components[root_id].number == ""
-
     def test_boundary_violation_raises(self):
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
@@ -155,7 +148,7 @@ class TestRecalculateTree:
             bounds=Bounds(x=50, y=50, w=100, h=100),
         )
         state = WorkspaceState(
-            sessionId=uuid.uuid4(),
+            workspaceId=uuid.uuid4(),
             components={parent_id: parent, child_id: child},
             rootComponents=[parent_id],
         )
