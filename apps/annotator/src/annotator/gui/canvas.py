@@ -237,6 +237,7 @@ class AnnotationCanvasView(QWidget):
         """Adjust zoom and pan to fit the active container (selected box, parent component, or full image) in the viewport."""
         if not self.full_pil_img:
             return
+        self.gestures.state.ignore_momentum = True
         self._needs_fit = True
         vw, vh = self.width(), self.height()
         if vw <= 1 or vh <= 1:
@@ -274,6 +275,7 @@ class AnnotationCanvasView(QWidget):
 
     def zoom_focus_target(self):
         """Zoom and pan to focus on the selected component."""
+        self.gestures.state.ignore_momentum = True
         ws = self.workspace_state
         ctx = self.make_viewport_ctx()
         if not ws or not self.selected_component_ids:

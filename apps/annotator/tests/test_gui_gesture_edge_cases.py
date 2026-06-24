@@ -253,4 +253,84 @@ def test_native_gesture_zoom(qapp):
     mock_wheel.accept.assert_called_once()
 
 
+def test_scrolling_inertia_stopped_on_fit(qapp):
+    """Verify that triggering a viewport fit stops trackpad scrolling inertia."""
+    from PySide6.QtCore import Qt
+
+    ws = WorkspaceManager()
+    ws.import_image(create_test_image(800, 600))
+    store = UIStateStore()
+    view = MainAppWindow()
+    AppController(ws, store, view, QtDialogService())
+    canvas = view.canvas
+    canvas.resize(800, 600)
+    canvas.fit_to_screen()
+
+    canvas.zoom_factor = 1.0
+    canvas.pan_offset = (0.0, 0.0)
+
+    # 1. Start scrolling (ScrollBegin)
+    canvas.gestures.on_trackpad_scroll(
+        canvas=canvas,
+        delta_x=10,
+        delta_y=10,
+        mouse_x=100.0,
+        mouse_y=100.0,
+        ctrl=False,
+        phase=Qt.ScrollPhase.ScrollBegin
+    )
+    assert canvas.pan_offset == (10.0, 10.0)
+
+    # 2. Simulate pressing F / Fit to screen
+    canvas.fit_to_screen()
+    fit_zoom = canvas.zoom_factor
+    fit_pan = canvas.pan_offset
+
+    # 3. Send momentum event (inertia) - should be ignored
+    canvas.gestures.on_trackpad_scroll(
+        canvas=canvas,
+        delta_x=20,
+        delta_y=20,
+        mouse_x=100.0,
+        mouse_y=100.0,
+        ctrl=False,
+        phase=Qt.ScrollPhase.ScrollMomentum
+    )
+    assert canvas.zoom_factor == fit_zoom
+    assert canvas.pan_offset == fit_pan
+
+    # 4. Start a new gesture (ScrollBegin) - should not be ignored
+    canvas.gestures.on_trackpad_scroll(
+        canvas=canvas,
+        delta_x=5,
+        delta_y=5,
+        mouse_x=100.0,
+        mouse_y=100.0,
+        ctrl=False,
+        phase=Qt.ScrollPhase.ScrollBegin
+    )
+    assert canvas.pan_offset == (fit_pan[0] + 5, fit_pan[1] + 5)
+
+
+def test_canvas_focus_on_init_with_image(qapp):
+    """Verify that the canvas receives focus upon image load and window show."""
+    ws = WorkspaceManager()
+    ws.import_image(create_test_image(800, 600))
+    store = UIStateStore()
+    view = MainAppWindow()
+    
+    # Initially no focus on canvas
+    assert not view.canvas.hasFocus()
+
+    # Instantiate controller to load raw image and trigger set_canvas_image
+    AppController(ws, store, view, QtDialogService())
+    
+    # Show the window (triggers showEvent)
+    view.show()
+
+    # Should now have focus on canvas
+    assert view.focusWidget() == view.canvas
+    view.close()
+
+
 

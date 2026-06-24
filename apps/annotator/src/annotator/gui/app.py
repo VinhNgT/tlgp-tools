@@ -340,6 +340,7 @@ class MainAppWindow(QMainWindow):
         else:
             self.welcome.hide()
             self.canvas.set_background_image(img)
+            self.canvas.setFocus()
 
         # Data-driven widget enable/disable
         self.btn_cut_lines.setEnabled(has_img)
@@ -475,6 +476,11 @@ class MainAppWindow(QMainWindow):
                 self.canvas.keyReleaseEvent(event)
                 return
         super().keyReleaseEvent(event)
+
+    def showEvent(self, event):
+        super().showEvent(event)
+        if self.canvas.full_pil_img:
+            self.canvas.setFocus()
 
     # ── Private ──────────────────────────────────────────────────────
 

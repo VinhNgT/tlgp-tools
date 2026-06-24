@@ -83,8 +83,12 @@ class PanScrollHandler:
     ):
         if phase == Qt.ScrollPhase.ScrollBegin:
             state.trackpad_zoom_active = ctrl
+            state.ignore_momentum = False
         elif phase == Qt.ScrollPhase.ScrollEnd:
             state.trackpad_zoom_active = None
+
+        if phase == Qt.ScrollPhase.ScrollMomentum and getattr(state, "ignore_momentum", False):
+            return
 
         is_zoom = ctrl
         if state.trackpad_zoom_active is not None:

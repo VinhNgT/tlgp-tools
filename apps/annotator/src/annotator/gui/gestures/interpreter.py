@@ -269,6 +269,7 @@ class GestureInterpreter:
             canvas.set_cursor("draw" if canvas.current_mode == "draw" else "default")
 
     def on_scroll(self, canvas: Any, delta: int, mouse_x: float, mouse_y: float, shift: bool, ctrl: bool):
+        self.state.ignore_momentum = False
         PanScrollHandler.on_scroll(canvas, delta, mouse_x, mouse_y, shift, ctrl)
 
     def on_trackpad_scroll(
