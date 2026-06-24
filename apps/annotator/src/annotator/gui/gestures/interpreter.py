@@ -244,29 +244,7 @@ class GestureInterpreter:
         return False
 
     def on_mouse_move(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
-        if not canvas.full_pil_img:
-            return
-        if canvas.space_pan_active or self.state.space_panning or canvas.current_mode == "pan":
-            return
-
-        ctx = canvas.make_viewport_ctx()
-        selected_boxes = canvas.get_selected_components()
-        handle = HitTester.hit_handle(cx, cy, selected_boxes, ctx, self.transformer)
-
-        if handle:
-            cursors = {
-                "nw": "resize_nw",
-                "n": "resize_n",
-                "ne": "resize_ne",
-                "w": "resize_w",
-                "e": "resize_e",
-                "sw": "resize_sw",
-                "s": "resize_s",
-                "se": "resize_se",
-            }
-            canvas.set_cursor(cursors.get(handle, "default"))
-        else:
-            canvas.set_cursor("draw" if canvas.current_mode == "draw" else "default")
+        pass
 
     def on_scroll(self, canvas: Any, delta: int, mouse_x: float, mouse_y: float, shift: bool, ctrl: bool):
         self.state.ignore_momentum = False

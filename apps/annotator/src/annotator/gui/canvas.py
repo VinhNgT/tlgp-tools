@@ -34,6 +34,7 @@ from annotator.rendering import (
 from .callbacks import CanvasCallbacks
 from .canvas_renderer import CanvasRenderer, CanvasRenderState
 from .gestures import GestureEvent, GestureInterpreter
+from .gestures.hit_testing import HitTester
 from .image_utils import pil_to_qpixmap
 from .transformer import ViewportTransformer
 from .viewport_calculator import ViewportCalculator
@@ -63,6 +64,15 @@ _CURSOR_MAP = {
     "size_ne_sw": Qt.CursorShape.SizeBDiagCursor,
     "size_ns": Qt.CursorShape.SizeVerCursor,
     "size_we": Qt.CursorShape.SizeHorCursor,
+    "resize_nw": Qt.CursorShape.SizeFDiagCursor,
+    "resize_se": Qt.CursorShape.SizeFDiagCursor,
+    "resize_ne": Qt.CursorShape.SizeBDiagCursor,
+    "resize_sw": Qt.CursorShape.SizeBDiagCursor,
+    "resize_n": Qt.CursorShape.SizeVerCursor,
+    "resize_s": Qt.CursorShape.SizeVerCursor,
+    "resize_w": Qt.CursorShape.SizeHorCursor,
+    "resize_e": Qt.CursorShape.SizeHorCursor,
+    "move": Qt.CursorShape.SizeAllCursor,
 }
 
 
@@ -126,6 +136,10 @@ class AnnotationCanvasView(QWidget):
 
         # ── Temporary rect for draw/select gesture ────────────────
         self._temp_rect: TempRect | None = None
+
+        # ── Mouse position tracking ───────────────────────────────
+        self._last_mouse_cx: float | None = None
+        self._last_mouse_cy: float | None = None
 
     # ── Public canvas API (called by gestures / controller) ────────────
 
@@ -192,6 +206,7 @@ class AnnotationCanvasView(QWidget):
             if self.callbacks.on_selection_ids_changed:
                 self.callbacks.on_selection_ids_changed(ids)
             self.update()
+            self.update_canvas_cursor()
 
     def set_workspace_state(
         self, workspace_state: WorkspaceState | None, active_interaction=None
@@ -200,12 +215,14 @@ class AnnotationCanvasView(QWidget):
         self.workspace_state = workspace_state
         self.active_interaction = active_interaction
         self.schedule_redraw()
+        self.update_canvas_cursor()
 
     def set_selection_state(self, selected_ids: list[UUID], active_interaction=None):
         """Update selection and active interaction from controller."""
         self.selected_component_ids = selected_ids
         self.active_interaction = active_interaction
         self.schedule_redraw()
+        self.update_canvas_cursor()
 
     def set_viewport_state(
         self,
@@ -232,6 +249,7 @@ class AnnotationCanvasView(QWidget):
         if viewport_changed and not getattr(self, "_is_fitting", False):
             self._needs_fit = False
         self.schedule_redraw()
+        self.update_canvas_cursor()
 
     def fit_to_screen(self):
         """Adjust zoom and pan to fit the active container (selected box, parent component, or full image) in the viewport."""
@@ -302,6 +320,79 @@ class AnnotationCanvasView(QWidget):
     def set_cursor(self, name: str):
         cursor = _CURSOR_MAP.get(name, Qt.CursorShape.ArrowCursor)
         self.setCursor(QCursor(cursor))
+
+    def update_canvas_cursor(self):
+        """Update the widget cursor based on the current mode, hover state, and modifier keys."""
+        if not self.full_pil_img:
+            self.set_cursor("default")
+            return
+
+        if self.space_pan_active or self.gestures.state.space_panning or self.current_mode == "pan":
+            if self.gestures.state.space_panning or (self._press_pos is not None and self._deadzone_bypassed):
+                self.set_cursor("pan_active")
+            else:
+                self.set_cursor("pan_inactive")
+            return
+
+        if self.current_mode == "draw":
+            self.set_cursor("draw")
+            return
+
+        if self.current_mode == "select":
+            if self.gestures.state.is_dragging and self.gestures.state.resize_handle:
+                cursors = {
+                    "nw": "resize_nw",
+                    "n": "resize_n",
+                    "ne": "resize_ne",
+                    "w": "resize_w",
+                    "e": "resize_e",
+                    "sw": "resize_sw",
+                    "s": "resize_s",
+                    "se": "resize_se",
+                }
+                handle = self.gestures.state.resize_handle
+                self.set_cursor(cursors.get(handle, "default"))
+                return
+
+            if self.gestures.state.is_dragging and not self.gestures.state.resize_handle:
+                # Dragging components uses the normal pointer (ArrowCursor) per design requirements.
+                self.set_cursor("default")
+                return
+
+            if self._last_mouse_cx is None or self._last_mouse_cy is None:
+                self.set_cursor("default")
+                return
+
+            ctx = self.make_viewport_ctx()
+            selected_boxes = self.get_selected_components()
+
+            handle = HitTester.hit_handle(
+                self._last_mouse_cx, self._last_mouse_cy, selected_boxes, ctx, self.transformer
+            )
+            if handle:
+                cursors = {
+                    "nw": "resize_nw",
+                    "n": "resize_n",
+                    "ne": "resize_ne",
+                    "w": "resize_w",
+                    "e": "resize_e",
+                    "sw": "resize_sw",
+                    "s": "resize_s",
+                    "se": "resize_se",
+                }
+                self.set_cursor(cursors.get(handle, "default"))
+                return
+
+            active_comps = self.get_active_boxes()
+            hovered_box = HitTester.hit_box(
+                self._last_mouse_cx, self._last_mouse_cy, active_comps, selected_boxes, ctx, self.transformer
+            )
+            if hovered_box is not None:
+                # Hovering over components uses the normal pointer (ArrowCursor) per design requirements.
+                self.set_cursor("default")
+                return
+
+            self.set_cursor("default")
 
     def set_temp_rect(
         self,
@@ -506,12 +597,17 @@ class AnnotationCanvasView(QWidget):
         elif button == Qt.MouseButton.RightButton:
             self.gestures.on_right_click(self, ge, cx, cy)
 
+        self.update_canvas_cursor()
+
     def mouseMoveEvent(self, event: QMouseEvent):
         if not self.full_pil_img:
             return
 
         ge = self._make_gesture_event(event)
         cx, cy = ge.x, ge.y
+
+        self._last_mouse_cx = cx
+        self._last_mouse_cy = cy
 
         if self._press_pos is not None:
             is_drag_allowed = not self.deadzone_enabled or self._deadzone_bypassed
@@ -524,18 +620,8 @@ class AnnotationCanvasView(QWidget):
                     self._deadzone_bypassed = True
                     self._hold_timer.stop()
 
-                    # Align starting coordinates in gestures to prevent the visual start jump
-                    workspace = self.workspace_state
-                    parent_stack = self.parent_stack
-                    cut_lines = workspace.cutLines if workspace else []
-                    self.gestures.drag_mouse_start_abs = self.transformer.to_abs(
-                        cx,
-                        cy,
-                        self.zoom_factor,
-                        parent_stack,
-                        cut_lines,
-                        pan_offset=self.pan_offset,
-                    )
+                    # Align pan starting coordinates to ensure smooth panning,
+                    # while leaving drag_mouse_start_abs unchanged so the clicked target snaps.
                     self.gestures.pan_start_mouse = (cx, cy)
 
             if is_drag_allowed:
@@ -545,6 +631,8 @@ class AnnotationCanvasView(QWidget):
                     self.gestures.on_middle_drag(self, ge)
         else:
             self.gestures.on_mouse_move(self, ge, cx, cy)
+
+        self.update_canvas_cursor()
 
     def mouseReleaseEvent(self, event: QMouseEvent):
         if not self.full_pil_img:
@@ -560,6 +648,8 @@ class AnnotationCanvasView(QWidget):
             self.gestures.on_release(self, ge, cx, cy)
         elif button == Qt.MouseButton.MiddleButton:
             self.gestures.on_middle_release(self, ge, cx, cy)
+
+        self.update_canvas_cursor()
 
     def event(self, event: QEvent) -> bool:
         if event.type() == QEvent.Type.NativeGesture:
@@ -646,7 +736,7 @@ class AnnotationCanvasView(QWidget):
             if not self.is_text_focused():
                 self.space_pan_active = True
                 self.mode_before_space = self.current_mode
-                self.set_cursor("pan_inactive")
+                self.update_canvas_cursor()
                 if self.callbacks.on_canvas_mode_change_request:
                     self.callbacks.on_canvas_mode_change_request("pan")
                 event.accept()
@@ -660,8 +750,7 @@ class AnnotationCanvasView(QWidget):
                 mode_to_restore = getattr(self, "mode_before_space", "select")
                 if hasattr(self, "mode_before_space"):
                     delattr(self, "mode_before_space")
-                cursor_name = "draw" if mode_to_restore == "draw" else "default"
-                self.set_cursor(cursor_name)
+                self.update_canvas_cursor()
                 if self.callbacks.on_canvas_mode_change_request:
                     self.callbacks.on_canvas_mode_change_request(mode_to_restore)
                 event.accept()
