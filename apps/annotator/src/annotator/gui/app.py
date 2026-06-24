@@ -5,8 +5,10 @@ All user interaction is delegated to the controller via callbacks.
 """
 
 
+import os
+
 from PySide6.QtCore import QPoint, QSize, Qt
-from PySide6.QtGui import QAction, QActionGroup, QKeySequence
+from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QLabel,
     QMainWindow,
@@ -115,6 +117,10 @@ class MainAppWindow(QMainWindow):
     def __init__(self, transformer: ViewportTransformer | None = None):
         super().__init__()
         self.setWindowTitle("Annotator")
+
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        if os.path.exists(icon_path):
+            self.setWindowIcon(QIcon(icon_path))
         self.resize(1400, 900)
         self.setMinimumSize(800, 600)
 

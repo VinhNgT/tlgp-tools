@@ -1,6 +1,9 @@
+import ctypes
+import os
 import sys
 
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 from tlgp_logger import get_logger
 
@@ -25,8 +28,20 @@ class _WorkspaceSignalBridge(QObject):
 
 def start_gui(workspace_manager):
     """Create the Qt application, wire all components, and run the event loop."""
+    if sys.platform == "win32":
+        try:
+            # Set AppUserModelID to ensure taskbar shows the correct application icon on Windows
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("tlgp.annotator.app.1.0")
+        except Exception:
+            pass
+
     app = QApplication.instance() or QApplication(sys.argv)
-    apply_dark_theme(app)
+
+    if isinstance(app, QApplication):
+        icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
+        if os.path.exists(icon_path):
+            app.setWindowIcon(QIcon(icon_path))
+        apply_dark_theme(app)
 
     # Create observable state store
     store = UIStateStore()
