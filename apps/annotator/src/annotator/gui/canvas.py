@@ -9,6 +9,7 @@ This avoids per-frame PIL resizing during pan/zoom interactions.
 """
 
 from typing import Any
+from dataclasses import dataclass, field
 from uuid import UUID
 
 from PIL import Image
@@ -40,6 +41,19 @@ from annotator.rendering import (
 from .gestures import GestureEvent, GestureInterpreter
 from .image_utils import pil_to_qpixmap
 from .transformer import ViewportTransformer
+
+
+@dataclass
+class TempRect:
+    """Temporary rectangle rendered during draw/select gestures."""
+
+    x1: float
+    y1: float
+    x2: float
+    y2: float
+    color: str = "#0000FF"
+    dash: bool = False
+    width: int = 1
 
 # ── Cursor Mapping ────────────────────────────────────────────────────
 
@@ -122,7 +136,7 @@ class AnnotationCanvasView(QWidget):
         self._base_cache_key: tuple | None = None
 
         # ── Temporary rect for draw/select gesture ────────────────
-        self._temp_rect: tuple[float, float, float, float, str, bool, int] | None = None
+        self._temp_rect: TempRect | None = None
 
     # ── Public canvas API (called by gestures / controller) ────────────
 
@@ -150,6 +164,17 @@ class AnnotationCanvasView(QWidget):
                     if cid in ws.components
                 ]
         return [ws.components[cid] for cid in ws.rootComponents if cid in ws.components]
+
+    def get_selected_components(self) -> list[Component]:
+        """Resolve selected component IDs to Component objects."""
+        ws = self.workspace_state
+        if not ws:
+            return []
+        return [
+            ws.components[uid]
+            for uid in self.selected_component_ids
+            if uid in ws.components
+        ]
 
     def get_children_bounds_union(
         self, comp: Component
@@ -209,8 +234,7 @@ class AnnotationCanvasView(QWidget):
         self.pan_offset = pan_offset
         self.parent_stack = parent_stack
         if (
-            hasattr(self, "space_pan_active")
-            and self.space_pan_active
+            self.space_pan_active
             and current_mode != "pan"
         ):
             self.mode_before_space = current_mode
@@ -338,13 +362,15 @@ class AnnotationCanvasView(QWidget):
     ):
         if color is None:
             color = "#0000FF"
-        self._temp_rect = (x1, y1, x2, y2, color, dash, width)
+        self._temp_rect = TempRect(x1, y1, x2, y2, color, dash, width)
         self.update()
 
     def update_temp_rect(self, x1: float, y1: float, x2: float, y2: float):
         if self._temp_rect:
-            _, _, _, _, color, dash, width = self._temp_rect
-            self._temp_rect = (x1, y1, x2, y2, color, dash, width)
+            self._temp_rect = TempRect(
+                x1, y1, x2, y2,
+                self._temp_rect.color, self._temp_rect.dash, self._temp_rect.width,
+            )
             self.update()
 
     def clear_temp_rect(self):
@@ -665,14 +691,17 @@ class AnnotationCanvasView(QWidget):
         """Paint the temporary selection/drawing rectangle."""
         if not self._temp_rect:
             return
-        x1, y1, x2, y2, color, dash, width = self._temp_rect
-        pen = QPen(QColor(color), width)
+        pen = QPen(QColor(self._temp_rect.color), self._temp_rect.width)
         pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
-        if dash:
+        if self._temp_rect.dash:
             pen.setStyle(Qt.PenStyle.DashLine)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRect(QRectF(x1, y1, x2 - x1, y2 - y1))
+        p.drawRect(QRectF(
+            self._temp_rect.x1, self._temp_rect.y1,
+            self._temp_rect.x2 - self._temp_rect.x1,
+            self._temp_rect.y2 - self._temp_rect.y1,
+        ))
 
     # ── Event Handlers ────────────────────────────────────────────────
 
@@ -684,8 +713,8 @@ class AnnotationCanvasView(QWidget):
         return GestureEvent(
             x=pos.x(),
             y=pos.y(),
-            x_root=int(gpos.x()),
-            y_root=int(gpos.y()),
+            screen_x=int(gpos.x()),
+            screen_y=int(gpos.y()),
             shift=bool(mods & Qt.KeyboardModifier.ShiftModifier),
             ctrl=bool(mods & Qt.KeyboardModifier.ControlModifier),
         )

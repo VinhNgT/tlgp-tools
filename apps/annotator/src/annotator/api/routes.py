@@ -36,8 +36,8 @@ class AddComponentRequest(BaseModel):
     id: uuid.UUID | None = None
     label: str
     parentId: uuid.UUID | None = None
-    bounds: dict
-    style: dict | None = None
+    bounds: Bounds
+    style: Style | None = None
 
 
 class MoveComponentRequest(BaseModel):
@@ -47,9 +47,9 @@ class MoveComponentRequest(BaseModel):
 
 class UpdateComponentRequest(BaseModel):
     label: str | None = None
-    bounds: dict | None = None
+    bounds: Bounds | None = None
     parentId: uuid.UUID | None = None
-    style: dict | None = None
+    style: Style | None = None
 
 
 class SetReadOnlyRequest(BaseModel):
@@ -78,7 +78,7 @@ def generate_image_bytes(
 ) -> bytes:
     """Generate a PNG image for a component or the root screenshot."""
     if not workspace.state.image:
-        raise ValueError("Workspace image is not loaded")
+        raise InvalidStateError("Workspace image is not loaded")
 
     if comp_id == "root":
         bounds_left, bounds_top = 0, 0
@@ -189,7 +189,7 @@ def create_router(
             label=req.label,
             bounds=req.bounds,
             parent_id=req.parentId,
-            style=Style(**req.style) if req.style else None,
+            style=req.style,
         )
         return {"id": comp_id, "status": "added"}
 
@@ -204,9 +204,9 @@ def create_router(
             workspace.update_component,
             comp_id=comp_id,
             label=req.label,
-            bounds=Bounds(**req.bounds) if req.bounds else None,
+            bounds=req.bounds,
             parent_id=req.parentId,
-            style=Style(**req.style) if req.style else None,
+            style=req.style,
         )
         return {"status": "updated"}
 

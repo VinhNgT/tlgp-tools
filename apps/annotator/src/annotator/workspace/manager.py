@@ -24,7 +24,7 @@ from .errors import (
     ParentNotFoundError,
     ReadOnlyError,
 )
-from .ordering import recalculate_tree
+from .ordering import ROOTS_CHANGED, recalculate_tree
 
 
 class WorkspaceManager:
@@ -37,14 +37,25 @@ class WorkspaceManager:
     - Subscribers are called outside the lock with an immutable snapshot.
     """
 
+    MAX_HISTORY_SIZE = 100
+
     def __init__(self):
         self._lock = threading.Lock()
         self._state = WorkspaceState(workspaceId=uuid.uuid4())
+
+        # Raw screenshot bytes kept in-memory for export_zip() and API image
+        # generation. This is one of three image representations held
+        # simultaneously (raw bytes, decoded PIL Image in the canvas, and
+        # QPixmap for Qt rendering). Each serves a distinct purpose and
+        # cannot be eliminated without fundamentally changing the pipeline.
         self.raw_image_bytes: bytes = b""
-        self._history: list[dict] = []
-        self._pointer: int = -1
+
+        # Patch-based undo/redo. Each entry is a (reverse_patch, forward_patch)
+        # tuple computed via jsonpatch, excluding the revision counter.
+        self._undo_stack: list[tuple[list, list]] = []
+        self._redo_stack: list[tuple[list, list]] = []
+
         self._subscribers: list[Callable] = []
-        self._save_history_snapshot(self._state.model_dump(mode="json"))
 
     @property
     def state(self) -> WorkspaceState:
@@ -58,14 +69,19 @@ class WorkspaceManager:
         """
         self._subscribers.append(callback)
 
-    def _save_history_snapshot(self, dump: dict):
-        if self._pointer < len(self._history) - 1:
-            self._history = self._history[: self._pointer + 1]
-        self._history.append(dump)
-        self._pointer += 1
+    @staticmethod
+    def _strip_revision(dump: dict) -> dict:
+        """Return a copy of the state dump without the revision counter.
+
+        Undo/redo patches must be independent of the monotonically-increasing
+        revision field so that patches can be replayed regardless of how many
+        times the user undoes/redoes.
+        """
+        return {k: v for k, v in dump.items() if k != "revision"}
 
     def mutate(self, fn, force=False):
         """Apply a mutation function to a deep copy of the state.
+
         Swaps the state reference atomically after mutation.
         Subscribers are notified outside the lock.
         """
@@ -83,18 +99,28 @@ class WorkspaceManager:
             fn(new_state)
 
             if new_state.workspaceId != old_workspace_id:
-                self._history = []
-                self._pointer = -1
+                self._undo_stack.clear()
+                self._redo_stack.clear()
                 new_state.revision = 0
-                new_dump = new_state.model_dump(mode="json")
                 self._state = new_state
-                self._save_history_snapshot(new_dump)
+                new_dump = new_state.model_dump(mode="json")
                 patch = [{"op": "replace", "path": "", "value": new_dump}]
             else:
                 new_state.revision += 1
                 self._state = new_state  # Atomic reference swap
                 new_dump = new_state.model_dump(mode="json")
-                self._save_history_snapshot(new_dump)
+
+                # Store revision-independent patches for undo/redo
+                old_content = self._strip_revision(old_dump)
+                new_content = self._strip_revision(new_dump)
+                fwd = jsonpatch.make_patch(old_content, new_content).patch
+                rev = jsonpatch.make_patch(new_content, old_content).patch
+                if fwd:
+                    self._undo_stack.append((rev, fwd))
+                    self._redo_stack.clear()
+                    if len(self._undo_stack) > self.MAX_HISTORY_SIZE:
+                        self._undo_stack.pop(0)
+
                 patch = jsonpatch.make_patch(old_dump, new_dump).patch
 
         # Notify outside lock — subscribers handle their own threading
@@ -249,7 +275,7 @@ class WorkspaceManager:
                     del state.components[cid]
 
             delete_recursive(comp_id)
-            recalculate_tree(state, changed_id=parent_id if parent_id else "roots")
+            recalculate_tree(state, changed_id=parent_id if parent_id else ROOTS_CHANGED)
 
         self.mutate(mutation)
 
@@ -301,18 +327,23 @@ class WorkspaceManager:
                 raise ReadOnlyError(
                     "Workspace is read-only", workspace_id=str(self._state.workspaceId)
                 )
-            if self._pointer > 0:
-                old_dump = self._state.model_dump(mode="json")
-                self._pointer -= 1
-                state_data = self._history[self._pointer]
-                self._state = WorkspaceState.model_validate(state_data)
-                self._state.revision += 1
-                new_dump = self._state.model_dump(mode="json")
-                self._history[self._pointer] = new_dump  # Keep updated
-                patch = jsonpatch.make_patch(old_dump, new_dump).patch
-                new_state = self._state
-            else:
+            if not self._undo_stack:
                 return False
+
+            old_dump = self._state.model_dump(mode="json")
+            entry = self._undo_stack.pop()
+
+            # Apply reverse patch to content (excluding revision)
+            old_content = self._strip_revision(old_dump)
+            restored_content = jsonpatch.apply_patch(old_content, entry[0])
+            restored_content["revision"] = old_dump["revision"] + 1
+
+            self._state = WorkspaceState.model_validate(restored_content)
+            new_dump = self._state.model_dump(mode="json")
+            self._redo_stack.append(entry)
+
+            patch = jsonpatch.make_patch(old_dump, new_dump).patch
+            new_state = self._state
 
         for cb in list(self._subscribers):
             cb(patch, new_state)
@@ -324,18 +355,23 @@ class WorkspaceManager:
                 raise ReadOnlyError(
                     "Workspace is read-only", workspace_id=str(self._state.workspaceId)
                 )
-            if self._pointer < len(self._history) - 1:
-                old_dump = self._state.model_dump(mode="json")
-                self._pointer += 1
-                state_data = self._history[self._pointer]
-                self._state = WorkspaceState.model_validate(state_data)
-                self._state.revision += 1
-                new_dump = self._state.model_dump(mode="json")
-                self._history[self._pointer] = new_dump
-                patch = jsonpatch.make_patch(old_dump, new_dump).patch
-                new_state = self._state
-            else:
+            if not self._redo_stack:
                 return False
+
+            old_dump = self._state.model_dump(mode="json")
+            entry = self._redo_stack.pop()
+
+            # Apply forward patch to content (excluding revision)
+            old_content = self._strip_revision(old_dump)
+            restored_content = jsonpatch.apply_patch(old_content, entry[1])
+            restored_content["revision"] = old_dump["revision"] + 1
+
+            self._state = WorkspaceState.model_validate(restored_content)
+            new_dump = self._state.model_dump(mode="json")
+            self._undo_stack.append(entry)
+
+            patch = jsonpatch.make_patch(old_dump, new_dump).patch
+            new_state = self._state
 
         for cb in list(self._subscribers):
             cb(patch, new_state)
@@ -374,9 +410,8 @@ class WorkspaceManager:
         self.mutate(mutation, force=True)
 
     def import_image(self, file_bytes: bytes, filename: str = "screenshot.png"):
-        with self._lock:
-            self.raw_image_bytes = file_bytes
-
+        # Validate image BEFORE committing bytes to prevent storing corrupt
+        # data that would be served by export_zip() or image endpoints.
         try:
             with Image.open(io.BytesIO(file_bytes)) as img:
                 width, height = img.width, img.height
@@ -384,6 +419,9 @@ class WorkspaceManager:
             raise InvalidImageError(
                 f"Invalid image format: {e}", filename=filename
             ) from e
+
+        with self._lock:
+            self.raw_image_bytes = file_bytes
 
         def mutation(state: WorkspaceState):
             state.workspaceId = uuid.uuid4()

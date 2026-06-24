@@ -34,8 +34,8 @@ class TreeUtils:
             yield from TreeUtils.walk_dfs(state, child.id)
 
     @staticmethod
-    def has_descendants(state: WorkspaceState, component_id: UUID) -> bool:
-        """Returns True if the component has any children."""
+    def has_children(state: WorkspaceState, component_id: UUID) -> bool:
+        """Returns True if the component has any direct children."""
         comp = state.components.get(component_id)
         if not comp:
             return False

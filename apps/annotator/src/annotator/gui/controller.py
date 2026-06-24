@@ -118,14 +118,6 @@ class AppController:
         self.view.properties.on_property_changed = self._on_property_changed
         self.view.properties.on_focus_changed = self._on_properties_focus_changed
 
-    def _global_error_handler(self, exc, val, tb):
-        logger.exception("Unhandled GUI exception", exc_info=(exc, val, tb))
-        self.dialog_service.show_error(
-            self.view,
-            "Unhandled Error",
-            f"An unexpected error occurred:\n{val}",
-        )
-
     def _show_async_error(self, message: str):
         self.store.update_state("selection", active_interaction=None)
         self.dialog_service.show_error(self.view, "Error", message)
@@ -328,7 +320,7 @@ class AppController:
                     self.view.properties.update_field_value("name", comp.label)
                 for key in ["x", "y", "w", "h"]:
                     if box_changed or not self.view.properties.is_field_focused(key):
-                        val = getattr(bounds, key, 0)
+                        val = getattr(bounds, key)
                         self.view.properties.update_field_value(key, str(val))
                 return
         self.view.properties.disable_properties_fields()
@@ -336,7 +328,7 @@ class AppController:
     def check_trigger_screen_info(self):
         state = self.store.state.workspace_state
         if state and state.image:
-            screen_name = getattr(state.screen, "name", "")
+            screen_name = state.screen.name
             if not screen_name:
                 self._on_open_screen_info_request()
 
@@ -389,7 +381,7 @@ class AppController:
                     self.workspace.delete_component(comp_id)
             self.store.update_state("selection", selected_component_ids=[])
 
-    def _on_sidebar_context_menu(self, comp_id: UUID, x_root: int, y_root: int):
+    def _on_sidebar_context_menu(self, comp_id: UUID, screen_x: int, screen_y: int):
         state = self.store.state.workspace_state
         if not state:
             return
@@ -403,7 +395,7 @@ class AppController:
         actions = [
             {"label": "Delete", "command": delete_comp},
         ]
-        self.view.show_context_menu(x_root, y_root, actions)
+        self.view.show_context_menu(screen_x, screen_y, actions)
 
     def _on_sidebar_rename_request(self, comp_id: UUID, new_label: str):
         self.workspace.update_component(comp_id, label=new_label)
@@ -513,33 +505,28 @@ class AppController:
         future = self._io_pool.submit(do_export)
         future.add_done_callback(
             lambda f: self._invoker.invoke(
-                lambda: self._handle_export_result(f, dialog)
+                lambda: self._handle_io_result(
+                    f,
+                    dialog,
+                    "Export Failed",
+                    "Failed to export workspace",
+                    success_msg="Workspace zip exported successfully.",
+                )
             )
         )
 
-    def _handle_io_result(self, future, dialog, title, message_prefix):
+    def _handle_io_result(
+        self, future, dialog, error_title, error_prefix, success_msg=None
+    ):
         """Handle the result of a background I/O operation."""
         dialog.dismiss()
         exc = future.exception()
         if exc:
             self.dialog_service.show_error(
-                self.view, title, f"{message_prefix}:\n{exc}"
+                self.view, error_title, f"{error_prefix}:\n{exc}"
             )
-
-    def _handle_export_result(self, future, dialog):
-        """Handle the result of a background export operation."""
-        dialog.dismiss()
-        exc = future.exception()
-        if exc:
-            self.dialog_service.show_error(
-                self.view,
-                "Export Failed",
-                f"Failed to export workspace:\n{exc}",
-            )
-        else:
-            self.dialog_service.show_info(
-                self.view, "Export Successful", "Workspace zip exported successfully."
-            )
+        elif success_msg:
+            self.dialog_service.show_info(self.view, "Success", success_msg)
 
     def _on_open_cut_editor_request(self):
         if not self.view.canvas.full_pil_img:
@@ -573,8 +560,8 @@ class AppController:
             )
             return
 
-        screen_name = getattr(state.screen, "name", "")
-        description = getattr(state.screen, "description", "")
+        screen_name = state.screen.name
+        description = state.screen.description
 
         result = self.dialog_service.show_screen_info(
             self.view, screen_name=screen_name, description=description
@@ -611,9 +598,11 @@ class AppController:
                 parent_stack=stack,
             )
 
-    def _on_canvas_viewport_change_request(
-        self, zoom_factor: float, pan_offset: tuple[float, float]
-    ):
+    def _on_canvas_viewport_change_request(self, zoom_factor: float, pan_offset: tuple):
+        # Update view
+        self.view.canvas.set_viewport(zoom_factor, pan_offset)
+
+        # Dispatch model update
         self.store.update_state(
             "viewport", zoom_factor=zoom_factor, pan_offset=pan_offset
         )
@@ -680,7 +669,7 @@ class AppController:
                 "command": self.view.canvas.toggle_labels_visibility,
             }
         )
-        self.view.show_context_menu(event.x_root, event.y_root, items)
+        self.view.show_context_menu(event.screen_x, event.screen_y, items)
 
     def _on_tree_component_selected(self, comp_id: UUID):
         state = self.store.state.workspace_state

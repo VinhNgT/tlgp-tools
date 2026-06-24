@@ -50,10 +50,11 @@ def main():
 
     def run_server():
         asyncio.set_event_loop(server_loop)
+        port = int(os.environ.get("TLGP_PORT", 8000))
         config = uvicorn.Config(
             app,
             host="127.0.0.1",
-            port=8000,
+            port=port,
             log_config=None,
         )
         server = uvicorn.Server(config)
@@ -78,7 +79,8 @@ def main():
         )
         sys.exit(1)
 
-    logger.info("FastAPI server ready on http://127.0.0.1:8000")
+    port = int(os.environ.get("TLGP_PORT", 8000))
+    logger.info(f"FastAPI server ready on http://127.0.0.1:{port}")
 
     # Load workspace session or raw image on startup if passed as CLI argument
     if len(sys.argv) > 1:

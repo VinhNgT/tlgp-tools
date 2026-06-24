@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from PySide6.QtCore import QModelIndex, Qt
+from PySide6.QtCore import QModelIndex, Qt, QObject, QEvent
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -87,21 +87,13 @@ class SidebarTreeView(QWidget):
                 )
 
                 # Re-parent if needed
-                actual_parent = cached_item.parent() or self.model.invisibleRootItem()
-                if (
-                    actual_parent != container
-                    or actual_parent.index().internalId()
-                    != container.index().internalId()
-                    if parent_item
-                    else actual_parent != container
-                ):
-                    row = cached_item.row()
-                    taken = actual_parent.takeRow(row)
+                if cached_item.parent() != parent_item:
+                    old_parent = cached_item.parent() or self.model.invisibleRootItem()
+                    taken = old_parent.takeRow(cached_item.row())
                     if taken:
                         container.insertRow(index, taken)
                 elif cached_item.row() != index:
-                    row = cached_item.row()
-                    taken = container.takeRow(row)
+                    taken = container.takeRow(cached_item.row())
                     if taken:
                         container.insertRow(index, taken)
 
@@ -234,16 +226,16 @@ class SidebarTreeView(QWidget):
         editor.returnPressed.connect(save_edit)
         editor.editingFinished.connect(save_edit)
 
-        def on_escape():
-            cancel_edit()
+        class EscapeEventFilter(QObject):
+            def __init__(self, callback):
+                super().__init__()
+                self.callback = callback
 
-        # Install escape key handler
-        original_key_press = editor.keyPressEvent
+            def eventFilter(self, obj, event):
+                if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+                    self.callback()
+                    return True
+                return super().eventFilter(obj, event)
 
-        def key_press(event):
-            if event.key() == Qt.Key.Key_Escape:
-                on_escape()
-            else:
-                original_key_press(event)
-
-        editor.keyPressEvent = key_press
+        editor._escape_filter = EscapeEventFilter(cancel_edit)
+        editor.installEventFilter(editor._escape_filter)

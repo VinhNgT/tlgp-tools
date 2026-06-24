@@ -1,8 +1,12 @@
+from typing import Final
 from uuid import UUID
 
 from annotator.models import Component, WorkspaceState
 
 from .errors import BoundaryViolationError
+
+# Sentinel indicating that root-level sibling ordering should be recalculated.
+ROOTS_CHANGED: Final = object()
 
 ROW_OVERLAP_THRESHOLD = 0.5
 
@@ -98,7 +102,7 @@ def sort_components_reading_order(components: list[Component]) -> list[Component
     return result
 
 
-def recalculate_tree(state: WorkspaceState, changed_id: UUID | str | None = None):
+def recalculate_tree(state: WorkspaceState, changed_id: UUID | object | None = None):
     """
     Performs a top-down pass over the WorkspaceState flat map to:
     1. Sort siblings visually in natural reading order (row-major).
@@ -138,7 +142,7 @@ def recalculate_tree(state: WorkspaceState, changed_id: UUID | str | None = None
         check_recursive(changed_id)
 
     # 1. Row-major visual sorting step
-    if changed_id == "roots":
+    if changed_id is ROOTS_CHANGED:
         valid_roots = [
             state.components[rid]
             for rid in state.rootComponents

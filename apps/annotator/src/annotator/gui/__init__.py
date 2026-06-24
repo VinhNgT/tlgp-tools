@@ -34,8 +34,8 @@ def start_gui(workspace_manager):
             ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
                 "tlgp.annotator.app.1.0"
             )
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Failed to set AppUserModelID: %s", e)
 
     app = QApplication.instance() or QApplication(sys.argv)
 
@@ -67,7 +67,7 @@ def start_gui(workspace_manager):
     bridge = _WorkspaceSignalBridge()
     bridge.workspace_changed.connect(controller._apply_state_sync)  # noqa: SLF001
 
-    def on_workspace_changed(patch, new_state):
+    def on_workspace_changed(*_args):
         bridge.workspace_changed.emit()
 
     workspace_manager.subscribe(on_workspace_changed)

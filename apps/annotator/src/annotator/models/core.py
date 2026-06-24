@@ -1,11 +1,14 @@
+from typing import Literal
 from uuid import UUID
 
 from pydantic import BaseModel, Field
 
+PillCorner = Literal["top_left", "top_right", "bottom_left", "bottom_right"]
+
 
 class Bounds(BaseModel):
-    x: int
-    y: int
+    x: int = Field(..., ge=0)
+    y: int = Field(..., ge=0)
     w: int = Field(..., ge=4)
     h: int = Field(..., ge=4)
 
@@ -27,9 +30,7 @@ class Bounds(BaseModel):
 
 
 class Style(BaseModel):
-    pillCorner: str = "top_left"
-
-
+    pillCorner: PillCorner = "top_left"
 
 
 class Component(BaseModel):
@@ -40,7 +41,6 @@ class Component(BaseModel):
     childrenIds: list[UUID] = Field(default_factory=list)
     bounds: Bounds
     style: Style = Field(default_factory=Style)
-
 
 
 class ScreenInfo(BaseModel):

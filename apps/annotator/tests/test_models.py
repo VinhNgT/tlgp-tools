@@ -159,12 +159,13 @@ class TestTreeUtils:
         ids = [c.id for c in walked]
         assert ids == [root_id, child_id, grandchild_id]
 
-    def test_has_descendants(self):
+    def test_has_children(self):
         state, root_id, child_id, grandchild_id = self._make_state_with_tree()
-        assert TreeUtils.has_descendants(state, root_id) is True
-        assert TreeUtils.has_descendants(state, child_id) is True
-        assert TreeUtils.has_descendants(state, grandchild_id) is False
+        assert TreeUtils.has_children(state, root_id) is True
+        assert TreeUtils.has_children(state, child_id) is True
+        assert TreeUtils.has_children(state, grandchild_id) is False
 
-    def test_has_descendants_missing_component(self):
+    def test_has_children_missing_component(self):
         state, _, _, _ = self._make_state_with_tree()
-        assert TreeUtils.has_descendants(state, uuid.uuid4()) is False
+        assert TreeUtils.has_children(state, uuid.uuid4()) is False
+

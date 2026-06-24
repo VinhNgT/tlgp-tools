@@ -25,7 +25,7 @@ BASE_FONT_SIZE = 24
 MIN_FONT_SIZE = 12
 
 # Pill padding ratios relative to font size.
-# At BASE_FONT_SIZE (30), these produce proportional padding.
+# At BASE_FONT_SIZE (24), these produce proportional padding.
 PILL_PAD_X_RATIO = 0.3  # total horizontal padding = font_size * 0.3
 PILL_PAD_Y_RATIO = 0.15  # total vertical padding  = font_size * 0.15
 
@@ -106,7 +106,7 @@ def compute_pill_font_size(
 ) -> int:
     """Compute the uniform pill font size for all children at a given nesting level.
 
-    At root level (parent_comp is None): returns BASE_FONT_SIZE (30).
+    At root level (parent_comp is None): returns BASE_FONT_SIZE (24).
     At sub-levels: returns round(BASE_FONT_SIZE * scale), clamped to MIN_FONT_SIZE.
     """
     scale = compute_level_scale(parent_comp, full_img_width)

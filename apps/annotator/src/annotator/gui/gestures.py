@@ -1,6 +1,6 @@
 import time
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID
 
 from annotator.models import Bounds, Component
@@ -19,10 +19,39 @@ class GestureEvent:
 
     x: float  # Widget-space x coordinate
     y: float  # Widget-space y coordinate
-    x_root: int = 0  # Screen-space x coordinate (for context menus)
-    y_root: int = 0  # Screen-space y coordinate (for context menus)
+    screen_x: int = 0  # Screen-space x coordinate (for context menus)
+    screen_y: int = 0  # Screen-space y coordinate (for context menus)
     shift: bool = False  # Shift modifier held
     ctrl: bool = False  # Control/Command modifier held
+
+
+class CanvasView(Protocol):
+    full_pil_img: Image.Image | None
+    workspace_state: WorkspaceState | None
+    parent_stack: list[UUID]
+    selected_component_ids: list[UUID]
+    zoom_factor: float
+    pan_offset: tuple[float, float]
+    current_mode: str
+    active_interaction: dict[UUID, Bounds] | None
+    space_pan_active: bool
+    on_viewport_change_request: Any
+    on_active_interaction_changed: Any
+    on_component_resized: Any
+    on_component_moved: Any
+    on_component_created: Any
+
+    def get_active_boxes(self) -> list[Component]: ...
+    def get_selected_components(self) -> list[Component]: ...
+    def get_children_bounds_union(self, comp: Component) -> tuple[int, int, int, int] | None: ...
+    def set_selection(self, boxes: list[Component]) -> None: ...
+    def set_cursor(self, name: str) -> None: ...
+    def set_temp_rect(self, x1: float, y1: float, x2: float, y2: float, color: str = ..., dash: bool = ..., width: int = ...) -> None: ...
+    def update_temp_rect(self, x1: float, y1: float, x2: float, y2: float) -> None: ...
+    def clear_temp_rect(self) -> None: ...
+    def schedule_redraw(self) -> None: ...
+    def is_text_focused(self) -> bool: ...
+    def clear_text_focus(self) -> None: ...
 
 
 class GestureInterpreter:
@@ -56,7 +85,7 @@ class GestureInterpreter:
         self.cycle_components = None
         self.last_cycle_index = -1
 
-    def _resolve_boundary(self, canvas: Any) -> tuple[int, int, int, int]:
+    def _resolve_boundary(self, canvas: CanvasView) -> tuple[int, int, int, int]:
         workspace = canvas.workspace_state
         parent_stack = canvas.parent_stack
         parent_bounds = None
@@ -74,7 +103,7 @@ class GestureInterpreter:
 
     def hit_handle(
         self,
-        canvas: Any,
+        canvas: CanvasView,
         cx: float,
         cy: float,
         selected_boxes: list[Component],
@@ -125,7 +154,7 @@ class GestureInterpreter:
 
     def get_hit_boxes(
         self,
-        canvas: Any,
+        canvas: CanvasView,
         cx: float,
         cy: float,
         components: list[Component],
@@ -159,7 +188,7 @@ class GestureInterpreter:
 
     def hit_box(
         self,
-        canvas: Any,
+        canvas: CanvasView,
         cx: float,
         cy: float,
         components: list[Component],
@@ -180,7 +209,7 @@ class GestureInterpreter:
         ordered = non_selected + selected
         return ordered[-1] if ordered else None
 
-    def on_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
+    def on_click(self, canvas: CanvasView, event: GestureEvent, cx: float, cy: float):
         """Processes canvas click triggers, initiating moves, resizes, or workspace panning."""
         if not canvas.full_pil_img:
             return
@@ -196,11 +225,7 @@ class GestureInterpreter:
         workspace = state.workspace_state
         parent_stack = state.parent_stack
         cut_lines = workspace.cutLines if workspace else []
-        selected_boxes = [
-            workspace.components[uid]
-            for uid in state.selected_component_ids
-            if workspace and uid in workspace.components
-        ]
+        selected_boxes = canvas.get_selected_components()
 
         now = time.time()
         is_multi = event.shift or event.ctrl
@@ -413,7 +438,7 @@ class GestureInterpreter:
             )
             self.has_temp_rect = True
 
-    def on_drag(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
+    def on_drag(self, canvas: CanvasView, event: GestureEvent, cx: float, cy: float):
         """Manages viewport space shifts, vector bounds resizing, and element coordinate dragging."""
         if not canvas.full_pil_img:
             return
@@ -491,11 +516,7 @@ class GestureInterpreter:
         workspace = state.workspace_state
         parent_stack = state.parent_stack
         cut_lines = workspace.cutLines if workspace else []
-        selected_boxes = [
-            workspace.components[uid]
-            for uid in state.selected_component_ids
-            if workspace and uid in workspace.components
-        ]
+        selected_boxes = canvas.get_selected_components()
 
         if not self.is_dragging or len(selected_boxes) != 1:
             return
@@ -584,7 +605,7 @@ class GestureInterpreter:
 
         canvas.schedule_redraw()
 
-    def on_release(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
+    def on_release(self, canvas: CanvasView, event: GestureEvent, cx: float, cy: float):
         """Concludes drawing operations, committing element shifts or selections to model layers."""
         if not canvas.full_pil_img:
             return
@@ -598,11 +619,7 @@ class GestureInterpreter:
         workspace = state.workspace_state
         parent_stack = state.parent_stack
         cut_lines = workspace.cutLines if workspace else []
-        selected_boxes = [
-            workspace.components[uid]
-            for uid in state.selected_component_ids
-            if workspace and uid in workspace.components
-        ]
+        selected_boxes = canvas.get_selected_components()
 
         event_generated = False
 
@@ -771,7 +788,7 @@ class GestureInterpreter:
                     canvas.on_active_interaction_changed(final_active_int)
             canvas.schedule_redraw()
 
-    def on_mouse_move(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
+    def on_mouse_move(self, canvas: CanvasView, event: GestureEvent, cx: float, cy: float):
         """Adjusts visual cursors depending on mouse hover positions over resize handles."""
         if not canvas.full_pil_img:
             return
@@ -783,11 +800,7 @@ class GestureInterpreter:
         workspace = state.workspace_state
         parent_stack = state.parent_stack
         cut_lines = workspace.cutLines if workspace else []
-        selected_boxes = [
-            workspace.components[uid]
-            for uid in state.selected_component_ids
-            if workspace and uid in workspace.components
-        ]
+        selected_boxes = canvas.get_selected_components()
 
         if (
             state.current_mode == "select"

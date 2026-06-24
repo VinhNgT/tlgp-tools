@@ -5,6 +5,8 @@ Uses a QWidget with QPainter for the canvas and a QListWidget for the
 coordinate list.
 """
 
+from __future__ import annotations
+
 from PIL import Image
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import (

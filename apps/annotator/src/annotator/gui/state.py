@@ -1,10 +1,12 @@
-import logging
+from tlgp_logger import get_logger
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from uuid import UUID
 
 from annotator.models import Bounds, WorkspaceState
+
+logger = get_logger(__name__)
 
 
 @dataclass
@@ -39,9 +41,7 @@ class UIStateStore:
             try:
                 callback()
             except Exception:
-                logging.getLogger(__name__).exception(
-                    "Error in state change subscriber"
-                )
+                logger.exception("Error in state change subscriber")
 
     def update_state(self, event_type: str, **kwargs):
         """Update fields in UIState and trigger the corresponding event notification if a value changed."""

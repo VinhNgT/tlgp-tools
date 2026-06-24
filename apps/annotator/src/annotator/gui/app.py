@@ -343,37 +343,29 @@ class MainAppWindow(QMainWindow):
 
     def set_canvas_image(self, img):
         """Toggle between welcome screen and annotation canvas."""
-        if img is None:
+        has_img = img is not None
+        if not has_img:
             self.welcome.show()
-            self.btn_cut_lines.setEnabled(False)
-            self.chk_show_labels.setEnabled(False)
-            self.btn_screen_info.setEnabled(False)
-            self.btn_back.setEnabled(False)
-            self.btn_fit.setEnabled(False)
             self.canvas.set_background_image(None)
-            for action in self._mode_actions.values():
-                action.setEnabled(False)
-            self.act_export.setEnabled(False)
-            self.act_screen_info.setEnabled(False)
-            self.act_cuts.setEnabled(False)
-            self.act_undo.setEnabled(False)
-            self.act_redo.setEnabled(False)
-            self.act_delete.setEnabled(False)
         else:
             self.welcome.hide()
             self.canvas.set_background_image(img)
-            self.btn_cut_lines.setEnabled(True)
-            self.chk_show_labels.setEnabled(True)
-            self.btn_screen_info.setEnabled(True)
-            self.btn_fit.setEnabled(True)
-            for action in self._mode_actions.values():
-                action.setEnabled(True)
-            self.act_export.setEnabled(True)
-            self.act_screen_info.setEnabled(True)
-            self.act_cuts.setEnabled(True)
-            self.act_undo.setEnabled(True)
-            self.act_redo.setEnabled(True)
-            self.act_delete.setEnabled(True)
+
+        # Data-driven widget enable/disable
+        self.btn_cut_lines.setEnabled(has_img)
+        self.chk_show_labels.setEnabled(has_img)
+        self.btn_screen_info.setEnabled(has_img)
+        self.btn_fit.setEnabled(has_img)
+        
+        for action in self._mode_actions.values():
+            action.setEnabled(has_img)
+            
+        self.act_export.setEnabled(has_img)
+        self.act_screen_info.setEnabled(has_img)
+        self.act_cuts.setEnabled(has_img)
+        self.act_undo.setEnabled(has_img)
+        self.act_redo.setEnabled(has_img)
+        self.act_delete.setEnabled(has_img)
 
     def set_mode_str(self, mode: str):
         """Update toolbar mode buttons to match the given mode."""
@@ -383,9 +375,6 @@ class MainAppWindow(QMainWindow):
 
     def update_status(self, text: str, is_error: bool = False):
         self.properties.update_status(text, is_error)
-
-    def update_zoom_display(self, zoom_factor: float):
-        pass
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:
