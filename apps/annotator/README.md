@@ -33,7 +33,7 @@ annotator/
 ## Running
 
 ```bash
-uv run python -m annotator
+uv run annotator
 ```
 
 ## Testing

@@ -16,6 +16,7 @@ dependencies = [
 
 [project.scripts]
 mcp-server-cmd = "mcp_server.__main__:main"
+tlgp-mcp = "mcp_server.__main__:main"
 
 [tool.uv.sources]
 doc-generator = { workspace = true }

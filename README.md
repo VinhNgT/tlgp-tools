@@ -38,18 +38,14 @@ uv sync
 Start the interactive annotator. This launches a monolithic process that runs both the backend API engine (on a background thread) and the Tkinter GUI frontend:
 
 ```bash
-uv run python -m annotator
+uv run annotator
 ```
 
 ### 2. Generate Specification Documents
-Run the document generator directly via the workspace CLI script or Python module:
+Run the document generator directly via the workspace CLI script alias:
 
 ```bash
-# Using the CLI script alias
 uv run doc-gen analysis.json -o spec_output.docx
-
-# Or using Python module execution
-uv run python -m doc_generator analysis.json -o spec_output.docx
 ```
 
 ### 3. Start the MCP Server
@@ -57,7 +53,7 @@ To expose these tools to AI assistants (like the Antigravity IDE or Gemini-in-An
 
 ```bash
 # Start the MCP server process over standard I/O (stdio)
-uv run python -m mcp_server
+uv run tlgp-mcp
 ```
 
 ---

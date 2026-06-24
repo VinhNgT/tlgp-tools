@@ -146,7 +146,7 @@ class DaemonManager:
         annotator_dir = os.path.join(self.workspace_root, "apps", "annotator")
 
         logger.info("Spawning annotator daemon under Cwd: %s", annotator_dir)
-        annotator_cmd = [self.uv_bin, "run", "python", "-m", "annotator"]
+        annotator_cmd = [self.uv_bin, "run", "annotator"]
         annotator_proc = subprocess.Popen(
             annotator_cmd,
             cwd=annotator_dir,

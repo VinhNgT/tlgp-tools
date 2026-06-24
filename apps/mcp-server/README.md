@@ -30,7 +30,7 @@ uv sync
   "mcpServers": {
     "tlgp-tools": {
       "command": "uv",
-      "args": ["run", "--directory", "/Volumes/Lexar2TB/Dev/tlgp-tools", "python", "-m", "mcp_server"]
+      "args": ["run", "--directory", "/Volumes/Lexar2TB/Dev/tlgp-tools", "tlgp-mcp"]
     }
   }
 }
@@ -50,7 +50,7 @@ uv sync
   "mcpServers": {
     "tlgp-tools": {
       "command": "uv",
-      "args": ["run", "--directory", "/Volumes/Lexar2TB/Dev/tlgp-tools", "python", "-m", "mcp_server"]
+      "args": ["run", "--directory", "/Volumes/Lexar2TB/Dev/tlgp-tools", "tlgp-mcp"]
     }
   }
 }
@@ -65,13 +65,13 @@ uv sync
 
 ```bash
 cd /Volumes/Lexar2TB/Dev/tlgp-tools
-npx -y @modelcontextprotocol/inspector uv run python -m mcp_server
+npx -y @modelcontextprotocol/inspector uv run tlgp-mcp
 ```
 
 ### Direct CLI
 
 ```bash
-uv run python -m mcp_server
+uv run tlgp-mcp
 ```
 
 ## Tools

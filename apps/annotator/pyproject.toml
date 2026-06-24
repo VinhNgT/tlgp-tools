@@ -14,6 +14,9 @@ dependencies = [
     "tlgp-logger",
 ]
 
+[project.scripts]
+annotator = "annotator.__main__:main"
+
 [tool.uv.sources]
 tlgp-logger = { workspace = true }
 

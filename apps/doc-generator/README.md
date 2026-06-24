@@ -5,7 +5,7 @@ Generate fully formatted TLGP screen specification `.docx` files from `analysis.
 ## Usage
 
 ```bash
-uv run python -m doc_generator analysis.json [-o output.docx] [--dry-run]
+uv run doc-gen analysis.json [-o output.docx] [--dry-run]
 ```
 
 ## Input
