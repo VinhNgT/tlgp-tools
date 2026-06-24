@@ -138,8 +138,6 @@ class MainAppWindow(QMainWindow):
         self._build_toolbar()
         self._build_central_area(transformer)
 
-        self._build_central_area(transformer)
-
     def _build_menu_bar(self):
         menubar = self.menuBar()
 
