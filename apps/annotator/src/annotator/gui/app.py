@@ -48,6 +48,7 @@ class WelcomeWidget(QWidget):
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         card = QFrame()
+        card.setObjectName("WelcomeCard")
         card.setFrameShape(QFrame.Shape.StyledPanel)
         card.setFrameShadow(QFrame.Shadow.Raised)
         card.setFixedSize(400, 220)
@@ -257,6 +258,7 @@ class MainAppWindow(QMainWindow):
 
     def _build_central_area(self, transformer: ViewportTransformer | None):
         splitter = QSplitter(Qt.Orientation.Horizontal)
+        splitter.setHandleWidth(4)
         self.setCentralWidget(splitter)
 
         # Left: canvas stack (welcome or annotation)
@@ -278,6 +280,7 @@ class MainAppWindow(QMainWindow):
         right_layout.setSpacing(0)
 
         right_splitter = QSplitter(Qt.Orientation.Vertical)
+        right_splitter.setHandleWidth(4)
 
         self.tree = SidebarTreeView()
         right_splitter.addWidget(self.tree)

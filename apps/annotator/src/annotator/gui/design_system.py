@@ -190,3 +190,44 @@ def set_widget_text_color(widget, hex_color: str | QColor):
     palette.setColor(QPalette.ColorRole.Text, color)
     palette.setColor(QPalette.ColorRole.ButtonText, color)
     widget.setPalette(palette)
+
+
+def get_application_stylesheet() -> str:
+    """Returns a global stylesheet (QSS) utilizing dynamic QPalette queries
+
+    to achieve modern styling (rounded borders, subtle hover feedback,
+    and distinct splitter handles) while respecting system themes.
+    """
+    return """
+        QPushButton {
+            border: 1px solid palette(mid);
+            border-radius: 4px;
+            padding: 5px 12px;
+            background-color: palette(button);
+        }
+        QPushButton:hover {
+            background-color: palette(midlight);
+        }
+        QPushButton:pressed {
+            background-color: palette(mid);
+        }
+        QPushButton:disabled {
+            background-color: palette(window);
+            color: palette(placeholder-text);
+            border: 1px solid palette(midlight);
+        }
+        QSplitter::handle {
+            background-color: palette(mid);
+        }
+        QSplitter::handle:horizontal {
+            width: 2px;
+        }
+        QSplitter::handle:vertical {
+            height: 2px;
+        }
+        #WelcomeCard {
+            background-color: palette(base);
+            border: 1px solid palette(mid);
+            border-radius: 8px;
+        }
+    """

@@ -174,7 +174,7 @@ class ComponentPropertiesView(QWidget):
 
         # Coordinate fields
         coords_grid = QGridLayout()
-        coords_grid.setSpacing(4)
+        coords_grid.setSpacing(LayoutTokens.SPACING_SM)
         self.prop_entries: dict[str, QLineEdit] = {}
         for idx, (label, key) in enumerate(
             [("X", "x"), ("Y", "y"), ("W", "w"), ("H", "h")]

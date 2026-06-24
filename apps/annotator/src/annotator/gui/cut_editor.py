@@ -308,7 +308,13 @@ class CutEditorDialog(QDialog):
 
     def _build_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setContentsMargins(
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+        )
+        layout.setSpacing(LayoutTokens.SPACING_DEFAULT)
 
         # Left: canvas
         self.canvas_widget = _CutCanvasWidget(self)
@@ -357,6 +363,7 @@ class CutEditorDialog(QDialog):
 
         # OK / Cancel
         btn_row = QHBoxLayout()
+        btn_row.setSpacing(LayoutTokens.SPACING_SM)
         btn_row.addStretch()
         btn_ok = QPushButton("OK")
         btn_ok.setFixedWidth(80)
