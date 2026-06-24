@@ -222,6 +222,13 @@ class MainAppWindow(QMainWindow):
         self.btn_back.triggered.connect(lambda: self._fire(self.on_back_request))
         tb.addAction(self.btn_back)
 
+        # Cut Lines button
+        self.btn_cut_lines = QAction("Cut Lines (C)", self)
+        self.btn_cut_lines.setToolTip("Edit Cut Lines (C / Ctrl+L)")
+        self.btn_cut_lines.setEnabled(False)
+        self.btn_cut_lines.triggered.connect(lambda: self._fire(self.on_open_cut_editor_request))
+        tb.addAction(self.btn_cut_lines)
+
         # Breadcrumbs label
         self.lbl_breadcrumbs = QLabel("Root")
         self.lbl_breadcrumbs.setStyleSheet("color: #888888; padding: 0 8px;")
@@ -278,9 +285,11 @@ class MainAppWindow(QMainWindow):
         """Switch between welcome screen and annotation canvas."""
         if img is None:
             self.canvas_stack.setCurrentWidget(self.welcome)
+            self.btn_cut_lines.setEnabled(False)
         else:
             self.canvas.set_background_image(img)
             self.canvas_stack.setCurrentWidget(self.canvas)
+            self.btn_cut_lines.setEnabled(True)
 
     def set_mode_str(self, mode: str):
         """Update toolbar mode buttons to match the given mode."""
@@ -375,13 +384,16 @@ class MainAppWindow(QMainWindow):
 
         # Canvas shortcuts
         if key == Qt.Key.Key_F:
-            self.canvas.fit_to_screen()
+            if mods & Qt.KeyboardModifier.ShiftModifier:
+                self.canvas.zoom_focus_target()
+            else:
+                self.canvas.fit_to_screen()
             return
         if key == Qt.Key.Key_T:
             self.canvas.toggle_labels_visibility()
             return
         if key == Qt.Key.Key_C:
-            self.canvas.zoom_focus_target()
+            self._fire(self.on_open_cut_editor_request)
             return
         if key == Qt.Key.Key_Backspace or key == Qt.Key.Key_Delete:
             if self.on_delete_request:
