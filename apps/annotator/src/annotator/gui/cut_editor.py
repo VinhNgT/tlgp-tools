@@ -28,19 +28,16 @@ from PySide6.QtWidgets import (
 
 from annotator.models import Component
 
-from .design_system import ColorSystem, get_ui_font
+from .design_system import (
+    ColorSystem,
+    get_caption_font,
+    get_header_font,
+)
 from .image_utils import pil_to_qpixmap
 from .validation import CutValidator
 
 MIN_CUT_GAP = 50
 SNAP_DISTANCE = 8
-
-# ── Colour Constants ──────────────────────────────────────────────────
-
-# Canvas overlay visuals (drawing helper frames and boxes)
-_COMP_FILL = ColorSystem.CUT_COMP_FILL
-_COMP_OUTLINE = ColorSystem.CUT_COMP_OUTLINE
-_CUT_LABEL_FONT = get_ui_font(size=8, bold=True)
 
 
 class _CutCanvasWidget(QWidget):
@@ -101,15 +98,16 @@ class _CutCanvasWidget(QWidget):
         source = QRectF(0, 0, src_w, src_h)
         p.drawPixmap(target, self._base_pixmap, source)
 
-        # Draw semi-transparent red overlays for existing components
-        comp_outline_pen = QPen(_COMP_OUTLINE, 1)
+        # Draw semi-transparent overlays for existing components
+        comp_outline_pen = QPen(ColorSystem.get_cut_comp_outline(), 1)
+        comp_fill_brush = ColorSystem.get_cut_comp_fill()
         for comp in self.dialog.existing_components:
             cx1 = comp.bounds.left * zoom
             cy1 = self._to_canvas_y(comp.bounds.top)
             cx2 = comp.bounds.right * zoom
             cy2 = self._to_canvas_y(comp.bounds.bottom)
             rect = QRectF(cx1, cy1, cx2 - cx1, cy2 - cy1)
-            p.fillRect(rect, _COMP_FILL)
+            p.fillRect(rect, comp_fill_brush)
             p.setPen(comp_outline_pen)
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawRect(rect)
@@ -126,7 +124,9 @@ class _CutCanvasWidget(QWidget):
             p.setPen(pen)
             p.drawLine(QPointF(0, cy), QPointF(disp_w, cy))
 
-            p.setFont(_CUT_LABEL_FONT)
+            label_font = get_caption_font()
+            label_font.setBold(True)
+            p.setFont(label_font)
             p.setPen(QPen(color))
             p.drawText(QPointF(disp_w - 50, cy - 6), f"Y={y}")
 
@@ -306,7 +306,7 @@ class CutEditorDialog(QDialog):
         right_layout.setContentsMargins(10, 10, 10, 10)
 
         lbl = QLabel("CUT LINES")
-        lbl.setFont(get_ui_font(size=10, bold=True))
+        lbl.setFont(get_header_font())
         right_layout.addWidget(lbl)
 
         self.listbox = QListWidget()
@@ -328,7 +328,7 @@ class CutEditorDialog(QDialog):
         right_layout.addWidget(self.btn_clear)
 
         self.status_label = QLabel("")
-        self.status_label.setFont(get_ui_font(size=8))
+        self.status_label.setFont(get_caption_font())
         self.status_label.setStyleSheet(f"color: {ColorSystem.ERROR};")
         self.status_label.setWordWrap(True)
         right_layout.addWidget(self.status_label)

@@ -24,7 +24,11 @@ from PySide6.QtWidgets import (
 )
 
 from .canvas import AnnotationCanvasView
-from .design_system import get_ui_font
+from .design_system import (
+    ColorSystem,
+    get_body_font,
+    get_title_font,
+)
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
 from .transformer import ViewportTransformer
@@ -53,7 +57,7 @@ class WelcomeWidget(QWidget):
 
         title = QLabel("Annotator")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(get_ui_font(size=18, bold=True))
+        title.setFont(get_title_font())
         card_layout.addWidget(title)
 
         self.desc_label = QLabel("Open a workspace session or raw image to begin.")
@@ -221,7 +225,8 @@ class MainAppWindow(QMainWindow):
 
         # Breadcrumbs label
         self.lbl_breadcrumbs = QLabel("Root")
-        self.lbl_breadcrumbs.setStyleSheet("color: palette(placeholder-text); padding: 0 8px;")
+        self.lbl_breadcrumbs.setFont(get_body_font())
+        self.lbl_breadcrumbs.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
         tb.addWidget(self.lbl_breadcrumbs)
 
         spacer = QWidget()
@@ -230,7 +235,8 @@ class MainAppWindow(QMainWindow):
 
         # Zoom display
         self.lbl_zoom = QLabel("100%")
-        self.lbl_zoom.setStyleSheet("color: palette(placeholder-text); padding: 0 8px;")
+        self.lbl_zoom.setFont(get_body_font())
+        self.lbl_zoom.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
         tb.addWidget(self.lbl_zoom)
 
     def _build_central_area(self, transformer: ViewportTransformer | None):
@@ -311,6 +317,7 @@ class MainAppWindow(QMainWindow):
     def update_zoom_display(self, zoom_factor: float):
         pct = round(zoom_factor * 100)
         self.lbl_zoom.setText(f"{pct}%")
+        self.lbl_zoom.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:
@@ -318,6 +325,7 @@ class MainAppWindow(QMainWindow):
         else:
             path = "Root"
         self.lbl_breadcrumbs.setText(path)
+        self.lbl_breadcrumbs.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
 
     def show_context_menu(self, x: int, y: int, actions: list[dict]):
         """Display a popup context menu at screen coordinates (x, y)."""

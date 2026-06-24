@@ -401,13 +401,13 @@ class GestureInterpreter:
 
                 self.draw_start_x = cx
                 self.draw_start_y = cy
-                canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.BOX_ACTIVE, dash=True)
+                canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.get_box_active(), dash=True)
                 self.has_temp_rect = True
 
         elif state.current_mode == "draw":
             self.draw_start_x = cx
             self.draw_start_y = cy
-            canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.BOX_INACTIVE, dash=False, width=2)
+            canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.get_box_inactive(), dash=False, width=2)
             self.has_temp_rect = True
 
     def on_drag(self, canvas: Any, event: GestureEvent, cx: float, cy: float):

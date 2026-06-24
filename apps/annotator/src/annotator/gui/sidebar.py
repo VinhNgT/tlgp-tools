@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .design_system import get_ui_font
+from .design_system import get_header_font
 
 
 class SidebarTreeView(QWidget):
@@ -24,7 +24,7 @@ class SidebarTreeView(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         lbl = QLabel("COMPONENTS")
-        lbl.setFont(get_ui_font(bold=True))
+        lbl.setFont(get_header_font())
         layout.addWidget(lbl)
 
         self.model = QStandardItemModel()

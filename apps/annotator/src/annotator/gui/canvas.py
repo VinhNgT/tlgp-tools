@@ -38,7 +38,11 @@ from annotator.rendering import (
     get_text_dimensions,
 )
 
-from .design_system import ColorSystem, get_ui_font
+from .design_system import (
+    ColorSystem,
+    get_body_font,
+    get_ui_font,
+)
 from .gestures import GestureEvent, GestureInterpreter
 from .image_utils import pil_to_qpixmap
 from .transformer import ViewportTransformer
@@ -284,8 +288,10 @@ class AnnotationCanvasView(QWidget):
     def set_temp_rect(
         self,
         x1: float, y1: float, x2: float, y2: float,
-        color: str = ColorSystem.BOX_ACTIVE, dash: bool = False, width: int = 1,
+        color: str | None = None, dash: bool = False, width: int = 1,
     ):
+        if color is None:
+            color = ColorSystem.get_box_active()
         self._temp_rect = (x1, y1, x2, y2, color, dash, width)
         self.update()
 
@@ -365,8 +371,7 @@ class AnnotationCanvasView(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        palette = self.palette()
-        p.fillRect(self.rect(), palette.color(QPalette.ColorRole.Base))
+        p.fillRect(self.rect(), QColor(ColorSystem.get_canvas_bg()))
 
         if not self.full_pil_img or not self._base_pixmap:
             p.end()
@@ -458,9 +463,10 @@ class AnnotationCanvasView(QWidget):
 
         border_width = max(1, round(abs_box_border * zoom))
         pill_outline_width = max(1, round(abs_pill_outline * zoom))
-        box_pen = QPen(QColor(ColorSystem.BOX_INACTIVE), border_width)
-        pill_outline_pen = QPen(QColor(ColorSystem.BOX_INACTIVE), pill_outline_width)
-        pill_text_pen = QPen(QColor(ColorSystem.BOX_INACTIVE))
+        inactive_color = QColor(ColorSystem.get_box_inactive())
+        box_pen = QPen(inactive_color, border_width)
+        pill_outline_pen = QPen(inactive_color, pill_outline_width)
+        pill_text_pen = QPen(inactive_color)
 
         non_selected = [comp for comp in active_comps if comp.id not in self.selected_component_ids]
         selected = [comp for comp in active_comps if comp.id in self.selected_component_ids]
@@ -479,15 +485,18 @@ class AnnotationCanvasView(QWidget):
                     cx2, cy2, zoom, self.parent_stack, cut_lines,
                     pan_offset=self.pan_offset,
                 )
-                dash_pen = QPen(QColor(ColorSystem.CHILD_BOUNDS_OVERLAY), 2)
+                overlay_color = QColor(ColorSystem.get_child_bounds_overlay())
+                dash_pen = QPen(overlay_color, 2)
                 dash_pen.setStyle(Qt.PenStyle.DashLine)
                 p.setPen(dash_pen)
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRect(QRectF(gcx1, gcy1, gcx2 - gcx1, gcy2 - gcy1))
 
-                font = get_ui_font(size=9, bold=True, italic=True)
+                font = get_body_font()
+                font.setBold(True)
+                font.setItalic(True)
                 p.setFont(font)
-                p.setPen(QPen(QColor(ColorSystem.CHILD_BOUNDS_OVERLAY)))
+                p.setPen(QPen(overlay_color))
                 p.drawText(QPointF(gcx1 + 4, gcy1 + 13), "Child Bounds")
 
         for comp in ordered_comps:
@@ -496,11 +505,11 @@ class AnnotationCanvasView(QWidget):
             is_locked = comp.visibility.locked
 
             if is_visible:
-                color_hex = ColorSystem.BOX_ACTIVE if is_selected else ColorSystem.BOX_INACTIVE
-                pill_fill_col = QColor(ColorSystem.PILL_BG_VISIBLE)
+                color_hex = ColorSystem.get_box_active() if is_selected else ColorSystem.get_box_inactive()
+                pill_fill_col = QColor(ColorSystem.get_pill_bg_visible())
             else:
-                color_hex = ColorSystem.BOX_ACTIVE_HIDDEN if is_selected else ColorSystem.BOX_INACTIVE_HIDDEN
-                pill_fill_col = QColor(ColorSystem.PILL_BG_HIDDEN)
+                color_hex = ColorSystem.get_box_active_hidden() if is_selected else ColorSystem.get_box_inactive_hidden()
+                pill_fill_col = QColor(ColorSystem.get_pill_bg_hidden())
 
             comp_color = QColor(color_hex)
             lw = border_width + 1 if is_selected else border_width
@@ -561,7 +570,7 @@ class AnnotationCanvasView(QWidget):
             p.drawText(QPointF(text_x, text_y), num_str)
 
             if self.show_labels and comp.label:
-                font = get_ui_font(size=9)
+                font = get_body_font()
                 p.setFont(font)
                 p.setPen(pill_text_pen)
                 p.drawText(QPointF(cx1, cy2 + 13), comp.label)

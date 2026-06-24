@@ -11,7 +11,11 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .design_system import ColorSystem, get_ui_font
+from .design_system import (
+    ColorSystem,
+    get_caption_font,
+    get_header_font,
+)
 
 
 class CornerSelector(QWidget):
@@ -140,7 +144,7 @@ class ComponentPropertiesView(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         lbl_header = QLabel("PROPERTIES")
-        lbl_header.setFont(get_ui_font(bold=True))
+        lbl_header.setFont(get_header_font())
         layout.addWidget(lbl_header)
 
         # Name field
@@ -166,7 +170,9 @@ class ComponentPropertiesView(QWidget):
             col = (idx % 2) * 2
             lbl = QLabel(label)
             lbl.setFixedWidth(20)
-            lbl.setFont(get_ui_font(size=8, bold=True))
+            lbl_font = get_caption_font()
+            lbl_font.setBold(True)
+            lbl.setFont(lbl_font)
             coords_grid.addWidget(lbl, row, col)
 
             entry = QLineEdit()
@@ -209,8 +215,8 @@ class ComponentPropertiesView(QWidget):
         # Status text at the bottom
         self.txt_status = QLabel("Connecting...")
         self.txt_status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
-        self.txt_status.setFont(get_ui_font(size=8))
-        self.txt_status.setStyleSheet(f"color: {ColorSystem.MUTED};")
+        self.txt_status.setFont(get_caption_font())
+        self.txt_status.setStyleSheet(f"color: {ColorSystem.get_muted()};")
         self.txt_status.setWordWrap(True)
         layout.addWidget(self.txt_status)
 
@@ -231,7 +237,7 @@ class ComponentPropertiesView(QWidget):
 
     def update_status(self, text: str, is_error: bool = False):
         self.txt_status.setText(text)
-        color = ColorSystem.ERROR if is_error else ColorSystem.MUTED
+        color = ColorSystem.ERROR if is_error else ColorSystem.get_muted()
         self.txt_status.setStyleSheet(f"color: {color};")
 
     def update_properties_panel(
