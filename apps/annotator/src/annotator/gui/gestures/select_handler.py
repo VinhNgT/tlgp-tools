@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from annotator.gui.gestures.state import GestureState
-from annotator.gui.validation import BoundsValidator
+from annotator.workspace.validation import BoundsValidator
 from annotator.gui.viewport_context import ViewportContext
 from annotator.models import Bounds
 

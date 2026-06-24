@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Any, Protocol
+from typing import Any, Callable, Protocol
 
 from PIL import Image
 
@@ -65,13 +65,18 @@ class DialogService(ABC):
         image: Image.Image,
         initial_cuts: list[int],
         components: list[Component],
-    ) -> list[int] | None:
+        on_save: Callable[[list[int]], None],
+    ) -> None:
         """Opens the screen cut editor dialog."""
         pass
 
     @abstractmethod
     def show_screen_info(
-        self, parent: Any, screen_name: str, description: str
-    ) -> dict[str, str] | None:
+        self,
+        parent: Any,
+        screen_name: str,
+        description: str,
+        on_save: Callable[[dict[str, str]], None],
+    ) -> None:
         """Opens the screen info editor dialog."""
         pass

@@ -30,11 +30,10 @@ from PySide6.QtWidgets import (
 
 from annotator.models import Component
 
+from annotator.workspace.validation import CutValidator, MIN_CUT_GAP
 from .cut_editor_state import CutEditorCallbacks, CutEditorState
 from .image_utils import pil_to_qpixmap
-from .validation import CutValidator
 
-MIN_CUT_GAP = 50
 SNAP_DISTANCE = 8
 
 
@@ -49,7 +48,7 @@ class _CutCanvasWidget(QWidget):
     def __init__(self, dialog: CutEditorDialog, parent=None):
         super().__init__(parent)
         self.dialog = dialog
-        self.state = CutEditorState()
+        self.state = dialog.state
         self.callbacks = CutEditorCallbacks()
         self.setMinimumSize(300, 200)
         self.setMouseTracking(True)
@@ -118,11 +117,11 @@ class _CutCanvasWidget(QWidget):
             cy = self._to_canvas_y(y)
             is_selected = i == self.state.drag_index
             color = (
-                palette.color(QPalette.ColorRole.Highlight)
+                QColor(Qt.GlobalColor.red)
                 if is_selected
-                else QColor(Qt.GlobalColor.red)
+                else QColor("#0c8ce9")
             )
-            width = 3 if is_selected else 2
+            width = 2
 
             pen = QPen(color, width, Qt.PenStyle.DashLine)
             p.setPen(pen)
@@ -214,9 +213,11 @@ class _CutCanvasWidget(QWidget):
                 self.state.cut_lines[self.state.drag_index] = new_y
                 self.state.cut_lines.sort()
                 self.state.drag_index = self.state.cut_lines.index(new_y)
-                self.state.drag_index = self.state.drag_index
                 self.state.last_valid_drag_y = new_y
             else:
+                self.dialog.status_label.setText(
+                    f"Blocked: invalid gap to adjacent cuts or boundaries (minimum is {MIN_CUT_GAP}px)"
+                )
                 self.state.cut_lines[self.state.drag_index] = (
                     self.state.last_valid_drag_y
                 )
@@ -272,7 +273,7 @@ class _CutCanvasWidget(QWidget):
 
 
 class CutEditorDialog(QDialog):
-    """Modal dialog for editing horizontal cut lines on the full screenshot."""
+    """Dialog for editing horizontal cut lines on the full screenshot."""
 
     def __init__(
         self,
@@ -281,10 +282,14 @@ class CutEditorDialog(QDialog):
         initial_cuts: list[int],
         components: list[Component],
     ):
-        super().__init__(parent)
+        # Use Qt.WindowType.Tool to keep the modeless dialog on top of the parent
+        # window within the application on macOS. Because the parent is passed
+        # during constructor initialization, macOS automatically hides the
+        # dialog when the application loses focus, preventing it from floating
+        # on top of other applications.
+        super().__init__(parent, Qt.WindowType.Tool)
         self.setWindowTitle("Edit Cut Lines")
         self.resize(900, 700)
-        self.setModal(True)
 
         self.source_image = image
         self.state = CutEditorState(cut_lines=sorted(initial_cuts))
@@ -292,12 +297,7 @@ class CutEditorDialog(QDialog):
         self.cut_lines_result: list[int] | None = None
 
         # Interaction state
-        self.state.mode: str = "idle"
-        self.state.drag_index: int = -1
         self.drag_start_y: int = 0
-        self.state.last_valid_drag_y: int = 0
-        self.state.drag_index: int = -1
-        self.state = CutEditorState()
 
         self._build_ui()
 

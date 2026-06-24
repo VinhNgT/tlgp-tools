@@ -3,7 +3,7 @@
 from typing import Any
 
 from annotator.gui.gestures.state import GestureState
-from annotator.gui.validation import BoundsValidator
+from annotator.workspace.validation import BoundsValidator
 from annotator.gui.viewport_context import ViewportContext
 
 

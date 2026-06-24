@@ -1,5 +1,7 @@
 """Figma-inspired UI theme for Annotator."""
 
+from PySide6.QtGui import QFontDatabase
+
 FIGMA_THEME = """
 QWidget {
     background-color: #2C2D2E;
@@ -168,3 +170,25 @@ QMenu::separator {
     background-color: #111111;
 }
 """
+
+
+def get_theme() -> str:
+    """Return the Figma UI stylesheet with a dynamically resolved font family.
+
+    Resolves the font family at runtime using the active QFontDatabase. This
+    prevents Qt from warning about missing font families and avoids the startup
+    overhead of populating font family aliases when a requested font is not
+    installed on the system.
+    """
+    families = QFontDatabase.families()
+    font_family = "sans-serif"
+    for font in ["Inter", ".AppleSystemUIFont", "Segoe UI", "Arial"]:
+        if font in families:
+            font_family = f'"{font}"'
+            break
+
+    return FIGMA_THEME.replace(
+        'font-family: "Inter", "Segoe UI", sans-serif;',
+        f"font-family: {font_family}, sans-serif;",
+    )
+

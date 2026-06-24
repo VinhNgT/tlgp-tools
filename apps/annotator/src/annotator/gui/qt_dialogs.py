@@ -4,6 +4,8 @@ Provides PySide6 implementations for file dialogs,
 message boxes, and custom modal dialogs.
 """
 
+from typing import Callable
+
 from PIL import Image
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
@@ -57,13 +59,17 @@ class _ImportingDialog(QDialog):
 
 
 class _ScreenInfoDialog(QDialog):
-    """Modal form dialog for editing screen name and functional description."""
+    """Form dialog for editing screen name and functional description."""
 
     def __init__(self, parent, screen_name="", description=""):
-        super().__init__(parent)
+        # Use Qt.WindowType.Tool to keep the modeless dialog on top of the parent
+        # window within the application on macOS. Because the parent is passed
+        # during constructor initialization, macOS automatically hides the
+        # dialog when the application loses focus, preventing it from floating
+        # on top of other applications.
+        super().__init__(parent, Qt.WindowType.Tool)
         self.setWindowTitle("Screen Information")
         self.resize(450, 240)
-        self.setModal(True)
 
         self.info_result = None
 
@@ -149,21 +155,28 @@ class QtDialogService(DialogService):
         image: Image.Image,
         initial_cuts: list[int],
         components: list[Component],
-    ) -> list[int] | None:
+        on_save: Callable[[list[int]], None],
+    ) -> None:
         dialog = CutEditorDialog(
             parent, image=image, initial_cuts=initial_cuts, components=components
         )
-        dialog.exec()
-        return dialog.cut_lines_result
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.accepted.connect(lambda: on_save(dialog.cut_lines_result))
+        dialog.show()
 
     def show_screen_info(
-        self, parent: QWidget, screen_name: str, description: str
-    ) -> dict[str, str] | None:
+        self,
+        parent: QWidget,
+        screen_name: str,
+        description: str,
+        on_save: Callable[[dict[str, str]], None],
+    ) -> None:
         dialog = _ScreenInfoDialog(
             parent, screen_name=screen_name, description=description
         )
-        dialog.exec()
-        return dialog.info_result
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.accepted.connect(lambda: on_save(dialog.info_result))
+        dialog.show()
 
     @staticmethod
     def _filetypes_to_filter(filetypes: list[tuple[str, str]]) -> str:

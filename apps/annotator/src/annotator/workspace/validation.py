@@ -1,4 +1,7 @@
-from annotator.models import Component
+from annotator.models import Component, Bounds
+from annotator.workspace.errors import InvalidStateError
+
+MIN_CUT_GAP = 50
 
 
 class BoundsValidator:
@@ -124,3 +127,31 @@ class CutValidator:
             if abs(img_y - existing_y) < min_gap:
                 return False
         return True
+
+    @staticmethod
+    def validate_cut_lines(
+        cut_lines: list[int], image_height: int, min_gap: int
+    ) -> None:
+        """Validates a list of cut lines against image boundaries and mutual spacing constraints."""
+        sorted_cuts = sorted(cut_lines)
+        for i, cut in enumerate(sorted_cuts):
+            if cut < min_gap or cut > image_height - min_gap:
+                raise InvalidStateError(
+                    f"Cut line at Y={cut} violates top/bottom margin constraint of {min_gap}px",
+                    cut_y=cut,
+                )
+            if i > 0 and (cut - sorted_cuts[i - 1]) < min_gap:
+                raise InvalidStateError(
+                    f"Cut line at Y={cut} is too close to adjacent cut line at Y={sorted_cuts[i - 1]} (minimum gap is {min_gap}px)",
+                    cut_y=cut,
+                )
+
+    @staticmethod
+    def get_intersecting_cut(
+        bounds: Bounds, cut_lines: list[int]
+    ) -> int | None:
+        """Determines if any cut line intersects with the component bounds."""
+        for cut in cut_lines:
+            if bounds.top <= cut <= bounds.bottom:
+                return cut
+        return None

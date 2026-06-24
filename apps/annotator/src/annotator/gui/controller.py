@@ -445,14 +445,13 @@ class AppController:
                 if rid in state.components
             ]
 
-        result = self.dialog_service.show_cut_editor(
+        self.dialog_service.show_cut_editor(
             self.view,
             image=self.view.canvas.full_pil_img,
             initial_cuts=state.cutLines if state else [],
             components=root_comps,
+            on_save=lambda result: self.workspace.update_cut_lines(result),
         )
-        if result is not None:
-            self.workspace.update_cut_lines(result)
 
     def _on_open_screen_info_request(self):
         state = self.store.state.workspace_state
@@ -465,13 +464,14 @@ class AppController:
         screen_name = state.screen.name
         description = state.screen.description
 
-        result = self.dialog_service.show_screen_info(
-            self.view, screen_name=screen_name, description=description
-        )
-        if result is not None:
-            self.workspace.update_screen_info(
+        self.dialog_service.show_screen_info(
+            self.view,
+            screen_name=screen_name,
+            description=description,
+            on_save=lambda result: self.workspace.update_screen_info(
                 result["screen_name"], result["description"]
-            )
+            ),
+        )
 
     def _on_canvas_drill_into(self, comp_id: UUID):
         stack = list(self.store.state.parent_stack)

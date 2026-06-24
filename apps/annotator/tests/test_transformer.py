@@ -67,7 +67,7 @@ class TestRebuildSegments:
         t.rebuild_segments([0, 600])
         # Cut at 0 produces no segment before it; cut at 600 produces no segment after it
         assert len(t.segments) == 1
-        assert t.segments[0] == (0, 600, CUT_GAP_PX)
+        assert t.segments[0] == (0, 600, 0)
 
     def test_cut_beyond_image_clamped(self):
         t = ViewportTransformer()

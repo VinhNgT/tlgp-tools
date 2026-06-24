@@ -328,6 +328,30 @@ class TestCutLines:
         with pytest.raises(InvalidStateError, match="intersects"):
             ws.update_cut_lines([75])
 
+    def test_add_component_intersecting_cut_line_raises(self):
+        ws = _workspace_with_image()
+        ws.update_cut_lines([200])
+        comp_id = uuid.uuid4()
+        with pytest.raises(InvalidStateError, match="intersects existing cut line"):
+            ws.add_component(comp_id, "Box", Bounds(x=0, y=150, w=100, h=100))
+
+    def test_move_component_intersecting_cut_line_raises(self):
+        ws = _workspace_with_image()
+        comp_id = uuid.uuid4()
+        ws.add_component(comp_id, "Box", Bounds(x=0, y=50, w=50, h=50))
+        ws.update_cut_lines([200])
+        with pytest.raises(InvalidStateError, match="intersects existing cut line"):
+            ws.move_component(comp_id, 0, 180)
+
+    def test_update_component_intersecting_cut_line_raises(self):
+        ws = _workspace_with_image()
+        comp_id = uuid.uuid4()
+        ws.add_component(comp_id, "Box", Bounds(x=0, y=50, w=50, h=50))
+        ws.update_cut_lines([200])
+        with pytest.raises(InvalidStateError, match="intersects existing cut line"):
+            ws.update_component(comp_id, bounds=Bounds(x=0, y=180, w=50, h=50))
+
+
 
 # ── Export ─────────────────────────────────────────────────────────────
 

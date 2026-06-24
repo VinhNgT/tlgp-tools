@@ -11,7 +11,7 @@ from .app import MainAppWindow
 from .controller import AppController
 from .qt_dialogs import QtDialogService
 from .state import UIStateStore
-from .theme import FIGMA_THEME
+from .theme import get_theme
 from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)
@@ -41,7 +41,7 @@ def start_gui(workspace_manager):
 
     # Apply Figma UI/UX theme
     if isinstance(app, QApplication):
-        app.setStyleSheet(FIGMA_THEME)
+        app.setStyleSheet(get_theme())
 
     if isinstance(app, QApplication):
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")

@@ -2,7 +2,8 @@
 
 import uuid
 
-from annotator.gui.validation import BoundsValidator, CutValidator
+from annotator.workspace.validation import BoundsValidator, CutValidator, MIN_CUT_GAP
+from annotator.workspace.errors import InvalidStateError
 from annotator.models import Bounds, Component
 
 # ── BoundsValidator.clamp_val ─────────────────────────────────────────
@@ -232,3 +233,48 @@ class TestIsValidPositionForDrag:
 
     def test_boundary_check_still_applies(self):
         assert CutValidator.is_valid_position_for_drag(5, 600, [300], 0, 20) is False
+
+
+# ── CutValidator.validate_cut_lines ───────────────────────────────────
+
+
+class TestValidateCutLines:
+    def test_valid_cuts(self):
+        # No exception should be raised
+        CutValidator.validate_cut_lines([100, 200, 300], 1000, 50)
+
+    def test_too_close_to_top_boundary(self):
+        import pytest
+        with pytest.raises(InvalidStateError, match="top/bottom margin"):
+            CutValidator.validate_cut_lines([30, 200], 1000, 50)
+
+    def test_too_close_to_bottom_boundary(self):
+        import pytest
+        with pytest.raises(InvalidStateError, match="top/bottom margin"):
+            CutValidator.validate_cut_lines([100, 960], 1000, 50)
+
+    def test_too_close_to_each_other(self):
+        import pytest
+        with pytest.raises(InvalidStateError, match="too close"):
+            CutValidator.validate_cut_lines([100, 140, 300], 1000, 50)
+
+
+# ── CutValidator.get_intersecting_cut ─────────────────────────────────
+
+
+class TestGetIntersectingCut:
+    def test_no_intersection(self):
+        comp = _make_comp(0, 100, 50, 50)
+        assert CutValidator.get_intersecting_cut(comp.bounds, [30, 200]) is None
+
+    def test_intersection_top(self):
+        comp = _make_comp(0, 100, 50, 50)
+        assert CutValidator.get_intersecting_cut(comp.bounds, [100]) == 100
+
+    def test_intersection_middle(self):
+        comp = _make_comp(0, 100, 50, 50)
+        assert CutValidator.get_intersecting_cut(comp.bounds, [120]) == 120
+
+    def test_intersection_bottom(self):
+        comp = _make_comp(0, 100, 50, 50)
+        assert CutValidator.get_intersecting_cut(comp.bounds, [150]) == 150

@@ -23,21 +23,29 @@ class ViewportTransformer:
         if self._image_height <= 0:
             self._segments = []
             return
-        if not cut_lines:
+
+        # Filter out edge cuts at the boundaries (0 and image_height) as they are redundant
+        active_cuts = [
+            y for y in sorted(cut_lines)
+            if 0 < y < self._image_height
+        ]
+
+        if not active_cuts:
             self._segments = [(0, self._image_height, 0)]
             return
 
         segments = []
         prev_y = 0
-        for i, cut_y in enumerate(sorted(cut_lines)):
-            clamped = max(0, min(self._image_height, cut_y))
-            if clamped > prev_y:
-                segments.append((prev_y, clamped, i * self.cut_gap_px))
-            prev_y = clamped
+        valid_cut_count = 0
+        for cut_y in active_cuts:
+            if cut_y > prev_y:
+                segments.append((prev_y, cut_y, valid_cut_count * self.cut_gap_px))
+                valid_cut_count += 1
+                prev_y = cut_y
 
         if prev_y < self._image_height:
             segments.append(
-                (prev_y, self._image_height, len(cut_lines) * self.cut_gap_px)
+                (prev_y, self._image_height, valid_cut_count * self.cut_gap_px)
             )
 
         self._segments = segments
