@@ -323,12 +323,15 @@ class TestLaunchAnnotator:
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def get(self, url, *args, **kwargs):
                 mock_res = MagicMock()
                 mock_res.status_code = 200
                 return mock_res
+
             async def post(self, url, *args, **kwargs):
                 mock_res = MagicMock()
                 mock_res.status_code = 200
@@ -404,8 +407,10 @@ class TestDaemonControl:
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def get(self, *args, **kwargs):
                 mock_res = MagicMock()
                 mock_res.status_code = 200
@@ -433,14 +438,19 @@ class TestDaemonControl:
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 assert method == "PUT"
                 mock_res = MagicMock()
                 mock_res.status_code = 200
                 json_data = kwargs.get("json", {})
-                mock_res.json.return_value = {"status": "success", "read_only": json_data.get("read_only")}
+                mock_res.json.return_value = {
+                    "status": "success",
+                    "read_only": json_data.get("read_only"),
+                }
                 return mock_res
 
         monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
@@ -473,16 +483,18 @@ class TestGenerateSpecDocWrapper:
 
         # Call generate_spec_doc wrapper
         result = await generate_spec_doc(
-            ctx=ctx,
-            analysis=analysis,
-            output_path=str(tmp_path / "out.docx")
+            ctx=ctx, analysis=analysis, output_path=str(tmp_path / "out.docx")
         )
 
         assert result["valid"] is True
 
         # Verify progress was reported
-        ctx.report_progress.assert_any_call(10, 100, "Loading and validating analysis data...")
-        ctx.report_progress.assert_any_call(30, 100, "Eliciting description for 'Header'...")
+        ctx.report_progress.assert_any_call(
+            10, 100, "Loading and validating analysis data..."
+        )
+        ctx.report_progress.assert_any_call(
+            30, 100, "Eliciting description for 'Header'..."
+        )
         ctx.report_progress.assert_any_call(60, 100, "Running document generation...")
         ctx.report_progress.assert_any_call(100, 100, "Spec generation complete.")
 
@@ -515,9 +527,7 @@ class TestGenerateSpecDocWrapper:
         # Call generate_spec_doc wrapper
         out_docx = tmp_path / "out.docx"
         result = await generate_spec_doc(
-            ctx=ctx,
-            analysis=analysis,
-            output_path=str(out_docx)
+            ctx=ctx, analysis=analysis, output_path=str(out_docx)
         )
 
         assert result["valid"] is True

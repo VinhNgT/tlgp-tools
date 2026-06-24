@@ -99,7 +99,9 @@ class ColorSystem:
         if app:
             bg = app.palette().color(QPalette.ColorRole.Window)
             return QColor(bg.red(), bg.green(), bg.blue(), 180)
-        return QColor(0, 0, 0, 180) if cls.is_dark_mode() else QColor(255, 255, 255, 120)
+        return (
+            QColor(0, 0, 0, 180) if cls.is_dark_mode() else QColor(255, 255, 255, 120)
+        )
 
     # Component overlay colors inside CutEditor
     @classmethod
@@ -108,7 +110,9 @@ class ColorSystem:
         if app:
             color = app.palette().color(QPalette.ColorRole.Highlight)
             return QColor(color.red(), color.green(), color.blue(), 40)
-        return QColor(231, 76, 60, 30) if cls.is_dark_mode() else QColor(231, 76, 60, 40)
+        return (
+            QColor(231, 76, 60, 30) if cls.is_dark_mode() else QColor(231, 76, 60, 40)
+        )
 
     @classmethod
     def get_cut_comp_outline(cls) -> QColor:
@@ -116,7 +120,9 @@ class ColorSystem:
         if app:
             color = app.palette().color(QPalette.ColorRole.Highlight)
             return QColor(color.red(), color.green(), color.blue(), 150)
-        return QColor(231, 76, 60, 120) if cls.is_dark_mode() else QColor(231, 76, 60, 150)
+        return (
+            QColor(231, 76, 60, 120) if cls.is_dark_mode() else QColor(231, 76, 60, 150)
+        )
 
     # Child bounds reference lines on canvas
     @classmethod
@@ -127,7 +133,9 @@ class ColorSystem:
         return "#aaaaaa" if cls.is_dark_mode() else "#888888"
 
 
-def get_ui_font(size: int | None = None, bold: bool = False, italic: bool = False) -> QFont:
+def get_ui_font(
+    size: int | None = None, bold: bool = False, italic: bool = False
+) -> QFont:
     """Constructs a platform-agnostic QFont using the standard system UI font family.
 
     If size is None, inherits the default application font size.
@@ -161,3 +169,24 @@ def get_caption_font(italic: bool = False) -> QFont:
     """Constructs the standard caption font (8pt, optionally italic)."""
     return get_ui_font(size=8, italic=italic)
 
+
+class LayoutTokens:
+    """Standard spacing, padding, and layout dimension tokens."""
+
+    MARGIN_DEFAULT = 10
+    MARGIN_SM = 6
+    SPACING_DEFAULT = 10
+    SPACING_SM = 4
+
+
+def set_widget_text_color(widget, hex_color: str | QColor):
+    """Sets a widget's text/foreground color dynamically using QPalette manipulation.
+
+    Avoids static QStyleSheets so colors adapt gracefully to theme updates.
+    """
+    palette = widget.palette()
+    color = QColor(hex_color) if isinstance(hex_color, str) else hex_color
+    palette.setColor(QPalette.ColorRole.WindowText, color)
+    palette.setColor(QPalette.ColorRole.Text, color)
+    palette.setColor(QPalette.ColorRole.ButtonText, color)
+    widget.setPalette(palette)

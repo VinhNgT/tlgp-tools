@@ -1405,9 +1405,7 @@ class AnnotationCanvas(tk.Canvas):
         self._invalidate_gapped_cache()
         self.update_view()
 
-    def _on_selection_change(
-        self, nav: NavigationContext, boxes: list[AnnotationBox]
-    ):
+    def _on_selection_change(self, nav: NavigationContext, boxes: list[AnnotationBox]):
         self.selected_boxes = boxes
         self.draw_boxes()
 

@@ -123,7 +123,17 @@ class TestClampResize:
     def test_children_union_constraint(self):
         children_union = (20, 20, 50, 50)
         rx1, ry1, rx2, ry2 = BoundsValidator.clamp_resize(
-            10, 10, 60, 60, 40, 0, "w", 0, 0, 800, 600,
+            10,
+            10,
+            60,
+            60,
+            40,
+            0,
+            "w",
+            0,
+            0,
+            800,
+            600,
             children_union=children_union,
         )
         # rx1 cannot exceed children's left edge
@@ -132,7 +142,17 @@ class TestClampResize:
     def test_children_union_prevents_shrink_right(self):
         children_union = (20, 20, 55, 55)
         rx1, ry1, rx2, ry2 = BoundsValidator.clamp_resize(
-            10, 10, 60, 60, -30, 0, "e", 0, 0, 800, 600,
+            10,
+            10,
+            60,
+            60,
+            -30,
+            0,
+            "e",
+            0,
+            0,
+            800,
+            600,
             children_union=children_union,
         )
         assert rx2 >= 55
@@ -205,9 +225,10 @@ class TestIsValidPositionForDrag:
         assert CutValidator.is_valid_position_for_drag(305, 600, [300], 0, 20) is True
 
     def test_still_checks_other_cuts(self):
-        assert CutValidator.is_valid_position_for_drag(
-            305, 600, [300, 310], 0, 20
-        ) is False
+        assert (
+            CutValidator.is_valid_position_for_drag(305, 600, [300, 310], 0, 20)
+            is False
+        )
 
     def test_boundary_check_still_applies(self):
         assert CutValidator.is_valid_position_for_drag(5, 600, [300], 0, 20) is False

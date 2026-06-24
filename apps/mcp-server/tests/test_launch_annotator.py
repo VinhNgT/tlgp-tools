@@ -25,8 +25,10 @@ async def test_launch_annotator_timeout_failure(monkeypatch):
     class MockAsyncClient:
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
+
         async def get(self, url, *args, **kwargs):
             raise httpx.RequestError("Annotator not ready")
 
@@ -55,16 +57,20 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
     )
 
     posted_urls = []
+
     # Mock AsyncClient to succeed on get and capture post
     class MockAsyncClient:
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
+
         async def get(self, url, *args, **kwargs):
             mock_res = MagicMock()
             mock_res.status_code = 200
             return mock_res
+
         async def post(self, url, *args, **kwargs):
             posted_urls.append(url)
             mock_res = MagicMock()
@@ -100,16 +106,20 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
     )
 
     posted_urls = []
+
     # Mock AsyncClient to succeed on get and capture post
     class MockAsyncClient:
         async def __aenter__(self):
             return self
+
         async def __aexit__(self, exc_type, exc_val, exc_tb):
             pass
+
         async def get(self, url, *args, **kwargs):
             mock_res = MagicMock()
             mock_res.status_code = 200
             return mock_res
+
         async def post(self, url, *args, **kwargs):
             posted_urls.append(url)
             mock_res = MagicMock()

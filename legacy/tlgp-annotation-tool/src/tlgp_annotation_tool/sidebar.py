@@ -298,9 +298,7 @@ class ComponentSidebar(tb.Frame):
         self.selected_boxes = matched_boxes
         self.controller.set_selection(matched_boxes)
 
-    def _on_selection_change(
-        self, nav: NavigationContext, boxes: list[AnnotationBox]
-    ):
+    def _on_selection_change(self, nav: NavigationContext, boxes: list[AnnotationBox]):
         self.selected_boxes = boxes
         self.select_boxes_in_tree(boxes)
 

@@ -141,11 +141,15 @@ class AnalysisData(BaseModel):
         errors = []
         for num, owners in api_numbers.items():
             if len(owners) > 1:
-                errors.append(f"API number {num} is defined in multiple places: {', '.join(owners)}")
+                errors.append(
+                    f"API number {num} is defined in multiple places: {', '.join(owners)}"
+                )
 
         for (method, url), owners in api_endpoints.items():
             if len(owners) > 1:
-                errors.append(f"API {method} {url} is defined in multiple places: {', '.join(owners)}")
+                errors.append(
+                    f"API {method} {url} is defined in multiple places: {', '.join(owners)}"
+                )
 
         if errors:
             raise ValueError("; ".join(errors))

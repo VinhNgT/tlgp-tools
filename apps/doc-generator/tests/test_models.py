@@ -75,12 +75,15 @@ class TestComponent:
         assert c.isLeaf is True
 
     def test_leaf_component_with_apis_raises(self):
-        with pytest.raises(ValidationError, match="is a leaf component and cannot have API documentation"):
+        with pytest.raises(
+            ValidationError,
+            match="is a leaf component and cannot have API documentation",
+        ):
             Component(
                 id=1,
                 label="Leaf",
                 isLeaf=True,
-                apis=[Api(number=1, method="GET", title="X", url="/x")]
+                apis=[Api(number=1, method="GET", title="X", url="/x")],
             )
 
 
@@ -260,39 +263,41 @@ class TestAnalysisData:
         assert data.discrepancies[0].location == "Header"
 
     def test_duplicate_api_number_raises(self, tmp_path):
-        with pytest.raises(ValidationError, match="API number 1 is defined in multiple places"):
+        with pytest.raises(
+            ValidationError, match="API number 1 is defined in multiple places"
+        ):
             AnalysisData(
                 exportDir=str(tmp_path),
                 screen=Screen(
-                    name="Test",
-                    apis=[Api(number=1, method="GET", title="X", url="/x")]
+                    name="Test", apis=[Api(number=1, method="GET", title="X", url="/x")]
                 ),
                 components=[
                     Component(
                         id=1,
                         label="Comp",
                         isLeaf=False,
-                        apis=[Api(number=1, method="POST", title="Y", url="/y")]
+                        apis=[Api(number=1, method="POST", title="Y", url="/y")],
                     )
-                ]
+                ],
             )
 
     def test_duplicate_api_endpoint_raises(self, tmp_path):
-        with pytest.raises(ValidationError, match="API GET /x is defined in multiple places"):
+        with pytest.raises(
+            ValidationError, match="API GET /x is defined in multiple places"
+        ):
             AnalysisData(
                 exportDir=str(tmp_path),
                 screen=Screen(
-                    name="Test",
-                    apis=[Api(number=1, method="GET", title="X", url="/x")]
+                    name="Test", apis=[Api(number=1, method="GET", title="X", url="/x")]
                 ),
                 components=[
                     Component(
                         id=1,
                         label="Comp",
                         isLeaf=False,
-                        apis=[Api(number=2, method="get", title="Y", url=" /x ")]
+                        apis=[Api(number=2, method="get", title="Y", url=" /x ")],
                     )
-                ]
+                ],
             )
 
 

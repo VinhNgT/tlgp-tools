@@ -39,7 +39,9 @@ class UIStateStore:
             try:
                 callback()
             except Exception:
-                logging.getLogger(__name__).exception("Error in state change subscriber")
+                logging.getLogger(__name__).exception(
+                    "Error in state change subscriber"
+                )
 
     def update_state(self, event_type: str, **kwargs):
         """Update fields in UIState and trigger the corresponding event notification if a value changed."""

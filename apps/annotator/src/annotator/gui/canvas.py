@@ -143,11 +143,7 @@ class AnnotationCanvasView(QWidget):
                     for cid in parent.childrenIds
                     if cid in ws.components
                 ]
-        return [
-            ws.components[cid]
-            for cid in ws.rootComponents
-            if cid in ws.components
-        ]
+        return [ws.components[cid] for cid in ws.rootComponents if cid in ws.components]
 
     def is_effectively_locked(self, comp: Component) -> bool:
         ws = self.workspace_state
@@ -173,7 +169,9 @@ class AnnotationCanvasView(QWidget):
                 return False
         return True
 
-    def get_children_bounds_union(self, comp: Component) -> tuple[int, int, int, int] | None:
+    def get_children_bounds_union(
+        self, comp: Component
+    ) -> tuple[int, int, int, int] | None:
         ws = self.workspace_state
         if not ws or not comp.childrenIds:
             return None
@@ -287,8 +285,13 @@ class AnnotationCanvasView(QWidget):
 
     def set_temp_rect(
         self,
-        x1: float, y1: float, x2: float, y2: float,
-        color: str | None = None, dash: bool = False, width: int = 1,
+        x1: float,
+        y1: float,
+        x2: float,
+        y2: float,
+        color: str | None = None,
+        dash: bool = False,
+        width: int = 1,
     ):
         if color is None:
             color = ColorSystem.get_box_active()
@@ -315,8 +318,6 @@ class AnnotationCanvasView(QWidget):
     def clear_text_focus(self):
         """Clear text focus by moving focus to this canvas."""
         self.setFocus()
-
-
 
     def schedule_redraw(self):
         """Schedule a deferred repaint (coalesces rapid updates)."""
@@ -450,7 +451,9 @@ class AnnotationCanvasView(QWidget):
         )
         full_img_width = self.full_pil_img.width if self.full_pil_img else 1
         font_size = compute_pill_font_size(parent_comp, full_img_width)
-        abs_box_border, abs_pill_outline = compute_border_widths(parent_comp, full_img_width)
+        abs_box_border, abs_pill_outline = compute_border_widths(
+            parent_comp, full_img_width
+        )
         pad_x, pad_y = compute_pill_padding(font_size)
 
         # PIL font for text measurement
@@ -468,21 +471,37 @@ class AnnotationCanvasView(QWidget):
         pill_outline_pen = QPen(inactive_color, pill_outline_width)
         pill_text_pen = QPen(inactive_color)
 
-        non_selected = [comp for comp in active_comps if comp.id not in self.selected_component_ids]
-        selected = [comp for comp in active_comps if comp.id in self.selected_component_ids]
+        non_selected = [
+            comp for comp in active_comps if comp.id not in self.selected_component_ids
+        ]
+        selected = [
+            comp for comp in active_comps if comp.id in self.selected_component_ids
+        ]
         ordered_comps = non_selected + selected
 
-        if len(selected) == 1 and self.gestures.resize_handle and self.gestures.is_dragging:
+        if (
+            len(selected) == 1
+            and self.gestures.resize_handle
+            and self.gestures.is_dragging
+        ):
             comp = selected[0]
             union = self.get_children_bounds_union(comp)
             if union:
                 cx1, cy1, cx2, cy2 = union
                 gcx1, gcy1 = self.transformer.to_canvas(
-                    cx1, cy1, zoom, self.parent_stack, cut_lines,
+                    cx1,
+                    cy1,
+                    zoom,
+                    self.parent_stack,
+                    cut_lines,
                     pan_offset=self.pan_offset,
                 )
                 gcx2, gcy2 = self.transformer.to_canvas(
-                    cx2, cy2, zoom, self.parent_stack, cut_lines,
+                    cx2,
+                    cy2,
+                    zoom,
+                    self.parent_stack,
+                    cut_lines,
                     pan_offset=self.pan_offset,
                 )
                 overlay_color = QColor(ColorSystem.get_child_bounds_overlay())
@@ -505,10 +524,18 @@ class AnnotationCanvasView(QWidget):
             is_locked = comp.visibility.locked
 
             if is_visible:
-                color_hex = ColorSystem.get_box_active() if is_selected else ColorSystem.get_box_inactive()
+                color_hex = (
+                    ColorSystem.get_box_active()
+                    if is_selected
+                    else ColorSystem.get_box_inactive()
+                )
                 pill_fill_col = QColor(ColorSystem.get_pill_bg_visible())
             else:
-                color_hex = ColorSystem.get_box_active_hidden() if is_selected else ColorSystem.get_box_inactive_hidden()
+                color_hex = (
+                    ColorSystem.get_box_active_hidden()
+                    if is_selected
+                    else ColorSystem.get_box_inactive_hidden()
+                )
                 pill_fill_col = QColor(ColorSystem.get_pill_bg_hidden())
 
             comp_color = QColor(color_hex)
@@ -528,11 +555,19 @@ class AnnotationCanvasView(QWidget):
                 bounds = self.active_interaction[comp.id]
 
             cx1, cy1 = self.transformer.to_canvas(
-                bounds.left, bounds.top, zoom, self.parent_stack, cut_lines,
+                bounds.left,
+                bounds.top,
+                zoom,
+                self.parent_stack,
+                cut_lines,
                 pan_offset=self.pan_offset,
             )
             cx2, cy2 = self.transformer.to_canvas(
-                bounds.right, bounds.bottom, zoom, self.parent_stack, cut_lines,
+                bounds.right,
+                bounds.bottom,
+                zoom,
+                self.parent_stack,
+                cut_lines,
                 pan_offset=self.pan_offset,
             )
 
@@ -579,16 +614,23 @@ class AnnotationCanvasView(QWidget):
             if is_selected and not is_locked:
                 self._paint_handles(p, cx1, cy1, cx2, cy2)
 
-    def _paint_handles(self, p: QPainter, cx1: float, cy1: float, cx2: float, cy2: float):
+    def _paint_handles(
+        self, p: QPainter, cx1: float, cy1: float, cx2: float, cy2: float
+    ):
         """Paint resize handles around a selected component."""
         mx = (cx1 + cx2) / 2
         my = (cy1 + cy2) / 2
         hs = 4
 
         handles = [
-            (cx1, cy1), (mx, cy1), (cx2, cy1),
-            (cx1, my),             (cx2, my),
-            (cx1, cy2), (mx, cy2), (cx2, cy2),
+            (cx1, cy1),
+            (mx, cy1),
+            (cx2, cy1),
+            (cx1, my),
+            (cx2, my),
+            (cx1, cy2),
+            (mx, cy2),
+            (cx2, cy2),
         ]
 
         palette = self.palette()
@@ -624,8 +666,6 @@ class AnnotationCanvasView(QWidget):
             shift=bool(mods & Qt.KeyboardModifier.ShiftModifier),
             ctrl=bool(mods & Qt.KeyboardModifier.ControlModifier),
         )
-
-
 
     def mousePressEvent(self, event: QMouseEvent):
         if not self.full_pil_img:

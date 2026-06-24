@@ -21,7 +21,9 @@ class TestMcpResources:
     @patch("mcp_server.server.get_client")
     async def test_get_workspace_state_resource(self, mock_get_client):
         mock_client = MagicMock()
-        mock_client.get_workspace_state = AsyncMock(return_value={"components": {}, "screen": {}})
+        mock_client.get_workspace_state = AsyncMock(
+            return_value={"components": {}, "screen": {}}
+        )
         mock_get_client.return_value = mock_client
 
         result = await get_workspace_state_resource()
@@ -43,7 +45,9 @@ class TestMcpResources:
     @patch("mcp_server.server.get_daemon_manager")
     def test_get_daemon_logs_resource(self, mock_get_daemon_manager):
         mock_manager = MagicMock()
-        mock_manager.read_daemon_logs.return_value = {"logs": "log line 1\nlog line 2\n"}
+        mock_manager.read_daemon_logs.return_value = {
+            "logs": "log line 1\nlog line 2\n"
+        }
         mock_get_daemon_manager.return_value = mock_manager
 
         result = get_daemon_logs_resource("annotator")
@@ -78,4 +82,3 @@ class TestMcpResources:
         assert "annotator" in result
         assert "running" in result
         mock_manager.get_status.assert_called_once()
-

@@ -153,9 +153,7 @@ class TestConcurrentReads:
 
         def writer():
             for _ in range(50):
-                ws.add_component(
-                    uuid.uuid4(), "W", Bounds(x=0, y=0, w=5, h=5)
-                )
+                ws.add_component(uuid.uuid4(), "W", Bounds(x=0, y=0, w=5, h=5))
 
         r_thread = threading.Thread(target=reader)
         w_thread = threading.Thread(target=writer)

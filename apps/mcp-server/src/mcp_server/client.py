@@ -20,7 +20,9 @@ class WorkspaceClient:
     Shares a single, reusable httpx.AsyncClient instance.
     """
 
-    def __init__(self, base_url: str | None = None, client: httpx.AsyncClient | None = None):
+    def __init__(
+        self, base_url: str | None = None, client: httpx.AsyncClient | None = None
+    ):
         """Initialize the client.
 
         Args:
@@ -29,7 +31,9 @@ class WorkspaceClient:
             client: An optional pre-configured AsyncClient. If None, an AsyncClient is
                 instantiated lazily.
         """
-        self.base_url = (base_url or os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000")).rstrip("/")
+        self.base_url = (
+            base_url or os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000")
+        ).rstrip("/")
         self._client = client
         self._owns_client = client is None
 
@@ -55,7 +59,13 @@ class WorkspaceClient:
             res.raise_for_status()
             return res
         except httpx.HTTPStatusError as e:
-            logger.error("HTTP error %s returned from %s %s: %s", e.response.status_code, method, url, e.response.text)
+            logger.error(
+                "HTTP error %s returned from %s %s: %s",
+                e.response.status_code,
+                method,
+                url,
+                e.response.text,
+            )
             raise ApiClientError(
                 message=f"HTTP status error during {method} {path}",
                 status_code=e.response.status_code,
@@ -76,26 +86,31 @@ class WorkspaceClient:
         res = await self._request("GET", "/workspace/state")
         return res.json()
 
-    async def download_image(self, comp_id: str, output_path: str, show_children: bool = False) -> dict:
+    async def download_image(
+        self, comp_id: str, output_path: str, show_children: bool = False
+    ) -> dict:
         """Download the full screenshot or a component image, writing it to output_path."""
-        res = await self._request("GET", f"/images/{comp_id}", params={"show_children": show_children})
+        res = await self._request(
+            "GET", f"/images/{comp_id}", params={"show_children": show_children}
+        )
         out_path = os.path.abspath(output_path)
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "wb") as f:
             f.write(res.content)
-        return {
-            "status": "success",
-            "output_path": out_path
-        }
+        return {"status": "success", "output_path": out_path}
 
     async def get_image_bytes(self, comp_id: str, show_children: bool = False) -> bytes:
         """Fetch the raw image bytes for a component from the Annotator."""
-        res = await self._request("GET", f"/images/{comp_id}", params={"show_children": show_children})
+        res = await self._request(
+            "GET", f"/images/{comp_id}", params={"show_children": show_children}
+        )
         return res.content
 
     async def set_workspace_readonly(self, read_only: bool) -> dict:
         """Toggle the workspace read-only mode in the Annotator."""
-        res = await self._request("PUT", "/workspace/readonly", json={"read_only": read_only})
+        res = await self._request(
+            "PUT", "/workspace/readonly", json={"read_only": read_only}
+        )
         return res.json()
 
     async def clear_workspace(self) -> dict:
@@ -110,10 +125,7 @@ class WorkspaceClient:
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
         with open(out_path, "wb") as f:
             f.write(res.content)
-        return {
-            "status": "success",
-            "output_path": out_path
-        }
+        return {"status": "success", "output_path": out_path}
 
     async def import_image(self, screenshot_path: str) -> None:
         """Import a screenshot into the workspace."""
@@ -151,7 +163,7 @@ class WorkspaceClient:
             "components": [
                 {"id": comp_id, "show_children": show_component_children}
                 for comp_id in component_ids
-            ]
+            ],
         }
 
         res = await self._request("POST", "/workspace/export-batch", json=payload)
@@ -163,5 +175,5 @@ class WorkspaceClient:
         return {
             "status": "success",
             "output_dir": out_path,
-            "extracted_files": os.listdir(out_path)
+            "extracted_files": os.listdir(out_path),
         }

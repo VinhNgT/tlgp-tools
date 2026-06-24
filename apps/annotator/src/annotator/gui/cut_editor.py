@@ -30,8 +30,10 @@ from annotator.models import Component
 
 from .design_system import (
     ColorSystem,
+    LayoutTokens,
     get_caption_font,
     get_header_font,
+    set_widget_text_color,
 )
 from .image_utils import pil_to_qpixmap
 from .validation import CutValidator
@@ -117,7 +119,11 @@ class _CutCanvasWidget(QWidget):
         for i, y in enumerate(self.dialog.cut_lines):
             cy = self._to_canvas_y(y)
             is_selected = i == self.dialog.selected_index
-            color = palette.color(QPalette.ColorRole.Highlight) if is_selected else QColor(ColorSystem.ERROR)
+            color = (
+                palette.color(QPalette.ColorRole.Highlight)
+                if is_selected
+                else QColor(ColorSystem.ERROR)
+            )
             width = 3 if is_selected else 2
 
             pen = QPen(color, width, Qt.PenStyle.DashLine)
@@ -149,7 +155,10 @@ class _CutCanvasWidget(QWidget):
                 return
 
             if CutValidator.is_valid_position(
-                img_y, self.dialog.source_image.height, self.dialog.cut_lines, MIN_CUT_GAP
+                img_y,
+                self.dialog.source_image.height,
+                self.dialog.cut_lines,
+                MIN_CUT_GAP,
             ):
                 self.dialog.cut_lines.append(img_y)
                 self.dialog.cut_lines.sort()
@@ -158,7 +167,9 @@ class _CutCanvasWidget(QWidget):
                 self.update()
                 self.dialog.refresh_listbox()
             else:
-                self.dialog.status_label.setText("Blocked: invalid gap to adjacent cuts")
+                self.dialog.status_label.setText(
+                    "Blocked: invalid gap to adjacent cuts"
+                )
             return
 
         hit_index = self._hit_test_cut(canvas_y)
@@ -180,7 +191,9 @@ class _CutCanvasWidget(QWidget):
 
         if self.dialog.mode == "dragging" and self.dialog.drag_index >= 0:
             new_y = self._to_img_y(canvas_y)
-            new_y = max(MIN_CUT_GAP, min(self.dialog.source_image.height - MIN_CUT_GAP, new_y))
+            new_y = max(
+                MIN_CUT_GAP, min(self.dialog.source_image.height - MIN_CUT_GAP, new_y)
+            )
 
             intersecting = CutValidator.get_intersecting_component(
                 new_y, self.dialog.existing_components
@@ -206,7 +219,9 @@ class _CutCanvasWidget(QWidget):
                 self.dialog.selected_index = self.dialog.drag_index
                 self.dialog.last_valid_drag_y = new_y
             else:
-                self.dialog.cut_lines[self.dialog.drag_index] = self.dialog.last_valid_drag_y
+                self.dialog.cut_lines[self.dialog.drag_index] = (
+                    self.dialog.last_valid_drag_y
+                )
 
             self.update()
             self.dialog.refresh_listbox()
@@ -303,7 +318,12 @@ class CutEditorDialog(QDialog):
         right = QWidget()
         right.setFixedWidth(200)
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(10, 10, 10, 10)
+        right_layout.setContentsMargins(
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+        )
 
         lbl = QLabel("CUT LINES")
         lbl.setFont(get_header_font())
@@ -329,7 +349,7 @@ class CutEditorDialog(QDialog):
 
         self.status_label = QLabel("")
         self.status_label.setFont(get_caption_font())
-        self.status_label.setStyleSheet(f"color: {ColorSystem.ERROR};")
+        set_widget_text_color(self.status_label, ColorSystem.ERROR)
         self.status_label.setWordWrap(True)
         right_layout.addWidget(self.status_label)
 
@@ -366,7 +386,9 @@ class CutEditorDialog(QDialog):
     def _start_add_mode(self):
         self.mode = "adding"
         self.canvas_widget.setCursor(Qt.CursorShape.CrossCursor)
-        self.status_label.setText("Click to add a horizontal cut line. Escape to cancel.")
+        self.status_label.setText(
+            "Click to add a horizontal cut line. Escape to cancel."
+        )
         self.btn_add.setEnabled(False)
 
     def cancel_add_mode(self):

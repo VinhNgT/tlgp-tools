@@ -267,10 +267,15 @@ class TestBuildDocumentWithApis:
                     label="Header",
                     description="Header component",
                     apis=[
-                        Api(number=1, method="GET", title="Get Header Data", url="/api/header"),
-                    ]
+                        Api(
+                            number=1,
+                            method="GET",
+                            title="Get Header Data",
+                            url="/api/header",
+                        ),
+                    ],
                 )
-            ]
+            ],
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)

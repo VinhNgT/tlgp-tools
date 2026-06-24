@@ -50,7 +50,9 @@ class DaemonManager:
             workspace_root = os.path.abspath(os.path.join(manager_dir, "../../../.."))
 
         self.workspace_root = workspace_root
-        logger.info("DaemonManager initialized with workspace root: %s", self.workspace_root)
+        logger.info(
+            "DaemonManager initialized with workspace root: %s", self.workspace_root
+        )
 
         # In-memory log buffers
         self.annotator_logs: deque[str] = deque(maxlen=log_maxlen)
@@ -90,7 +92,9 @@ class DaemonManager:
 
         # 2. Check annotator HTTP readiness
         # If client is passed, use it, otherwise instantiate a short-lived client
-        annotator_url = os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000").rstrip("/")
+        annotator_url = os.environ.get(
+            "TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000"
+        ).rstrip("/")
         try:
             if client is not None:
                 res = await client.get(f"{annotator_url}/workspace/state", timeout=0.5)
@@ -112,7 +116,6 @@ class DaemonManager:
                 "ready": annotator_ready,
             }
         }
-
 
     def read_daemon_logs(self, daemon: str = "annotator", lines: int = 100) -> dict:
         """Read requested tailing lines from the selected daemon's log buffer."""
@@ -173,9 +176,12 @@ class DaemonManager:
 
         # Wait for the Annotator's HTTP API to become ready
         annotator_ready = False
-        annotator_url = os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000").rstrip("/")
+        annotator_url = os.environ.get(
+            "TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000"
+        ).rstrip("/")
 
         logger.info("Polling Annotator HTTP readiness at %s...", annotator_url)
+
         # Use provided client or short-lived client
         async def poll_readiness(c: httpx.AsyncClient) -> bool:
             for _ in range(30):
@@ -202,18 +208,27 @@ class DaemonManager:
                 abs_screenshot = os.path.abspath(screenshot_path)
                 with open(abs_screenshot, "rb") as f:
                     if client is not None:
-                        await client.post(f"{annotator_url}/workspace/import-image", files={"file": f})
+                        await client.post(
+                            f"{annotator_url}/workspace/import-image", files={"file": f}
+                        )
                     else:
                         async with httpx.AsyncClient() as c:
-                            await c.post(f"{annotator_url}/workspace/import-image", files={"file": f})
+                            await c.post(
+                                f"{annotator_url}/workspace/import-image",
+                                files={"file": f},
+                            )
             elif workspace_zip:
                 abs_zip = os.path.abspath(workspace_zip)
                 with open(abs_zip, "rb") as f:
                     if client is not None:
-                        await client.post(f"{annotator_url}/workspace/import", files={"file": f})
+                        await client.post(
+                            f"{annotator_url}/workspace/import", files={"file": f}
+                        )
                     else:
                         async with httpx.AsyncClient() as c:
-                            await c.post(f"{annotator_url}/workspace/import", files={"file": f})
+                            await c.post(
+                                f"{annotator_url}/workspace/import", files={"file": f}
+                            )
 
         return {
             "annotator_pid": annotator_proc.pid,

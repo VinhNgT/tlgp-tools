@@ -51,7 +51,10 @@ def main():
     def run_server():
         asyncio.set_event_loop(server_loop)
         config = uvicorn.Config(
-            app, host="127.0.0.1", port=8000, log_config=None,
+            app,
+            host="127.0.0.1",
+            port=8000,
+            log_config=None,
         )
         server = uvicorn.Server(config)
 
@@ -70,7 +73,9 @@ def main():
 
     # Block until server is ready (or timeout)
     if not ready_event.wait(timeout=_SERVER_STARTUP_TIMEOUT):
-        logger.error("FastAPI server failed to start within %ds", _SERVER_STARTUP_TIMEOUT)
+        logger.error(
+            "FastAPI server failed to start within %ds", _SERVER_STARTUP_TIMEOUT
+        )
         sys.exit(1)
 
     logger.info("FastAPI server ready on http://127.0.0.1:8000")

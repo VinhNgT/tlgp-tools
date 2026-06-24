@@ -30,7 +30,9 @@ def start_gui(workspace_manager):
     if sys.platform == "win32":
         try:
             # Set AppUserModelID to ensure taskbar shows the correct application icon on Windows
-            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("tlgp.annotator.app.1.0")
+            ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID(
+                "tlgp.annotator.app.1.0"
+            )
         except Exception:
             pass
 

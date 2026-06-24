@@ -20,7 +20,9 @@ logger = get_logger(__name__)
 class ComponentDescription(BaseModel):
     """Schema for eliciting component descriptions from the user."""
 
-    description: str = Field(..., description="A brief 1-sentence UX description of the component")
+    description: str = Field(
+        ..., description="A brief 1-sentence UX description of the component"
+    )
 
 
 class SpecGeneratorService:
@@ -39,14 +41,18 @@ class SpecGeneratorService:
     ) -> dict:
         """Validate, elicit missing descriptions, and generate the final specification document."""
         if ctx:
-            await ctx.report_progress(10, 100, "Loading and validating analysis data...")
+            await ctx.report_progress(
+                10, 100, "Loading and validating analysis data..."
+            )
 
         if analysis_path:
             try:
                 with open(analysis_path, encoding="utf-8") as f:
                     analysis = json.load(f)
             except Exception as e:
-                logger.error("Failed to load analysis file from %s: %s", analysis_path, e)
+                logger.error(
+                    "Failed to load analysis file from %s: %s", analysis_path, e
+                )
                 return {
                     "valid": False,
                     "errors": [f"Failed to read analysis_path: {e}"],
@@ -69,8 +75,14 @@ class SpecGeneratorService:
                 updated = False
                 for comp in non_leaf:
                     if not comp.description:
-                        await ctx.report_progress(30, 100, f"Eliciting description for '{comp.label}'...")
-                        logger.info("Eliciting description for empty component '%s' (ID: %s)", comp.label, comp.id)
+                        await ctx.report_progress(
+                            30, 100, f"Eliciting description for '{comp.label}'..."
+                        )
+                        logger.info(
+                            "Eliciting description for empty component '%s' (ID: %s)",
+                            comp.label,
+                            comp.id,
+                        )
                         try:
                             result = await ctx.elicit(
                                 message=f"The component '{comp.label}' (id={comp.id}) has an empty description. Please provide a UX description.",
@@ -84,16 +96,30 @@ class SpecGeneratorService:
                                         updated = True
                                         break
                         except Exception as e:
-                            logger.error("Description elicitation failed for component '%s': %s", comp.label, e)
-                            await ctx.log("error", f"Elicitation failed for component '{comp.label}': {e}")
+                            logger.error(
+                                "Description elicitation failed for component '%s': %s",
+                                comp.label,
+                                e,
+                            )
+                            await ctx.log(
+                                "error",
+                                f"Elicitation failed for component '{comp.label}': {e}",
+                            )
 
                 if updated and analysis_path:
                     try:
                         with open(analysis_path, "w", encoding="utf-8") as f:
                             json.dump(analysis, f, indent=2, ensure_ascii=False)
                     except Exception as e:
-                        logger.warning("Failed to save updated analysis data to %s: %s", analysis_path, e)
-                        await ctx.log("warning", f"Failed to write updated analysis back to {analysis_path}: {e}")
+                        logger.warning(
+                            "Failed to save updated analysis data to %s: %s",
+                            analysis_path,
+                            e,
+                        )
+                        await ctx.log(
+                            "warning",
+                            f"Failed to write updated analysis back to {analysis_path}: {e}",
+                        )
 
             except ValidationError:
                 # Fall through to let strict validation function capture and report structured errors
@@ -112,9 +138,12 @@ class SpecGeneratorService:
             docx_path = Path(result["output_path"])
             workspace_zip_path = docx_path.parent / "workspace.zip"
             if ctx:
-                await ctx.log("info", f"Exporting workspace state to {workspace_zip_path}...")
+                await ctx.log(
+                    "info", f"Exporting workspace state to {workspace_zip_path}..."
+                )
             try:
                 from mcp_server.client import WorkspaceClient  # noqa: PLC0415
+
                 client = WorkspaceClient()
                 try:
                     await client.export_workspace(str(workspace_zip_path))
@@ -123,7 +152,9 @@ class SpecGeneratorService:
             except Exception as e:
                 logger.error("Failed to export workspace.zip next to docx: %s", e)
                 if ctx:
-                    await ctx.log("warning", f"Failed to export workspace.zip next to docx: {e}")
+                    await ctx.log(
+                        "warning", f"Failed to export workspace.zip next to docx: {e}"
+                    )
 
         if ctx:
             await ctx.report_progress(100, 100, "Spec generation complete.")
@@ -229,7 +260,9 @@ class SpecGeneratorService:
             out = Path(output_path).resolve()
         else:
             safe_name = (
-                "".join(c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-"))
+                "".join(
+                    c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-")
+                )
                 .strip()
                 .replace(" ", "_")
             )
@@ -246,7 +279,9 @@ class SpecGeneratorService:
         )
 
         table_count = len(doc.tables)
-        image_count = len(data.screen.imageFiles) + sum(1 for c in non_leaf if c.imageFile)
+        image_count = len(data.screen.imageFiles) + sum(
+            1 for c in non_leaf if c.imageFile
+        )
 
         return {
             "valid": True,
@@ -283,7 +318,9 @@ class SpecGeneratorService:
                 "analysis_path": str(out_path.resolve()),
             }
         except Exception as e:
-            logger.error("Failed to write analysis JSON file to export directory: %s", e)
+            logger.error(
+                "Failed to write analysis JSON file to export directory: %s", e
+            )
             return {
                 "success": False,
                 "error": f"Failed to write analysis JSON file: {e}",

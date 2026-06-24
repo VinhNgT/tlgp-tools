@@ -66,8 +66,14 @@ def get_prompt_section(section_title: str) -> str:
     if section_title == "analysis.json Schema Reference":
         return (_PROMPT_DIR / "schema_reference.md").read_text(encoding="utf-8").strip()
     elif section_title == "UI Control Type Classification Guide":
-        return (_PROMPT_DIR / "classification_guide.md").read_text(encoding="utf-8").strip()
+        return (
+            (_PROMPT_DIR / "classification_guide.md")
+            .read_text(encoding="utf-8")
+            .strip()
+        )
     elif section_title == "Example: Complete Analysis Dict":
-        example_json = (_PROMPT_DIR / "example_analysis.json").read_text(encoding="utf-8").strip()
+        example_json = (
+            (_PROMPT_DIR / "example_analysis.json").read_text(encoding="utf-8").strip()
+        )
         return f"## Example: Complete Analysis Dict\n\n```json\n{example_json}\n```"
     return ""

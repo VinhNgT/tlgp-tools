@@ -88,4 +88,3 @@ def test_excepthook_keyboard_interrupt():
     finally:
         sys.excepthook = original_hook
         sys.__excepthook__ = original_sys_excepthook
-

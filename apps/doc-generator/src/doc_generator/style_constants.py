@@ -21,7 +21,9 @@ class StyleConfig:
         self.FONT_FAMILY: str = cfg["global"]["font_family"]
         self.FONT_SIZE_DEFAULT: Pt = Pt(cfg["global"]["font_size_pt"])
         self.FONT_SIZE_API: Pt = Pt(cfg["table"]["api"]["font_size_pt"])
-        self.SPACE_AFTER_TABLE_PT: float = float(cfg["global"].get("space_after_table_pt", 12.0))
+        self.SPACE_AFTER_TABLE_PT: float = float(
+            cfg["global"].get("space_after_table_pt", 12.0)
+        )
 
         heading_hex = cfg["global"]["heading_color"].lstrip("#")
         self.HEADING_COLOR = RGBColor(
@@ -38,7 +40,9 @@ class StyleConfig:
 
         self.INFO_COLS_PT: list[float] = cfg["table"]["info"]["col_widths_pt"]
         self.UI_COLS_PT: list[float] = cfg["table"]["ui_elements"]["col_widths_pt"]
-        self.INTERACTION_COLS_PT: list[float] = cfg["table"]["interaction"]["col_widths_pt"]
+        self.INTERACTION_COLS_PT: list[float] = cfg["table"]["interaction"][
+            "col_widths_pt"
+        ]
         self.API_COLS_PT: list[float] = cfg["table"]["api"]["col_widths_pt"]
 
         self.CELL_PAD_TOP_PT: int = cfg["cell"]["padding_top_pt"]
@@ -52,7 +56,9 @@ class StyleConfig:
         self.BORDER_WIDTH_PT: float = cfg["border"]["width_pt"]
 
         self.UI_TABLE_HEADERS: list[str] = cfg["table"]["ui_elements"]["headers"]
-        self.INTERACTION_TABLE_HEADERS: list[str] = cfg["table"]["interaction"]["headers"]
+        self.INTERACTION_TABLE_HEADERS: list[str] = cfg["table"]["interaction"][
+            "headers"
+        ]
         self.API_TABLE_HEADERS: list[str] = cfg["table"]["api"]["headers"]
 
 

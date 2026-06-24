@@ -19,9 +19,7 @@ from PIL import Image
 # ── Helpers ────────────────────────────────────────────────────────────
 
 
-def _make_components(
-    parent_bounds: Bounds, count: int = 3
-) -> list[Component]:
+def _make_components(parent_bounds: Bounds, count: int = 3) -> list[Component]:
     """Create N child components arranged horizontally within parent bounds."""
     children = []
     slot_w = parent_bounds.w // max(count, 1) - 10
@@ -110,9 +108,7 @@ class TestPillCornerConsistency:
 
         results = {}
         for corner in ("top_left", "top_right", "bottom_left", "bottom_right"):
-            child = base_child.model_copy(
-                update={"style": Style(pillCorner=corner)}
-            )
+            child = base_child.model_copy(update={"style": Style(pillCorner=corner)})
             img = Image.new("RGB", (img_w, img_h), (255, 255, 255))
             result = paint_annotations(img, [child], 0, 0, None, img_w)
             results[corner] = result.tobytes()

@@ -84,7 +84,8 @@ class _ScreenInfoDialog(QDialog):
         layout.addWidget(self.text_desc, stretch=1)
 
         button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Save
+            | QDialogButtonBox.StandardButton.Cancel
         )
         button_box.accepted.connect(self._on_save)
         button_box.rejected.connect(self.reject)
@@ -137,9 +138,7 @@ class QtDialogService(DialogService):
     def show_info(self, parent: QWidget, title: str, message: str) -> None:
         QMessageBox.information(parent, title, message)
 
-    def show_importing_dialog(
-        self, parent: QWidget, message: str
-    ) -> ProgressIndicator:
+    def show_importing_dialog(self, parent: QWidget, message: str) -> ProgressIndicator:
         dialog = _ImportingDialog(parent, message=message)
         return _QtProgressIndicator(dialog)
 
@@ -159,7 +158,9 @@ class QtDialogService(DialogService):
     def show_screen_info(
         self, parent: QWidget, screen_name: str, description: str
     ) -> dict[str, str] | None:
-        dialog = _ScreenInfoDialog(parent, screen_name=screen_name, description=description)
+        dialog = _ScreenInfoDialog(
+            parent, screen_name=screen_name, description=description
+        )
         dialog.exec()
         return dialog.info_result
 

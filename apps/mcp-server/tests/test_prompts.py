@@ -112,7 +112,9 @@ class TestSpecWorkflowPrompt:
     @patch("mcp_server.server.get_client")
     async def test_spec_doc_workflow_renders(self, mock_get_client):
         mock_client = MagicMock()
-        mock_client.get_workspace_state = AsyncMock(return_value={"components": {}, "screen": {}})
+        mock_client.get_workspace_state = AsyncMock(
+            return_value={"components": {}, "screen": {}}
+        )
         mock_get_client.return_value = mock_client
         res = await spec_doc_workflow("3.2")
         assert isinstance(res, list)
@@ -134,4 +136,3 @@ class TestStrictGuidelines:
         assert "DFS Document Ordering" in content
         assert "Children Annotations Overlay" in content
         assert "Leaf Components" in content
-

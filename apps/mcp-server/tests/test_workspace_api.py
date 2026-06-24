@@ -21,7 +21,10 @@ def test_api_client_error_serialization():
         backend_detail="Invalid query parameters",
     )
 
-    assert "ApiClientError: Failed operation [Status: 400] (GET http://localhost/api)" in str(err)
+    assert (
+        "ApiClientError: Failed operation [Status: 400] (GET http://localhost/api)"
+        in str(err)
+    )
     assert "Backend Detail" in str(err)
 
     serialized = err.to_dict()
@@ -38,16 +41,20 @@ class TestWorkspaceApi:
     async def test_get_workspace_state_success(self, monkeypatch):
         class MockResponse:
             status_code = 200
+
             def raise_for_status(self):
                 pass
+
             def json(self):
                 return {"version": 1, "sessionId": "abc"}
 
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 # We mock HTTP request method
                 assert method == "GET"
@@ -69,8 +76,10 @@ class TestWorkspaceApi:
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 raise httpx.HTTPStatusError("Not Found", request=req, response=resp)
 
@@ -94,8 +103,10 @@ class TestWorkspaceApi:
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 raise httpx.RequestError("Connection refused", request=req)
 
@@ -116,14 +127,17 @@ class TestWorkspaceApi:
         class MockResponse:
             status_code = 200
             content = b"fake_png_data"
+
             def raise_for_status(self):
                 pass
 
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 assert method == "GET"
                 assert "images/comp-uuid" in url
@@ -151,8 +165,10 @@ class TestWorkspaceApi:
         class MockResponse:
             status_code = 200
             content = zip_buf.getvalue()
+
             def raise_for_status(self):
                 pass
+
             def json(self):
                 # When get_workspace_state is called internally if component_ids is None
                 return {"components": {"comp1": {}}}
@@ -160,8 +176,10 @@ class TestWorkspaceApi:
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 # Can be GET for workspace state or POST for export-batch
                 if method == "GET":
@@ -192,14 +210,17 @@ class TestWorkspaceApi:
         class MockResponse:
             status_code = 200
             content = b"zip_bytes"
+
             def raise_for_status(self):
                 pass
 
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 assert method == "GET"
                 assert "workspace/export" in url
@@ -220,14 +241,17 @@ class TestWorkspaceApi:
         class MockResponse:
             status_code = 200
             content = b"raw_bytes"
+
             def raise_for_status(self):
                 pass
 
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 assert method == "GET"
                 assert "images/comp-uuid" in url
@@ -243,16 +267,20 @@ class TestWorkspaceApi:
     async def test_clear_workspace_success(self, monkeypatch):
         class MockResponse:
             status_code = 200
+
             def raise_for_status(self):
                 pass
+
             def json(self):
                 return {"status": "success", "sessionId": "new-uuid"}
 
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 assert method == "POST"
                 assert "workspace/clear" in url
@@ -269,14 +297,17 @@ class TestWorkspaceApi:
     async def test_import_image_success(self, tmp_path, monkeypatch):
         class MockResponse:
             status_code = 200
+
             def raise_for_status(self):
                 pass
 
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 assert method == "POST"
                 assert "workspace/import-image" in url
@@ -295,14 +326,17 @@ class TestWorkspaceApi:
     async def test_import_workspace_success(self, tmp_path, monkeypatch):
         class MockResponse:
             status_code = 200
+
             def raise_for_status(self):
                 pass
 
         class MockAsyncClient:
             async def __aenter__(self):
                 return self
+
             async def __aexit__(self, exc_type, exc_val, exc_tb):
                 pass
+
             async def request(self, method, url, *args, **kwargs):
                 assert method == "POST"
                 assert "workspace/import" in url
@@ -316,4 +350,3 @@ class TestWorkspaceApi:
 
         client = WorkspaceClient()
         await client.import_workspace(str(dummy_zip))
-

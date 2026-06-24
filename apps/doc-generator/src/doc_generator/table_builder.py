@@ -147,7 +147,12 @@ def _set_paragraph_spacing(cell, style: StyleConfig):
         pf.space_after = Pt(style.CELL_SPACE_BELOW_PT)
 
 
-def _style_table(table: Table, col_widths_pt: list[float], style: StyleConfig, font_size: Pt | None = None):
+def _style_table(
+    table: Table,
+    col_widths_pt: list[float],
+    style: StyleConfig,
+    font_size: Pt | None = None,
+):
     """Apply full styling to a table: borders, padding, widths, header row."""
     table.alignment = WD_TABLE_ALIGNMENT.CENTER
 
@@ -186,7 +191,9 @@ def _add_table_spacing(doc: Document, style: StyleConfig):
 # ============================================================
 
 
-def build_info_table(doc: Document, label: str, description: str, style: StyleConfig) -> Table:
+def build_info_table(
+    doc: Document, label: str, description: str, style: StyleConfig
+) -> Table:
     """Build a 2×2 Info Table for a component section."""
     table = doc.add_table(rows=2, cols=2)
     _style_cell_text(
@@ -326,7 +333,9 @@ def build_api_table(doc: Document, params: list[ApiParam], style: StyleConfig) -
             param.defaultValue,
         ]
         for c, text in enumerate(row_data):
-            _style_cell_text(table.cell(r + 1, c), text, style, font_size=style.FONT_SIZE_API)
+            _style_cell_text(
+                table.cell(r + 1, c), text, style, font_size=style.FONT_SIZE_API
+            )
 
     _style_table(table, style.API_COLS_PT, style, font_size=style.FONT_SIZE_API)
     _add_table_spacing(doc, style)

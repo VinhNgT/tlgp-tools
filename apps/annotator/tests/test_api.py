@@ -72,11 +72,14 @@ class TestComponentRoutes:
     @pytest.mark.anyio()
     async def test_add_component(self, client, workspace):
         comp_id = str(uuid.uuid4())
-        resp = await client.post("/components", json={
-            "id": comp_id,
-            "label": "Button",
-            "bounds": {"x": 10, "y": 10, "w": 50, "h": 30},
-        })
+        resp = await client.post(
+            "/components",
+            json={
+                "id": comp_id,
+                "label": "Button",
+                "bounds": {"x": 10, "y": 10, "w": 50, "h": 30},
+            },
+        )
         assert resp.status_code == 200
         assert uuid.UUID(comp_id) in workspace.state.components
 
@@ -98,7 +101,9 @@ class TestComponentRoutes:
     async def test_move_component(self, client, workspace):
         comp_id = uuid.uuid4()
         workspace.add_component(comp_id, "Box", Bounds(x=10, y=10, w=50, h=50))
-        resp = await client.put(f"/components/{comp_id}/move", json={"x": 100, "y": 100})
+        resp = await client.put(
+            f"/components/{comp_id}/move", json={"x": 100, "y": 100}
+        )
         assert resp.status_code == 200
         assert workspace.state.components[comp_id].bounds.x == 100
 
@@ -196,9 +201,12 @@ class TestExceptionHandler:
     @pytest.mark.anyio()
     async def test_readonly_returns_403(self, client, workspace):
         workspace.mutate(lambda s: setattr(s, "readOnly", True), force=True)
-        resp = await client.post("/components", json={
-            "label": "X",
-            "bounds": {"x": 0, "y": 0, "w": 10, "h": 10},
-        })
+        resp = await client.post(
+            "/components",
+            json={
+                "label": "X",
+                "bounds": {"x": 0, "y": 0, "w": 10, "h": 10},
+            },
+        )
         assert resp.status_code == 403
         assert "detail" in resp.json()

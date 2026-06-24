@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .design_system import get_header_font
+from .design_system import LayoutTokens, get_header_font
 
 
 class SidebarTreeView(QWidget):
@@ -21,7 +21,12 @@ class SidebarTreeView(QWidget):
         super().__init__(parent)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+        )
 
         lbl = QLabel("COMPONENTS")
         lbl.setFont(get_header_font())
@@ -36,12 +41,6 @@ class SidebarTreeView(QWidget):
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.setAnimated(False)
         self.tree.setIndentation(16)
-        self.tree.setStyleSheet("""
-            QTreeView::branch {
-                border-image: none;
-                image: none;
-            }
-        """)
         layout.addWidget(self.tree)
 
         self.tree.selectionModel().selectionChanged.connect(self._on_tree_select)
@@ -69,7 +68,11 @@ class SidebarTreeView(QWidget):
             synced_ids.add(node_id)
 
             cached_item = self._item_map.get(node_id)
-            container = parent_item if parent_item is not None else self.model.invisibleRootItem()
+            container = (
+                parent_item
+                if parent_item is not None
+                else self.model.invisibleRootItem()
+            )
 
             if cached_item is None:
                 item = QStandardItem(node_text)
@@ -87,7 +90,13 @@ class SidebarTreeView(QWidget):
 
                 # Re-parent if needed
                 actual_parent = cached_item.parent() or self.model.invisibleRootItem()
-                if actual_parent != container or actual_parent.index().internalId() != container.index().internalId() if parent_item else actual_parent != container:
+                if (
+                    actual_parent != container
+                    or actual_parent.index().internalId()
+                    != container.index().internalId()
+                    if parent_item
+                    else actual_parent != container
+                ):
                     row = cached_item.row()
                     taken = actual_parent.takeRow(row)
                     if taken:

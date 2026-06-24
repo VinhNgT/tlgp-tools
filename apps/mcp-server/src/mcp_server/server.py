@@ -289,9 +289,9 @@ async def spec_doc_workflow(section_prefix: str = "1.1") -> list:
                     "uri": "tlgp://workspace/state",
                     "mimeType": "application/json",
                     "text": state_json,
-                }
-            }
-        }
+                },
+            },
+        },
     ]
 
 
@@ -346,4 +346,3 @@ async def import_workspace(workspace_zip: str) -> dict:
     """
     await get_client().import_workspace(workspace_zip)
     return {"status": "success", "workspace_zip": workspace_zip}
-

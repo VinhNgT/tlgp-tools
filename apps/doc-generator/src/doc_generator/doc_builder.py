@@ -103,7 +103,11 @@ def _add_component_section(
 
     # H4: 3. UI elements
     if component.children:
-        _add_h4(doc, f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình", style)
+        _add_h4(
+            doc,
+            f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình",
+            style,
+        )
         build_ui_elements_table(doc, component.children, style)
 
     # H4: 4. Interaction events
@@ -144,7 +148,11 @@ def _add_screen_section(
 
     # H4: 3. UI elements (top-level children)
     if screen.topLevelChildren:
-        _add_h4(doc, f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình", style)
+        _add_h4(
+            doc,
+            f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình",
+            style,
+        )
         build_ui_elements_table(doc, screen.topLevelChildren, style)
 
     # H4: 4. Interaction events
@@ -241,6 +249,8 @@ def build_document(analysis: AnalysisData) -> Document:
 
     # Screen overview section
     screen_section_num = f"{analysis.sectionPrefix}.{len(non_leaf_components) + 1}"
-    _add_screen_section(doc, analysis.screen, screen_section_num, analysis, style_config)
+    _add_screen_section(
+        doc, analysis.screen, screen_section_num, analysis, style_config
+    )
 
     return doc

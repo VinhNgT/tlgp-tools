@@ -4,7 +4,6 @@ Provides the toolbar, menu bar, sidebar splitter, and canvas area.
 All user interaction is delegated to the controller via callbacks.
 """
 
-
 import os
 
 from PySide6.QtCore import QPoint, QSize, Qt
@@ -26,8 +25,10 @@ from PySide6.QtWidgets import (
 from .canvas import AnnotationCanvasView
 from .design_system import (
     ColorSystem,
+    LayoutTokens,
     get_body_font,
     get_title_font,
+    set_widget_text_color,
 )
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
@@ -52,8 +53,13 @@ class WelcomeWidget(QWidget):
         card.setFixedSize(400, 220)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(30, 25, 30, 25)
-        card_layout.setSpacing(10)
+        card_layout.setContentsMargins(
+            LayoutTokens.MARGIN_DEFAULT * 3,
+            int(LayoutTokens.MARGIN_DEFAULT * 2.5),
+            LayoutTokens.MARGIN_DEFAULT * 3,
+            int(LayoutTokens.MARGIN_DEFAULT * 2.5),
+        )
+        card_layout.setSpacing(LayoutTokens.SPACING_DEFAULT)
 
         title = QLabel("Annotator")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -76,8 +82,6 @@ class WelcomeWidget(QWidget):
         card_layout.addWidget(self.btn_img)
 
         layout.addWidget(card)
-
-
 
     def _on_import_zip(self):
         if self.on_import_zip:
@@ -135,26 +139,34 @@ class MainAppWindow(QMainWindow):
         file_menu.addAction(act_import_zip)
 
         act_import_img = QAction("Import Raw Image", self)
-        act_import_img.triggered.connect(lambda: self._fire(self.on_import_image_request))
+        act_import_img.triggered.connect(
+            lambda: self._fire(self.on_import_image_request)
+        )
         file_menu.addAction(act_import_img)
 
         self.act_export = QAction("Export Session (.zip)", self)
         self.act_export.setShortcut(QKeySequence("Ctrl+S"))
         self.act_export.setEnabled(False)
-        self.act_export.triggered.connect(lambda: self._fire(self.on_export_zip_request))
+        self.act_export.triggered.connect(
+            lambda: self._fire(self.on_export_zip_request)
+        )
         file_menu.addAction(self.act_export)
 
         file_menu.addSeparator()
 
         self.act_screen_info = QAction("Screen Info…", self)
         self.act_screen_info.setEnabled(False)
-        self.act_screen_info.triggered.connect(lambda: self._fire(self.on_open_screen_info_request))
+        self.act_screen_info.triggered.connect(
+            lambda: self._fire(self.on_open_screen_info_request)
+        )
         file_menu.addAction(self.act_screen_info)
 
         self.act_cuts = QAction("Edit Cut Lines…", self)
         self.act_cuts.setShortcut(QKeySequence("Ctrl+L"))
         self.act_cuts.setEnabled(False)
-        self.act_cuts.triggered.connect(lambda: self._fire(self.on_open_cut_editor_request))
+        self.act_cuts.triggered.connect(
+            lambda: self._fire(self.on_open_cut_editor_request)
+        )
         file_menu.addAction(self.act_cuts)
 
         edit_menu = menubar.addMenu("&Edit")
@@ -220,13 +232,16 @@ class MainAppWindow(QMainWindow):
         self.btn_cut_lines = QAction("Cut Lines (C)", self)
         self.btn_cut_lines.setToolTip("Edit Cut Lines (C / Ctrl+L)")
         self.btn_cut_lines.setEnabled(False)
-        self.btn_cut_lines.triggered.connect(lambda: self._fire(self.on_open_cut_editor_request))
+        self.btn_cut_lines.triggered.connect(
+            lambda: self._fire(self.on_open_cut_editor_request)
+        )
         tb.addAction(self.btn_cut_lines)
 
         # Breadcrumbs label
         self.lbl_breadcrumbs = QLabel("Root")
         self.lbl_breadcrumbs.setFont(get_body_font())
-        self.lbl_breadcrumbs.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
+        self.lbl_breadcrumbs.setContentsMargins(8, 0, 8, 0)
+        set_widget_text_color(self.lbl_breadcrumbs, ColorSystem.get_muted())
         tb.addWidget(self.lbl_breadcrumbs)
 
         spacer = QWidget()
@@ -236,7 +251,8 @@ class MainAppWindow(QMainWindow):
         # Zoom display
         self.lbl_zoom = QLabel("100%")
         self.lbl_zoom.setFont(get_body_font())
-        self.lbl_zoom.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
+        self.lbl_zoom.setContentsMargins(8, 0, 8, 0)
+        set_widget_text_color(self.lbl_zoom, ColorSystem.get_muted())
         tb.addWidget(self.lbl_zoom)
 
     def _build_central_area(self, transformer: ViewportTransformer | None):
@@ -317,7 +333,6 @@ class MainAppWindow(QMainWindow):
     def update_zoom_display(self, zoom_factor: float):
         pct = round(zoom_factor * 100)
         self.lbl_zoom.setText(f"{pct}%")
-        self.lbl_zoom.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:
@@ -325,7 +340,6 @@ class MainAppWindow(QMainWindow):
         else:
             path = "Root"
         self.lbl_breadcrumbs.setText(path)
-        self.lbl_breadcrumbs.setStyleSheet(f"color: {ColorSystem.get_muted()}; padding: 0 8px;")
 
     def show_context_menu(self, x: int, y: int, actions: list[dict]):
         """Display a popup context menu at screen coordinates (x, y)."""
@@ -341,8 +355,6 @@ class MainAppWindow(QMainWindow):
     def is_text_focused(self) -> bool:
         """Check if any text entry in properties is focused."""
         return self.properties.is_text_focused()
-
-
 
     # ── Keyboard Handling ─────────────────────────────────────────────
 
@@ -428,8 +440,6 @@ class MainAppWindow(QMainWindow):
     def _on_mode_toggled(self, mode: str):
         if self.on_mode_change_request:
             self.on_mode_change_request(mode)
-
-
 
     @staticmethod
     def _fire(callback):

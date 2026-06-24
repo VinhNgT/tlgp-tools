@@ -159,7 +159,9 @@ class TestMoveComponent:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         ws.add_component(parent_id, "Parent", Bounds(x=0, y=0, w=200, h=200))
-        ws.add_component(child_id, "Child", Bounds(x=10, y=10, w=50, h=50), parent_id=parent_id)
+        ws.add_component(
+            child_id, "Child", Bounds(x=10, y=10, w=50, h=50), parent_id=parent_id
+        )
         ws.move_component(parent_id, 100, 100)
         assert ws.state.components[child_id].bounds.x == 110
         assert ws.state.components[child_id].bounds.y == 110
@@ -225,7 +227,9 @@ class TestDeleteComponent:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         ws.add_component(parent_id, "P", Bounds(x=0, y=0, w=200, h=200))
-        ws.add_component(child_id, "C", Bounds(x=10, y=10, w=50, h=50), parent_id=parent_id)
+        ws.add_component(
+            child_id, "C", Bounds(x=10, y=10, w=50, h=50), parent_id=parent_id
+        )
         ws.delete_component(parent_id)
         assert parent_id not in ws.state.components
         assert child_id not in ws.state.components

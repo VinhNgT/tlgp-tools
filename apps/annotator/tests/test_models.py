@@ -49,7 +49,6 @@ class TestComponent:
         assert comp.visibility.visible is True
         assert comp.visibility.locked is False
 
-
     def test_custom_style_and_visibility(self):
         comp = Component(
             id=uuid.uuid4(),

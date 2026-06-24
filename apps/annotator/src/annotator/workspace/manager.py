@@ -72,7 +72,9 @@ class WorkspaceManager:
         """
         with self._lock:
             if self._state.readOnly and not force:
-                raise ReadOnlyError("Workspace is read-only", session_id=str(self._state.sessionId))
+                raise ReadOnlyError(
+                    "Workspace is read-only", session_id=str(self._state.sessionId)
+                )
 
             old_state = self._state
             old_dump = old_state.model_dump(mode="json")
@@ -100,7 +102,9 @@ class WorkspaceManager:
         for cb in list(self._subscribers):
             cb(patch, new_state)
 
-    def _shift_descendants(self, state: WorkspaceState, comp_id: uuid.UUID, dx: int, dy: int):
+    def _shift_descendants(
+        self, state: WorkspaceState, comp_id: uuid.UUID, dx: int, dy: int
+    ):
         comp = state.components.get(comp_id)
         if not comp:
             return
@@ -156,7 +160,9 @@ class WorkspaceManager:
 
         def mutation(state: WorkspaceState):
             if comp_id not in state.components:
-                raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
+                raise ComponentNotFoundError(
+                    "Component not found", component_id=str(comp_id)
+                )
             comp = state.components[comp_id]
             dx = x - comp.bounds.x
             dy = y - comp.bounds.y
@@ -182,7 +188,9 @@ class WorkspaceManager:
 
         def mutation(state: WorkspaceState):
             if comp_id not in state.components:
-                raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
+                raise ComponentNotFoundError(
+                    "Component not found", component_id=str(comp_id)
+                )
 
             comp = state.components[comp_id]
 
@@ -224,7 +232,9 @@ class WorkspaceManager:
 
         def mutation(state: WorkspaceState):
             if comp_id not in state.components:
-                raise ComponentNotFoundError("Component not found", component_id=str(comp_id))
+                raise ComponentNotFoundError(
+                    "Component not found", component_id=str(comp_id)
+                )
 
             comp = state.components[comp_id]
             parent_id = comp.parentId
@@ -286,6 +296,7 @@ class WorkspaceManager:
             state.rootComponents = []
             state.components = {}
             state.readOnly = False
+
         with self._lock:
             self.raw_image_bytes = b""
         self.mutate(mutation, force=force)
@@ -293,7 +304,9 @@ class WorkspaceManager:
     def undo(self, force: bool = False) -> bool:
         with self._lock:
             if self._state.readOnly and not force:
-                raise ReadOnlyError("Workspace is read-only", session_id=str(self._state.sessionId))
+                raise ReadOnlyError(
+                    "Workspace is read-only", session_id=str(self._state.sessionId)
+                )
             if self._pointer > 0:
                 old_dump = self._state.model_dump(mode="json")
                 self._pointer -= 1
@@ -301,7 +314,7 @@ class WorkspaceManager:
                 self._state = WorkspaceState.model_validate(state_data)
                 self._state.revision += 1
                 new_dump = self._state.model_dump(mode="json")
-                self._history[self._pointer] = new_dump # Keep updated
+                self._history[self._pointer] = new_dump  # Keep updated
                 patch = jsonpatch.make_patch(old_dump, new_dump).patch
                 new_state = self._state
             else:
@@ -314,7 +327,9 @@ class WorkspaceManager:
     def redo(self, force: bool = False) -> bool:
         with self._lock:
             if self._state.readOnly and not force:
-                raise ReadOnlyError("Workspace is read-only", session_id=str(self._state.sessionId))
+                raise ReadOnlyError(
+                    "Workspace is read-only", session_id=str(self._state.sessionId)
+                )
             if self._pointer < len(self._history) - 1:
                 old_dump = self._state.model_dump(mode="json")
                 self._pointer += 1
@@ -334,6 +349,7 @@ class WorkspaceManager:
 
     def import_zip(self, file_bytes: bytes):
         import json  # noqa: PLC0415
+
         with zipfile.ZipFile(io.BytesIO(file_bytes), "r") as zf:
             if "workspace.json" not in zf.namelist():
                 raise InvalidArchiveError("Invalid archive: Missing workspace.json")
@@ -371,7 +387,9 @@ class WorkspaceManager:
             with Image.open(io.BytesIO(file_bytes)) as img:
                 width, height = img.width, img.height
         except Exception as e:
-            raise InvalidImageError(f"Invalid image format: {e}", filename=filename) from e
+            raise InvalidImageError(
+                f"Invalid image format: {e}", filename=filename
+            ) from e
 
         def mutation(state: WorkspaceState):
             state.sessionId = uuid.uuid4()

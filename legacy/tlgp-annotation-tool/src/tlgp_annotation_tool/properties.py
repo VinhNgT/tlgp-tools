@@ -259,9 +259,7 @@ class PropertiesPanel(tb.Frame):
             except Exception:
                 pass
 
-    def _on_selection_change(
-        self, nav: NavigationContext, boxes: list[AnnotationBox]
-    ):
+    def _on_selection_change(self, nav: NavigationContext, boxes: list[AnnotationBox]):
         self._save_pending_name()
         self.selected_boxes = boxes
         self.refresh_layer_display()

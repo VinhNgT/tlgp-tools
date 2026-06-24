@@ -247,7 +247,9 @@ class TestTableSpacing:
         # There should be at least one paragraph added for spacing
         spacer_para = doc.paragraphs[-1]
         assert spacer_para.paragraph_format.space_before == Pt(0)
-        assert spacer_para.paragraph_format.space_after == Pt(style.SPACE_AFTER_TABLE_PT)
+        assert spacer_para.paragraph_format.space_after == Pt(
+            style.SPACE_AFTER_TABLE_PT
+        )
         assert spacer_para.paragraph_format.line_spacing == Pt(1)
 
     def test_spacing_added_after_ui_table(self):
@@ -255,5 +257,7 @@ class TestTableSpacing:
         build_ui_elements_table(doc, [], style)
         spacer_para = doc.paragraphs[-1]
         assert spacer_para.paragraph_format.space_before == Pt(0)
-        assert spacer_para.paragraph_format.space_after == Pt(style.SPACE_AFTER_TABLE_PT)
+        assert spacer_para.paragraph_format.space_after == Pt(
+            style.SPACE_AFTER_TABLE_PT
+        )
         assert spacer_para.paragraph_format.line_spacing == Pt(1)

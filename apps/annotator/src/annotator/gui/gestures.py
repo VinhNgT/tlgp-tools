@@ -401,13 +401,23 @@ class GestureInterpreter:
 
                 self.draw_start_x = cx
                 self.draw_start_y = cy
-                canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.get_box_active(), dash=True)
+                canvas.set_temp_rect(
+                    cx, cy, cx, cy, color=ColorSystem.get_box_active(), dash=True
+                )
                 self.has_temp_rect = True
 
         elif state.current_mode == "draw":
             self.draw_start_x = cx
             self.draw_start_y = cy
-            canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.get_box_inactive(), dash=False, width=2)
+            canvas.set_temp_rect(
+                cx,
+                cy,
+                cx,
+                cy,
+                color=ColorSystem.get_box_inactive(),
+                dash=False,
+                width=2,
+            )
             self.has_temp_rect = True
 
     def on_drag(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
@@ -914,8 +924,15 @@ class GestureInterpreter:
             if canvas.on_drill_into:
                 canvas.on_drill_into(clicked.id)
 
-    def on_scroll(self, canvas: Any, delta: float, mouse_x: float, mouse_y: float,
-                  shift: bool = False, ctrl: bool = False):
+    def on_scroll(
+        self,
+        canvas: Any,
+        delta: float,
+        mouse_x: float,
+        mouse_y: float,
+        shift: bool = False,
+        ctrl: bool = False,
+    ):
         """Translates wheel rotations to zoom scales or horizontal/vertical scrolls."""
         if not canvas.full_pil_img:
             return
@@ -933,8 +950,15 @@ class GestureInterpreter:
             if canvas.on_viewport_change_request:
                 canvas.on_viewport_change_request(canvas.zoom_factor, (pan_x, pan_y))
 
-    def on_trackpad_scroll(self, canvas: Any, delta_x: float, delta_y: float,
-                           mouse_x: float, mouse_y: float, ctrl: bool = False):
+    def on_trackpad_scroll(
+        self,
+        canvas: Any,
+        delta_x: float,
+        delta_y: float,
+        mouse_x: float,
+        mouse_y: float,
+        ctrl: bool = False,
+    ):
         """Processes trackpad inputs, supporting standard panning and pinch-zooms."""
         if not canvas.full_pil_img:
             return
@@ -948,9 +972,7 @@ class GestureInterpreter:
             pan_x += delta_x
             pan_y += delta_y
             if canvas.on_viewport_change_request:
-                canvas.on_viewport_change_request(
-                    canvas.zoom_factor, (pan_x, pan_y)
-                )
+                canvas.on_viewport_change_request(canvas.zoom_factor, (pan_x, pan_y))
 
     def zoom(
         self,

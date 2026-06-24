@@ -52,7 +52,9 @@ class AppController:
         self.dialog_service = dialog_service
         self._loaded_session_id = None
         self.pending_created_ids: set[UUID] = set()
-        self._io_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="annotator-io")
+        self._io_pool = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="annotator-io"
+        )
         self._invoker = _MainThreadInvoker(self.view)
 
         # Observable state subscriptions
@@ -139,9 +141,16 @@ class AppController:
         )
 
         current_session_id = str(state.sessionId) if state.sessionId else None
-        if self._loaded_session_id is not None and current_session_id != self._loaded_session_id:
-            self.store.update_state("selection", selected_component_ids=[], active_interaction=None)
-            self.store.update_state("viewport", parent_stack=[], zoom_factor=1.0, pan_offset=(0.0, 0.0))
+        if (
+            self._loaded_session_id is not None
+            and current_session_id != self._loaded_session_id
+        ):
+            self.store.update_state(
+                "selection", selected_component_ids=[], active_interaction=None
+            )
+            self.store.update_state(
+                "viewport", parent_stack=[], zoom_factor=1.0, pan_offset=(0.0, 0.0)
+            )
 
         if state.image:
             if (
@@ -250,7 +259,9 @@ class AppController:
         if not state:
             return []
 
-        def build_node(comp_uuid: UUID, parent_visible: bool = True, parent_locked: bool = False) -> dict | None:
+        def build_node(
+            comp_uuid: UUID, parent_visible: bool = True, parent_locked: bool = False
+        ) -> dict | None:
             comp = state.components.get(comp_uuid)
             if not comp:
                 return None
@@ -272,7 +283,9 @@ class AppController:
 
             children = []
             for child_uuid in comp.childrenIds:
-                child_node = build_node(child_uuid, is_effectively_visible, is_effectively_locked)
+                child_node = build_node(
+                    child_uuid, is_effectively_visible, is_effectively_locked
+                )
                 if child_node:
                     children.append(child_node)
 
@@ -431,10 +444,14 @@ class AppController:
         is_locked = comp.visibility.locked
 
         def toggle_visible():
-            self.workspace.update_component(comp_id, visibility=Visibility(visible=not is_visible, locked=is_locked))
+            self.workspace.update_component(
+                comp_id, visibility=Visibility(visible=not is_visible, locked=is_locked)
+            )
 
         def toggle_lock():
-            self.workspace.update_component(comp_id, visibility=Visibility(visible=is_visible, locked=not is_locked))
+            self.workspace.update_component(
+                comp_id, visibility=Visibility(visible=is_visible, locked=not is_locked)
+            )
 
         def delete_comp():
             self.workspace.delete_component(comp_id)
@@ -500,7 +517,11 @@ class AppController:
 
         future = self._io_pool.submit(do_import)
         future.add_done_callback(
-            lambda f: self._invoker.invoke(lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import workspace session"))
+            lambda f: self._invoker.invoke(
+                lambda: self._handle_io_result(
+                    f, dialog, "Import Failed", "Failed to import workspace session"
+                )
+            )
         )
 
     def _on_import_image_request(self):
@@ -521,7 +542,11 @@ class AppController:
 
         future = self._io_pool.submit(do_import)
         future.add_done_callback(
-            lambda f: self._invoker.invoke(lambda: self._handle_io_result(f, dialog, "Import Failed", "Failed to import raw image"))
+            lambda f: self._invoker.invoke(
+                lambda: self._handle_io_result(
+                    f, dialog, "Import Failed", "Failed to import raw image"
+                )
+            )
         )
 
     def _on_export_zip_request(self):
@@ -546,7 +571,9 @@ class AppController:
 
         future = self._io_pool.submit(do_export)
         future.add_done_callback(
-            lambda f: self._invoker.invoke(lambda: self._handle_export_result(f, dialog))
+            lambda f: self._invoker.invoke(
+                lambda: self._handle_export_result(f, dialog)
+            )
         )
 
     def _handle_io_result(self, future, dialog, title, message_prefix):
@@ -564,7 +591,9 @@ class AppController:
         exc = future.exception()
         if exc:
             self.dialog_service.show_error(
-                self.view, "Export Failed", f"Failed to export workspace session:\n{exc}"
+                self.view,
+                "Export Failed",
+                f"Failed to export workspace session:\n{exc}",
             )
         else:
             self.dialog_service.show_info(
@@ -610,7 +639,9 @@ class AppController:
             self.view, screen_name=screen_name, description=description
         )
         if result is not None:
-            self.workspace.update_screen_info(result["screen_name"], result["description"])
+            self.workspace.update_screen_info(
+                result["screen_name"], result["description"]
+            )
 
     def _on_canvas_drill_into(self, comp_id: UUID):
         stack = list(self.store.state.parent_stack)

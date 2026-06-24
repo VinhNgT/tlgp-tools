@@ -46,7 +46,6 @@ class Component(BaseModel):
     visibility: Visibility = Field(default_factory=Visibility)
 
 
-
 class ScreenInfo(BaseModel):
     name: str = ""
     description: str = ""
@@ -68,4 +67,3 @@ class WorkspaceState(BaseModel):
     cutLines: list[int] = Field(default_factory=list)
     rootComponents: list[UUID] = Field(default_factory=list)
     components: dict[UUID, Component] = Field(default_factory=dict)
-

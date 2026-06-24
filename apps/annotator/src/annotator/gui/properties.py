@@ -13,8 +13,10 @@ from PySide6.QtWidgets import (
 
 from .design_system import (
     ColorSystem,
+    LayoutTokens,
     get_caption_font,
     get_header_font,
+    set_widget_text_color,
 )
 
 
@@ -56,7 +58,9 @@ class CornerSelector(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
         palette = self.palette()
-        cg = QPalette.ColorGroup.Active if self.enabled else QPalette.ColorGroup.Disabled
+        cg = (
+            QPalette.ColorGroup.Active if self.enabled else QPalette.ColorGroup.Disabled
+        )
 
         bg = palette.color(cg, QPalette.ColorRole.Window)
         border = palette.color(cg, QPalette.ColorRole.Mid)
@@ -109,7 +113,9 @@ class CornerSelector(QWidget):
     def mousePressEvent(self, event):
         if not self.enabled:
             return
-        clicked = self._get_closest_corner(int(event.position().x()), int(event.position().y()))
+        clicked = self._get_closest_corner(
+            int(event.position().x()), int(event.position().y())
+        )
         if clicked:
             self.set_corner(clicked)
             self.corner_selected.emit(clicked)
@@ -118,7 +124,9 @@ class CornerSelector(QWidget):
         if not self.enabled:
             self.setCursor(Qt.CursorShape.ArrowCursor)
             return
-        hovered = self._get_closest_corner(int(event.position().x()), int(event.position().y()))
+        hovered = self._get_closest_corner(
+            int(event.position().x()), int(event.position().y())
+        )
         if hovered:
             self.setCursor(Qt.CursorShape.PointingHandCursor)
         else:
@@ -141,7 +149,12 @@ class ComponentPropertiesView(QWidget):
         self._current_pill_corner = "top_left"
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(10, 10, 10, 10)
+        layout.setContentsMargins(
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+            LayoutTokens.MARGIN_DEFAULT,
+        )
 
         lbl_header = QLabel("PROPERTIES")
         lbl_header.setFont(get_header_font())
@@ -214,9 +227,11 @@ class ComponentPropertiesView(QWidget):
 
         # Status text at the bottom
         self.txt_status = QLabel("Connecting...")
-        self.txt_status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
+        self.txt_status.setAlignment(
+            Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom
+        )
         self.txt_status.setFont(get_caption_font())
-        self.txt_status.setStyleSheet(f"color: {ColorSystem.get_muted()};")
+        set_widget_text_color(self.txt_status, ColorSystem.get_muted())
         self.txt_status.setWordWrap(True)
         layout.addWidget(self.txt_status)
 
@@ -238,7 +253,7 @@ class ComponentPropertiesView(QWidget):
     def update_status(self, text: str, is_error: bool = False):
         self.txt_status.setText(text)
         color = ColorSystem.ERROR if is_error else ColorSystem.get_muted()
-        self.txt_status.setStyleSheet(f"color: {color};")
+        set_widget_text_color(self.txt_status, color)
 
     def update_properties_panel(
         self,
