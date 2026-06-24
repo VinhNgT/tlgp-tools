@@ -9,9 +9,9 @@ from tlgp_logger import get_logger
 
 from .app import MainAppWindow
 from .controller import AppController
-from .design_system import get_application_stylesheet
 from .qt_dialogs import QtDialogService
 from .state import UIStateStore
+from .theme import get_application_stylesheet
 from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)

@@ -23,15 +23,16 @@ from PySide6.QtWidgets import (
 )
 
 from .canvas import AnnotationCanvasView
-from .design_system import (
-    ColorSystem,
-    LayoutTokens,
+from .properties import ComponentPropertiesView
+from .sidebar import SidebarTreeView
+from .theme import (
+    MARGIN,
+    SPACING,
+    colors,
     get_body_font,
     get_title_font,
     set_widget_text_color,
 )
-from .properties import ComponentPropertiesView
-from .sidebar import SidebarTreeView
 from .transformer import ViewportTransformer
 
 
@@ -55,12 +56,12 @@ class WelcomeWidget(QWidget):
 
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(
-            LayoutTokens.MARGIN_DEFAULT * 3,
-            int(LayoutTokens.MARGIN_DEFAULT * 2.5),
-            LayoutTokens.MARGIN_DEFAULT * 3,
-            int(LayoutTokens.MARGIN_DEFAULT * 2.5),
+            MARGIN * 3,
+            int(MARGIN * 2.5),
+            MARGIN * 3,
+            int(MARGIN * 2.5),
         )
-        card_layout.setSpacing(LayoutTokens.SPACING_DEFAULT)
+        card_layout.setSpacing(SPACING)
 
         title = QLabel("Annotator")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -242,7 +243,7 @@ class MainAppWindow(QMainWindow):
         self.lbl_breadcrumbs = QLabel("Root")
         self.lbl_breadcrumbs.setFont(get_body_font())
         self.lbl_breadcrumbs.setContentsMargins(8, 0, 8, 0)
-        set_widget_text_color(self.lbl_breadcrumbs, ColorSystem.get_muted())
+        set_widget_text_color(self.lbl_breadcrumbs, colors.muted)
         tb.addWidget(self.lbl_breadcrumbs)
 
         spacer = QWidget()
@@ -253,7 +254,7 @@ class MainAppWindow(QMainWindow):
         self.lbl_zoom = QLabel("100%")
         self.lbl_zoom.setFont(get_body_font())
         self.lbl_zoom.setContentsMargins(8, 0, 8, 0)
-        set_widget_text_color(self.lbl_zoom, ColorSystem.get_muted())
+        set_widget_text_color(self.lbl_zoom, colors.muted)
         tb.addWidget(self.lbl_zoom)
 
     def _build_central_area(self, transformer: ViewportTransformer | None):

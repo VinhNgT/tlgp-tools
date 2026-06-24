@@ -21,8 +21,8 @@ from PySide6.QtWidgets import (
 from annotator.models import Component
 
 from .cut_editor import CutEditorDialog
-from .design_system import get_ui_font
 from .dialog_service import DialogService, ProgressIndicator
+from .theme import get_ui_font
 
 
 class _QtProgressIndicator:

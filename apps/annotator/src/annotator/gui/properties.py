@@ -11,9 +11,10 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .design_system import (
-    ColorSystem,
-    LayoutTokens,
+from .theme import (
+    MARGIN,
+    SPACING_SM,
+    colors,
     get_caption_font,
     get_header_font,
     set_widget_text_color,
@@ -150,10 +151,10 @@ class ComponentPropertiesView(QWidget):
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(
-            LayoutTokens.MARGIN_DEFAULT,
-            LayoutTokens.MARGIN_DEFAULT,
-            LayoutTokens.MARGIN_DEFAULT,
-            LayoutTokens.MARGIN_DEFAULT,
+            MARGIN,
+            MARGIN,
+            MARGIN,
+            MARGIN,
         )
 
         lbl_header = QLabel("PROPERTIES")
@@ -174,7 +175,7 @@ class ComponentPropertiesView(QWidget):
 
         # Coordinate fields
         coords_grid = QGridLayout()
-        coords_grid.setSpacing(LayoutTokens.SPACING_SM)
+        coords_grid.setSpacing(SPACING_SM)
         self.prop_entries: dict[str, QLineEdit] = {}
         for idx, (label, key) in enumerate(
             [("X", "x"), ("Y", "y"), ("W", "w"), ("H", "h")]
@@ -231,7 +232,7 @@ class ComponentPropertiesView(QWidget):
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom
         )
         self.txt_status.setFont(get_caption_font())
-        set_widget_text_color(self.txt_status, ColorSystem.get_muted())
+        set_widget_text_color(self.txt_status, colors.muted)
         self.txt_status.setWordWrap(True)
         layout.addWidget(self.txt_status)
 
@@ -252,7 +253,7 @@ class ComponentPropertiesView(QWidget):
 
     def update_status(self, text: str, is_error: bool = False):
         self.txt_status.setText(text)
-        color = ColorSystem.ERROR if is_error else ColorSystem.get_muted()
+        color = colors.error if is_error else colors.muted
         set_widget_text_color(self.txt_status, color)
 
     def update_properties_panel(
