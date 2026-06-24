@@ -87,10 +87,14 @@ class GestureInterpreter:
 
         now = time.time()
         is_multi = event.shift or event.ctrl
-        hit_boxes_at_click = HitTester.get_hit_boxes(cx, cy, active_comps, ctx, self.transformer)
+        hit_boxes_at_click = HitTester.get_hit_boxes(
+            cx, cy, active_comps, ctx, self.transformer
+        )
         primary_sel = selected_boxes[-1] if selected_boxes else None
 
-        clicked = HitTester.hit_box(cx, cy, active_comps, selected_boxes, ctx, self.transformer)
+        clicked = HitTester.hit_box(
+            cx, cy, active_comps, selected_boxes, ctx, self.transformer
+        )
         is_selection_click = clicked is not None and clicked not in selected_boxes
 
         if (
@@ -127,18 +131,22 @@ class GestureInterpreter:
                             self.state.last_cycle_index = 0
 
                 if self.state.cycle_components is not None:
-                    self.state.last_cycle_index = (self.state.last_cycle_index + 1) % len(
-                        self.state.cycle_components
-                    )
+                    self.state.last_cycle_index = (
+                        self.state.last_cycle_index + 1
+                    ) % len(self.state.cycle_components)
                     new_box = self.state.cycle_components[self.state.last_cycle_index]
                     canvas.set_selection([new_box])
-                    SelectHandler.initiate_drag(self.state, canvas, cx, cy, ctx, new_box)
+                    SelectHandler.initiate_drag(
+                        self.state, canvas, cx, cy, ctx, new_box
+                    )
                     return
 
         handle = HitTester.hit_handle(cx, cy, selected_boxes, ctx, self.transformer)
         if handle:
             self.state.resize_handle = handle
-            SelectHandler.initiate_drag(self.state, canvas, cx, cy, ctx, selected_boxes[0])
+            SelectHandler.initiate_drag(
+                self.state, canvas, cx, cy, ctx, selected_boxes[0]
+            )
             return
 
         if canvas.current_mode == "select":
@@ -174,7 +182,11 @@ class GestureInterpreter:
             return
 
         ctx = canvas.make_viewport_ctx()
-        boundary = canvas.resolve_boundary() if hasattr(canvas, "resolve_boundary") else (0.0, 0.0, float("inf"), float("inf"))
+        boundary = (
+            canvas.resolve_boundary()
+            if hasattr(canvas, "resolve_boundary")
+            else (0.0, 0.0, float("inf"), float("inf"))
+        )
 
         if self.state.has_temp_rect:
             DrawHandler.on_drag(self.state, canvas, cx, cy, ctx, boundary)
@@ -192,7 +204,11 @@ class GestureInterpreter:
             return
 
         ctx = canvas.make_viewport_ctx()
-        boundary = canvas.resolve_boundary() if hasattr(canvas, "resolve_boundary") else (0.0, 0.0, float("inf"), float("inf"))
+        boundary = (
+            canvas.resolve_boundary()
+            if hasattr(canvas, "resolve_boundary")
+            else (0.0, 0.0, float("inf"), float("inf"))
+        )
         selected_boxes = canvas.get_selected_components()
         is_select_mode = canvas.current_mode == "select"
         is_multi = event.shift or event.ctrl
@@ -201,13 +217,23 @@ class GestureInterpreter:
 
         if self.state.has_temp_rect:
             event_generated = DrawHandler.on_release(
-                self.state, canvas, cx, cy, ctx, boundary, is_select_mode, is_multi, selected_boxes
+                self.state,
+                canvas,
+                cx,
+                cy,
+                ctx,
+                boundary,
+                is_select_mode,
+                is_multi,
+                selected_boxes,
             )
         elif self.state.is_dragging:
-            event_generated = SelectHandler.on_release(self.state, canvas, selected_boxes)
+            event_generated = SelectHandler.on_release(
+                self.state, canvas, selected_boxes
+            )
 
         if not event_generated and self.state.has_temp_rect:
-             pass # Already cleared by DrawHandler.on_release
+            pass  # Already cleared by DrawHandler.on_release
 
         self.state.is_dragging = False
         self.state.resize_handle = None
@@ -225,18 +251,24 @@ class GestureInterpreter:
         ctx = canvas.make_viewport_ctx()
         active_comps = canvas.get_active_boxes()
         selected_boxes = canvas.get_selected_components()
-        clicked = HitTester.hit_box(cx, cy, active_comps, selected_boxes, ctx, self.transformer)
+        clicked = HitTester.hit_box(
+            cx, cy, active_comps, selected_boxes, ctx, self.transformer
+        )
         if clicked and clicked not in selected_boxes:
             canvas.set_selection([clicked])
         if canvas.callbacks.on_context_menu_request:
             canvas.callbacks.on_context_menu_request(event.screen_x, event.screen_y)
 
-    def on_control_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float) -> bool:
+    def on_control_click(
+        self, canvas: Any, event: GestureEvent, cx: float, cy: float
+    ) -> bool:
         if canvas.current_mode == "select":
             ctx = canvas.make_viewport_ctx()
             active_comps = canvas.get_active_boxes()
             selected_boxes = canvas.get_selected_components()
-            clicked = HitTester.hit_box(cx, cy, active_comps, selected_boxes, ctx, self.transformer)
+            clicked = HitTester.hit_box(
+                cx, cy, active_comps, selected_boxes, ctx, self.transformer
+            )
             if clicked:
                 if canvas.callbacks.on_drill_into:
                     canvas.callbacks.on_drill_into(clicked.id)
@@ -246,7 +278,15 @@ class GestureInterpreter:
     def on_mouse_move(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         pass
 
-    def on_scroll(self, canvas: Any, delta: int, mouse_x: float, mouse_y: float, shift: bool, ctrl: bool):
+    def on_scroll(
+        self,
+        canvas: Any,
+        delta: int,
+        mouse_x: float,
+        mouse_y: float,
+        shift: bool,
+        ctrl: bool,
+    ):
         self.state.ignore_momentum = False
         PanScrollHandler.on_scroll(canvas, delta, mouse_x, mouse_y, shift, ctrl)
 
@@ -263,4 +303,3 @@ class GestureInterpreter:
         PanScrollHandler.on_trackpad_scroll(
             self.state, canvas, delta_x, delta_y, mouse_x, mouse_y, ctrl, phase
         )
-

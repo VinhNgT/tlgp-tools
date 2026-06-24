@@ -1,6 +1,5 @@
 """Hit testing utilities for components and handles."""
 
-
 from annotator.gui.transformer import ViewportTransformer
 from annotator.gui.viewport_context import ViewportContext
 from annotator.models import Component
@@ -21,7 +20,9 @@ class HitTester:
         hit = []
         for box in components:
             bx1, by1 = transformer.to_canvas_ctx(box.bounds.left, box.bounds.top, ctx)
-            bx2, by2 = transformer.to_canvas_ctx(box.bounds.right, box.bounds.bottom, ctx)
+            bx2, by2 = transformer.to_canvas_ctx(
+                box.bounds.right, box.bounds.bottom, ctx
+            )
             if bx1 <= cx <= bx2 and by1 <= cy <= by2:
                 hit.append(box)
         return hit
@@ -79,4 +80,3 @@ class HitTester:
             if hx - hs <= cx <= hx + hs and hy - hs <= cy <= hy + hs:
                 return name
         return None
-

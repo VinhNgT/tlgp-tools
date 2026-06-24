@@ -1,6 +1,7 @@
 """Shared test fixtures for the annotator test suite."""
 
 import io
+import os
 import uuid
 
 import httpx
@@ -9,6 +10,19 @@ from annotator.api.app import create_app
 from annotator.models import Bounds
 from annotator.workspace import WorkspaceManager
 from PIL import Image
+from PySide6.QtWidgets import QApplication
+
+# Configure Qt to run headlessly to avoid launching graphical windows
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+
+
+@pytest.fixture(scope="session")
+def qapp():
+    """A session-wide QApplication instance configured for headless execution."""
+    app = QApplication.instance()
+    if not app:
+        app = QApplication([])
+    yield app
 
 
 def create_test_image(width: int = 800, height: int = 600) -> bytes:

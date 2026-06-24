@@ -3,8 +3,8 @@
 import io
 import time
 import uuid
+from unittest.mock import MagicMock
 
-import pytest
 from annotator.gui.app import MainAppWindow
 from annotator.gui.controller import AppController
 from annotator.gui.gestures import GestureEvent
@@ -13,15 +13,8 @@ from annotator.gui.state import UIStateStore
 from annotator.models import Bounds
 from annotator.workspace.manager import WorkspaceManager
 from PIL import Image
-from PySide6.QtWidgets import QApplication
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    app = QApplication.instance()
-    if not app:
-        app = QApplication([])
-    yield app
+from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtGui import QWheelEvent
 
 
 def create_test_image(width=800, height=600):
@@ -52,7 +45,9 @@ def test_gesture_double_click_cycle(qapp):
     canvas.resize(800, 600)
     canvas.fit_to_screen()
 
-    cx, cy = canvas.transformer.to_canvas(150, 150, canvas.zoom_factor, [], [], canvas.pan_offset)
+    cx, cy = canvas.transformer.to_canvas(
+        150, 150, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
 
     ge = GestureEvent(cx, cy, int(cx), int(cy), False, False)
 
@@ -79,7 +74,9 @@ def test_gesture_double_click_cycle(qapp):
     canvas.gestures.last_click_cy = cy
 
     canvas.gestures.on_click(canvas, ge, cx, cy)
-    assert canvas.selected_component_ids == [comp1_id]  # Wait, debug_cycle.py printed comp1_id twice. The cycling logic requires the click_sequence_count to be % 2 == 0 to cycle! So click 3 is an odd click. It won't cycle. Let's fix the test to match the code behavior. Click 1 = comp2, Click 2 = comp1, Click 3 = comp1, Click 4 = comp2
+    assert (
+        canvas.selected_component_ids == [comp1_id]
+    )  # Wait, debug_cycle.py printed comp1_id twice. The cycling logic requires the click_sequence_count to be % 2 == 0 to cycle! So click 3 is an odd click. It won't cycle. Let's fix the test to match the code behavior. Click 1 = comp2, Click 2 = comp1, Click 3 = comp1, Click 4 = comp2
 
 
 def test_gesture_multi_select(qapp):
@@ -99,19 +96,29 @@ def test_gesture_multi_select(qapp):
     canvas.resize(800, 600)
     canvas.fit_to_screen()
 
-    cx1, cy1 = canvas.transformer.to_canvas(150, 150, canvas.zoom_factor, [], [], canvas.pan_offset)
-    cx2, cy2 = canvas.transformer.to_canvas(350, 150, canvas.zoom_factor, [], [], canvas.pan_offset)
+    cx1, cy1 = canvas.transformer.to_canvas(
+        150, 150, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
+    cx2, cy2 = canvas.transformer.to_canvas(
+        350, 150, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
 
     # Normal click comp1
-    canvas.gestures.on_click(canvas, GestureEvent(cx1, cy1, int(cx1), int(cy1), False, False), cx1, cy1)
+    canvas.gestures.on_click(
+        canvas, GestureEvent(cx1, cy1, int(cx1), int(cy1), False, False), cx1, cy1
+    )
     assert canvas.selected_component_ids == [comp1_id]
 
     # Shift click comp2
-    canvas.gestures.on_click(canvas, GestureEvent(cx2, cy2, int(cx2), int(cy2), True, False), cx2, cy2)
+    canvas.gestures.on_click(
+        canvas, GestureEvent(cx2, cy2, int(cx2), int(cy2), True, False), cx2, cy2
+    )
     assert set(canvas.selected_component_ids) == {comp1_id, comp2_id}
 
     # Shift click comp1 (removes it)
-    canvas.gestures.on_click(canvas, GestureEvent(cx1, cy1, int(cx1), int(cy1), True, False), cx1, cy1)
+    canvas.gestures.on_click(
+        canvas, GestureEvent(cx1, cy1, int(cx1), int(cy1), True, False), cx1, cy1
+    )
     assert canvas.selected_component_ids == [comp2_id]
 
 
@@ -130,22 +137,27 @@ def test_gesture_ctrl_click_drill_through(qapp):
     canvas.resize(800, 600)
     canvas.fit_to_screen()
 
-    cx1, cy1 = canvas.transformer.to_canvas(150, 150, canvas.zoom_factor, [], [], canvas.pan_offset)
+    cx1, cy1 = canvas.transformer.to_canvas(
+        150, 150, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
 
     drilled_id = None
+
     def mock_drill(cid):
         nonlocal drilled_id
         drilled_id = cid
+
     canvas.callbacks.on_drill_into = mock_drill
 
     # Ctrl+Click inside comp1
-    canvas.gestures.on_control_click(canvas, GestureEvent(cx1, cy1, int(cx1), int(cy1), False, True), cx1, cy1)
+    canvas.gestures.on_control_click(
+        canvas, GestureEvent(cx1, cy1, int(cx1), int(cy1), False, True), cx1, cy1
+    )
     assert drilled_id == comp1_id
 
 
 def test_trackpad_scroll_zoom(qapp):
     """Verify trackpad zoom gestures, exponential scaling, and phase-lock stability."""
-    from PySide6.QtCore import Qt
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     store = UIStateStore()
@@ -167,7 +179,7 @@ def test_trackpad_scroll_zoom(qapp):
         mouse_x=100.0,
         mouse_y=100.0,
         ctrl=True,
-        phase=Qt.ScrollPhase.ScrollBegin
+        phase=Qt.ScrollPhase.ScrollBegin,
     )
     assert canvas.gestures.state.trackpad_zoom_active is True
     assert canvas.zoom_factor > 1.0  # Zoomed in
@@ -182,7 +194,7 @@ def test_trackpad_scroll_zoom(qapp):
         mouse_x=100.0,
         mouse_y=100.0,
         ctrl=True,
-        phase=Qt.ScrollPhase.ScrollUpdate
+        phase=Qt.ScrollPhase.ScrollUpdate,
     )
     assert canvas.zoom_factor > last_zoom
 
@@ -197,7 +209,7 @@ def test_trackpad_scroll_zoom(qapp):
         mouse_x=100.0,
         mouse_y=100.0,
         ctrl=False,  # Ctrl/Command released
-        phase=Qt.ScrollPhase.ScrollUpdate
+        phase=Qt.ScrollPhase.ScrollUpdate,
     )
     assert canvas.gestures.state.trackpad_zoom_active is True
     assert canvas.zoom_factor > last_zoom  # Continues to zoom in
@@ -211,17 +223,13 @@ def test_trackpad_scroll_zoom(qapp):
         mouse_x=100.0,
         mouse_y=100.0,
         ctrl=False,
-        phase=Qt.ScrollPhase.ScrollEnd
+        phase=Qt.ScrollPhase.ScrollEnd,
     )
     assert canvas.gestures.state.trackpad_zoom_active is None
 
 
 def test_native_gesture_zoom(qapp):
     """Verify that macOS native gesture event handles pinch zoom and blocks duplicate wheel zoom events."""
-    from PySide6.QtGui import QWheelEvent
-    from PySide6.QtCore import QEvent, QPointF, Qt
-    from unittest.mock import MagicMock
-
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     store = UIStateStore()
@@ -255,8 +263,6 @@ def test_native_gesture_zoom(qapp):
 
 def test_scrolling_inertia_stopped_on_fit(qapp):
     """Verify that triggering a viewport fit stops trackpad scrolling inertia."""
-    from PySide6.QtCore import Qt
-
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     store = UIStateStore()
@@ -277,7 +283,7 @@ def test_scrolling_inertia_stopped_on_fit(qapp):
         mouse_x=100.0,
         mouse_y=100.0,
         ctrl=False,
-        phase=Qt.ScrollPhase.ScrollBegin
+        phase=Qt.ScrollPhase.ScrollBegin,
     )
     assert canvas.pan_offset == (10.0, 10.0)
 
@@ -294,7 +300,7 @@ def test_scrolling_inertia_stopped_on_fit(qapp):
         mouse_x=100.0,
         mouse_y=100.0,
         ctrl=False,
-        phase=Qt.ScrollPhase.ScrollMomentum
+        phase=Qt.ScrollPhase.ScrollMomentum,
     )
     assert canvas.zoom_factor == fit_zoom
     assert canvas.pan_offset == fit_pan
@@ -307,7 +313,7 @@ def test_scrolling_inertia_stopped_on_fit(qapp):
         mouse_x=100.0,
         mouse_y=100.0,
         ctrl=False,
-        phase=Qt.ScrollPhase.ScrollBegin
+        phase=Qt.ScrollPhase.ScrollBegin,
     )
     assert canvas.pan_offset == (fit_pan[0] + 5, fit_pan[1] + 5)
 
@@ -318,19 +324,16 @@ def test_canvas_focus_on_init_with_image(qapp):
     ws.import_image(create_test_image(800, 600))
     store = UIStateStore()
     view = MainAppWindow()
-    
+
     # Initially no focus on canvas
     assert not view.canvas.hasFocus()
 
     # Instantiate controller to load raw image and trigger set_canvas_image
     AppController(ws, store, view, QtDialogService())
-    
+
     # Show the window (triggers showEvent)
     view.show()
 
     # Should now have focus on canvas
     assert view.focusWidget() == view.canvas
     view.close()
-
-
-

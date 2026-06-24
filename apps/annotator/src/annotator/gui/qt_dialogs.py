@@ -4,7 +4,7 @@ Provides PySide6 implementations for file dialogs,
 message boxes, and custom modal dialogs.
 """
 
-from typing import Callable
+from collections.abc import Callable
 
 from PIL import Image
 from PySide6.QtCore import Qt

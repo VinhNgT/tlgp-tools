@@ -1,6 +1,5 @@
 """Tests for annotator.gui.viewport_calculator."""
 
-
 import uuid
 
 import pytest
@@ -45,7 +44,7 @@ def test_calculate_fit_target_component():
         number="1",
         label="Test",
         bounds=Bounds(x=100, y=100, w=200, h=100),
-        style=Style()
+        style=Style(),
     )
 
     zoom, pad_x, pad_y = ViewportCalculator.calculate_fit(

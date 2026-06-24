@@ -352,7 +352,6 @@ class TestCutLines:
             ws.update_component(comp_id, bounds=Bounds(x=0, y=180, w=50, h=50))
 
 
-
 # ── Export ─────────────────────────────────────────────────────────────
 
 

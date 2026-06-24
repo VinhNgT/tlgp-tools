@@ -29,8 +29,8 @@ from PySide6.QtWidgets import (
 )
 
 from annotator.models import Component
+from annotator.workspace.validation import MIN_CUT_GAP, CutValidator
 
-from annotator.workspace.validation import CutValidator, MIN_CUT_GAP
 from .cut_editor_state import CutEditorCallbacks, CutEditorState
 from .image_utils import pil_to_qpixmap
 
@@ -116,11 +116,7 @@ class _CutCanvasWidget(QWidget):
         for i, y in enumerate(self.state.cut_lines):
             cy = self._to_canvas_y(y)
             is_selected = i == self.state.drag_index
-            color = (
-                QColor(Qt.GlobalColor.red)
-                if is_selected
-                else QColor("#0c8ce9")
-            )
+            color = QColor(Qt.GlobalColor.red) if is_selected else QColor("#0c8ce9")
             width = 2
 
             pen = QPen(color, width, Qt.PenStyle.DashLine)
@@ -402,17 +398,23 @@ class CutEditorDialog(QDialog):
             self.listbox.setCurrentRow(self.state.drag_index)
         self.listbox.blockSignals(False)
 
-        self.btn_remove.setEnabled(0 <= self.state.drag_index < len(self.state.cut_lines))
+        self.btn_remove.setEnabled(
+            0 <= self.state.drag_index < len(self.state.cut_lines)
+        )
 
     def _on_listbox_select(self, row):
         self.state.drag_index = row
         self.canvas_widget.update()
-        self.btn_remove.setEnabled(0 <= self.state.drag_index < len(self.state.cut_lines))
+        self.btn_remove.setEnabled(
+            0 <= self.state.drag_index < len(self.state.cut_lines)
+        )
 
     def _remove_selected(self):
         if 0 <= self.state.drag_index < len(self.state.cut_lines):
             self.state.cut_lines.pop(self.state.drag_index)
-            self.state.drag_index = min(self.state.drag_index, len(self.state.cut_lines) - 1)
+            self.state.drag_index = min(
+                self.state.drag_index, len(self.state.cut_lines) - 1
+            )
             self.canvas_widget.update()
             self.refresh_listbox()
 

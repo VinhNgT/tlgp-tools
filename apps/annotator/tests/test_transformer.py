@@ -350,4 +350,3 @@ class TestViewportContextParity:
         expected = t.get_segment_y_bounds(100, [], [300], (0, 0, 800, 600))
         result = t.get_segment_y_bounds_ctx(100, ctx, (0, 0, 800, 600))
         assert result == expected
-

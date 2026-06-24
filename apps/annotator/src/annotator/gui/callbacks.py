@@ -6,6 +6,7 @@ from uuid import UUID
 
 class CanvasCallbacks:
     """Callbacks emitted by the AnnotationCanvasView."""
+
     def __init__(self):
         self.on_component_moved: Callable[[str, int, int], None] | None = None
         self.on_component_resized: Callable[[str, dict], None] | None = None
@@ -18,8 +19,10 @@ class CanvasCallbacks:
         self.on_import_zip: Callable[[], None] | None = None
         self.on_import_image: Callable[[], None] | None = None
 
+
 class AppCallbacks:
     """Callbacks emitted by the MainAppWindow."""
+
     def __init__(self):
         self.on_mode_change_request: Callable[[str], None] | None = None
         self.on_undo_request: Callable[[], None] | None = None
@@ -36,4 +39,3 @@ class AppCallbacks:
         self.on_arrow_key_pressed: Callable[[int, int], None] | None = None
         self.on_sidebar_context_menu: Callable[[UUID, int, int], None] | None = None
         self.on_sidebar_rename_request: Callable[[UUID, str], None] | None = None
-

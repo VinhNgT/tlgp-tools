@@ -1,6 +1,5 @@
 import io
 
-import pytest
 from annotator.gui.app import MainAppWindow
 from annotator.gui.controller import AppController
 from annotator.gui.qt_dialogs import QtDialogService
@@ -10,14 +9,6 @@ from PIL import Image
 from PySide6.QtCore import QEvent, Qt
 from PySide6.QtGui import QKeyEvent
 from PySide6.QtWidgets import QApplication
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    app = QApplication.instance()
-    if not app:
-        app = QApplication([])
-    yield app
 
 
 def create_test_image(width: int = 800, height: int = 600) -> bytes:
@@ -44,7 +35,9 @@ def test_space_pan_keyboard_highlight(qapp):
     assert view._mode_actions["select"].isChecked()
 
     # Simulate Space key press on the main window
-    press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier)
+    press_event = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier
+    )
     QApplication.sendEvent(view, press_event)
 
     # Verify state switches to "pan" and is highlighted
@@ -54,7 +47,9 @@ def test_space_pan_keyboard_highlight(qapp):
     assert view.canvas.space_pan_active is True
 
     # Simulate Space key release on the main window
-    release_event = QKeyEvent(QEvent.Type.KeyRelease, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier)
+    release_event = QKeyEvent(
+        QEvent.Type.KeyRelease, Qt.Key.Key_Space, Qt.KeyboardModifier.NoModifier
+    )
     QApplication.sendEvent(view, release_event)
 
     # Verify state restores to "select" and "select" action is checked
@@ -88,10 +83,11 @@ def test_show_labels_checkbox(qapp):
     assert view.chk_show_labels.isChecked() is False
 
     # Simulate keyboard shortcut 'T'
-    press_event = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_T, Qt.KeyboardModifier.NoModifier)
+    press_event = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_T, Qt.KeyboardModifier.NoModifier
+    )
     QApplication.sendEvent(view, press_event)
 
     # Verify canvas show_labels is True and checkbox is checked again
     assert view.canvas.show_labels is True
     assert view.chk_show_labels.isChecked() is True
-

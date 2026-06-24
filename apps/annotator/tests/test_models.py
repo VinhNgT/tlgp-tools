@@ -168,4 +168,3 @@ class TestTreeUtils:
     def test_has_children_missing_component(self):
         state, _, _, _ = self._make_state_with_tree()
         assert TreeUtils.has_children(state, uuid.uuid4()) is False
-

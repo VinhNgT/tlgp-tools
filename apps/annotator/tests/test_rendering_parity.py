@@ -117,8 +117,6 @@ class TestPillCornerConsistency:
         assert results["top_left"] != results["bottom_right"]
 
 
-
-
 # ── Font Sizing Consistency Across Levels ─────────────────────────────
 
 

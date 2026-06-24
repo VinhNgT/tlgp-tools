@@ -3,15 +3,17 @@
 from typing import Any
 
 from annotator.gui.gestures.state import GestureState
-from annotator.workspace.validation import BoundsValidator
 from annotator.gui.viewport_context import ViewportContext
+from annotator.workspace.validation import BoundsValidator
 
 
 class DrawHandler:
     """Handles temporary rectangle drawing and new component creation."""
 
     @staticmethod
-    def start_draw(state: GestureState, canvas: Any, cx: float, cy: float, is_select_mode: bool):
+    def start_draw(
+        state: GestureState, canvas: Any, cx: float, cy: float, is_select_mode: bool
+    ):
         state.draw_start_x = cx
         state.draw_start_y = cy
         color = "#0c8ce9" if is_select_mode else "#ff4444"
@@ -27,18 +29,22 @@ class DrawHandler:
         cx: float,
         cy: float,
         ctx: ViewportContext,
-        boundary: tuple[float, float, float, float]
+        boundary: tuple[float, float, float, float],
     ):
         if not state.has_temp_rect:
             return
 
-        ax1, ay1 = state.transformer.to_abs_ctx(state.draw_start_x, state.draw_start_y, ctx)
+        ax1, ay1 = state.transformer.to_abs_ctx(
+            state.draw_start_x, state.draw_start_y, ctx
+        )
         ax2, ay2 = state.transformer.to_abs_ctx(cx, cy, ctx)
 
         bx1, by1, bx2, by2 = boundary
 
         if state.transformer.has_active_cuts_ctx(ctx):
-            seg_top, seg_bot = state.transformer.get_segment_y_bounds_ctx(ay1, ctx, boundary)
+            seg_top, seg_bot = state.transformer.get_segment_y_bounds_ctx(
+                ay1, ctx, boundary
+            )
             by1 = max(by1, seg_top)
             by2 = min(by2, seg_bot)
 
@@ -62,7 +68,7 @@ class DrawHandler:
         boundary: tuple[float, float, float, float],
         is_select_mode: bool,
         is_multi: bool,
-        selected_boxes: list
+        selected_boxes: list,
     ):
         if not state.has_temp_rect:
             return
@@ -71,11 +77,15 @@ class DrawHandler:
         state.has_temp_rect = False
 
         bx1, by1, bx2, by2 = boundary
-        ax1, ay1 = state.transformer.to_abs_ctx(state.draw_start_x, state.draw_start_y, ctx)
+        ax1, ay1 = state.transformer.to_abs_ctx(
+            state.draw_start_x, state.draw_start_y, ctx
+        )
         ax2, ay2 = state.transformer.to_abs_ctx(cx, cy, ctx)
 
         if state.transformer.has_active_cuts_ctx(ctx):
-            seg_top, seg_bot = state.transformer.get_segment_y_bounds_ctx(ay1, ctx, boundary)
+            seg_top, seg_bot = state.transformer.get_segment_y_bounds_ctx(
+                ay1, ctx, boundary
+            )
             by1 = max(by1, seg_top)
             by2 = min(by2, seg_bot)
 
@@ -116,4 +126,3 @@ class DrawHandler:
                     )
                 return True
         return False
-

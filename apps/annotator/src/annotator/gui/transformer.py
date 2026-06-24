@@ -25,10 +25,7 @@ class ViewportTransformer:
             return
 
         # Filter out edge cuts at the boundaries (0 and image_height) as they are redundant
-        active_cuts = [
-            y for y in sorted(cut_lines)
-            if 0 < y < self._image_height
-        ]
+        active_cuts = [y for y in sorted(cut_lines) if 0 < y < self._image_height]
 
         if not active_cuts:
             self._segments = [(0, self._image_height, 0)]
@@ -160,9 +157,7 @@ class ViewportTransformer:
             ctx.pan_offset,
         )
 
-    def to_abs_ctx(
-        self, cx: float, cy: float, ctx: ViewportContext
-    ) -> tuple[int, int]:
+    def to_abs_ctx(self, cx: float, cy: float, ctx: ViewportContext) -> tuple[int, int]:
         """Translates canvas visual coordinates to absolute raw coordinates using a ViewportContext."""
         return self.to_abs(
             cx,
@@ -192,4 +187,3 @@ class ViewportTransformer:
     def segments(self) -> list[tuple[int, int, int]]:
         """Gets the active list of gap-shifted display segments."""
         return self._segments
-

@@ -73,10 +73,16 @@ class AppController:
         self.view.callbacks.on_delete_request = self._on_delete_request
         self.view.callbacks.on_back_request = self._on_back_request
         self.view.callbacks.on_import_zip_request = self.io_handler.handle_import_zip
-        self.view.callbacks.on_import_image_request = self.io_handler.handle_import_image
+        self.view.callbacks.on_import_image_request = (
+            self.io_handler.handle_import_image
+        )
         self.view.callbacks.on_export_zip_request = self.io_handler.handle_export_zip
-        self.view.callbacks.on_open_cut_editor_request = self._on_open_cut_editor_request
-        self.view.callbacks.on_open_screen_info_request = self._on_open_screen_info_request
+        self.view.callbacks.on_open_cut_editor_request = (
+            self._on_open_cut_editor_request
+        )
+        self.view.callbacks.on_open_screen_info_request = (
+            self._on_open_screen_info_request
+        )
         self.view.callbacks.on_enter_pressed = self._on_enter_pressed
         self.view.callbacks.on_escape_pressed = self._on_escape_pressed
         self.view.callbacks.on_arrow_key_pressed = self._on_arrow_key_pressed
@@ -89,7 +95,9 @@ class AppController:
         self.view.canvas.callbacks.on_component_moved = self._on_component_moved
         self.view.canvas.callbacks.on_component_resized = self._on_component_resized
         self.view.canvas.callbacks.on_component_created = self._on_component_created
-        self.view.canvas.callbacks.on_request_context_menu = self._on_canvas_context_menu
+        self.view.canvas.callbacks.on_request_context_menu = (
+            self._on_canvas_context_menu
+        )
 
         # Canvas decoupled store request callbacks
         self.view.canvas.callbacks.on_viewport_change_request = (
@@ -104,7 +112,9 @@ class AppController:
         self.view.canvas.callbacks.on_viewport_size_changed = (
             self._on_canvas_viewport_size_changed
         )
-        self.view.canvas.callbacks.on_canvas_mode_change_request = self._on_mode_change_request
+        self.view.canvas.callbacks.on_canvas_mode_change_request = (
+            self._on_mode_change_request
+        )
 
         # Sidebar callbacks
         self.view.tree.on_component_selected = self._on_tree_component_selected

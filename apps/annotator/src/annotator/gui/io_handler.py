@@ -23,6 +23,7 @@ class _MainThreadInvoker(QObject):
     def _execute(self, fn):
         fn()
 
+
 class IOCommandHandler:
     """Handles asynchronous I/O commands."""
 
@@ -30,7 +31,9 @@ class IOCommandHandler:
         self.workspace = workspace
         self.dialog_service = dialog_service
         self.view = view
-        self._io_pool = ThreadPoolExecutor(max_workers=1, thread_name_prefix="annotator-io")
+        self._io_pool = ThreadPoolExecutor(
+            max_workers=1, thread_name_prefix="annotator-io"
+        )
         self._invoker = _MainThreadInvoker(self.view)
 
     def handle_import_zip(self):
@@ -114,7 +117,9 @@ class IOCommandHandler:
             )
         )
 
-    def _handle_io_result(self, future, dialog, error_title, error_prefix, success_msg=None):
+    def _handle_io_result(
+        self, future, dialog, error_title, error_prefix, success_msg=None
+    ):
         dialog.dismiss()
         exc = future.exception()
         if exc:

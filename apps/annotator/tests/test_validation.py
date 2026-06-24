@@ -2,9 +2,10 @@
 
 import uuid
 
-from annotator.workspace.validation import BoundsValidator, CutValidator, MIN_CUT_GAP
-from annotator.workspace.errors import InvalidStateError
+import pytest
 from annotator.models import Bounds, Component
+from annotator.workspace.errors import InvalidStateError
+from annotator.workspace.validation import BoundsValidator, CutValidator
 
 # ── BoundsValidator.clamp_val ─────────────────────────────────────────
 
@@ -244,17 +245,14 @@ class TestValidateCutLines:
         CutValidator.validate_cut_lines([100, 200, 300], 1000, 50)
 
     def test_too_close_to_top_boundary(self):
-        import pytest
         with pytest.raises(InvalidStateError, match="top/bottom margin"):
             CutValidator.validate_cut_lines([30, 200], 1000, 50)
 
     def test_too_close_to_bottom_boundary(self):
-        import pytest
         with pytest.raises(InvalidStateError, match="top/bottom margin"):
             CutValidator.validate_cut_lines([100, 960], 1000, 50)
 
     def test_too_close_to_each_other(self):
-        import pytest
         with pytest.raises(InvalidStateError, match="too close"):
             CutValidator.validate_cut_lines([100, 140, 300], 1000, 50)
 

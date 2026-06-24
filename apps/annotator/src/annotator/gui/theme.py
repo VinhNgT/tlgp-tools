@@ -191,4 +191,3 @@ def get_theme() -> str:
         'font-family: "Inter", "Segoe UI", sans-serif;',
         f"font-family: {font_family}, sans-serif;",
     )
-

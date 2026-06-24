@@ -85,7 +85,6 @@ class WelcomeWidget(QWidget):
             self.on_import_image()
 
 
-
 class GlobalFocusAndSelectionFilter(QObject):
     """Universal event filter that clears input focus and label text selections
     when clicking outside of them anywhere in the application.
@@ -160,7 +159,9 @@ class MainAppWindow(QMainWindow):
 
         act_import_zip = QAction("Import Workspace (.zip)", self)
         act_import_zip.setShortcut(QKeySequence("Ctrl+O"))
-        act_import_zip.triggered.connect(lambda: self._fire(self.callbacks.on_import_zip_request))
+        act_import_zip.triggered.connect(
+            lambda: self._fire(self.callbacks.on_import_zip_request)
+        )
         file_menu.addAction(act_import_zip)
 
         act_import_img = QAction("Import Raw Image", self)
@@ -199,13 +200,17 @@ class MainAppWindow(QMainWindow):
         self.act_undo = QAction("Undo", self)
         self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
         self.act_undo.setEnabled(False)
-        self.act_undo.triggered.connect(lambda: self._fire(self.callbacks.on_undo_request))
+        self.act_undo.triggered.connect(
+            lambda: self._fire(self.callbacks.on_undo_request)
+        )
         edit_menu.addAction(self.act_undo)
 
         self.act_redo = QAction("Redo", self)
         self.act_redo.setShortcut(QKeySequence.StandardKey.Redo)
         self.act_redo.setEnabled(False)
-        self.act_redo.triggered.connect(lambda: self._fire(self.callbacks.on_redo_request))
+        self.act_redo.triggered.connect(
+            lambda: self._fire(self.callbacks.on_redo_request)
+        )
         edit_menu.addAction(self.act_redo)
 
         edit_menu.addSeparator()
@@ -213,7 +218,9 @@ class MainAppWindow(QMainWindow):
         self.act_delete = QAction("Delete", self)
         self.act_delete.setShortcut(QKeySequence.StandardKey.Delete)
         self.act_delete.setEnabled(False)
-        self.act_delete.triggered.connect(lambda: self._fire(self.callbacks.on_delete_request))
+        self.act_delete.triggered.connect(
+            lambda: self._fire(self.callbacks.on_delete_request)
+        )
         edit_menu.addAction(self.act_delete)
 
     def _build_toolbar(self):
@@ -257,7 +264,9 @@ class MainAppWindow(QMainWindow):
         self.btn_back = QAction("← Back", self)
         self.btn_back.setToolTip("Go back (Escape)")
         self.btn_back.setEnabled(False)
-        self.btn_back.triggered.connect(lambda: self._fire(self.callbacks.on_back_request))
+        self.btn_back.triggered.connect(
+            lambda: self._fire(self.callbacks.on_back_request)
+        )
         tb.addAction(self.btn_back)
 
         # Spacing
@@ -313,8 +322,12 @@ class MainAppWindow(QMainWindow):
         self.canvas = AnnotationCanvasView(transformer=transformer)
 
         self.welcome = WelcomeWidget(self.canvas)
-        self.welcome.on_import_zip = lambda: self._fire(self.callbacks.on_import_zip_request)
-        self.welcome.on_import_image = lambda: self._fire(self.callbacks.on_import_image_request)
+        self.welcome.on_import_zip = lambda: self._fire(
+            self.callbacks.on_import_zip_request
+        )
+        self.welcome.on_import_image = lambda: self._fire(
+            self.callbacks.on_import_image_request
+        )
 
         canvas_layout = QVBoxLayout(self.canvas)
         canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)

@@ -4,9 +4,9 @@ from typing import Any
 from uuid import UUID
 
 from annotator.gui.gestures.state import GestureState
-from annotator.workspace.validation import BoundsValidator
 from annotator.gui.viewport_context import ViewportContext
 from annotator.models import Bounds
+from annotator.workspace.validation import BoundsValidator
 
 
 class SelectHandler:
@@ -19,7 +19,7 @@ class SelectHandler:
         cx: float,
         cy: float,
         ctx: ViewportContext,
-        box: Any
+        box: Any,
     ):
         state.is_dragging = True
         state.drag_mouse_start_abs = state.transformer.to_abs_ctx(cx, cy, ctx)
@@ -32,6 +32,7 @@ class SelectHandler:
         state.drag_orig_descendants = {}
 
         workspace = canvas.workspace_state
+
         def cache_descendants(c_id: UUID):
             comp = workspace.components.get(c_id)
             if comp:
@@ -55,7 +56,7 @@ class SelectHandler:
         cy: float,
         ctx: ViewportContext,
         boundary: tuple[float, float, float, float],
-        selected_boxes: list
+        selected_boxes: list,
     ):
         if not state.is_dragging or len(selected_boxes) != 1:
             return
@@ -70,7 +71,9 @@ class SelectHandler:
         bx1, by1, bx2, by2 = boundary
 
         if state.transformer.has_active_cuts_ctx(ctx):
-            seg_top, seg_bot = state.transformer.get_segment_y_bounds_ctx(state.drag_orig_bounds[1], ctx, boundary)
+            seg_top, seg_bot = state.transformer.get_segment_y_bounds_ctx(
+                state.drag_orig_bounds[1], ctx, boundary
+            )
             by1 = max(by1, seg_top)
             by2 = min(by2, seg_bot)
 
@@ -78,10 +81,24 @@ class SelectHandler:
             ox1, oy1, ox2, oy2 = state.drag_orig_bounds
             union = canvas.get_children_bounds_union(box)
             rx1, ry1, rx2, ry2 = BoundsValidator.clamp_resize(
-                ox1, oy1, ox2, oy2, dx, dy, state.resize_handle, bx1, by1, bx2, by2, min_size=4, children_union=union
+                ox1,
+                oy1,
+                ox2,
+                oy2,
+                dx,
+                dy,
+                state.resize_handle,
+                bx1,
+                by1,
+                bx2,
+                by2,
+                min_size=4,
+                children_union=union,
             )
             bounds = Bounds(x=rx1, y=ry1, w=rx2 - rx1, h=ry2 - ry1)
-            active_int = dict(canvas.active_interaction) if canvas.active_interaction else {}
+            active_int = (
+                dict(canvas.active_interaction) if canvas.active_interaction else {}
+            )
             active_int[box.id] = bounds
             if canvas.callbacks.on_active_interaction_changed:
                 canvas.callbacks.on_active_interaction_changed(active_int)
@@ -94,17 +111,22 @@ class SelectHandler:
             ddx = rx1 - ox1
             ddy = ry1 - oy1
 
-            active_int = dict(canvas.active_interaction) if canvas.active_interaction else {}
+            active_int = (
+                dict(canvas.active_interaction) if canvas.active_interaction else {}
+            )
             active_int[box.id] = Bounds(x=rx1, y=ry1, w=w, h=h)
 
             workspace = canvas.workspace_state
+
             def shift_descendants_transient(c_id: UUID):
                 comp = workspace.components.get(c_id)
                 if comp and c_id in state.drag_orig_descendants:
                     d_ox1, d_oy1, d_ox2, d_oy2 = state.drag_orig_descendants[c_id]
                     d_w = d_ox2 - d_ox1
                     d_h = d_oy2 - d_oy1
-                    active_int[c_id] = Bounds(x=d_ox1 + ddx, y=d_oy1 + ddy, w=d_w, h=d_h)
+                    active_int[c_id] = Bounds(
+                        x=d_ox1 + ddx, y=d_oy1 + ddy, w=d_w, h=d_h
+                    )
                     for child_id in comp.childrenIds:
                         shift_descendants_transient(child_id)
 
@@ -168,6 +190,7 @@ class SelectHandler:
                 active_dict = dict(active_int)
                 active_dict.pop(box.id, None)
                 workspace = canvas.workspace_state
+
                 def remove_descendants(c_id: UUID):
                     comp = workspace.components.get(c_id)
                     if comp:
@@ -183,4 +206,3 @@ class SelectHandler:
                 canvas.schedule_redraw()
 
         return event_generated
-

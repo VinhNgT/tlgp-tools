@@ -38,6 +38,3 @@ class GestureState:
         self.trackpad_zoom_active: bool | None = None
         self.last_trackpad_zoom_time: float = 0.0
         self.ignore_momentum: bool = False
-
-
-

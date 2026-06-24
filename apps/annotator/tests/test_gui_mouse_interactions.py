@@ -9,17 +9,9 @@ from annotator.gui.state import UIStateStore
 from annotator.models import Bounds, Style
 from annotator.workspace import WorkspaceManager
 from PIL import Image
-from PySide6.QtCore import QEvent, QPointF, Qt
-from PySide6.QtGui import QMouseEvent
+from PySide6.QtCore import QEvent, QPointF, QRect, Qt
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QPaintEvent
 from PySide6.QtWidgets import QApplication
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    app = QApplication.instance()
-    if not app:
-        app = QApplication([])
-    yield app
 
 
 def create_test_image(width: int = 800, height: int = 600) -> bytes:
@@ -353,8 +345,10 @@ def test_zoom_focus_target_with_cuts(qapp):
     canvas.transformer.rebuild_segments(ws.state.cutLines)
 
     viewport_changes = []
+
     def on_viewport_change(zoom, pan):
         viewport_changes.append((zoom, pan))
+
     canvas.callbacks.on_viewport_change_request = on_viewport_change
 
     canvas.zoom_focus_target()
@@ -400,8 +394,10 @@ def test_fit_to_screen_with_parent_stack(qapp):
     canvas.transformer.rebuild_segments(ws.state.cutLines)
 
     viewport_changes = []
+
     def on_viewport_change(zoom, pan):
         viewport_changes.append((zoom, pan))
+
     canvas.callbacks.on_viewport_change_request = on_viewport_change
 
     canvas.fit_to_screen()
@@ -447,8 +443,10 @@ def test_fit_to_screen_with_highlighted_box(qapp):
     canvas.transformer.rebuild_segments(ws.state.cutLines)
 
     viewport_changes = []
+
     def on_viewport_change(zoom, pan):
         viewport_changes.append((zoom, pan))
+
     canvas.callbacks.on_viewport_change_request = on_viewport_change
 
     canvas.fit_to_screen()
@@ -569,15 +567,12 @@ def test_canvas_paint_event(qapp):
     view = MainAppWindow()
     AppController(ws, store, view, dialog_service)
 
-    from PySide6.QtGui import QPaintEvent
-    from PySide6.QtCore import QRect
     event = QPaintEvent(QRect(0, 0, 800, 600))
     # This triggers paintEvent, which should not raise any AttributeError
     view.canvas.paintEvent(event)
 
 
 def test_canvas_adaptive_cursors(qapp):
-    from PySide6.QtGui import QKeyEvent
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
 
@@ -598,34 +593,52 @@ def test_canvas_adaptive_cursors(qapp):
     # 1. Default mode is 'select'. Hovering over background (e.g. 50, 50) should show default cursor.
     pos_bg = QPointF(50.0, 50.0)
     move_bg = QMouseEvent(
-        QEvent.Type.MouseMove, pos_bg, pos_bg, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier
+        QEvent.Type.MouseMove,
+        pos_bg,
+        pos_bg,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, move_bg)
     assert canvas.cursor().shape() == Qt.CursorShape.ArrowCursor
 
     # 2. Press 'R' to switch to draw mode. Cursor should instantly change to CrossCursor (draw) without moving the mouse.
-    press_r = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_R, Qt.KeyboardModifier.NoModifier)
+    press_r = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_R, Qt.KeyboardModifier.NoModifier
+    )
     QApplication.sendEvent(view, press_r)
     assert canvas.cursor().shape() == Qt.CursorShape.CrossCursor
 
     # 3. Press 'H' to switch to pan mode. Cursor should instantly change to OpenHandCursor (pan_inactive) without moving.
-    press_h = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_H, Qt.KeyboardModifier.NoModifier)
+    press_h = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_H, Qt.KeyboardModifier.NoModifier
+    )
     QApplication.sendEvent(view, press_h)
     assert canvas.cursor().shape() == Qt.CursorShape.OpenHandCursor
 
     # 4. Press 'V' to switch back to select mode.
-    press_v = QKeyEvent(QEvent.Type.KeyPress, Qt.Key.Key_V, Qt.KeyboardModifier.NoModifier)
+    press_v = QKeyEvent(
+        QEvent.Type.KeyPress, Qt.Key.Key_V, Qt.KeyboardModifier.NoModifier
+    )
     QApplication.sendEvent(view, press_v)
-    
+
     # Hover over background again
     QApplication.sendEvent(canvas, move_bg)
     assert canvas.cursor().shape() == Qt.CursorShape.ArrowCursor
 
     # 5. Hovering over the component (center at 150, 150)
-    cx, cy = canvas.transformer.to_canvas(150, 150, canvas.zoom_factor, [], [], canvas.pan_offset)
+    cx, cy = canvas.transformer.to_canvas(
+        150, 150, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
     pos_comp = QPointF(cx, cy)
     move_comp = QMouseEvent(
-        QEvent.Type.MouseMove, pos_comp, pos_comp, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier
+        QEvent.Type.MouseMove,
+        pos_comp,
+        pos_comp,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, move_comp)
     # Should show ArrowCursor (normal pointer)
@@ -637,10 +650,17 @@ def test_canvas_adaptive_cursors(qapp):
 
     # Now check handles of the selected component.
     # Top-left corner of the component is (100, 100).
-    cx_tl, cy_tl = canvas.transformer.to_canvas(100, 100, canvas.zoom_factor, [], [], canvas.pan_offset)
+    cx_tl, cy_tl = canvas.transformer.to_canvas(
+        100, 100, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
     pos_tl = QPointF(cx_tl, cy_tl)
     move_tl = QMouseEvent(
-        QEvent.Type.MouseMove, pos_tl, pos_tl, Qt.MouseButton.NoButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier
+        QEvent.Type.MouseMove,
+        pos_tl,
+        pos_tl,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, move_tl)
     # Should show SizeFDiagCursor (resize_nw)
@@ -649,7 +669,12 @@ def test_canvas_adaptive_cursors(qapp):
     # 7. Drag on the handle (resizing)
     # Simulate press
     press_tl = QMouseEvent(
-        QEvent.Type.MouseButtonPress, pos_tl, pos_tl, Qt.MouseButton.LeftButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier
+        QEvent.Type.MouseButtonPress,
+        pos_tl,
+        pos_tl,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, press_tl)
     # Under selection mode drag, it should keep the SizeFDiagCursor
@@ -658,7 +683,12 @@ def test_canvas_adaptive_cursors(qapp):
     # Drag move
     pos_drag = QPointF(cx_tl - 20, cy_tl - 20)
     drag_tl = QMouseEvent(
-        QEvent.Type.MouseMove, pos_drag, pos_drag, Qt.MouseButton.NoButton, Qt.MouseButton.LeftButton, Qt.KeyboardModifier.NoModifier
+        QEvent.Type.MouseMove,
+        pos_drag,
+        pos_drag,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.LeftButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     # Bypass deadzone to start drag
     canvas._deadzone_bypassed = True
@@ -667,7 +697,12 @@ def test_canvas_adaptive_cursors(qapp):
 
     # Release
     release_tl = QMouseEvent(
-        QEvent.Type.MouseButtonRelease, pos_drag, pos_drag, Qt.MouseButton.LeftButton, Qt.MouseButton.NoButton, Qt.KeyboardModifier.NoModifier
+        QEvent.Type.MouseButtonRelease,
+        pos_drag,
+        pos_drag,
+        Qt.MouseButton.LeftButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, release_tl)
 
@@ -675,25 +710,27 @@ def test_canvas_adaptive_cursors(qapp):
 def test_drag_snap_on_winning_deadzone(qapp):
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
-    
+
     comp_id = uuid.uuid4()
     ws.add_component(comp_id, "TestComponent", Bounds(x=100, y=100, w=50, h=50))
-    
+
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
     controller = AppController(ws, store, view, dialog_service)
     canvas = view.canvas
-    
+
     canvas.resize(800, 600)
     canvas.fit_to_screen()
     store.update_state("selection", selected_component_ids=[comp_id])
     controller._on_selection_updated()
-    
+
     canvas.deadzone_radius = 5.0
     canvas.deadzone_enabled = True
-    
-    cx, cy = canvas.transformer.to_canvas(125, 125, canvas.zoom_factor, [], [], canvas.pan_offset)
+
+    cx, cy = canvas.transformer.to_canvas(
+        125, 125, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
     pos_press = QPointF(cx, cy)
     press_event = QMouseEvent(
         QEvent.Type.MouseButtonPress,
@@ -704,10 +741,10 @@ def test_drag_snap_on_winning_deadzone(qapp):
         Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, press_event)
-    
+
     assert canvas._press_pos is not None
     assert canvas.gestures.is_dragging is True
-    
+
     pos_drag = QPointF(cx + 10, cy)
     drag_event = QMouseEvent(
         QEvent.Type.MouseMove,
@@ -718,19 +755,23 @@ def test_drag_snap_on_winning_deadzone(qapp):
         Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, drag_event)
-    
+
     assert canvas._deadzone_bypassed is True
-    
-    orig_mx, orig_my = canvas.transformer.to_abs(cx, cy, canvas.zoom_factor, [], [], canvas.pan_offset)
-    drag_mx, drag_my = canvas.transformer.to_abs(cx + 10, cy, canvas.zoom_factor, [], [], canvas.pan_offset)
+
+    orig_mx, orig_my = canvas.transformer.to_abs(
+        cx, cy, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
+    drag_mx, drag_my = canvas.transformer.to_abs(
+        cx + 10, cy, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
     expected_dx = drag_mx - orig_mx
-    
+
     assert canvas.active_interaction is not None
     assert comp_id in canvas.active_interaction
     bounds = canvas.active_interaction[comp_id]
-    
+
     assert bounds.x == pytest.approx(100.0 + expected_dx)
-    
+
     release_event = QMouseEvent(
         QEvent.Type.MouseButtonRelease,
         pos_drag,
@@ -749,8 +790,15 @@ def test_parent_boundary_enforced_on_drag(qapp):
     parent_id = uuid.uuid4()
     child_id = uuid.uuid4()
 
-    ws.add_component(comp_id=parent_id, label="parent", bounds=Bounds(x=50, y=50, w=200, h=200))
-    ws.add_component(comp_id=child_id, label="child", bounds=Bounds(x=100, y=100, w=50, h=50), parent_id=parent_id)
+    ws.add_component(
+        comp_id=parent_id, label="parent", bounds=Bounds(x=50, y=50, w=200, h=200)
+    )
+    ws.add_component(
+        comp_id=child_id,
+        label="child",
+        bounds=Bounds(x=100, y=100, w=50, h=50),
+        parent_id=parent_id,
+    )
 
     store = UIStateStore()
     dialog_service = QtDialogService()
@@ -768,8 +816,10 @@ def test_parent_boundary_enforced_on_drag(qapp):
 
     canvas.deadzone_enabled = False
 
-    cx, cy = canvas.transformer.to_canvas(125, 125, canvas.zoom_factor, [], [], canvas.pan_offset)
-    
+    cx, cy = canvas.transformer.to_canvas(
+        125, 125, canvas.zoom_factor, [], [], canvas.pan_offset
+    )
+
     pos_press = QPointF(cx, cy)
     press_event = QMouseEvent(
         QEvent.Type.MouseButtonPress,
@@ -780,7 +830,7 @@ def test_parent_boundary_enforced_on_drag(qapp):
         Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, press_event)
-    
+
     # Drag far to the right (e.g., cx + 500)
     pos_drag = QPointF(cx + 500, cy)
     drag_event = QMouseEvent(
@@ -792,14 +842,14 @@ def test_parent_boundary_enforced_on_drag(qapp):
         Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, drag_event)
-    
+
     assert canvas.active_interaction is not None
     assert child_id in canvas.active_interaction
     bounds = canvas.active_interaction[child_id]
-    
+
     # It must be clamped exactly to the parent bounds: x + w <= 250 -> x <= 200
     assert bounds.x == 200
-    
+
     # Also test dragging left past parent left boundary (x=50)
     pos_drag_left = QPointF(cx - 500, cy)
     drag_event_left = QMouseEvent(
@@ -811,7 +861,7 @@ def test_parent_boundary_enforced_on_drag(qapp):
         Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, drag_event_left)
-    
+
     bounds_left = canvas.active_interaction[child_id]
     # It must be clamped exactly to parent left boundary: x >= 50
     assert bounds_left.x == 50
@@ -826,12 +876,3 @@ def test_parent_boundary_enforced_on_drag(qapp):
         Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, release_event)
-
-
-
-
-
-
-
-
-

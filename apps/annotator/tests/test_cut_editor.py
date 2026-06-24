@@ -1,18 +1,9 @@
-import pytest
+from annotator.gui.cut_editor import CutEditorDialog
+from annotator.gui.qt_dialogs import QtDialogService
 from PIL import Image
-from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QPointF, Qt, QEvent
+from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
-
-from annotator.gui.cut_editor import CutEditorDialog, _CutCanvasWidget
-
-
-@pytest.fixture(scope="session")
-def qapp():
-    app = QApplication.instance()
-    if not app:
-        app = QApplication([])
-    yield app
+from PySide6.QtWidgets import QApplication
 
 
 def test_cut_editor_initialization(qapp):
@@ -116,8 +107,6 @@ def test_cut_editor_drag_spacing_warning(qapp):
 
 def test_dialog_service_show_cut_editor_modeless(qapp):
     """Verify that QtDialogService.show_cut_editor shows the dialog without blocking and triggers callback on save."""
-    from annotator.gui.qt_dialogs import QtDialogService
-
     image = Image.new("RGB", (800, 1000), color=(128, 128, 128))
     initial_cuts = [100, 200]
     components = []
@@ -151,8 +140,6 @@ def test_dialog_service_show_cut_editor_modeless(qapp):
 
 def test_dialog_service_show_screen_info_modeless(qapp):
     """Verify that QtDialogService.show_screen_info shows the dialog without blocking and triggers callback on save."""
-    from annotator.gui.qt_dialogs import QtDialogService
-
     callback_called = False
     callback_result = None
 
@@ -162,7 +149,12 @@ def test_dialog_service_show_screen_info_modeless(qapp):
         callback_result = result
 
     service = QtDialogService()
-    service.show_screen_info(None, screen_name="Product Details", description="Main product info page", on_save=on_save)
+    service.show_screen_info(
+        None,
+        screen_name="Product Details",
+        description="Main product info page",
+        on_save=on_save,
+    )
     QApplication.processEvents()
 
     dialog = None
@@ -177,7 +169,7 @@ def test_dialog_service_show_screen_info_modeless(qapp):
     dialog._on_save()
 
     assert callback_called
-    assert callback_result == {"screen_name": "Product Details", "description": "Main product info page"}
-
-
-
+    assert callback_result == {
+        "screen_name": "Product Details",
+        "description": "Main product info page",
+    }

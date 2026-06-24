@@ -1,6 +1,5 @@
 """Viewport calculator for determining zoom and pan values to fit components."""
 
-
 from annotator.gui.transformer import ViewportTransformer
 from annotator.gui.viewport_context import ViewportContext
 from annotator.models import Component
@@ -23,8 +22,14 @@ class ViewportCalculator:
         if target_comp:
             bw = target_comp.bounds.w
             has_cuts = transformer.has_active_cuts_ctx(ctx)
-            gap_top = transformer.gap_offset_for_y(target_comp.bounds.top) if has_cuts else 0
-            gap_bottom = transformer.gap_offset_for_y(target_comp.bounds.bottom) if has_cuts else 0
+            gap_top = (
+                transformer.gap_offset_for_y(target_comp.bounds.top) if has_cuts else 0
+            )
+            gap_bottom = (
+                transformer.gap_offset_for_y(target_comp.bounds.bottom)
+                if has_cuts
+                else 0
+            )
 
             visual_top = target_comp.bounds.top + gap_top
             visual_bottom = target_comp.bounds.bottom + gap_bottom
@@ -47,4 +52,3 @@ class ViewportCalculator:
             pad_x = (vw - img_w * new_zoom) / 2
             pad_y = (vh - total_h * new_zoom) / 2
             return new_zoom, pad_x, pad_y
-

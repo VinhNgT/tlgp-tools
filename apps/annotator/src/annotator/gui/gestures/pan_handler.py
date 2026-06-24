@@ -58,7 +58,9 @@ class PanScrollHandler:
                 new_pan_x = mouse_x - (mouse_x - px) * (new_zoom / old_zoom)
                 new_pan_y = mouse_y - (mouse_y - py) * (new_zoom / old_zoom)
                 if canvas.callbacks.on_viewport_change_request:
-                    canvas.callbacks.on_viewport_change_request(new_zoom, (new_pan_x, new_pan_y))
+                    canvas.callbacks.on_viewport_change_request(
+                        new_zoom, (new_pan_x, new_pan_y)
+                    )
         else:
             # Pan
             px, py = canvas.pan_offset
@@ -68,7 +70,9 @@ class PanScrollHandler:
             else:
                 py += scroll_amount
             if canvas.callbacks.on_viewport_change_request:
-                canvas.callbacks.on_viewport_change_request(canvas.zoom_factor, (px, py))
+                canvas.callbacks.on_viewport_change_request(
+                    canvas.zoom_factor, (px, py)
+                )
 
     @staticmethod
     def on_trackpad_scroll(
@@ -87,7 +91,9 @@ class PanScrollHandler:
         elif phase == Qt.ScrollPhase.ScrollEnd:
             state.trackpad_zoom_active = None
 
-        if phase == Qt.ScrollPhase.ScrollMomentum and getattr(state, "ignore_momentum", False):
+        if phase == Qt.ScrollPhase.ScrollMomentum and getattr(
+            state, "ignore_momentum", False
+        ):
             return
 
         is_zoom = ctrl
@@ -104,13 +110,19 @@ class PanScrollHandler:
                 new_pan_x = mouse_x - (mouse_x - px) * (new_zoom / old_zoom)
                 new_pan_y = mouse_y - (mouse_y - py) * (new_zoom / old_zoom)
                 if canvas.callbacks.on_viewport_change_request:
-                    canvas.callbacks.on_viewport_change_request(new_zoom, (new_pan_x, new_pan_y))
+                    canvas.callbacks.on_viewport_change_request(
+                        new_zoom, (new_pan_x, new_pan_y)
+                    )
         else:
-            if getattr(state, "last_trackpad_zoom_time", 0.0) > 0.0 and (time.time() - state.last_trackpad_zoom_time) < 0.25:
+            if (
+                getattr(state, "last_trackpad_zoom_time", 0.0) > 0.0
+                and (time.time() - state.last_trackpad_zoom_time) < 0.25
+            ):
                 return
             px, py = canvas.pan_offset
             px += delta_x
             py += delta_y
             if canvas.callbacks.on_viewport_change_request:
-                canvas.callbacks.on_viewport_change_request(canvas.zoom_factor, (px, py))
-
+                canvas.callbacks.on_viewport_change_request(
+                    canvas.zoom_factor, (px, py)
+                )

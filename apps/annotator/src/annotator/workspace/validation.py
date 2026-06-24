@@ -1,4 +1,4 @@
-from annotator.models import Component, Bounds
+from annotator.models import Bounds, Component
 from annotator.workspace.errors import InvalidStateError
 
 MIN_CUT_GAP = 50
@@ -153,9 +153,7 @@ class CutValidator:
                 )
 
     @staticmethod
-    def get_intersecting_cut(
-        bounds: Bounds, cut_lines: list[int]
-    ) -> int | None:
+    def get_intersecting_cut(bounds: Bounds, cut_lines: list[int]) -> int | None:
         """Determines if any cut line intersects with the component bounds."""
         for cut in cut_lines:
             if bounds.top <= cut <= bounds.bottom:

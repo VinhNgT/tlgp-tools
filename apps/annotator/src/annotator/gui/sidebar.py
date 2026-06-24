@@ -232,7 +232,10 @@ class SidebarTreeView(QWidget):
                 self.callback = callback
 
             def eventFilter(self, obj, event):
-                if event.type() == QEvent.Type.KeyPress and event.key() == Qt.Key.Key_Escape:
+                if (
+                    event.type() == QEvent.Type.KeyPress
+                    and event.key() == Qt.Key.Key_Escape
+                ):
                     self.callback()
                     return True
                 return super().eventFilter(obj, event)

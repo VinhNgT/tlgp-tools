@@ -25,7 +25,7 @@ from .errors import (
     ReadOnlyError,
 )
 from .ordering import ROOTS_CHANGED, recalculate_tree
-from .validation import CutValidator, MIN_CUT_GAP
+from .validation import MIN_CUT_GAP, CutValidator
 
 
 class WorkspaceManager:
@@ -176,7 +176,9 @@ class WorkspaceManager:
                 state.rootComponents.append(comp_id)
             recalculate_tree(state, changed_id=comp_id)
 
-            intersecting_cut = CutValidator.get_intersecting_cut(new_comp.bounds, state.cutLines)
+            intersecting_cut = CutValidator.get_intersecting_cut(
+                new_comp.bounds, state.cutLines
+            )
             if intersecting_cut is not None:
                 raise InvalidStateError(
                     f"Component '{new_comp.label}' intersects existing cut line at Y={intersecting_cut}",
@@ -205,17 +207,21 @@ class WorkspaceManager:
             recalculate_tree(state, changed_id=comp_id)
 
             descendants = []
+
             def collect_descendants(c_id: uuid.UUID):
                 descendants.append(c_id)
                 comp = state.components.get(c_id)
                 if comp:
                     for child_id in comp.childrenIds:
                         collect_descendants(child_id)
+
             collect_descendants(comp_id)
 
             for cid in descendants:
                 c = state.components[cid]
-                intersecting_cut = CutValidator.get_intersecting_cut(c.bounds, state.cutLines)
+                intersecting_cut = CutValidator.get_intersecting_cut(
+                    c.bounds, state.cutLines
+                )
                 if intersecting_cut is not None:
                     raise InvalidStateError(
                         f"Component '{c.label}' intersects existing cut line at Y={intersecting_cut}",
@@ -273,7 +279,9 @@ class WorkspaceManager:
             recalculate_tree(state, changed_id=comp_id)
 
             if bounds is not None:
-                intersecting_cut = CutValidator.get_intersecting_cut(comp.bounds, state.cutLines)
+                intersecting_cut = CutValidator.get_intersecting_cut(
+                    comp.bounds, state.cutLines
+                )
                 if intersecting_cut is not None:
                     raise InvalidStateError(
                         f"Component '{comp.label}' intersects existing cut line at Y={intersecting_cut}",
@@ -312,7 +320,9 @@ class WorkspaceManager:
                     del state.components[cid]
 
             delete_recursive(comp_id)
-            recalculate_tree(state, changed_id=parent_id if parent_id else ROOTS_CHANGED)
+            recalculate_tree(
+                state, changed_id=parent_id if parent_id else ROOTS_CHANGED
+            )
 
         self.mutate(mutation)
 

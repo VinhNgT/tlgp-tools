@@ -21,6 +21,7 @@ from annotator.rendering import (
 @dataclass(frozen=True)
 class CanvasRenderState:
     """Parameters required for a single frame render."""
+
     viewport_ctx: ViewportContext
     active_comps: list[Component]
     selected_ids: list[UUID]
@@ -40,7 +41,9 @@ class CanvasRenderer:
     def __init__(self, transformer: ViewportTransformer):
         self.transformer = transformer
 
-    def paint_parent_mask(self, p: QPainter, state: CanvasRenderState, base_pixmap: Any):
+    def paint_parent_mask(
+        self, p: QPainter, state: CanvasRenderState, base_pixmap: Any
+    ):
         """Paints the dark overlay masking out non-parent components."""
         if not state.parent_comp or not base_pixmap:
             return
@@ -89,7 +92,9 @@ class CanvasRenderer:
         zoom = ctx.zoom_factor
 
         font_size = compute_pill_font_size(state.parent_comp, state.full_img_width)
-        abs_box_border, abs_pill_outline = compute_border_widths(state.parent_comp, state.full_img_width)
+        abs_box_border, abs_pill_outline = compute_border_widths(
+            state.parent_comp, state.full_img_width
+        )
 
         pill_font_size = max(4, round(font_size * zoom))
         qfont = QFont(font)
@@ -166,7 +171,9 @@ class CanvasRenderer:
             pill_w = pill_h = pill_size
 
             pill_corner = comp.style.pillCorner
-            pill_x, pill_y = get_pill_coords(cx1, cy1, cx2, cy2, pill_w, pill_h, pill_corner)
+            pill_x, pill_y = get_pill_coords(
+                cx1, cy1, cx2, cy2, pill_w, pill_h, pill_corner
+            )
 
             p.setPen(pill_outline_pen)
             p.setBrush(QBrush(pill_fill_col))
@@ -191,14 +198,21 @@ class CanvasRenderer:
             if is_selected:
                 self._paint_handles(p, cx1, cy1, cx2, cy2)
 
-    def _paint_handles(self, p: QPainter, cx1: float, cy1: float, cx2: float, cy2: float):
+    def _paint_handles(
+        self, p: QPainter, cx1: float, cy1: float, cx2: float, cy2: float
+    ):
         mx = (cx1 + cx2) / 2
         my = (cy1 + cy2) / 2
         hs = 5
         handles = [
-            (cx1, cy1), (mx, cy1), (cx2, cy1),
-            (cx1, my),             (cx2, my),
-            (cx1, cy2), (mx, cy2), (cx2, cy2),
+            (cx1, cy1),
+            (mx, cy1),
+            (cx2, cy1),
+            (cx1, my),
+            (cx2, my),
+            (cx1, cy2),
+            (mx, cy2),
+            (cx2, cy2),
         ]
 
         # We hardcode highlight color here to avoid passing palette, it's roughly this Qt role
@@ -217,9 +231,11 @@ class CanvasRenderer:
             pen.setStyle(Qt.PenStyle.DashLine)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
-        p.drawRect(QRectF(
-            temp_rect.x1, temp_rect.y1,
-            temp_rect.x2 - temp_rect.x1,
-            temp_rect.y2 - temp_rect.y1,
-        ))
-
+        p.drawRect(
+            QRectF(
+                temp_rect.x1,
+                temp_rect.y1,
+                temp_rect.x2 - temp_rect.x1,
+                temp_rect.y2 - temp_rect.y1,
+            )
+        )

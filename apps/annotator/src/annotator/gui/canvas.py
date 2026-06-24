@@ -53,6 +53,7 @@ class TempRect:
     dash: bool = False
     width: int = 1
 
+
 # ── Cursor Mapping ────────────────────────────────────────────────────
 
 _CURSOR_MAP = {
@@ -210,7 +211,12 @@ class AnnotationCanvasView(QWidget):
                     parent_id = selected[0].parentId
                     if parent_id and parent_id in ws.components:
                         p = ws.components[parent_id].bounds
-                        return float(p.left), float(p.top), float(p.right), float(p.bottom)
+                        return (
+                            float(p.left),
+                            float(p.top),
+                            float(p.right),
+                            float(p.bottom),
+                        )
 
             # Fallback to the active parent component boundary if one is entered (in the stack)
             if self.parent_stack:
@@ -221,7 +227,12 @@ class AnnotationCanvasView(QWidget):
 
         # Fallback to full image boundary if available
         if self.full_pil_img:
-            return 0.0, 0.0, float(self.full_pil_img.width), float(self.full_pil_img.height)
+            return (
+                0.0,
+                0.0,
+                float(self.full_pil_img.width),
+                float(self.full_pil_img.height),
+            )
 
         return 0.0, 0.0, float("inf"), float("inf")
 
@@ -265,10 +276,7 @@ class AnnotationCanvasView(QWidget):
         self.zoom_factor = zoom_factor
         self.pan_offset = pan_offset
         self.parent_stack = parent_stack
-        if (
-            self.space_pan_active
-            and current_mode != "pan"
-        ):
+        if self.space_pan_active and current_mode != "pan":
             self.mode_before_space = current_mode
         self.current_mode = current_mode
         self.active_interaction = active_interaction
@@ -297,7 +305,13 @@ class AnnotationCanvasView(QWidget):
                 target_comp = ws.components.get(self.parent_stack[-1])
 
         new_zoom, pad_x, pad_y = ViewportCalculator.calculate_fit(
-            vw, vh, target_comp, self.full_pil_img.width, self.full_pil_img.height, ctx, self.transformer
+            vw,
+            vh,
+            target_comp,
+            self.full_pil_img.width,
+            self.full_pil_img.height,
+            ctx,
+            self.transformer,
         )
 
         self._is_fitting = True
@@ -332,7 +346,13 @@ class AnnotationCanvasView(QWidget):
 
         vw, vh = self.width(), self.height()
         new_zoom, pad_x, pad_y = ViewportCalculator.calculate_fit(
-            vw, vh, comp, self.full_pil_img.width if self.full_pil_img else 0, self.full_pil_img.height if self.full_pil_img else 0, ctx, self.transformer
+            vw,
+            vh,
+            comp,
+            self.full_pil_img.width if self.full_pil_img else 0,
+            self.full_pil_img.height if self.full_pil_img else 0,
+            ctx,
+            self.transformer,
         )
 
         if self.callbacks.on_viewport_change_request:
@@ -353,8 +373,14 @@ class AnnotationCanvasView(QWidget):
             self.set_cursor("default")
             return
 
-        if self.space_pan_active or self.gestures.state.space_panning or self.current_mode == "pan":
-            if self.gestures.state.space_panning or (self._press_pos is not None and self._deadzone_bypassed):
+        if (
+            self.space_pan_active
+            or self.gestures.state.space_panning
+            or self.current_mode == "pan"
+        ):
+            if self.gestures.state.space_panning or (
+                self._press_pos is not None and self._deadzone_bypassed
+            ):
                 self.set_cursor("pan_active")
             else:
                 self.set_cursor("pan_inactive")
@@ -380,7 +406,10 @@ class AnnotationCanvasView(QWidget):
                 self.set_cursor(cursors.get(handle, "default"))
                 return
 
-            if self.gestures.state.is_dragging and not self.gestures.state.resize_handle:
+            if (
+                self.gestures.state.is_dragging
+                and not self.gestures.state.resize_handle
+            ):
                 # Dragging components uses the normal pointer (ArrowCursor) per design requirements.
                 self.set_cursor("default")
                 return
@@ -393,7 +422,11 @@ class AnnotationCanvasView(QWidget):
             selected_boxes = self.get_selected_components()
 
             handle = HitTester.hit_handle(
-                self._last_mouse_cx, self._last_mouse_cy, selected_boxes, ctx, self.transformer
+                self._last_mouse_cx,
+                self._last_mouse_cy,
+                selected_boxes,
+                ctx,
+                self.transformer,
             )
             if handle:
                 cursors = {
@@ -411,7 +444,12 @@ class AnnotationCanvasView(QWidget):
 
             active_comps = self.get_active_boxes()
             hovered_box = HitTester.hit_box(
-                self._last_mouse_cx, self._last_mouse_cy, active_comps, selected_boxes, ctx, self.transformer
+                self._last_mouse_cx,
+                self._last_mouse_cy,
+                active_comps,
+                selected_boxes,
+                ctx,
+                self.transformer,
             )
             if hovered_box is not None:
                 # Hovering over components uses the normal pointer (ArrowCursor) per design requirements.
@@ -438,8 +476,13 @@ class AnnotationCanvasView(QWidget):
     def update_temp_rect(self, x1: float, y1: float, x2: float, y2: float):
         if self._temp_rect:
             self._temp_rect = TempRect(
-                x1, y1, x2, y2,
-                self._temp_rect.color, self._temp_rect.dash, self._temp_rect.width,
+                x1,
+                y1,
+                x2,
+                y2,
+                self._temp_rect.color,
+                self._temp_rect.dash,
+                self._temp_rect.width,
             )
             self.update()
 
@@ -457,7 +500,6 @@ class AnnotationCanvasView(QWidget):
     def clear_text_focus(self):
         """Clear text focus by moving focus to this canvas."""
         self.setFocus()
-
 
     def make_viewport_ctx(self) -> ViewportContext:
         ws = self.workspace_state
@@ -532,7 +574,6 @@ class AnnotationCanvasView(QWidget):
         target_rect = QRectF(pan_x, pan_y, src_w * zoom, src_h * zoom)
         source_rect = QRectF(0, 0, src_w, src_h)
 
-
         ws = self.workspace_state
         parent_comp = None
         if self.parent_stack and ws:
@@ -541,11 +582,14 @@ class AnnotationCanvasView(QWidget):
         active_comps = self.get_active_boxes()
         ctx = self.make_viewport_ctx()
 
-
         # Build state
         selected_boxes = self.get_selected_components()
         union = None
-        if len(selected_boxes) == 1 and self.gestures.resize_handle and self.gestures.is_dragging:
+        if (
+            len(selected_boxes) == 1
+            and self.gestures.resize_handle
+            and self.gestures.is_dragging
+        ):
             union = self.get_children_bounds_union(selected_boxes[0])
 
         render_state = CanvasRenderState(
@@ -692,7 +736,9 @@ class AnnotationCanvasView(QWidget):
                     new_pan_x = mouse_x - (mouse_x - px) * (new_zoom / old_zoom)
                     new_pan_y = mouse_y - (mouse_y - py) * (new_zoom / old_zoom)
                     if self.callbacks.on_viewport_change_request:
-                        self.callbacks.on_viewport_change_request(new_zoom, (new_pan_x, new_pan_y))
+                        self.callbacks.on_viewport_change_request(
+                            new_zoom, (new_pan_x, new_pan_y)
+                        )
                 event.accept()
                 return True
         return super().event(event)
@@ -713,7 +759,9 @@ class AnnotationCanvasView(QWidget):
             return
 
         pixel_delta = event.pixelDelta()
-        is_trackpad = (phase != Qt.ScrollPhase.NoScrollPhase) or (not pixel_delta.isNull())
+        is_trackpad = (phase != Qt.ScrollPhase.NoScrollPhase) or (
+            not pixel_delta.isNull()
+        )
 
         if is_trackpad:
             # Fall back to angleDelta if pixelDelta is null during active trackpad gestures
