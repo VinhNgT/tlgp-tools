@@ -113,12 +113,19 @@ class GestureInterpreter:
         self.state.last_click_cx = cx
         self.state.last_click_cy = cy
 
+        lw = (
+            canvas.get_selected_border_width(ctx.zoom_factor)
+            if hasattr(canvas, "get_selected_border_width")
+            else 0
+        )
         if (
             self.state.click_sequence_count % 2 == 0
             and canvas.current_mode == "select"
             and not is_multi
         ):
-            handle = HitTester.hit_handle(cx, cy, selected_boxes, ctx, self.transformer)
+            handle = HitTester.hit_handle(
+                cx, cy, selected_boxes, ctx, self.transformer, border_width=lw
+            )
             if not handle:
                 if self.state.cycle_components is None:
                     hit_boxes = list(hit_boxes_at_click)
@@ -141,7 +148,9 @@ class GestureInterpreter:
                     )
                     return
 
-        handle = HitTester.hit_handle(cx, cy, selected_boxes, ctx, self.transformer)
+        handle = HitTester.hit_handle(
+            cx, cy, selected_boxes, ctx, self.transformer, border_width=lw
+        )
         if handle:
             self.state.resize_handle = handle
             SelectHandler.initiate_drag(

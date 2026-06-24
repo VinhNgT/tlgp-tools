@@ -52,6 +52,7 @@ class HitTester:
         selected_boxes: list[Component],
         ctx: ViewportContext,
         transformer: ViewportTransformer,
+        border_width: float = 0,
     ) -> str | None:
         """Hit tests resize handles of the currently selected component."""
         if len(selected_boxes) != 1:
@@ -60,6 +61,12 @@ class HitTester:
         box = selected_boxes[0]
         bx1, by1 = transformer.to_canvas_ctx(box.bounds.left, box.bounds.top, ctx)
         bx2, by2 = transformer.to_canvas_ctx(box.bounds.right, box.bounds.bottom, ctx)
+
+        half_lw = border_width / 2.0
+        bx1 += half_lw
+        by1 += half_lw
+        bx2 -= half_lw
+        by2 -= half_lw
 
         mx = (bx1 + bx2) / 2
         my = (by1 + by2) / 2

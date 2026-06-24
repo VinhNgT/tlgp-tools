@@ -129,14 +129,31 @@ class CanvasRenderer:
                 dash_pen.setStyle(Qt.PenStyle.DashLine)
                 p.setPen(dash_pen)
                 p.setBrush(Qt.BrushStyle.NoBrush)
-                p.drawRect(QRectF(gcx1, gcy1, gcx2 - gcx1, gcy2 - gcy1))
+
+                lw = border_width + 1
+                inset = float(lw)
+                max_w_inset = max(0.0, (gcx2 - gcx1 - 2.0) / 2.0)
+                max_h_inset = max(0.0, (gcy2 - gcy1 - 2.0) / 2.0)
+                actual_inset = min(inset, max_w_inset, max_h_inset)
+
+                p.drawRect(
+                    QRectF(
+                        gcx1 + actual_inset + 1.0,
+                        gcy1 + actual_inset + 1.0,
+                        gcx2 - gcx1 - 2 * actual_inset - 2.0,
+                        gcy2 - gcy1 - 2 * actual_inset - 2.0,
+                    )
+                )
 
                 overlay_font = QFont(font)
                 overlay_font.setBold(True)
                 overlay_font.setItalic(True)
                 p.setFont(overlay_font)
                 p.setPen(QPen(overlay_color))
-                p.drawText(QPointF(gcx1 + 4, gcy1 + 13), "Child Bounds")
+                p.drawText(
+                    QPointF(gcx1 + actual_inset + 4, gcy1 + actual_inset + 13),
+                    "Child Bounds",
+                )
 
         for comp in ordered_comps:
             is_selected = comp.id in state.selected_ids
@@ -161,7 +178,10 @@ class CanvasRenderer:
             # Box border
             p.setPen(box_pen)
             p.setBrush(Qt.BrushStyle.NoBrush)
-            p.drawRect(QRectF(cx1, cy1, cx2 - cx1, cy2 - cy1))
+            half_lw = lw / 2.0
+            p.drawRect(
+                QRectF(cx1 + half_lw, cy1 + half_lw, cx2 - cx1 - lw, cy2 - cy1 - lw)
+            )
 
             # Number pill
             num_str = comp.number
@@ -177,7 +197,15 @@ class CanvasRenderer:
 
             p.setPen(pill_outline_pen)
             p.setBrush(QBrush(pill_fill_col))
-            p.drawRect(QRectF(pill_x, pill_y, pill_w, pill_h))
+            half_pow = pill_outline_width / 2.0
+            p.drawRect(
+                QRectF(
+                    pill_x + half_pow,
+                    pill_y + half_pow,
+                    pill_w - pill_outline_width,
+                    pill_h - pill_outline_width,
+                )
+            )
 
             # Pill text
             p.setFont(qfont)
@@ -196,7 +224,9 @@ class CanvasRenderer:
 
             # Selection handles
             if is_selected:
-                self._paint_handles(p, cx1, cy1, cx2, cy2)
+                self._paint_handles(
+                    p, cx1 + half_lw, cy1 + half_lw, cx2 - half_lw, cy2 - half_lw
+                )
 
     def _paint_handles(
         self, p: QPainter, cx1: float, cy1: float, cx2: float, cy2: float
@@ -225,17 +255,23 @@ class CanvasRenderer:
         """Paints the drag selection or draw marquee."""
         if not temp_rect:
             return
-        pen = QPen(QColor(temp_rect.color), temp_rect.width)
+        w = temp_rect.width
+        pen = QPen(QColor(temp_rect.color), w)
         pen.setJoinStyle(Qt.PenJoinStyle.MiterJoin)
         if temp_rect.dash:
             pen.setStyle(Qt.PenStyle.DashLine)
         p.setPen(pen)
         p.setBrush(Qt.BrushStyle.NoBrush)
+        x1 = min(temp_rect.x1, temp_rect.x2)
+        x2 = max(temp_rect.x1, temp_rect.x2)
+        y1 = min(temp_rect.y1, temp_rect.y2)
+        y2 = max(temp_rect.y1, temp_rect.y2)
+        half_w = w / 2.0
         p.drawRect(
             QRectF(
-                temp_rect.x1,
-                temp_rect.y1,
-                temp_rect.x2 - temp_rect.x1,
-                temp_rect.y2 - temp_rect.y1,
+                x1 + half_w,
+                y1 + half_w,
+                (x2 - x1) - w,
+                (y2 - y1) - w,
             )
         )

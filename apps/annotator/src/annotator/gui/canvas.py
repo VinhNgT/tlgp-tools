@@ -29,6 +29,7 @@ from PySide6.QtWidgets import QWidget
 from annotator.models import Component, WorkspaceState
 from annotator.rendering import (
     composite_gapped_image,
+    compute_border_widths,
 )
 
 from .callbacks import CanvasCallbacks
@@ -179,6 +180,20 @@ class AnnotationCanvasView(QWidget):
             for uid in self.selected_component_ids
             if uid in ws.components
         ]
+
+    def get_selected_border_width(self, zoom: float) -> int:
+        """Returns the border width (lw) for a selected component on the canvas."""
+        ws = self.workspace_state
+        if not ws:
+            return 1
+        parent_comp = None
+        if self.parent_stack:
+            parent_comp = ws.components.get(self.parent_stack[-1])
+        full_img_width = self.full_pil_img.width if self.full_pil_img else 1
+
+        abs_box_border, _ = compute_border_widths(parent_comp, full_img_width)
+        border_width = max(1, round(abs_box_border * zoom))
+        return border_width + 1
 
     def get_children_bounds_union(
         self, comp: Component
@@ -421,12 +436,14 @@ class AnnotationCanvasView(QWidget):
             ctx = self.make_viewport_ctx()
             selected_boxes = self.get_selected_components()
 
+            lw = self.get_selected_border_width(ctx.zoom_factor)
             handle = HitTester.hit_handle(
                 self._last_mouse_cx,
                 self._last_mouse_cy,
                 selected_boxes,
                 ctx,
                 self.transformer,
+                border_width=lw,
             )
             if handle:
                 cursors = {
