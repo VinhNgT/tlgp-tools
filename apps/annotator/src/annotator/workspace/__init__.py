@@ -1,4 +1,4 @@
 from .errors import WorkspaceError
 from .manager import WorkspaceManager
 
-__all__ = ["WorkspaceManager", "WorkspaceError"]
+__all__ = ["WorkspaceError", "WorkspaceManager"]

@@ -1,7 +1,7 @@
 from uuid import UUID
 
 from PySide6.QtCore import QModelIndex, Qt
-from PySide6.QtGui import QColor, QStandardItem, QStandardItemModel
+from PySide6.QtGui import QPalette, QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QLabel,
@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from .design_system import get_ui_font
 
 
 class SidebarTreeView(QWidget):
@@ -22,7 +24,7 @@ class SidebarTreeView(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         lbl = QLabel("COMPONENTS")
-        lbl.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        lbl.setFont(get_ui_font(bold=True))
         layout.addWidget(lbl)
 
         self.model = QStandardItemModel()
@@ -118,9 +120,10 @@ class SidebarTreeView(QWidget):
 
     def _apply_tags(self, item: QStandardItem, tags: list[str]):
         if "hidden" in tags:
-            item.setForeground(QColor("#999999"))
+            palette = self.tree.palette()
+            item.setForeground(palette.color(QPalette.ColorRole.PlaceholderText))
         else:
-            item.setForeground(QColor("#e0e0e0"))
+            item.setData(None, Qt.ItemDataRole.ForegroundRole)
 
     def select_component(self, comp_id: UUID):
         """Highlights specific component node without triggering selection update feedback loops."""

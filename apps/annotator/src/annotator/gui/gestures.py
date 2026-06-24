@@ -5,6 +5,7 @@ from uuid import UUID
 
 from annotator.models import Bounds, Component
 
+from .design_system import ColorSystem
 from .transformer import ViewportTransformer
 from .validation import BoundsValidator
 
@@ -40,7 +41,7 @@ class GestureInterpreter:
 
         # Viewport space panning tracking
         self.space_panning = False
-        self.pan_start_mouse = (0, 0)
+        self.pan_start_mouse: tuple[float, float] = (0.0, 0.0)
         self.pan_start_offset = (0.0, 0.0)
 
         # Drawing coordinates
@@ -269,7 +270,7 @@ class GestureInterpreter:
                     hit_boxes.reverse()
                     if len(hit_boxes) > 1:
                         self.cycle_components = hit_boxes
-                        if primary_sel in hit_boxes:
+                        if primary_sel is not None and primary_sel in hit_boxes:
                             self.last_cycle_index = hit_boxes.index(primary_sel)
                         else:
                             self.last_cycle_index = 0
@@ -400,13 +401,13 @@ class GestureInterpreter:
 
                 self.draw_start_x = cx
                 self.draw_start_y = cy
-                canvas.set_temp_rect(cx, cy, cx, cy, color="#0c8ce9", dash=True)
+                canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.BOX_ACTIVE, dash=True)
                 self.has_temp_rect = True
 
         elif state.current_mode == "draw":
             self.draw_start_x = cx
             self.draw_start_y = cy
-            canvas.set_temp_rect(cx, cy, cx, cy, color="#ff4444", dash=False, width=2)
+            canvas.set_temp_rect(cx, cy, cx, cy, color=ColorSystem.BOX_INACTIVE, dash=False, width=2)
             self.has_temp_rect = True
 
     def on_drag(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
@@ -734,10 +735,10 @@ class GestureInterpreter:
                     if canvas.on_component_created:
                         canvas.on_component_created(
                             {
-                                "x": int(left),
-                                "y": int(top),
-                                "w": int(right - left),
-                                "h": int(bot - top),
+                                "x": left,
+                                "y": top,
+                                "w": right - left,
+                                "h": bot - top,
                             }
                         )
                     event_generated = True
@@ -748,24 +749,23 @@ class GestureInterpreter:
         if not event_generated:
             active_int = canvas.active_interaction
             if active_int:
-                active_int = dict(active_int)
+                active_dict = dict(active_int)
                 if selected_boxes:
                     box = selected_boxes[0]
-                    active_int.pop(box.id, None)
+                    active_dict.pop(box.id, None)
 
                     def remove_descendants(c_id: UUID):
                         comp = workspace.components.get(c_id)
                         if comp:
-                            active_int.pop(c_id, None)
+                            active_dict.pop(c_id, None)
                             for child_id in comp.childrenIds:
                                 remove_descendants(child_id)
 
                     for child_id in box.childrenIds:
                         remove_descendants(child_id)
-                if not active_int:
-                    active_int = None
+                final_active_int = None if not active_dict else active_dict
                 if canvas.on_active_interaction_changed:
-                    canvas.on_active_interaction_changed(active_int)
+                    canvas.on_active_interaction_changed(final_active_int)
             canvas.schedule_redraw()
 
     def on_mouse_move(self, canvas: Any, event: GestureEvent, cx: float, cy: float):

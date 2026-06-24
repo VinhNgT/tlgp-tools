@@ -10,6 +10,7 @@ import os
 from PySide6.QtCore import QPoint, QSize, Qt
 from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
 from PySide6.QtWidgets import (
+    QFrame,
     QLabel,
     QMainWindow,
     QMenu,
@@ -23,13 +24,14 @@ from PySide6.QtWidgets import (
 )
 
 from .canvas import AnnotationCanvasView
+from .design_system import get_ui_font
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
 from .transformer import ViewportTransformer
 
 
 class WelcomeWidget(QWidget):
-    """Welcome screen displayed when no image is loaded."""
+    """Fallback canvas display shown when no image or workspace is imported."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -40,62 +42,36 @@ class WelcomeWidget(QWidget):
         layout = QVBoxLayout(self)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        card = QWidget()
+        card = QFrame()
+        card.setFrameShape(QFrame.Shape.StyledPanel)
+        card.setFrameShadow(QFrame.Shadow.Raised)
         card.setFixedSize(400, 220)
-        card.setStyleSheet("""
-            QWidget {
-                background-color: #1e1e1e;
-                border: 1px solid #333333;
-                border-radius: 12px;
-            }
-        """)
+
         card_layout = QVBoxLayout(card)
         card_layout.setContentsMargins(30, 25, 30, 25)
         card_layout.setSpacing(10)
 
         title = QLabel("Annotator")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("font-size: 18pt; font-weight: bold; color: white; border: none;")
+        title.setFont(get_ui_font(size=18, bold=True))
         card_layout.addWidget(title)
 
         self.desc_label = QLabel("Open a workspace session or raw image to begin.")
         self.desc_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.desc_label.setWordWrap(True)
-        self.desc_label.setStyleSheet("font-size: 10pt; color: #888888; border: none;")
         card_layout.addWidget(self.desc_label)
 
         card_layout.addSpacing(10)
 
-        btn_style = """
-            QPushButton {
-                background-color: #0c8ce9;
-                color: white;
-                border: none;
-                border-radius: 6px;
-                padding: 8px 20px;
-                font-size: 10pt;
-            }
-            QPushButton:hover {
-                background-color: #1a9cf5;
-            }
-            QPushButton:pressed {
-                background-color: #0a6fc0;
-            }
-        """
-
         self.btn_zip = QPushButton("Import Workspace (.zip)")
-        self.btn_zip.setStyleSheet(btn_style)
         self.btn_zip.clicked.connect(self._on_import_zip)
         card_layout.addWidget(self.btn_zip)
 
         self.btn_img = QPushButton("Import Raw Image")
-        self.btn_img.setStyleSheet(btn_style)
         self.btn_img.clicked.connect(self._on_import_image)
         card_layout.addWidget(self.btn_img)
 
         layout.addWidget(card)
-
-        self.setStyleSheet("background-color: #121212;")
 
 
 
@@ -245,7 +221,7 @@ class MainAppWindow(QMainWindow):
 
         # Breadcrumbs label
         self.lbl_breadcrumbs = QLabel("Root")
-        self.lbl_breadcrumbs.setStyleSheet("color: #888888; padding: 0 8px;")
+        self.lbl_breadcrumbs.setStyleSheet("color: palette(placeholder-text); padding: 0 8px;")
         tb.addWidget(self.lbl_breadcrumbs)
 
         spacer = QWidget()
@@ -254,7 +230,7 @@ class MainAppWindow(QMainWindow):
 
         # Zoom display
         self.lbl_zoom = QLabel("100%")
-        self.lbl_zoom.setStyleSheet("color: #888888; padding: 0 8px;")
+        self.lbl_zoom.setStyleSheet("color: palette(placeholder-text); padding: 0 8px;")
         tb.addWidget(self.lbl_zoom)
 
     def _build_central_area(self, transformer: ViewportTransformer | None):
@@ -338,7 +314,7 @@ class MainAppWindow(QMainWindow):
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:
-            path = " › ".join(["Root"] + breadcrumbs)
+            path = " › ".join(["Root", *breadcrumbs])
         else:
             path = "Root"
         self.lbl_breadcrumbs.setText(path)

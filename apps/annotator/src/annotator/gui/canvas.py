@@ -17,10 +17,10 @@ from PySide6.QtGui import (
     QBrush,
     QColor,
     QCursor,
-    QFont,
     QFontMetrics,
     QMouseEvent,
     QPainter,
+    QPalette,
     QPen,
     QPixmap,
     QWheelEvent,
@@ -38,18 +38,12 @@ from annotator.rendering import (
     get_text_dimensions,
 )
 
+from .design_system import ColorSystem, get_ui_font
 from .gestures import GestureEvent, GestureInterpreter
 from .image_utils import pil_to_qpixmap
 from .transformer import ViewportTransformer
 
-# ── Colour Constants ──────────────────────────────────────────────────
-
-_BG_COLOR = QColor("#121212")
-_BOX_COLOR = QColor("#ff4444")
-_HANDLE_COLOR = QColor("#0c8ce9")
-_HANDLE_FILL = QColor(Qt.GlobalColor.white)
-_PILL_FILL = QColor(Qt.GlobalColor.white)
-_MASK_OVERLAY = QColor(0, 0, 0, 150)
+# We will use the central design system and system palette roles dynamically.
 
 # ── Cursor Mapping ────────────────────────────────────────────────────
 
@@ -290,7 +284,7 @@ class AnnotationCanvasView(QWidget):
     def set_temp_rect(
         self,
         x1: float, y1: float, x2: float, y2: float,
-        color: str = "#0c8ce9", dash: bool = False, width: int = 1,
+        color: str = ColorSystem.BOX_ACTIVE, dash: bool = False, width: int = 1,
     ):
         self._temp_rect = (x1, y1, x2, y2, color, dash, width)
         self.update()
@@ -371,7 +365,8 @@ class AnnotationCanvasView(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        p.fillRect(self.rect(), _BG_COLOR)
+        palette = self.palette()
+        p.fillRect(self.rect(), palette.color(QPalette.ColorRole.Base))
 
         if not self.full_pil_img or not self._base_pixmap:
             p.end()
@@ -458,15 +453,14 @@ class AnnotationCanvasView(QWidget):
 
         # QFont + metrics created once for the entire level (not per component)
         pill_font_size = max(4, min(72, round(font_size * zoom)))
-        qfont = QFont("Arial", pill_font_size)
-        qfont.setBold(True)
+        qfont = get_ui_font(size=pill_font_size, bold=True)
         pill_ascent = QFontMetrics(qfont).ascent()
 
         border_width = max(1, round(abs_box_border * zoom))
         pill_outline_width = max(1, round(abs_pill_outline * zoom))
-        box_pen = QPen(_BOX_COLOR, border_width)
-        pill_outline_pen = QPen(_BOX_COLOR, pill_outline_width)
-        pill_text_pen = QPen(_BOX_COLOR)
+        box_pen = QPen(QColor(ColorSystem.BOX_INACTIVE), border_width)
+        pill_outline_pen = QPen(QColor(ColorSystem.BOX_INACTIVE), pill_outline_width)
+        pill_text_pen = QPen(QColor(ColorSystem.BOX_INACTIVE))
 
         non_selected = [comp for comp in active_comps if comp.id not in self.selected_component_ids]
         selected = [comp for comp in active_comps if comp.id in self.selected_component_ids]
@@ -485,14 +479,15 @@ class AnnotationCanvasView(QWidget):
                     cx2, cy2, zoom, self.parent_stack, cut_lines,
                     pan_offset=self.pan_offset,
                 )
-                dash_pen = QPen(QColor("#888888"), 2)
+                dash_pen = QPen(QColor(ColorSystem.CHILD_BOUNDS_OVERLAY), 2)
                 dash_pen.setStyle(Qt.PenStyle.DashLine)
                 p.setPen(dash_pen)
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRect(QRectF(gcx1, gcy1, gcx2 - gcx1, gcy2 - gcy1))
 
-                p.setFont(QFont("Arial", 9, QFont.Weight.Bold, italic=True))
-                p.setPen(QPen(QColor("#888888")))
+                font = get_ui_font(size=9, bold=True, italic=True)
+                p.setFont(font)
+                p.setPen(QPen(QColor(ColorSystem.CHILD_BOUNDS_OVERLAY)))
                 p.drawText(QPointF(gcx1 + 4, gcy1 + 13), "Child Bounds")
 
         for comp in ordered_comps:
@@ -501,11 +496,11 @@ class AnnotationCanvasView(QWidget):
             is_locked = comp.visibility.locked
 
             if is_visible:
-                color_hex = "#0c8ce9" if is_selected else "#ff4444"
-                pill_fill_col = _PILL_FILL
+                color_hex = ColorSystem.BOX_ACTIVE if is_selected else ColorSystem.BOX_INACTIVE
+                pill_fill_col = QColor(ColorSystem.PILL_BG_VISIBLE)
             else:
-                color_hex = "#88bbee" if is_selected else "#aaaaaa"
-                pill_fill_col = QColor("#f0f0f0")
+                color_hex = ColorSystem.BOX_ACTIVE_HIDDEN if is_selected else ColorSystem.BOX_INACTIVE_HIDDEN
+                pill_fill_col = QColor(ColorSystem.PILL_BG_HIDDEN)
 
             comp_color = QColor(color_hex)
             lw = border_width + 1 if is_selected else border_width
@@ -539,7 +534,7 @@ class AnnotationCanvasView(QWidget):
 
             # Number pill
             num_str = comp.number
-            tw, th, top_offset = get_text_dimensions(None, num_str, pil_font)
+            tw, th, _top_offset = get_text_dimensions(None, num_str, pil_font)
 
             scaled_tw = tw * zoom
             scaled_th = th * zoom
@@ -566,7 +561,8 @@ class AnnotationCanvasView(QWidget):
             p.drawText(QPointF(text_x, text_y), num_str)
 
             if self.show_labels and comp.label:
-                p.setFont(QFont("Arial", 9))
+                font = get_ui_font(size=9)
+                p.setFont(font)
                 p.setPen(pill_text_pen)
                 p.drawText(QPointF(cx1, cy2 + 13), comp.label)
 
@@ -586,13 +582,16 @@ class AnnotationCanvasView(QWidget):
             (cx1, cy2), (mx, cy2), (cx2, cy2),
         ]
 
-        p.setPen(QPen(_HANDLE_COLOR, 1))
-        p.setBrush(QBrush(_HANDLE_FILL))
+        palette = self.palette()
+        p.setPen(QPen(palette.color(QPalette.ColorRole.Highlight), 1))
+        p.setBrush(QBrush(palette.color(QPalette.ColorRole.Base)))
         for hx, hy in handles:
             p.drawRect(QRectF(hx - hs, hy - hs, hs * 2, hs * 2))
 
     def _paint_temp_rect(self, p: QPainter):
         """Paint the temporary selection/drawing rectangle."""
+        if not self._temp_rect:
+            return
         x1, y1, x2, y2, color, dash, width = self._temp_rect
         pen = QPen(QColor(color), width)
         if dash:

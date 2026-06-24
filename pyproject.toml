@@ -29,14 +29,18 @@ select = [
     "UP",  # pyupgrade
     "PLC0415", # Enforce import-outside-top-level
     "SLF", # flake8-self (Private member access)
+    "RUF", # Ruff-specific rules
 ]
 ignore = [
     "E501",  # line too long (handled by formatting)
+    "RUF001", # Ambiguous character in string
+    "RUF002", # Ambiguous character in docstring
+    "RUF003", # Ambiguous character in comment
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"legacy/**" = ["SLF"]
-"**/tests/**" = ["SLF"]
+"legacy/**" = ["SLF", "RUF"]
+"**/tests/**" = ["SLF", "RUF"]
 
 [tool.ruff.format]
 quote-style = "double"

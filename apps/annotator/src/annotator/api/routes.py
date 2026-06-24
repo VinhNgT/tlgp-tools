@@ -81,6 +81,9 @@ def generate_image_bytes(
     show_children: bool = False,
 ) -> bytes:
     """Generate a PNG image for a component or the root screenshot."""
+    if not workspace.state.image:
+        raise ValueError("Workspace image is not loaded")
+
     if comp_id == "root":
         bounds_left, bounds_top = 0, 0
         bounds_right, bounds_bottom = workspace.state.image.width, workspace.state.image.height
@@ -235,7 +238,7 @@ def create_router(
                     if workspace.state.cutLines:
                         with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
                             img_w, img_h = img.width, img.height
-                            boundaries = [0] + sorted(workspace.state.cutLines) + [img_h]
+                            boundaries = [0, *sorted(workspace.state.cutLines), img_h]
                             for part_idx in range(len(boundaries) - 1):
                                 seg_y_start = boundaries[part_idx]
                                 seg_y_end = boundaries[part_idx + 1]

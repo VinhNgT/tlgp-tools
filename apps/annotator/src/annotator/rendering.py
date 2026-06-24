@@ -64,7 +64,7 @@ def get_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
 
 
 def get_text_dimensions(
-    draw: ImageDraw.Draw | None, text: str, font
+    draw: ImageDraw.ImageDraw | None, text: str, font
 ) -> tuple[int, int, int]:
     """Get text (width, height, top_offset).
 
@@ -76,7 +76,7 @@ def get_text_dimensions(
         left, top, right, bottom = draw.textbbox((0, 0), text, font=font)
     else:
         left, top, right, bottom = font.getbbox(text)
-    return right - left, bottom - top, top
+    return int(right - left), int(bottom - top), int(top)
 
 
 # ── Level Scaling ──────────────────────────────────────────────────────

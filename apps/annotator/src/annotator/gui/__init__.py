@@ -11,7 +11,6 @@ from .app import MainAppWindow
 from .controller import AppController
 from .qt_dialogs import QtDialogService
 from .state import UIStateStore
-from .theme import apply_dark_theme
 from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)
@@ -41,7 +40,6 @@ def start_gui(workspace_manager):
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         if os.path.exists(icon_path):
             app.setWindowIcon(QIcon(icon_path))
-        apply_dark_theme(app)
 
     # Create observable state store
     store = UIStateStore()

@@ -1,5 +1,5 @@
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QPainter, QPalette, QPen
 from PySide6.QtWidgets import (
     QCheckBox,
     QGridLayout,
@@ -11,21 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-# ── Colour Constants ──────────────────────────────────────────────────
-
-_PRIMARY = QColor("#0c8ce9")
-_BG_ENABLED = QColor("#1e1e1e")
-_BG_DISABLED = QColor("#121212")
-_BORDER_ENABLED = QColor("#444444")
-_BORDER_DISABLED = QColor("#2c2c2c")
-_OUTLINE_ENABLED = QColor("#555555")
-_OUTLINE_DISABLED = QColor("#2c2c2c")
-_CROSSHAIR_ENABLED = QColor("#333333")
-_CROSSHAIR_DISABLED = QColor("#222222")
-_DOT_FILL_ENABLED = QColor("#444444")
-_DOT_FILL_DISABLED = QColor("#2c2c2c")
-_DOT_OUTLINE_ENABLED = QColor("#666666")
-_DOT_OUTLINE_DISABLED = QColor("#333333")
+from .design_system import ColorSystem, get_ui_font
 
 
 class CornerSelector(QWidget):
@@ -65,8 +51,11 @@ class CornerSelector(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
 
-        bg = _BG_ENABLED if self.enabled else _BG_DISABLED
-        border = _BORDER_ENABLED if self.enabled else _BORDER_DISABLED
+        palette = self.palette()
+        cg = QPalette.ColorGroup.Active if self.enabled else QPalette.ColorGroup.Disabled
+
+        bg = palette.color(cg, QPalette.ColorRole.Window)
+        border = palette.color(cg, QPalette.ColorRole.Mid)
 
         # Background
         p.fillRect(self.rect(), bg)
@@ -74,7 +63,7 @@ class CornerSelector(QWidget):
         p.drawRect(self.rect().adjusted(0, 0, -1, -1))
 
         # Dashed rectangle
-        outline_color = _OUTLINE_ENABLED if self.enabled else _OUTLINE_DISABLED
+        outline_color = palette.color(cg, QPalette.ColorRole.Dark)
         pen = QPen(outline_color, 1, Qt.PenStyle.DashLine)
         p.setPen(pen)
         p.drawRect(self.x1, self.y1, self.x2 - self.x1, self.y2 - self.y1)
@@ -82,7 +71,7 @@ class CornerSelector(QWidget):
         # Crosshairs
         cx = (self.x1 + self.x2) // 2
         cy = (self.y1 + self.y2) // 2
-        line_color = _CROSSHAIR_ENABLED if self.enabled else _CROSSHAIR_DISABLED
+        line_color = palette.color(cg, QPalette.ColorRole.Midlight)
         pen = QPen(line_color, 1, Qt.PenStyle.DotLine)
         p.setPen(pen)
         p.drawLine(self.x1, cy, self.x2, cy)
@@ -93,10 +82,10 @@ class CornerSelector(QWidget):
         for name, (px, py) in self.corners.items():
             if self.enabled and self.selected_corner == name:
                 p.setPen(QPen(Qt.GlobalColor.white, 1.5))
-                p.setBrush(_PRIMARY)
+                p.setBrush(palette.color(QPalette.ColorRole.Highlight))
             else:
-                dot_fill = _DOT_FILL_DISABLED if not self.enabled else _DOT_FILL_ENABLED
-                dot_outline = _DOT_OUTLINE_DISABLED if not self.enabled else _DOT_OUTLINE_ENABLED
+                dot_fill = palette.color(cg, QPalette.ColorRole.Button)
+                dot_outline = palette.color(cg, QPalette.ColorRole.Dark)
                 p.setPen(QPen(dot_outline, 1))
                 p.setBrush(dot_fill)
             p.drawEllipse(px - r, py - r, r * 2, r * 2)
@@ -151,18 +140,16 @@ class ComponentPropertiesView(QWidget):
         layout.setContentsMargins(10, 10, 10, 10)
 
         lbl_header = QLabel("PROPERTIES")
-        lbl_header.setStyleSheet("font-weight: bold; font-size: 9pt;")
+        lbl_header.setFont(get_ui_font(bold=True))
         layout.addWidget(lbl_header)
 
         # Name field
         name_row = QHBoxLayout()
         lbl_name = QLabel("Name:")
         lbl_name.setFixedWidth(50)
-        lbl_name.setStyleSheet("font-size: 9pt;")
         name_row.addWidget(lbl_name)
 
         self.entry_name = QLineEdit()
-        self.entry_name.setStyleSheet("font-size: 9pt;")
         self.entry_name.returnPressed.connect(self._save_name)
         self.entry_name.editingFinished.connect(self._save_name)
         name_row.addWidget(self.entry_name)
@@ -179,14 +166,13 @@ class ComponentPropertiesView(QWidget):
             col = (idx % 2) * 2
             lbl = QLabel(label)
             lbl.setFixedWidth(20)
-            lbl.setStyleSheet("font-size: 8pt; font-weight: bold;")
+            lbl.setFont(get_ui_font(size=8, bold=True))
             coords_grid.addWidget(lbl, row, col)
 
             entry = QLineEdit()
             entry.setFixedWidth(70)
             entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
             entry.setReadOnly(True)
-            entry.setStyleSheet("font-size: 9pt;")
             coords_grid.addWidget(entry, row, col + 1)
             self.prop_entries[key] = entry
 
@@ -209,7 +195,6 @@ class ComponentPropertiesView(QWidget):
         # Pill corner selector
         pill_row = QHBoxLayout()
         lbl_pill = QLabel("Pill Corner:")
-        lbl_pill.setStyleSheet("font-size: 9pt;")
         pill_row.addWidget(lbl_pill)
 
         self.corner_selector = CornerSelector(
@@ -224,7 +209,8 @@ class ComponentPropertiesView(QWidget):
         # Status text at the bottom
         self.txt_status = QLabel("Connecting...")
         self.txt_status.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom)
-        self.txt_status.setStyleSheet("font-size: 8pt; color: #888888;")
+        self.txt_status.setFont(get_ui_font(size=8))
+        self.txt_status.setStyleSheet(f"color: {ColorSystem.MUTED};")
         self.txt_status.setWordWrap(True)
         layout.addWidget(self.txt_status)
 
@@ -245,8 +231,8 @@ class ComponentPropertiesView(QWidget):
 
     def update_status(self, text: str, is_error: bool = False):
         self.txt_status.setText(text)
-        color = "#e74c3c" if is_error else "#888888"
-        self.txt_status.setStyleSheet(f"font-size: 8pt; color: {color};")
+        color = ColorSystem.ERROR if is_error else ColorSystem.MUTED
+        self.txt_status.setStyleSheet(f"color: {color};")
 
     def update_properties_panel(
         self,

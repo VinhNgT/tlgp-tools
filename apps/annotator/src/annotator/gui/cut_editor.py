@@ -9,9 +9,9 @@ from PIL import Image
 from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import (
     QColor,
-    QFont,
     QMouseEvent,
     QPainter,
+    QPalette,
     QPen,
     QPixmap,
     QWheelEvent,
@@ -28,6 +28,7 @@ from PySide6.QtWidgets import (
 
 from annotator.models import Component
 
+from .design_system import ColorSystem, get_ui_font
 from .image_utils import pil_to_qpixmap
 from .validation import CutValidator
 
@@ -36,13 +37,10 @@ SNAP_DISTANCE = 8
 
 # ── Colour Constants ──────────────────────────────────────────────────
 
-_BG_COLOR = QColor("#1a1a1a")
-_COMP_FILL = QColor(255, 0, 0, 40)
-_COMP_OUTLINE = QColor(255, 0, 0, 150)
-_CUT_SELECTED = QColor("#0c8ce9")
-_CUT_NORMAL = QColor("#ff4444")
-_CUT_LABEL_FONT = QFont("Arial", 8)
-_CUT_LABEL_FONT.setBold(True)
+# Canvas overlay visuals (drawing helper frames and boxes)
+_COMP_FILL = ColorSystem.CUT_COMP_FILL
+_COMP_OUTLINE = ColorSystem.CUT_COMP_OUTLINE
+_CUT_LABEL_FONT = get_ui_font(size=8, bold=True)
 
 
 class _CutCanvasWidget(QWidget):
@@ -86,7 +84,9 @@ class _CutCanvasWidget(QWidget):
         p = QPainter(self)
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        p.fillRect(self.rect(), _BG_COLOR)
+
+        palette = self.palette()
+        p.fillRect(self.rect(), palette.color(QPalette.ColorRole.Window))
 
         if not self._base_pixmap:
             p.end()
@@ -119,7 +119,7 @@ class _CutCanvasWidget(QWidget):
         for i, y in enumerate(self.dialog.cut_lines):
             cy = self._to_canvas_y(y)
             is_selected = i == self.dialog.selected_index
-            color = _CUT_SELECTED if is_selected else _CUT_NORMAL
+            color = palette.color(QPalette.ColorRole.Highlight) if is_selected else QColor(ColorSystem.ERROR)
             width = 3 if is_selected else 2
 
             pen = QPen(color, width, Qt.PenStyle.DashLine)
@@ -276,7 +276,7 @@ class CutEditorDialog(QDialog):
         self.source_image = image
         self.cut_lines: list[int] = sorted(initial_cuts)
         self.existing_components = components
-        self.result: list[int] | None = None
+        self.cut_lines_result: list[int] | None = None
 
         # Interaction state
         self.mode: str = "idle"
@@ -306,7 +306,7 @@ class CutEditorDialog(QDialog):
         right_layout.setContentsMargins(10, 10, 10, 10)
 
         lbl = QLabel("CUT LINES")
-        lbl.setStyleSheet("font-weight: bold; font-size: 10pt;")
+        lbl.setFont(get_ui_font(size=10, bold=True))
         right_layout.addWidget(lbl)
 
         self.listbox = QListWidget()
@@ -328,7 +328,8 @@ class CutEditorDialog(QDialog):
         right_layout.addWidget(self.btn_clear)
 
         self.status_label = QLabel("")
-        self.status_label.setStyleSheet("font-size: 8pt; color: #ff4444;")
+        self.status_label.setFont(get_ui_font(size=8))
+        self.status_label.setStyleSheet(f"color: {ColorSystem.ERROR};")
         self.status_label.setWordWrap(True)
         right_layout.addWidget(self.status_label)
 
@@ -407,9 +408,9 @@ class CutEditorDialog(QDialog):
         self.refresh_listbox()
 
     def _on_ok(self):
-        self.result = sorted(self.cut_lines)
+        self.cut_lines_result = sorted(self.cut_lines)
         self.accept()
 
     def _on_cancel(self):
-        self.result = None
+        self.cut_lines_result = None
         self.reject()

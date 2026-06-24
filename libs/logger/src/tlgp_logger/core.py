@@ -24,9 +24,7 @@ def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
     ]
 
     # Processors specific to structlog
-    structlog_processors = shared_processors + [
-        structlog.stdlib.ProcessorFormatter.wrap_for_formatter,
-    ]
+    structlog_processors = [*shared_processors, structlog.stdlib.ProcessorFormatter.wrap_for_formatter]
 
     structlog.configure(
         processors=structlog_processors,

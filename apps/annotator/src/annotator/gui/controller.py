@@ -1,6 +1,7 @@
 import io
 import uuid
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any
 from uuid import UUID
 
 from PIL import Image
@@ -323,7 +324,7 @@ class AppController:
             for comp_id in parent_stack:
                 comp = state.components.get(comp_id)
                 if comp:
-                    breadcrumbs.append(str(comp.number) if comp.number else comp.label)
+                    breadcrumbs.append(comp.number if comp.number else comp.label)
         self.view.update_breadcrumbs(breadcrumbs)
 
     def _sync_properties(self):
@@ -346,10 +347,10 @@ class AppController:
                 self.view.properties.update_properties_panel(
                     box_id=current_box_id,
                     label=comp.label,
-                    x=int(bounds.x),
-                    y=int(bounds.y),
-                    w=int(bounds.w),
-                    h=int(bounds.h),
+                    x=bounds.x,
+                    y=bounds.y,
+                    w=bounds.w,
+                    h=bounds.h,
                     is_visible=comp.visibility.visible,
                     is_locked=comp.visibility.locked,
                     is_effectively_locked=self._is_effectively_locked(comp.id),
@@ -360,7 +361,7 @@ class AppController:
                 for key in ["x", "y", "w", "h"]:
                     if box_changed or not self.view.properties.is_field_focused(key):
                         val = getattr(bounds, key, 0)
-                        self.view.properties.update_field_value(key, str(int(val)))
+                        self.view.properties.update_field_value(key, str(val))
                 return
         self.view.properties.disable_properties_fields()
 
@@ -479,8 +480,8 @@ class AppController:
         for comp_id in selected_ids:
             comp = state.components.get(comp_id)
             if comp and not self._is_effectively_locked(comp_id):
-                new_x = int(comp.bounds.x) + dx
-                new_y = int(comp.bounds.y) + dy
+                new_x = comp.bounds.x + dx
+                new_y = comp.bounds.y + dy
                 self.workspace.move_component(comp_id, new_x, new_y)
 
     def _on_import_zip_request(self):
@@ -655,10 +656,10 @@ class AppController:
         self.store.update_state("viewport", viewport_size=(cw, ch))
 
     def _on_component_moved(self, comp_id: str, x: int, y: int):
-        self.workspace.move_component(UUID(str(comp_id)), x, y)
+        self.workspace.move_component(UUID(comp_id), x, y)
 
     def _on_component_resized(self, comp_id: str, bounds: dict):
-        self.workspace.update_component(UUID(str(comp_id)), bounds=Bounds(**bounds))
+        self.workspace.update_component(UUID(comp_id), bounds=Bounds(**bounds))
 
     def _on_component_created(self, bounds: dict):
         parent_id = (
@@ -676,11 +677,11 @@ class AppController:
         if not self.view.canvas.full_pil_img:
             return
 
-        items = []
+        items: list[dict[str, Any]] = []
 
         if clicked:
             self.view.canvas.set_selection([clicked])
-            num_str = str(clicked.number) if clicked.number else clicked.label
+            num_str = clicked.number if clicked.number else clicked.label
             items.append(
                 {
                     "label": f"Drill into Component {num_str}",

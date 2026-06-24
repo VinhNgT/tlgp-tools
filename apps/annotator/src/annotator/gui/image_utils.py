@@ -4,6 +4,8 @@ Provides efficient PIL → QImage → QPixmap conversions. The QImage retains
 a reference to the raw pixel buffer, avoiding a redundant deep copy.
 """
 
+from typing import Any
+
 from PIL import Image
 from PySide6.QtGui import QImage, QPixmap
 
@@ -31,7 +33,8 @@ def pil_to_qimage(pil_img: Image.Image) -> QImage:
     qimg = QImage(data, pil_img.width, pil_img.height, bytes_per_line, fmt)
     # Pin the buffer reference on the QImage to prevent GC of the
     # underlying bytes while the QImage is alive.
-    qimg._pil_data = data  # noqa: SLF001
+    qimg_any: Any = qimg
+    qimg_any._pil_data = data  # noqa: SLF001
     return qimg
 
 

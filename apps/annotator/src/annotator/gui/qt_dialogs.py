@@ -21,6 +21,7 @@ from PySide6.QtWidgets import (
 from annotator.models import Component
 
 from .cut_editor import CutEditorDialog
+from .design_system import get_ui_font
 from .dialog_service import DialogService, ProgressIndicator
 
 
@@ -48,7 +49,7 @@ class _ImportingDialog(QDialog):
         layout = QVBoxLayout(self)
         lbl = QLabel(message)
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl.setStyleSheet("font-size: 10pt;")
+        lbl.setFont(get_ui_font(size=10))
         layout.addWidget(lbl)
 
         self.show()
@@ -63,7 +64,7 @@ class _ScreenInfoDialog(QDialog):
         self.resize(450, 240)
         self.setModal(True)
 
-        self.result = None
+        self.info_result = None
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
@@ -99,7 +100,7 @@ class _ScreenInfoDialog(QDialog):
             QMessageBox.warning(self, "Warning", "Please enter a screen name!")
             return
 
-        self.result = {"screen_name": name, "description": desc}
+        self.info_result = {"screen_name": name, "description": desc}
         self.accept()
 
 
@@ -153,14 +154,14 @@ class QtDialogService(DialogService):
             parent, image=image, initial_cuts=initial_cuts, components=components
         )
         dialog.exec()
-        return dialog.result
+        return dialog.cut_lines_result
 
     def show_screen_info(
         self, parent: QWidget, screen_name: str, description: str
     ) -> dict[str, str] | None:
         dialog = _ScreenInfoDialog(parent, screen_name=screen_name, description=description)
         dialog.exec()
-        return dialog.result
+        return dialog.info_result
 
     @staticmethod
     def _filetypes_to_filter(filetypes: list[tuple[str, str]]) -> str:
