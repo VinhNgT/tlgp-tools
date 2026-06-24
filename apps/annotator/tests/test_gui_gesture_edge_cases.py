@@ -142,3 +142,115 @@ def test_gesture_ctrl_click_drill_through(qapp):
     canvas.gestures.on_control_click(canvas, GestureEvent(cx1, cy1, int(cx1), int(cy1), False, True), cx1, cy1)
     assert drilled_id == comp1_id
 
+
+def test_trackpad_scroll_zoom(qapp):
+    """Verify trackpad zoom gestures, exponential scaling, and phase-lock stability."""
+    from PySide6.QtCore import Qt
+    ws = WorkspaceManager()
+    ws.import_image(create_test_image(800, 600))
+    store = UIStateStore()
+    view = MainAppWindow()
+    AppController(ws, store, view, QtDialogService())
+    canvas = view.canvas
+    canvas.resize(800, 600)
+    canvas.fit_to_screen()
+
+    # Initial zoom factor should be set
+    canvas.zoom_factor = 1.0
+    canvas.pan_offset = (0.0, 0.0)
+
+    # 1. Start gesture: Zoom session starts with ctrl=True
+    canvas.gestures.on_trackpad_scroll(
+        canvas=canvas,
+        delta_x=0,
+        delta_y=10,  # Positive delta_y should zoom IN (increase zoom)
+        mouse_x=100.0,
+        mouse_y=100.0,
+        ctrl=True,
+        phase=Qt.ScrollPhase.ScrollBegin
+    )
+    assert canvas.gestures.state.trackpad_zoom_active is True
+    assert canvas.zoom_factor > 1.0  # Zoomed in
+
+    last_zoom = canvas.zoom_factor
+
+    # 2. Update gesture: ctrl is still True, zoom should increase further
+    canvas.gestures.on_trackpad_scroll(
+        canvas=canvas,
+        delta_x=0,
+        delta_y=20,
+        mouse_x=100.0,
+        mouse_y=100.0,
+        ctrl=True,
+        phase=Qt.ScrollPhase.ScrollUpdate
+    )
+    assert canvas.zoom_factor > last_zoom
+
+    last_zoom = canvas.zoom_factor
+
+    # 3. Update gesture (simulating key release): ctrl key is released,
+    # but phase-lock (trackpad_zoom_active) should force it to continue zooming, not pan
+    canvas.gestures.on_trackpad_scroll(
+        canvas=canvas,
+        delta_x=50,  # In panning, this would shift pan_offset, but here it shouldn't
+        delta_y=10,
+        mouse_x=100.0,
+        mouse_y=100.0,
+        ctrl=False,  # Ctrl/Command released
+        phase=Qt.ScrollPhase.ScrollUpdate
+    )
+    assert canvas.gestures.state.trackpad_zoom_active is True
+    assert canvas.zoom_factor > last_zoom  # Continues to zoom in
+    assert canvas.pan_offset[0] != 50.0  # Panning was not triggered
+
+    # 4. End gesture: resets active state to None
+    canvas.gestures.on_trackpad_scroll(
+        canvas=canvas,
+        delta_x=0,
+        delta_y=0,
+        mouse_x=100.0,
+        mouse_y=100.0,
+        ctrl=False,
+        phase=Qt.ScrollPhase.ScrollEnd
+    )
+    assert canvas.gestures.state.trackpad_zoom_active is None
+
+
+def test_native_gesture_zoom(qapp):
+    """Verify that macOS native gesture event handles pinch zoom and blocks duplicate wheel zoom events."""
+    from PySide6.QtGui import QWheelEvent
+    from PySide6.QtCore import QEvent, QPointF, Qt
+    from unittest.mock import MagicMock
+
+    ws = WorkspaceManager()
+    ws.import_image(create_test_image(800, 600))
+    store = UIStateStore()
+    view = MainAppWindow()
+    AppController(ws, store, view, QtDialogService())
+    canvas = view.canvas
+    canvas.resize(800, 600)
+    canvas.fit_to_screen()
+
+    canvas.zoom_factor = 1.0
+
+    mock_event = MagicMock()
+    mock_event.type.return_value = QEvent.Type.NativeGesture
+    mock_event.gestureType.return_value = Qt.NativeGestureType.ZoomNativeGesture
+    mock_event.value.return_value = 0.2
+    mock_event.position.return_value = QPointF(100.0, 100.0)
+
+    canvas.event(mock_event)
+
+    assert canvas.zoom_factor == 1.2
+    mock_event.accept.assert_called_once()
+
+    mock_wheel = MagicMock(spec=QWheelEvent)
+    mock_wheel.modifiers.return_value = Qt.KeyboardModifier.ControlModifier
+    mock_wheel.position.return_value = QPointF(100.0, 100.0)
+    mock_wheel.phase.return_value = Qt.ScrollPhase.ScrollUpdate
+
+    canvas.wheelEvent(mock_wheel)
+    mock_wheel.accept.assert_called_once()
+
+
+

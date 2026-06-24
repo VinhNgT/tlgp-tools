@@ -9,12 +9,13 @@ This avoids per-frame PIL resizing during pan/zoom interactions.
 """
 
 import math
+import time
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
 
 from PIL import Image
-from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import (
     QCursor,
     QMouseEvent,
@@ -558,6 +559,26 @@ class AnnotationCanvasView(QWidget):
         elif button == Qt.MouseButton.MiddleButton:
             self.gestures.on_middle_release(self, ge, cx, cy)
 
+    def event(self, event: QEvent) -> bool:
+        if event.type() == QEvent.Type.NativeGesture:
+            if event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+                self._last_native_gesture_time = time.time()
+                old_zoom = self.zoom_factor
+                scale = 1.0 + event.value()
+                new_zoom = max(0.1, min(4.0, old_zoom * scale))
+                if new_zoom != old_zoom:
+                    local_pos = self.mapFromGlobal(QCursor.pos())
+                    mouse_x = local_pos.x()
+                    mouse_y = local_pos.y()
+                    px, py = self.pan_offset
+                    new_pan_x = mouse_x - (mouse_x - px) * (new_zoom / old_zoom)
+                    new_pan_y = mouse_y - (mouse_y - py) * (new_zoom / old_zoom)
+                    if self.callbacks.on_viewport_change_request:
+                        self.callbacks.on_viewport_change_request(new_zoom, (new_pan_x, new_pan_y))
+                event.accept()
+                return True
+        return super().event(event)
+
     def wheelEvent(self, event: QWheelEvent):
         if not self.full_pil_img:
             return
@@ -566,16 +587,35 @@ class AnnotationCanvasView(QWidget):
         ctrl = bool(mods & Qt.KeyboardModifier.ControlModifier)
         shift = bool(mods & Qt.KeyboardModifier.ShiftModifier)
         pos = event.position()
+        phase = event.phase()
+
+        # Ignore wheel events during active native pinch gestures to prevent double-handling
+        if ctrl and time.time() - getattr(self, "_last_native_gesture_time", 0.0) < 0.1:
+            event.accept()
+            return
 
         pixel_delta = event.pixelDelta()
-        if not pixel_delta.isNull():
+        is_trackpad = (phase != Qt.ScrollPhase.NoScrollPhase) or (not pixel_delta.isNull())
+
+        if is_trackpad:
+            # Fall back to angleDelta if pixelDelta is null during active trackpad gestures
+            if not pixel_delta.isNull():
+                dx = pixel_delta.x()
+                dy = pixel_delta.y()
+            else:
+                angle_delta = event.angleDelta()
+                # A standard wheel notch is 120, which maps to ~12 logical pixels of scroll
+                dx = int(angle_delta.x() * 0.1)
+                dy = int(angle_delta.y() * 0.1)
+
             self.gestures.on_trackpad_scroll(
                 self,
-                delta_x=pixel_delta.x(),
-                delta_y=pixel_delta.y(),
+                delta_x=dx,
+                delta_y=dy,
                 mouse_x=pos.x(),
                 mouse_y=pos.y(),
                 ctrl=ctrl,
+                phase=phase,
             )
         else:
             angle = event.angleDelta()

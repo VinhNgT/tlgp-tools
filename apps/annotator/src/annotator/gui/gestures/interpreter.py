@@ -3,6 +3,8 @@
 import time
 from typing import Any
 
+from PySide6.QtCore import Qt
+
 from annotator.gui.gestures.draw_handler import DrawHandler
 from annotator.gui.gestures.hit_testing import HitTester
 from annotator.gui.gestures.pan_handler import PanScrollHandler
@@ -269,6 +271,17 @@ class GestureInterpreter:
     def on_scroll(self, canvas: Any, delta: int, mouse_x: float, mouse_y: float, shift: bool, ctrl: bool):
         PanScrollHandler.on_scroll(canvas, delta, mouse_x, mouse_y, shift, ctrl)
 
-    def on_trackpad_scroll(self, canvas: Any, delta_x: int, delta_y: int, mouse_x: float, mouse_y: float, ctrl: bool):
-        PanScrollHandler.on_trackpad_scroll(canvas, delta_x, delta_y, mouse_x, mouse_y, ctrl)
+    def on_trackpad_scroll(
+        self,
+        canvas: Any,
+        delta_x: int,
+        delta_y: int,
+        mouse_x: float,
+        mouse_y: float,
+        ctrl: bool,
+        phase: Qt.ScrollPhase = Qt.ScrollPhase.NoScrollPhase,
+    ):
+        PanScrollHandler.on_trackpad_scroll(
+            self.state, canvas, delta_x, delta_y, mouse_x, mouse_y, ctrl, phase
+        )
 

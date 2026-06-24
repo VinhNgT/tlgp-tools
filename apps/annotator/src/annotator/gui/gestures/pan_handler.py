@@ -1,6 +1,10 @@
 """Event handlers for panning and scrolling."""
 
+import math
+import time
 from typing import Any
+
+from PySide6.QtCore import Qt
 
 from annotator.gui.gestures.state import GestureState
 from annotator.gui.gestures.types import GestureEvent
@@ -68,18 +72,28 @@ class PanScrollHandler:
 
     @staticmethod
     def on_trackpad_scroll(
+        state: GestureState,
         canvas: Any,
         delta_x: int,
         delta_y: int,
         mouse_x: float,
         mouse_y: float,
         ctrl: bool,
+        phase: Qt.ScrollPhase = Qt.ScrollPhase.NoScrollPhase,
     ):
-        if ctrl:
+        if phase == Qt.ScrollPhase.ScrollBegin:
+            state.trackpad_zoom_active = ctrl
+        elif phase == Qt.ScrollPhase.ScrollEnd:
+            state.trackpad_zoom_active = None
+
+        is_zoom = ctrl
+        if state.trackpad_zoom_active is not None:
+            is_zoom = state.trackpad_zoom_active
+
+        if is_zoom:
+            state.last_trackpad_zoom_time = time.time()
             old_zoom = canvas.zoom_factor
-            zoom_step = 1.0 + (delta_y * 0.01)
-            if zoom_step <= 0:
-                zoom_step = 0.1
+            zoom_step = math.exp(delta_y * 0.0035)
             new_zoom = max(0.1, min(4.0, old_zoom * zoom_step))
             if new_zoom != old_zoom:
                 px, py = canvas.pan_offset
@@ -88,6 +102,8 @@ class PanScrollHandler:
                 if canvas.callbacks.on_viewport_change_request:
                     canvas.callbacks.on_viewport_change_request(new_zoom, (new_pan_x, new_pan_y))
         else:
+            if getattr(state, "last_trackpad_zoom_time", 0.0) > 0.0 and (time.time() - state.last_trackpad_zoom_time) < 0.25:
+                return
             px, py = canvas.pan_offset
             px += delta_x
             py += delta_y

@@ -35,4 +35,8 @@ class GestureState:
         self.space_panning: bool = False
         self.pan_start_mouse: tuple[float, float] = (0.0, 0.0)
         self.pan_start_offset: tuple[float, float] = (0.0, 0.0)
+        self.trackpad_zoom_active: bool | None = None
+        self.last_trackpad_zoom_time: float = 0.0
+
+
 
