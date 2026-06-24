@@ -1,12 +1,10 @@
 """FastAPI application factory for the Annotator API.
 
-Creates a FastAPI instance with workspace dependency injection,
-global error-to-HTTP mapping, and WebSocket broadcaster wiring.
+Creates a FastAPI instance with workspace dependency injection and
+global error-to-HTTP mapping.
 """
 
 from __future__ import annotations
-
-import asyncio
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
@@ -40,14 +38,11 @@ _ERROR_STATUS_MAP: dict[type[WorkspaceError], int] = {
 
 def create_app(
     workspace: WorkspaceManager,
-    server_loop: asyncio.AbstractEventLoop,
 ) -> FastAPI:
     """Create and configure the FastAPI application.
 
     Args:
         workspace: The shared WorkspaceManager instance.
-        server_loop: The asyncio event loop running the server thread.
-            Passed to WebSocketBroadcaster for cross-thread event posting.
     """
     app = FastAPI(title="Annotator API")
 
@@ -62,15 +57,12 @@ def create_app(
 
     # Store workspace in app state for dependency injection
     app.state.workspace = workspace
-    app.state.server_loop = server_loop
 
-    # Wire routes and broadcaster
+    # Wire routes
     from .routes import create_router  # noqa: PLC0415
 
-    router, broadcaster = create_router(workspace, server_loop)
+    router = create_router(workspace)
     app.include_router(router)
 
-    # Subscribe the broadcaster to workspace mutations
-    workspace.subscribe(broadcaster.broadcast_sync)
-
     return app
+

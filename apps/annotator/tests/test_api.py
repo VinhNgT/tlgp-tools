@@ -3,7 +3,6 @@
 Uses httpx.ASGITransport for testing without spawning a server.
 """
 
-import asyncio
 import io
 import uuid
 
@@ -31,9 +30,7 @@ def workspace():
 
 @pytest.fixture()
 def app(workspace):
-    loop = asyncio.new_event_loop()
-    yield create_app(workspace, loop)
-    loop.close()
+    yield create_app(workspace)
 
 
 @pytest.fixture()

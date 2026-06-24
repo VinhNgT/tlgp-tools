@@ -1,6 +1,5 @@
 """Shared test fixtures for the annotator test suite."""
 
-import asyncio
 import io
 import uuid
 
@@ -51,9 +50,7 @@ def workspace():
 @pytest.fixture()
 def app(workspace):
     """A FastAPI app wired to a test workspace."""
-    loop = asyncio.new_event_loop()
-    yield create_app(workspace, loop)
-    loop.close()
+    yield create_app(workspace)
 
 
 @pytest.fixture()

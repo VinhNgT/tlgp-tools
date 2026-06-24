@@ -43,10 +43,9 @@ def main():
 
     # Explicit event loop for the server thread.
     # We use server.serve() (not uvicorn.run()) because run() creates its
-    # own loop internally, and we need the loop reference for the
-    # WebSocketBroadcaster to call loop.call_soon_threadsafe().
+    # own loop internally.
     server_loop = asyncio.new_event_loop()
-    app = create_app(workspace, server_loop)
+    app = create_app(workspace)
     ready_event = threading.Event()
 
     def run_server():

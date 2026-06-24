@@ -1,15 +1,12 @@
-"""FastAPI routes and WebSocket broadcaster for the Annotator API.
+"""FastAPI routes for the Annotator API.
 
 Routes are async and delegate sync workspace calls via asyncio.to_thread().
-The WebSocketBroadcaster bridges sync workspace mutations to async WS clients.
 """
 
 from __future__ import annotations
 
 import asyncio
 import io
-import json
-import threading
 import uuid
 import zipfile
 
@@ -17,14 +14,12 @@ from fastapi import (
     APIRouter,
     File,
     UploadFile,
-    WebSocket,
-    WebSocketDisconnect,
 )
 from fastapi.responses import Response
 from PIL import Image
 from pydantic import BaseModel
 
-from annotator.models import Bounds, Style, Visibility, WorkspaceState
+from annotator.models import Bounds, Style, Visibility
 from annotator.models.tree import TreeUtils
 from annotator.rendering import paint_annotations
 from annotator.workspace import WorkspaceManager
@@ -33,56 +28,6 @@ from annotator.workspace.errors import (
     InvalidStateError,
     UndoRedoError,
 )
-
-# ── WebSocket Broadcaster ─────────────────────────────────────────────
-
-
-class WebSocketBroadcaster:
-    """Subscriber that bridges sync workspace mutations to async WS clients.
-
-    Thread-safe: uses loop.call_soon_threadsafe() for cross-thread event posting.
-    """
-
-    def __init__(self, loop: asyncio.AbstractEventLoop):
-        self._loop = loop
-        self._clients: list[asyncio.Queue] = []
-        self._clients_lock = threading.Lock()
-
-    def broadcast_sync(self, patch: list[dict], new_state: WorkspaceState):
-        """Called by WorkspaceManager on any mutation (from any thread)."""
-        if self._loop.is_closed():
-            return
-
-        if patch and patch[0].get("op") == "replace" and patch[0].get("path") == "":
-            msg = {"type": "full_sync", "state": patch[0]["value"]}
-        else:
-            msg = {"type": "patch", "revision": new_state.revision, "patch": patch}
-
-        with self._clients_lock:
-            clients = list(self._clients)
-        def _safe_put(q: asyncio.Queue, m: dict):
-            try:
-                q.put_nowait(m)
-            except asyncio.QueueFull:
-                pass
-
-        for q in clients:
-            self._loop.call_soon_threadsafe(_safe_put, q, msg)
-
-    def connect(self) -> asyncio.Queue:
-        """Register a new WS client and return its message queue."""
-        q: asyncio.Queue = asyncio.Queue(maxsize=64)
-        with self._clients_lock:
-            self._clients.append(q)
-        return q
-
-    def disconnect(self, q: asyncio.Queue):
-        """Unregister a WS client queue."""
-        with self._clients_lock:
-            if q in self._clients:
-                self._clients.remove(q)
-
-
 
 # ── Request Models ─────────────────────────────────────────────────────
 
@@ -125,57 +70,6 @@ class BatchExportRequest(BaseModel):
     components: list[BatchComponentItem] = []
 
 
-# ── JSON-RPC Handler ──────────────────────────────────────────────────
-
-
-def handle_json_rpc(method: str, params: dict, workspace: WorkspaceManager) -> dict:
-    """Dispatch a JSON-RPC method call to the workspace."""
-    if method == "add_component":
-        comp_id = uuid.UUID(params.get("id")) if params.get("id") else uuid.uuid4()
-        workspace.add_component(
-            comp_id=comp_id,
-            label=params["label"],
-            bounds=params["bounds"],
-            parent_id=uuid.UUID(params["parentId"]) if params.get("parentId") else None,
-            style=Style(**params["style"]) if params.get("style") else None,
-            visibility=Visibility(**params["visibility"]) if params.get("visibility") else None,
-        )
-        return {"id": str(comp_id), "status": "added"}
-    elif method == "move_component":
-        comp_id = uuid.UUID(str(params.get("comp_id") or params.get("id")))
-        workspace.move_component(comp_id, params["x"], params["y"])
-        return {"status": "moved"}
-    elif method == "update_component":
-        comp_id = uuid.UUID(str(params.get("comp_id") or params.get("id")))
-        workspace.update_component(
-            comp_id=comp_id,
-            label=params.get("label"),
-            bounds=Bounds(**params["bounds"]) if params.get("bounds") else None,
-            parent_id=uuid.UUID(params["parentId"]) if params.get("parentId") else None,
-            style=Style(**params["style"]) if params.get("style") else None,
-            visibility=Visibility(**params["visibility"]) if params.get("visibility") else None,
-        )
-        return {"status": "updated"}
-    elif method == "delete_component":
-        comp_id = uuid.UUID(str(params.get("comp_id") or params.get("id")))
-        workspace.delete_component(comp_id)
-        return {"status": "deleted"}
-    elif method == "undo":
-        if not workspace.undo():
-            raise UndoRedoError("Cannot undo", session_id=str(workspace.state.sessionId))
-        return {"status": "undone"}
-    elif method == "redo":
-        if not workspace.redo():
-            raise UndoRedoError("Cannot redo", session_id=str(workspace.state.sessionId))
-        return {"status": "redone"}
-    elif method == "update_cut_lines":
-        workspace.update_cut_lines(params["lines"])
-        return {"status": "updated_cuts"}
-    elif method == "update_screen_info":
-        workspace.update_screen_info(params["name"], params["description"])
-        return {"status": "updated_screen_info"}
-    else:
-        raise ValueError(f"Method '{method}' not found")
 
 
 # ── Image Generation ──────────────────────────────────────────────────
@@ -219,71 +113,9 @@ def generate_image_bytes(
 
 def create_router(
     workspace: WorkspaceManager,
-    server_loop: asyncio.AbstractEventLoop,
-) -> tuple[APIRouter, WebSocketBroadcaster]:
-    """Create the API router and broadcaster.
-
-    Returns:
-        (router, broadcaster) tuple. The caller must subscribe
-        the broadcaster to the workspace.
-    """
+) -> APIRouter:
+    """Create the API router."""
     router = APIRouter()
-    broadcaster = WebSocketBroadcaster(server_loop)
-
-    # ── WebSocket ──────────────────────────────────────────────────
-
-    @router.websocket("/ws")
-    async def websocket_endpoint(websocket: WebSocket):
-        await websocket.accept()
-        queue = broadcaster.connect()
-        try:
-            # Send initial full state
-            await websocket.send_json({
-                "type": "full_sync",
-                "state": workspace.state.model_dump(mode="json"),
-            })
-
-            # Process incoming JSON-RPC + relay outgoing broadcasts
-
-            async def relay_broadcasts():
-                while True:
-                    msg = await queue.get()
-                    await websocket.send_json(msg)
-
-            async def process_rpc():
-                while True:
-                    data_str = await websocket.receive_text()
-                    req_id = None
-                    try:
-                        rpc_req = json.loads(data_str)
-                        if not isinstance(rpc_req, dict) or rpc_req.get("jsonrpc") != "2.0":
-                            continue
-                        req_id = rpc_req.get("id")
-                        method = rpc_req.get("method")
-                        params = rpc_req.get("params", {})
-
-                        result = await asyncio.to_thread(handle_json_rpc, method, params, workspace)
-                        await websocket.send_json({"jsonrpc": "2.0", "result": result, "id": req_id})
-
-                    except Exception as e:
-                        error_msg = getattr(e, "message", str(e))
-                        await websocket.send_json({
-                            "jsonrpc": "2.0",
-                            "error": {"code": -32603, "message": error_msg},
-                            "id": req_id,
-                        })
-
-            # Run both tasks concurrently; cancel on disconnect
-            relay_task = asyncio.create_task(relay_broadcasts())
-            try:
-                await process_rpc()
-            finally:
-                relay_task.cancel()
-
-        except WebSocketDisconnect:
-            pass
-        finally:
-            broadcaster.disconnect(queue)
 
     # ── State Routes ───────────────────────────────────────────────
 
@@ -435,4 +267,5 @@ def create_router(
             headers={"Content-Disposition": "attachment; filename=batch_export.zip"},
         )
 
-    return router, broadcaster
+    return router
+
