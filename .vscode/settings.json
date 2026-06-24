@@ -1,0 +1,14 @@
+{
+  "python.analysis.ignore": [
+    "**/__pyrefly_virtual__/**"
+  ],
+  "pyright.analysis.ignore": [
+    "**/__pyrefly_virtual__/**"
+  ],
+  "python.analysis.exclude": [
+    "**/__pyrefly_virtual__/**"
+  ],
+  "ruff.exclude": [
+    "**/__pyrefly_virtual__/**"
+  ]
+}
