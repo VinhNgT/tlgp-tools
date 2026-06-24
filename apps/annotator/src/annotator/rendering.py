@@ -225,7 +225,7 @@ def paint_annotations(
 
         # Number pill (use string number like "1.1")
         num_str = comp.number
-        ref_tw, ref_th, ref_top = get_text_dimensions(draw, "99", font)
+        ref_tw, ref_th, _ref_top = get_text_dimensions(draw, "99", font)
         pad_x, pad_y = compute_pill_padding(font_size)
 
         pill_size = max(ref_tw + pad_x, ref_th + pad_y)

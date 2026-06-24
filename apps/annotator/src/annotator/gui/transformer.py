@@ -1,5 +1,7 @@
 from uuid import UUID
 
+from .viewport_context import ViewportContext
+
 CUT_GAP_PX = 20
 
 
@@ -135,7 +137,51 @@ class ViewportTransformer:
             raw_y = self.gap_offset_inverse(raw_y)
         return raw_x, raw_y
 
+    # ── ViewportContext convenience methods ──────────────────────────
+
+    def to_canvas_ctx(
+        self, abs_x: int, abs_y: int, ctx: ViewportContext
+    ) -> tuple[float, float]:
+        """Converts absolute raw coordinates to visual canvas space using a ViewportContext."""
+        return self.to_canvas(
+            abs_x,
+            abs_y,
+            ctx.zoom_factor,
+            list(ctx.parent_stack),
+            list(ctx.cut_lines),
+            ctx.pan_offset,
+        )
+
+    def to_abs_ctx(
+        self, cx: float, cy: float, ctx: ViewportContext
+    ) -> tuple[int, int]:
+        """Translates canvas visual coordinates to absolute raw coordinates using a ViewportContext."""
+        return self.to_abs(
+            cx,
+            cy,
+            ctx.zoom_factor,
+            list(ctx.parent_stack),
+            list(ctx.cut_lines),
+            ctx.pan_offset,
+        )
+
+    def has_active_cuts_ctx(self, ctx: ViewportContext) -> bool:
+        """Determines if cut-line gap spacing is active using a ViewportContext."""
+        return self.has_active_cuts(list(ctx.parent_stack), list(ctx.cut_lines))
+
+    def get_segment_y_bounds_ctx(
+        self,
+        abs_y: int,
+        ctx: ViewportContext,
+        boundary: tuple[int, int, int, int],
+    ) -> tuple[int, int]:
+        """Returns segment Y bounds using a ViewportContext."""
+        return self.get_segment_y_bounds(
+            abs_y, list(ctx.parent_stack), list(ctx.cut_lines), boundary
+        )
+
     @property
     def segments(self) -> list[tuple[int, int, int]]:
         """Gets the active list of gap-shifted display segments."""
         return self._segments
+

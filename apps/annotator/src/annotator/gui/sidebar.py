@@ -1,6 +1,6 @@
 from uuid import UUID
 
-from PySide6.QtCore import QModelIndex, Qt, QObject, QEvent
+from PySide6.QtCore import QEvent, QModelIndex, QObject, Qt
 from PySide6.QtGui import QStandardItem, QStandardItemModel
 from PySide6.QtWidgets import (
     QAbstractItemView,
@@ -237,5 +237,5 @@ class SidebarTreeView(QWidget):
                     return True
                 return super().eventFilter(obj, event)
 
-        editor._escape_filter = EscapeEventFilter(cancel_edit)
-        editor.installEventFilter(editor._escape_filter)
+        editor.escape_filter = EscapeEventFilter(cancel_edit)
+        editor.installEventFilter(editor.escape_filter)

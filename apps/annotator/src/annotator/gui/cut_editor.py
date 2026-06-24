@@ -30,6 +30,7 @@ from PySide6.QtWidgets import (
 
 from annotator.models import Component
 
+from .cut_editor_state import CutEditorCallbacks, CutEditorState
 from .image_utils import pil_to_qpixmap
 from .validation import CutValidator
 
@@ -48,6 +49,8 @@ class _CutCanvasWidget(QWidget):
     def __init__(self, dialog: CutEditorDialog, parent=None):
         super().__init__(parent)
         self.dialog = dialog
+        self.state = CutEditorState()
+        self.callbacks = CutEditorCallbacks()
         self.setMinimumSize(300, 200)
         self.setMouseTracking(True)
         self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
@@ -111,9 +114,9 @@ class _CutCanvasWidget(QWidget):
 
         # Draw cut lines
         disp_w = src_w * zoom
-        for i, y in enumerate(self.dialog.cut_lines):
+        for i, y in enumerate(self.state.cut_lines):
             cy = self._to_canvas_y(y)
-            is_selected = i == self.dialog.selected_index
+            is_selected = i == self.state.drag_index
             color = (
                 palette.color(QPalette.ColorRole.Highlight)
                 if is_selected
@@ -139,7 +142,7 @@ class _CutCanvasWidget(QWidget):
         canvas_y = event.position().y()
         img_y = self._to_img_y(canvas_y)
 
-        if self.dialog.mode == "adding":
+        if self.state.mode == "adding":
             intersecting = CutValidator.get_intersecting_component(
                 img_y, self.dialog.existing_components
             )
@@ -152,12 +155,12 @@ class _CutCanvasWidget(QWidget):
             if CutValidator.is_valid_position(
                 img_y,
                 self.dialog.source_image.height,
-                self.dialog.cut_lines,
+                self.state.cut_lines,
                 MIN_CUT_GAP,
             ):
-                self.dialog.cut_lines.append(img_y)
-                self.dialog.cut_lines.sort()
-                self.dialog.selected_index = self.dialog.cut_lines.index(img_y)
+                self.state.cut_lines.append(img_y)
+                self.state.cut_lines.sort()
+                self.state.drag_index = self.state.cut_lines.index(img_y)
                 self.dialog.cancel_add_mode()
                 self.update()
                 self.dialog.refresh_listbox()
@@ -169,14 +172,14 @@ class _CutCanvasWidget(QWidget):
 
         hit_index = self._hit_test_cut(canvas_y)
         if hit_index >= 0:
-            self.dialog.selected_index = hit_index
-            self.dialog.mode = "dragging"
-            self.dialog.drag_index = hit_index
+            self.state.drag_index = hit_index
+            self.state.mode = "dragging"
+            self.state.drag_index = hit_index
             self.dialog.drag_start_y = img_y
-            self.dialog.last_valid_drag_y = self.dialog.cut_lines[hit_index]
+            self.state.last_valid_drag_y = self.state.cut_lines[hit_index]
             self.setCursor(Qt.CursorShape.SizeVerCursor)
         else:
-            self.dialog.selected_index = -1
+            self.state.drag_index = -1
 
         self.update()
         self.dialog.refresh_listbox()
@@ -184,7 +187,7 @@ class _CutCanvasWidget(QWidget):
     def mouseMoveEvent(self, event: QMouseEvent):
         canvas_y = event.position().y()
 
-        if self.dialog.mode == "dragging" and self.dialog.drag_index >= 0:
+        if self.state.mode == "dragging" and self.state.drag_index >= 0:
             new_y = self._to_img_y(canvas_y)
             new_y = max(
                 MIN_CUT_GAP, min(self.dialog.source_image.height - MIN_CUT_GAP, new_y)
@@ -197,32 +200,32 @@ class _CutCanvasWidget(QWidget):
                 self.dialog.status_label.setText(
                     f"Blocked: intersects component '{intersecting.label}'"
                 )
-                new_y = self.dialog.last_valid_drag_y
+                new_y = self.state.last_valid_drag_y
             else:
                 self.dialog.status_label.setText("")
 
             if CutValidator.is_valid_position_for_drag(
                 new_y,
                 self.dialog.source_image.height,
-                self.dialog.cut_lines,
-                self.dialog.drag_index,
+                self.state.cut_lines,
+                self.state.drag_index,
                 MIN_CUT_GAP,
             ):
-                self.dialog.cut_lines[self.dialog.drag_index] = new_y
-                self.dialog.cut_lines.sort()
-                self.dialog.drag_index = self.dialog.cut_lines.index(new_y)
-                self.dialog.selected_index = self.dialog.drag_index
-                self.dialog.last_valid_drag_y = new_y
+                self.state.cut_lines[self.state.drag_index] = new_y
+                self.state.cut_lines.sort()
+                self.state.drag_index = self.state.cut_lines.index(new_y)
+                self.state.drag_index = self.state.drag_index
+                self.state.last_valid_drag_y = new_y
             else:
-                self.dialog.cut_lines[self.dialog.drag_index] = (
-                    self.dialog.last_valid_drag_y
+                self.state.cut_lines[self.state.drag_index] = (
+                    self.state.last_valid_drag_y
                 )
 
             self.update()
             self.dialog.refresh_listbox()
             return
 
-        if self.dialog.mode == "adding":
+        if self.state.mode == "adding":
             return
 
         hit = self._hit_test_cut(canvas_y)
@@ -232,9 +235,9 @@ class _CutCanvasWidget(QWidget):
             self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def mouseReleaseEvent(self, event: QMouseEvent):
-        if self.dialog.mode == "dragging":
-            self.dialog.mode = "idle"
-            self.dialog.drag_index = -1
+        if self.state.mode == "dragging":
+            self.state.mode = "idle"
+            self.state.drag_index = -1
             self.setCursor(Qt.CursorShape.ArrowCursor)
 
     def wheelEvent(self, event: QWheelEvent):
@@ -261,7 +264,7 @@ class _CutCanvasWidget(QWidget):
         self.fit_and_render()
 
     def _hit_test_cut(self, canvas_y: float) -> int:
-        for i, y in enumerate(self.dialog.cut_lines):
+        for i, y in enumerate(self.state.cut_lines):
             cy = self._to_canvas_y(y)
             if abs(canvas_y - cy) <= SNAP_DISTANCE:
                 return i
@@ -284,16 +287,17 @@ class CutEditorDialog(QDialog):
         self.setModal(True)
 
         self.source_image = image
-        self.cut_lines: list[int] = sorted(initial_cuts)
+        self.state = CutEditorState(cut_lines=sorted(initial_cuts))
         self.existing_components = components
         self.cut_lines_result: list[int] | None = None
 
         # Interaction state
-        self.mode: str = "idle"
-        self.drag_index: int = -1
+        self.state.mode: str = "idle"
+        self.state.drag_index: int = -1
         self.drag_start_y: int = 0
-        self.last_valid_drag_y: int = 0
-        self.selected_index: int = -1
+        self.state.last_valid_drag_y: int = 0
+        self.state.drag_index: int = -1
+        self.state = CutEditorState()
 
         self._build_ui()
 
@@ -364,7 +368,7 @@ class CutEditorDialog(QDialog):
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key.Key_Escape:
-            if self.mode == "adding":
+            if self.state.mode == "adding":
                 self.cancel_add_mode()
             else:
                 self._on_cancel()
@@ -375,7 +379,7 @@ class CutEditorDialog(QDialog):
         super().keyPressEvent(event)
 
     def _start_add_mode(self):
-        self.mode = "adding"
+        self.state.mode = "adding"
         self.canvas_widget.setCursor(Qt.CursorShape.CrossCursor)
         self.status_label.setText(
             "Click to add a horizontal cut line. Escape to cancel."
@@ -383,7 +387,7 @@ class CutEditorDialog(QDialog):
         self.btn_add.setEnabled(False)
 
     def cancel_add_mode(self):
-        self.mode = "idle"
+        self.state.mode = "idle"
         self.canvas_widget.setCursor(Qt.CursorShape.ArrowCursor)
         self.status_label.setText("")
         self.btn_add.setEnabled(True)
@@ -391,37 +395,37 @@ class CutEditorDialog(QDialog):
     def refresh_listbox(self):
         self.listbox.blockSignals(True)
         self.listbox.clear()
-        for i, y in enumerate(self.cut_lines):
+        for i, y in enumerate(self.state.cut_lines):
             self.listbox.addItem(f"Cut {i + 1}:  Y = {y}")
 
-        if 0 <= self.selected_index < len(self.cut_lines):
-            self.listbox.setCurrentRow(self.selected_index)
+        if 0 <= self.state.drag_index < len(self.state.cut_lines):
+            self.listbox.setCurrentRow(self.state.drag_index)
         self.listbox.blockSignals(False)
 
-        self.btn_remove.setEnabled(0 <= self.selected_index < len(self.cut_lines))
+        self.btn_remove.setEnabled(0 <= self.state.drag_index < len(self.state.cut_lines))
 
     def _on_listbox_select(self, row):
-        self.selected_index = row
+        self.state.drag_index = row
         self.canvas_widget.update()
-        self.btn_remove.setEnabled(0 <= self.selected_index < len(self.cut_lines))
+        self.btn_remove.setEnabled(0 <= self.state.drag_index < len(self.state.cut_lines))
 
     def _remove_selected(self):
-        if 0 <= self.selected_index < len(self.cut_lines):
-            self.cut_lines.pop(self.selected_index)
-            self.selected_index = min(self.selected_index, len(self.cut_lines) - 1)
+        if 0 <= self.state.drag_index < len(self.state.cut_lines):
+            self.state.cut_lines.pop(self.state.drag_index)
+            self.state.drag_index = min(self.state.drag_index, len(self.state.cut_lines) - 1)
             self.canvas_widget.update()
             self.refresh_listbox()
 
     def _clear_all(self):
-        if not self.cut_lines:
+        if not self.state.cut_lines:
             return
-        self.cut_lines.clear()
-        self.selected_index = -1
+        self.state.cut_lines.clear()
+        self.state.drag_index = -1
         self.canvas_widget.update()
         self.refresh_listbox()
 
     def _on_ok(self):
-        self.cut_lines_result = sorted(self.cut_lines)
+        self.cut_lines_result = sorted(self.state.cut_lines)
         self.accept()
 
     def _on_cancel(self):

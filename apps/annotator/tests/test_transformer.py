@@ -1,6 +1,7 @@
 """Tests for annotator.gui.transformer (ViewportTransformer coordinate math)."""
 
 from annotator.gui.transformer import CUT_GAP_PX, ViewportTransformer
+from annotator.gui.viewport_context import ViewportContext
 
 # ── Construction & Image Size ──────────────────────────────────────────
 
@@ -259,3 +260,94 @@ class TestGetSegmentYBounds:
         result = t.get_segment_y_bounds(400, [], [300], (0, 0, 800, 600))
         assert result[0] == 300
         assert result[1] == 600  # Last segment keeps its full end
+
+
+# ── ViewportContext convenience method parity ─────────────────────────
+
+
+class TestViewportContextParity:
+    """Verifies _ctx methods produce identical results to positional-arg methods."""
+
+    def test_to_canvas_ctx_no_cuts(self):
+        t = ViewportTransformer()
+        ctx = ViewportContext(
+            zoom_factor=2.0,
+            parent_stack=(),
+            cut_lines=(),
+            pan_offset=(50.0, 30.0),
+        )
+        expected = t.to_canvas(100, 200, 2.0, [], [], pan_offset=(50.0, 30.0))
+        result = t.to_canvas_ctx(100, 200, ctx)
+        assert result == expected
+
+    def test_to_canvas_ctx_with_cuts(self):
+        t = ViewportTransformer()
+        t.update_image_size(800, 600)
+        t.rebuild_segments([300])
+        ctx = ViewportContext(
+            zoom_factor=1.5,
+            parent_stack=(),
+            cut_lines=(300,),
+            pan_offset=(10.0, 20.0),
+        )
+        expected = t.to_canvas(100, 400, 1.5, [], [300], pan_offset=(10.0, 20.0))
+        result = t.to_canvas_ctx(100, 400, ctx)
+        assert result == expected
+
+    def test_to_abs_ctx_no_cuts(self):
+        t = ViewportTransformer()
+        ctx = ViewportContext(
+            zoom_factor=2.0,
+            parent_stack=(),
+            cut_lines=(),
+            pan_offset=(100.0, 100.0),
+        )
+        expected = t.to_abs(300.0, 500.0, 2.0, [], [], pan_offset=(100.0, 100.0))
+        result = t.to_abs_ctx(300.0, 500.0, ctx)
+        assert result == expected
+
+    def test_to_abs_ctx_with_cuts(self):
+        t = ViewportTransformer()
+        t.update_image_size(800, 600)
+        t.rebuild_segments([200])
+        ctx = ViewportContext(
+            zoom_factor=1.5,
+            parent_stack=(),
+            cut_lines=(200,),
+            pan_offset=(10.0, 20.0),
+        )
+        expected = t.to_abs(400.0, 500.0, 1.5, [], [200], pan_offset=(10.0, 20.0))
+        result = t.to_abs_ctx(400.0, 500.0, ctx)
+        assert result == expected
+
+    def test_round_trip_ctx(self):
+        t = ViewportTransformer()
+        t.update_image_size(800, 600)
+        t.rebuild_segments([200])
+        ctx = ViewportContext(
+            zoom_factor=2.5,
+            parent_stack=(),
+            cut_lines=(200,),
+            pan_offset=(100.0, -50.0),
+        )
+        cx, cy = t.to_canvas_ctx(100, 100, ctx)
+        ax, ay = t.to_abs_ctx(cx, cy, ctx)
+        assert ax == 100
+        assert ay == 100
+
+    def test_has_active_cuts_ctx(self):
+        t = ViewportTransformer()
+        ctx_empty = ViewportContext(1.0, (), (), (0.0, 0.0))
+        ctx_with = ViewportContext(1.0, (), (300,), (0.0, 0.0))
+        assert t.has_active_cuts_ctx(ctx_empty) is False
+        assert t.has_active_cuts_ctx(ctx_with) is True
+
+    def test_get_segment_y_bounds_ctx(self):
+        t = ViewportTransformer()
+        t.update_image_size(800, 600)
+        t.rebuild_segments([300])
+        ctx = ViewportContext(1.0, (), (300,), (0.0, 0.0))
+        expected = t.get_segment_y_bounds(100, [], [300], (0, 0, 800, 600))
+        result = t.get_segment_y_bounds_ctx(100, ctx, (0, 0, 800, 600))
+        assert result == expected
+

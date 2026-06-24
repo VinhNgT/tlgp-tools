@@ -1,15 +1,17 @@
 import io
-import pytest
-from PIL import Image
-from PySide6.QtCore import QEvent, QPointF, Qt
-from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QApplication
+import uuid
 
+import pytest
 from annotator.gui.app import MainAppWindow
 from annotator.gui.controller import AppController
 from annotator.gui.qt_dialogs import QtDialogService
 from annotator.gui.state import UIStateStore
+from annotator.models import Bounds, Style
 from annotator.workspace import WorkspaceManager
+from PIL import Image
+from PySide6.QtCore import QEvent, QPointF, Qt
+from PySide6.QtGui import QMouseEvent
+from PySide6.QtWidgets import QApplication
 
 
 @pytest.fixture(scope="session")
@@ -34,7 +36,7 @@ def test_mouse_deadzone(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
     canvas.deadzone_radius = 5.0
@@ -107,7 +109,7 @@ def test_mouse_deadzone_bypass_on_hold(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
     canvas.deadzone_radius = 5.0
@@ -166,7 +168,7 @@ def test_mouse_instant_click(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
 
@@ -205,7 +207,7 @@ def test_drag_and_pan_with_state_updates(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
     canvas.deadzone_radius = 5.0
@@ -278,7 +280,7 @@ def test_ctrl_mouse_drag_marquee_select(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
     canvas.deadzone_radius = 5.0
@@ -331,9 +333,6 @@ def test_ctrl_mouse_drag_marquee_select(qapp):
 
 
 def test_zoom_focus_target_with_cuts(qapp):
-    import uuid
-    from annotator.models import Bounds
-
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     ws.update_cut_lines([150])  # Adds a cut line at y = 150
@@ -345,7 +344,7 @@ def test_zoom_focus_target_with_cuts(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
     canvas.selected_component_ids = [comp_id]
@@ -356,7 +355,7 @@ def test_zoom_focus_target_with_cuts(qapp):
     viewport_changes = []
     def on_viewport_change(zoom, pan):
         viewport_changes.append((zoom, pan))
-    canvas.on_viewport_change_request = on_viewport_change
+    canvas.callbacks.on_viewport_change_request = on_viewport_change
 
     canvas.zoom_focus_target()
 
@@ -381,9 +380,6 @@ def test_zoom_focus_target_with_cuts(qapp):
 
 
 def test_fit_to_screen_with_parent_stack(qapp):
-    import uuid
-    from annotator.models import Bounds
-
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     ws.update_cut_lines([150])  # Adds a cut line at y = 150
@@ -395,7 +391,7 @@ def test_fit_to_screen_with_parent_stack(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
     canvas.parent_stack = [comp_id]  # Mock drill-down state
@@ -406,7 +402,7 @@ def test_fit_to_screen_with_parent_stack(qapp):
     viewport_changes = []
     def on_viewport_change(zoom, pan):
         viewport_changes.append((zoom, pan))
-    canvas.on_viewport_change_request = on_viewport_change
+    canvas.callbacks.on_viewport_change_request = on_viewport_change
 
     canvas.fit_to_screen()
 
@@ -431,9 +427,6 @@ def test_fit_to_screen_with_parent_stack(qapp):
 
 
 def test_fit_to_screen_with_highlighted_box(qapp):
-    import uuid
-    from annotator.models import Bounds
-
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     ws.update_cut_lines([150])  # Adds a cut line at y = 150
@@ -445,7 +438,7 @@ def test_fit_to_screen_with_highlighted_box(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     canvas = view.canvas
     canvas.selected_component_ids = [comp_id]  # Component is selected/highlighted
@@ -456,7 +449,7 @@ def test_fit_to_screen_with_highlighted_box(qapp):
     viewport_changes = []
     def on_viewport_change(zoom, pan):
         viewport_changes.append((zoom, pan))
-    canvas.on_viewport_change_request = on_viewport_change
+    canvas.callbacks.on_viewport_change_request = on_viewport_change
 
     canvas.fit_to_screen()
 
@@ -486,7 +479,7 @@ def test_app_fit_button(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     # Initially enabled since image is loaded
     assert view.btn_fit.isEnabled() is True
@@ -500,9 +493,6 @@ def test_app_fit_button(qapp):
 
 
 def test_properties_cleared_after_unselecting(qapp):
-    import uuid
-    from annotator.models import Bounds, Style
-
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     comp_id = uuid.uuid4()
@@ -539,6 +529,53 @@ def test_properties_cleared_after_unselecting(qapp):
     assert view.properties.prop_entries["h"].text() == ""
     assert view.properties.entry_name.isEnabled() is False
     assert view.properties.corner_selector.selected_corner is None
+
+
+def test_welcome_widget_import_callbacks(qapp):
+    ws = WorkspaceManager()
+    store = UIStateStore()
+    dialog_service = QtDialogService()
+    view = MainAppWindow()
+    AppController(ws, store, view, dialog_service)
+
+    assert view.welcome.isHidden() is False
+
+    called_zip = False
+    called_img = False
+
+    def on_zip():
+        nonlocal called_zip
+        called_zip = True
+
+    def on_img():
+        nonlocal called_img
+        called_img = True
+
+    view.callbacks.on_import_zip_request = on_zip
+    view.callbacks.on_import_image_request = on_img
+
+    view.welcome.btn_zip.click()
+    assert called_zip is True
+
+    view.welcome.btn_img.click()
+    assert called_img is True
+
+
+def test_canvas_paint_event(qapp):
+    ws = WorkspaceManager()
+    ws.import_image(create_test_image())
+    store = UIStateStore()
+    dialog_service = QtDialogService()
+    view = MainAppWindow()
+    AppController(ws, store, view, dialog_service)
+
+    from PySide6.QtGui import QPaintEvent
+    from PySide6.QtCore import QRect
+    event = QPaintEvent(QRect(0, 0, 800, 600))
+    # This triggers paintEvent, which should not raise any AttributeError
+    view.canvas.paintEvent(event)
+
+
 
 
 

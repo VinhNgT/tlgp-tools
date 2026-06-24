@@ -1,15 +1,15 @@
 import io
-import pytest
-from PIL import Image
-from PySide6.QtCore import QEvent, Qt
-from PySide6.QtGui import QKeyEvent
-from PySide6.QtWidgets import QApplication
 
+import pytest
 from annotator.gui.app import MainAppWindow
 from annotator.gui.controller import AppController
 from annotator.gui.qt_dialogs import QtDialogService
 from annotator.gui.state import UIStateStore
 from annotator.workspace import WorkspaceManager
+from PIL import Image
+from PySide6.QtCore import QEvent, Qt
+from PySide6.QtGui import QKeyEvent
+from PySide6.QtWidgets import QApplication
 
 
 @pytest.fixture(scope="session")
@@ -36,7 +36,7 @@ def test_space_pan_keyboard_highlight(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     # Initial state should be "select"
     assert store.state.current_mode == "select"
@@ -73,7 +73,7 @@ def test_show_labels_checkbox(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     # Initial state should be: labels shown, chk_show_labels checked and enabled
     assert view.canvas.show_labels is True

@@ -23,6 +23,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from .callbacks import AppCallbacks
 from .canvas import AnnotationCanvasView
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
@@ -84,6 +85,7 @@ class WelcomeWidget(QWidget):
             self.on_import_image()
 
 
+
 class GlobalFocusAndSelectionFilter(QObject):
     """Universal event filter that clears input focus and label text selections
     when clicking outside of them anywhere in the application.
@@ -140,19 +142,7 @@ class MainAppWindow(QMainWindow):
         self.setMinimumSize(800, 600)
 
         # ── Callback attributes (set by controller) ───────────────
-        self.on_mode_change_request = None
-        self.on_undo_request = None
-        self.on_redo_request = None
-        self.on_delete_request = None
-        self.on_back_request = None
-        self.on_import_zip_request = None
-        self.on_import_image_request = None
-        self.on_export_zip_request = None
-        self.on_open_cut_editor_request = None
-        self.on_open_screen_info_request = None
-        self.on_enter_pressed = None
-        self.on_escape_pressed = None
-        self.on_arrow_key_pressed = None
+        self.callbacks = AppCallbacks()
 
         # Install global focus-out event filter to unfocus inputs on click outside
         self.focus_filter = GlobalFocusAndSelectionFilter(self)
@@ -170,12 +160,12 @@ class MainAppWindow(QMainWindow):
 
         act_import_zip = QAction("Import Workspace (.zip)", self)
         act_import_zip.setShortcut(QKeySequence("Ctrl+O"))
-        act_import_zip.triggered.connect(lambda: self._fire(self.on_import_zip_request))
+        act_import_zip.triggered.connect(lambda: self._fire(self.callbacks.on_import_zip_request))
         file_menu.addAction(act_import_zip)
 
         act_import_img = QAction("Import Raw Image", self)
         act_import_img.triggered.connect(
-            lambda: self._fire(self.on_import_image_request)
+            lambda: self._fire(self.callbacks.on_import_image_request)
         )
         file_menu.addAction(act_import_img)
 
@@ -183,7 +173,7 @@ class MainAppWindow(QMainWindow):
         self.act_export.setShortcut(QKeySequence("Ctrl+S"))
         self.act_export.setEnabled(False)
         self.act_export.triggered.connect(
-            lambda: self._fire(self.on_export_zip_request)
+            lambda: self._fire(self.callbacks.on_export_zip_request)
         )
         file_menu.addAction(self.act_export)
 
@@ -192,7 +182,7 @@ class MainAppWindow(QMainWindow):
         self.act_screen_info = QAction("Screen Info…", self)
         self.act_screen_info.setEnabled(False)
         self.act_screen_info.triggered.connect(
-            lambda: self._fire(self.on_open_screen_info_request)
+            lambda: self._fire(self.callbacks.on_open_screen_info_request)
         )
         file_menu.addAction(self.act_screen_info)
 
@@ -200,7 +190,7 @@ class MainAppWindow(QMainWindow):
         self.act_cuts.setShortcut(QKeySequence("Ctrl+L"))
         self.act_cuts.setEnabled(False)
         self.act_cuts.triggered.connect(
-            lambda: self._fire(self.on_open_cut_editor_request)
+            lambda: self._fire(self.callbacks.on_open_cut_editor_request)
         )
         file_menu.addAction(self.act_cuts)
 
@@ -209,13 +199,13 @@ class MainAppWindow(QMainWindow):
         self.act_undo = QAction("Undo", self)
         self.act_undo.setShortcut(QKeySequence.StandardKey.Undo)
         self.act_undo.setEnabled(False)
-        self.act_undo.triggered.connect(lambda: self._fire(self.on_undo_request))
+        self.act_undo.triggered.connect(lambda: self._fire(self.callbacks.on_undo_request))
         edit_menu.addAction(self.act_undo)
 
         self.act_redo = QAction("Redo", self)
         self.act_redo.setShortcut(QKeySequence.StandardKey.Redo)
         self.act_redo.setEnabled(False)
-        self.act_redo.triggered.connect(lambda: self._fire(self.on_redo_request))
+        self.act_redo.triggered.connect(lambda: self._fire(self.callbacks.on_redo_request))
         edit_menu.addAction(self.act_redo)
 
         edit_menu.addSeparator()
@@ -223,7 +213,7 @@ class MainAppWindow(QMainWindow):
         self.act_delete = QAction("Delete", self)
         self.act_delete.setShortcut(QKeySequence.StandardKey.Delete)
         self.act_delete.setEnabled(False)
-        self.act_delete.triggered.connect(lambda: self._fire(self.on_delete_request))
+        self.act_delete.triggered.connect(lambda: self._fire(self.callbacks.on_delete_request))
         edit_menu.addAction(self.act_delete)
 
     def _build_toolbar(self):
@@ -267,7 +257,7 @@ class MainAppWindow(QMainWindow):
         self.btn_back = QAction("← Back", self)
         self.btn_back.setToolTip("Go back (Escape)")
         self.btn_back.setEnabled(False)
-        self.btn_back.triggered.connect(lambda: self._fire(self.on_back_request))
+        self.btn_back.triggered.connect(lambda: self._fire(self.callbacks.on_back_request))
         tb.addAction(self.btn_back)
 
         # Spacing
@@ -298,7 +288,7 @@ class MainAppWindow(QMainWindow):
         self.btn_cut_lines.setToolTip("Edit Cut Lines (Ctrl+L)")
         self.btn_cut_lines.setEnabled(False)
         self.btn_cut_lines.triggered.connect(
-            lambda: self._fire(self.on_open_cut_editor_request)
+            lambda: self._fire(self.callbacks.on_open_cut_editor_request)
         )
         tb.addAction(self.btn_cut_lines)
 
@@ -307,7 +297,7 @@ class MainAppWindow(QMainWindow):
         self.btn_screen_info.setToolTip("View/Edit Screen Info")
         self.btn_screen_info.setEnabled(False)
         self.btn_screen_info.triggered.connect(
-            lambda: self._fire(self.on_open_screen_info_request)
+            lambda: self._fire(self.callbacks.on_open_screen_info_request)
         )
         tb.addAction(self.btn_screen_info)
 
@@ -323,8 +313,8 @@ class MainAppWindow(QMainWindow):
         self.canvas = AnnotationCanvasView(transformer=transformer)
 
         self.welcome = WelcomeWidget(self.canvas)
-        self.welcome.on_import_zip = lambda: self._fire(self.on_import_zip_request)
-        self.welcome.on_import_image = lambda: self._fire(self.on_import_image_request)
+        self.welcome.on_import_zip = lambda: self._fire(self.callbacks.on_import_zip_request)
+        self.welcome.on_import_image = lambda: self._fire(self.callbacks.on_import_image_request)
 
         canvas_layout = QVBoxLayout(self.canvas)
         canvas_layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -356,10 +346,10 @@ class MainAppWindow(QMainWindow):
         self.chk_show_labels.setEnabled(has_img)
         self.btn_screen_info.setEnabled(has_img)
         self.btn_fit.setEnabled(has_img)
-        
+
         for action in self._mode_actions.values():
             action.setEnabled(has_img)
-            
+
         self.act_export.setEnabled(has_img)
         self.act_screen_info.setEnabled(has_img)
         self.act_cuts.setEnabled(has_img)
@@ -435,14 +425,14 @@ class MainAppWindow(QMainWindow):
 
         # Navigation
         if key == Qt.Key.Key_Return or key == Qt.Key.Key_Enter:
-            if self.on_enter_pressed:
-                result = self.on_enter_pressed()
+            if self.callbacks.on_enter_pressed:
+                result = self.callbacks.on_enter_pressed()
                 if result == "break":
                     return
 
         if key == Qt.Key.Key_Escape:
-            if self.on_escape_pressed:
-                result = self.on_escape_pressed()
+            if self.callbacks.on_escape_pressed:
+                result = self.callbacks.on_escape_pressed()
                 if result == "break":
                     return
 
@@ -457,8 +447,8 @@ class MainAppWindow(QMainWindow):
                 dy = -1
             elif key == Qt.Key.Key_Down:
                 dy = 1
-            if self.on_arrow_key_pressed:
-                self.on_arrow_key_pressed(dx, dy)
+            if self.callbacks.on_arrow_key_pressed:
+                self.callbacks.on_arrow_key_pressed(dx, dy)
             return
 
         # Canvas shortcuts
@@ -473,8 +463,8 @@ class MainAppWindow(QMainWindow):
             self.chk_show_labels.setChecked(self.canvas.show_labels)
             return
         if key == Qt.Key.Key_Backspace or key == Qt.Key.Key_Delete:
-            if self.on_delete_request:
-                self.on_delete_request()
+            if self.callbacks.on_delete_request:
+                self.callbacks.on_delete_request()
             return
 
         super().keyPressEvent(event)
@@ -489,8 +479,8 @@ class MainAppWindow(QMainWindow):
     # ── Private ──────────────────────────────────────────────────────
 
     def _on_mode_toggled(self, mode: str):
-        if self.on_mode_change_request:
-            self.on_mode_change_request(mode)
+        if self.callbacks.on_mode_change_request:
+            self.callbacks.on_mode_change_request(mode)
 
     def _on_show_labels_toggled(self, checked: bool):
         if self.canvas.show_labels != checked:

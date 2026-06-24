@@ -1,8 +1,9 @@
-from tlgp_logger import get_logger
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from uuid import UUID
+
+from tlgp_logger import get_logger
 
 from annotator.models import Bounds, WorkspaceState
 

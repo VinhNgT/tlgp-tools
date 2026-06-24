@@ -1,6 +1,5 @@
 import io
 import uuid
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from uuid import UUID
 
@@ -13,6 +12,7 @@ from annotator.workspace import WorkspaceManager
 
 from .app import MainAppWindow
 from .dialog_service import DialogService
+from .io_handler import IOCommandHandler
 from .state import UIStateStore
 
 logger = get_logger(__name__)
@@ -50,12 +50,9 @@ class AppController:
         self.store = store
         self.view = view
         self.dialog_service = dialog_service
+        self.io_handler = IOCommandHandler(workspace, dialog_service, view)
         self._loaded_workspace_id = None
         self.pending_created_ids: set[UUID] = set()
-        self._io_pool = ThreadPoolExecutor(
-            max_workers=1, thread_name_prefix="annotator-io"
-        )
-        self._invoker = _MainThreadInvoker(self.view)
 
         # Observable state subscriptions
         self.store.subscribe("workspace", self._on_workspace_updated)
@@ -70,44 +67,44 @@ class AppController:
 
     def _bind_view_callbacks(self):
         # App layout window callbacks
-        self.view.on_mode_change_request = self._on_mode_change_request
-        self.view.on_undo_request = self._on_undo_request
-        self.view.on_redo_request = self._on_redo_request
-        self.view.on_delete_request = self._on_delete_request
-        self.view.on_back_request = self._on_back_request
-        self.view.on_import_zip_request = self._on_import_zip_request
-        self.view.on_import_image_request = self._on_import_image_request
-        self.view.on_export_zip_request = self._on_export_zip_request
-        self.view.on_open_cut_editor_request = self._on_open_cut_editor_request
-        self.view.on_open_screen_info_request = self._on_open_screen_info_request
-        self.view.on_enter_pressed = self._on_enter_pressed
-        self.view.on_escape_pressed = self._on_escape_pressed
-        self.view.on_arrow_key_pressed = self._on_arrow_key_pressed
+        self.view.callbacks.on_mode_change_request = self._on_mode_change_request
+        self.view.callbacks.on_undo_request = self._on_undo_request
+        self.view.callbacks.on_redo_request = self._on_redo_request
+        self.view.callbacks.on_delete_request = self._on_delete_request
+        self.view.callbacks.on_back_request = self._on_back_request
+        self.view.callbacks.on_import_zip_request = self.io_handler.handle_import_zip
+        self.view.callbacks.on_import_image_request = self.io_handler.handle_import_image
+        self.view.callbacks.on_export_zip_request = self.io_handler.handle_export_zip
+        self.view.callbacks.on_open_cut_editor_request = self._on_open_cut_editor_request
+        self.view.callbacks.on_open_screen_info_request = self._on_open_screen_info_request
+        self.view.callbacks.on_enter_pressed = self._on_enter_pressed
+        self.view.callbacks.on_escape_pressed = self._on_escape_pressed
+        self.view.callbacks.on_arrow_key_pressed = self._on_arrow_key_pressed
 
         # Canvas callbacks
-        self.view.canvas.on_import_zip = self._on_import_zip_request
-        self.view.canvas.on_import_image = self._on_import_image_request
-        self.view.canvas.on_drill_into = self._on_canvas_drill_into
-        self.view.canvas.on_drill_out = self._on_canvas_drill_out
-        self.view.canvas.on_component_moved = self._on_component_moved
-        self.view.canvas.on_component_resized = self._on_component_resized
-        self.view.canvas.on_component_created = self._on_component_created
-        self.view.canvas.on_request_context_menu = self._on_canvas_context_menu
+        self.view.canvas.callbacks.on_import_zip = self.io_handler.handle_import_zip
+        self.view.canvas.callbacks.on_import_image = self.io_handler.handle_import_image
+        self.view.canvas.callbacks.on_drill_into = self._on_canvas_drill_into
+        self.view.canvas.callbacks.on_drill_out = self._on_canvas_drill_out
+        self.view.canvas.callbacks.on_component_moved = self._on_component_moved
+        self.view.canvas.callbacks.on_component_resized = self._on_component_resized
+        self.view.canvas.callbacks.on_component_created = self._on_component_created
+        self.view.canvas.callbacks.on_request_context_menu = self._on_canvas_context_menu
 
         # Canvas decoupled store request callbacks
-        self.view.canvas.on_viewport_change_request = (
+        self.view.canvas.callbacks.on_viewport_change_request = (
             self._on_canvas_viewport_change_request
         )
-        self.view.canvas.on_active_interaction_changed = (
+        self.view.canvas.callbacks.on_active_interaction_changed = (
             self._on_canvas_active_interaction_changed
         )
-        self.view.canvas.on_selection_ids_changed = (
+        self.view.canvas.callbacks.on_selection_ids_changed = (
             self._on_canvas_selection_ids_changed
         )
-        self.view.canvas.on_viewport_size_changed = (
+        self.view.canvas.callbacks.on_viewport_size_changed = (
             self._on_canvas_viewport_size_changed
         )
-        self.view.canvas.on_canvas_mode_change_request = self._on_mode_change_request
+        self.view.canvas.callbacks.on_canvas_mode_change_request = self._on_mode_change_request
 
         # Sidebar callbacks
         self.view.tree.on_component_selected = self._on_tree_component_selected
@@ -268,7 +265,6 @@ class AppController:
     def _on_viewport_updated(self):
         st = self.store.state
         self._sync_breadcrumbs()
-        self.view.update_zoom_display(st.zoom_factor)
         self.view.btn_back.setEnabled(bool(st.parent_stack))
         self.view.set_mode_str(st.current_mode)
         self.view.canvas.set_viewport_state(
@@ -434,100 +430,6 @@ class AppController:
                 new_y = comp.bounds.y + dy
                 self.workspace.move_component(comp_id, new_x, new_y)
 
-    def _on_import_zip_request(self):
-        path = self.dialog_service.ask_open_filename(
-            self.view, title="Select workspace zip", filetypes=[("Zip files", "*.zip")]
-        )
-        if not path:
-            return
-        dialog = self.dialog_service.show_importing_dialog(
-            self.view, message="Importing workspace..."
-        )
-
-        def do_import():
-            with open(path, "rb") as f:
-                self.workspace.import_zip(f.read())
-
-        future = self._io_pool.submit(do_import)
-        future.add_done_callback(
-            lambda f: self._invoker.invoke(
-                lambda: self._handle_io_result(
-                    f, dialog, "Import Failed", "Failed to import workspace"
-                )
-            )
-        )
-
-    def _on_import_image_request(self):
-        path = self.dialog_service.ask_open_filename(
-            self.view,
-            title="Select raw image",
-            filetypes=[("Image files", "*.png *.jpg *.jpeg")],
-        )
-        if not path:
-            return
-        dialog = self.dialog_service.show_importing_dialog(
-            self.view, message="Importing raw image..."
-        )
-
-        def do_import():
-            with open(path, "rb") as f:
-                self.workspace.import_image(f.read(), path)
-
-        future = self._io_pool.submit(do_import)
-        future.add_done_callback(
-            lambda f: self._invoker.invoke(
-                lambda: self._handle_io_result(
-                    f, dialog, "Import Failed", "Failed to import raw image"
-                )
-            )
-        )
-
-    def _on_export_zip_request(self):
-        if not self.view.canvas.full_pil_img:
-            return
-        path = self.dialog_service.ask_save_as_filename(
-            self.view,
-            title="Save workspace zip",
-            filetypes=[("Zip files", "*.zip")],
-            defaultextension=".zip",
-        )
-        if not path:
-            return
-        dialog = self.dialog_service.show_importing_dialog(
-            self.view, message="Exporting workspace..."
-        )
-
-        def do_export():
-            zip_bytes = self.workspace.export_zip()
-            with open(path, "wb") as f:
-                f.write(zip_bytes)
-
-        future = self._io_pool.submit(do_export)
-        future.add_done_callback(
-            lambda f: self._invoker.invoke(
-                lambda: self._handle_io_result(
-                    f,
-                    dialog,
-                    "Export Failed",
-                    "Failed to export workspace",
-                    success_msg="Workspace zip exported successfully.",
-                )
-            )
-        )
-
-    def _handle_io_result(
-        self, future, dialog, error_title, error_prefix, success_msg=None
-    ):
-        """Handle the result of a background I/O operation."""
-        dialog.dismiss()
-        exc = future.exception()
-        if exc:
-            self.dialog_service.show_error(
-                self.view, error_title, f"{error_prefix}:\n{exc}"
-            )
-        elif success_msg:
-            self.dialog_service.show_info(self.view, "Success", success_msg)
-
     def _on_open_cut_editor_request(self):
         if not self.view.canvas.full_pil_img:
             self.dialog_service.show_warning(
@@ -599,10 +501,6 @@ class AppController:
             )
 
     def _on_canvas_viewport_change_request(self, zoom_factor: float, pan_offset: tuple):
-        # Update view
-        self.view.canvas.set_viewport(zoom_factor, pan_offset)
-
-        # Dispatch model update
         self.store.update_state(
             "viewport", zoom_factor=zoom_factor, pan_offset=pan_offset
         )
