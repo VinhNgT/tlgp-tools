@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .theme import MARGIN, get_header_font
+
 
 
 class SidebarTreeView(QWidget):
@@ -21,15 +21,12 @@ class SidebarTreeView(QWidget):
         super().__init__(parent)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(
-            MARGIN,
-            MARGIN,
-            MARGIN,
-            MARGIN,
-        )
 
-        lbl = QLabel("COMPONENTS")
-        lbl.setFont(get_header_font())
+        lbl = QLabel("LAYERS")
+        font = lbl.font()
+        font.setBold(True)
+        lbl.setFont(font)
+        
         layout.addWidget(lbl)
 
         self.model = QStandardItemModel()

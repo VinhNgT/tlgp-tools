@@ -11,7 +11,6 @@ from .app import MainAppWindow
 from .controller import AppController
 from .qt_dialogs import QtDialogService
 from .state import UIStateStore
-from .theme import get_application_stylesheet
 from .transformer import ViewportTransformer
 
 logger = get_logger(__name__)
@@ -40,7 +39,6 @@ def start_gui(workspace_manager):
     app = QApplication.instance() or QApplication(sys.argv)
 
     if isinstance(app, QApplication):
-        app.setStyleSheet(get_application_stylesheet())
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
         if os.path.exists(icon_path):
             app.setWindowIcon(QIcon(icon_path))

@@ -25,14 +25,6 @@ from PySide6.QtWidgets import (
 from .canvas import AnnotationCanvasView
 from .properties import ComponentPropertiesView
 from .sidebar import SidebarTreeView
-from .theme import (
-    MARGIN,
-    SPACING,
-    colors,
-    get_body_font,
-    get_title_font,
-    set_widget_text_color,
-)
 from .transformer import ViewportTransformer
 
 
@@ -55,17 +47,13 @@ class WelcomeWidget(QWidget):
         card.setFixedSize(400, 220)
 
         card_layout = QVBoxLayout(card)
-        card_layout.setContentsMargins(
-            MARGIN * 3,
-            int(MARGIN * 2.5),
-            MARGIN * 3,
-            int(MARGIN * 2.5),
-        )
-        card_layout.setSpacing(SPACING)
 
         title = QLabel("Annotator")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setFont(get_title_font())
+        font = title.font()
+        font.setPointSize(18)
+        font.setBold(True)
+        title.setFont(font)
         card_layout.addWidget(title)
 
         self.desc_label = QLabel("Open a workspace session or raw image to begin.")
@@ -241,9 +229,6 @@ class MainAppWindow(QMainWindow):
 
         # Breadcrumbs label
         self.lbl_breadcrumbs = QLabel("Root")
-        self.lbl_breadcrumbs.setFont(get_body_font())
-        self.lbl_breadcrumbs.setContentsMargins(8, 0, 8, 0)
-        set_widget_text_color(self.lbl_breadcrumbs, colors.muted)
         tb.addWidget(self.lbl_breadcrumbs)
 
         spacer = QWidget()
@@ -252,17 +237,17 @@ class MainAppWindow(QMainWindow):
 
         # Zoom display
         self.lbl_zoom = QLabel("100%")
-        self.lbl_zoom.setFont(get_body_font())
-        self.lbl_zoom.setContentsMargins(8, 0, 8, 0)
-        set_widget_text_color(self.lbl_zoom, colors.muted)
         tb.addWidget(self.lbl_zoom)
 
     def _build_central_area(self, transformer: ViewportTransformer | None):
         splitter = QSplitter(Qt.Orientation.Horizontal)
-        splitter.setHandleWidth(4)
         self.setCentralWidget(splitter)
 
-        # Left: canvas stack (welcome or annotation)
+        # 1. Left: Tree
+        self.tree = SidebarTreeView()
+        splitter.addWidget(self.tree)
+
+        # 2. Center: Canvas stack (welcome or annotation)
         self.canvas_stack = QStackedWidget()
         self.welcome = WelcomeWidget()
         self.welcome.on_import_zip = lambda: self._fire(self.on_import_zip_request)
@@ -274,26 +259,12 @@ class MainAppWindow(QMainWindow):
 
         splitter.addWidget(self.canvas_stack)
 
-        # Right: sidebar + properties
-        right_panel = QWidget()
-        right_layout = QVBoxLayout(right_panel)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.setSpacing(0)
-
-        right_splitter = QSplitter(Qt.Orientation.Vertical)
-        right_splitter.setHandleWidth(4)
-
-        self.tree = SidebarTreeView()
-        right_splitter.addWidget(self.tree)
-
+        # 3. Right: Properties
         self.properties = ComponentPropertiesView()
-        right_splitter.addWidget(self.properties)
+        splitter.addWidget(self.properties)
 
-        right_splitter.setSizes([400, 300])
-        right_layout.addWidget(right_splitter)
-
-        splitter.addWidget(right_panel)
-        splitter.setSizes([1000, 300])
+        # Set initial sizes (Tree, Canvas, Properties)
+        splitter.setSizes([250, 850, 300])
 
     # ── Public API (called by controller) ─────────────────────────────
 

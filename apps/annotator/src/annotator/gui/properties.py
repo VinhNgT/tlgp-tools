@@ -11,14 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from .theme import (
-    MARGIN,
-    SPACING_SM,
-    colors,
-    get_caption_font,
-    get_header_font,
-    set_widget_text_color,
-)
+
 
 
 class CornerSelector(QWidget):
@@ -150,20 +143,16 @@ class ComponentPropertiesView(QWidget):
         self._current_pill_corner = "top_left"
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(
-            MARGIN,
-            MARGIN,
-            MARGIN,
-            MARGIN,
-        )
 
         lbl_header = QLabel("PROPERTIES")
-        lbl_header.setFont(get_header_font())
+        header_font = lbl_header.font()
+        header_font.setBold(True)
+        lbl_header.setFont(header_font)
         layout.addWidget(lbl_header)
 
         # Name field
         name_row = QHBoxLayout()
-        lbl_name = QLabel("Name:")
+        lbl_name = QLabel("Name")
         lbl_name.setFixedWidth(50)
         name_row.addWidget(lbl_name)
 
@@ -175,20 +164,20 @@ class ComponentPropertiesView(QWidget):
 
         # Coordinate fields
         coords_grid = QGridLayout()
-        coords_grid.setSpacing(SPACING_SM)
+        coords_grid.setSpacing(8)
         self.prop_entries: dict[str, QLineEdit] = {}
         for idx, (label, key) in enumerate(
             [("X", "x"), ("Y", "y"), ("W", "w"), ("H", "h")]
         ):
             row = idx // 2
             col = (idx % 2) * 2
+            
+            # Label
             lbl = QLabel(label)
             lbl.setFixedWidth(20)
-            lbl_font = get_caption_font()
-            lbl_font.setBold(True)
-            lbl.setFont(lbl_font)
             coords_grid.addWidget(lbl, row, col)
 
+            # Input
             entry = QLineEdit()
             entry.setFixedWidth(70)
             entry.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -231,8 +220,6 @@ class ComponentPropertiesView(QWidget):
         self.txt_status.setAlignment(
             Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignBottom
         )
-        self.txt_status.setFont(get_caption_font())
-        set_widget_text_color(self.txt_status, colors.muted)
         self.txt_status.setWordWrap(True)
         layout.addWidget(self.txt_status)
 
@@ -253,8 +240,10 @@ class ComponentPropertiesView(QWidget):
 
     def update_status(self, text: str, is_error: bool = False):
         self.txt_status.setText(text)
-        color = colors.error if is_error else colors.muted
-        set_widget_text_color(self.txt_status, color)
+        palette = self.txt_status.palette()
+        color = Qt.GlobalColor.red if is_error else Qt.GlobalColor.gray
+        palette.setColor(self.txt_status.foregroundRole(), color)
+        self.txt_status.setPalette(palette)
 
     def update_properties_panel(
         self,

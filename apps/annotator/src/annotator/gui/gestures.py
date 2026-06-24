@@ -5,7 +5,7 @@ from uuid import UUID
 
 from annotator.models import Bounds, Component
 
-from .theme import colors
+
 from .transformer import ViewportTransformer
 from .validation import BoundsValidator
 
@@ -402,7 +402,7 @@ class GestureInterpreter:
                 self.draw_start_x = cx
                 self.draw_start_y = cy
                 canvas.set_temp_rect(
-                    cx, cy, cx, cy, color=colors.box_active.name(), dash=True
+                    cx, cy, cx, cy, color="#0000FF", dash=True
                 )
                 self.has_temp_rect = True
 
@@ -414,7 +414,7 @@ class GestureInterpreter:
                 cy,
                 cx,
                 cy,
-                color=colors.box_inactive.name(),
+                color="#A9A9A9",
                 dash=False,
                 width=2,
             )

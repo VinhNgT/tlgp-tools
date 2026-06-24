@@ -29,15 +29,7 @@ from PySide6.QtWidgets import (
 from annotator.models import Component
 
 from .image_utils import pil_to_qpixmap
-from .theme import (
-    MARGIN,
-    SPACING,
-    SPACING_SM,
-    colors,
-    get_caption_font,
-    get_header_font,
-    set_widget_text_color,
-)
+
 from .validation import CutValidator
 
 MIN_CUT_GAP = 50
@@ -103,8 +95,8 @@ class _CutCanvasWidget(QWidget):
         p.drawPixmap(target, self._base_pixmap, source)
 
         # Draw semi-transparent overlays for existing components
-        comp_outline_pen = QPen(colors.cut_comp_outline, 1)
-        comp_fill_brush = colors.cut_comp_fill
+        comp_outline_pen = QPen(QColor(0, 120, 215, 150), 1)
+        comp_fill_brush = QColor(0, 120, 215, 40)
         for comp in self.dialog.existing_components:
             cx1 = comp.bounds.left * zoom
             cy1 = self._to_canvas_y(comp.bounds.top)
@@ -124,7 +116,7 @@ class _CutCanvasWidget(QWidget):
             color = (
                 palette.color(QPalette.ColorRole.Highlight)
                 if is_selected
-                else QColor(colors.error)
+                else QColor(Qt.GlobalColor.red)
             )
             width = 3 if is_selected else 2
 
@@ -132,7 +124,7 @@ class _CutCanvasWidget(QWidget):
             p.setPen(pen)
             p.drawLine(QPointF(0, cy), QPointF(disp_w, cy))
 
-            label_font = get_caption_font()
+            label_font = self.font()
             label_font.setBold(True)
             p.setFont(label_font)
             p.setPen(QPen(color))
@@ -310,13 +302,6 @@ class CutEditorDialog(QDialog):
 
     def _build_ui(self):
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(
-            MARGIN,
-            MARGIN,
-            MARGIN,
-            MARGIN,
-        )
-        layout.setSpacing(SPACING)
 
         # Left: canvas
         self.canvas_widget = _CutCanvasWidget(self)
@@ -326,15 +311,11 @@ class CutEditorDialog(QDialog):
         right = QWidget()
         right.setFixedWidth(200)
         right_layout = QVBoxLayout(right)
-        right_layout.setContentsMargins(
-            MARGIN,
-            MARGIN,
-            MARGIN,
-            MARGIN,
-        )
 
         lbl = QLabel("CUT LINES")
-        lbl.setFont(get_header_font())
+        font = lbl.font()
+        font.setBold(True)
+        lbl.setFont(font)
         right_layout.addWidget(lbl)
 
         self.listbox = QListWidget()
@@ -356,8 +337,9 @@ class CutEditorDialog(QDialog):
         right_layout.addWidget(self.btn_clear)
 
         self.status_label = QLabel("")
-        self.status_label.setFont(get_caption_font())
-        set_widget_text_color(self.status_label, colors.error)
+        palette = self.status_label.palette()
+        palette.setColor(self.status_label.foregroundRole(), Qt.GlobalColor.red)
+        self.status_label.setPalette(palette)
         self.status_label.setWordWrap(True)
         right_layout.addWidget(self.status_label)
 
@@ -365,7 +347,6 @@ class CutEditorDialog(QDialog):
 
         # OK / Cancel
         btn_row = QHBoxLayout()
-        btn_row.setSpacing(SPACING_SM)
         btn_row.addStretch()
         btn_ok = QPushButton("OK")
         btn_ok.setFixedWidth(80)

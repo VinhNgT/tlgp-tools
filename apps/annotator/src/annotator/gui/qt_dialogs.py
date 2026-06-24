@@ -22,7 +22,7 @@ from annotator.models import Component
 
 from .cut_editor import CutEditorDialog
 from .dialog_service import DialogService, ProgressIndicator
-from .theme import get_ui_font
+
 
 
 class _QtProgressIndicator:
@@ -49,7 +49,9 @@ class _ImportingDialog(QDialog):
         layout = QVBoxLayout(self)
         lbl = QLabel(message)
         lbl.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        lbl.setFont(get_ui_font(size=10))
+        font = lbl.font()
+        font.setPointSize(10)
+        lbl.setFont(font)
         layout.addWidget(lbl)
 
         self.show()

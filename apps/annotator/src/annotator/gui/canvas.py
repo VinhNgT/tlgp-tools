@@ -40,7 +40,6 @@ from annotator.rendering import (
 
 from .gestures import GestureEvent, GestureInterpreter
 from .image_utils import pil_to_qpixmap
-from .theme import colors, get_body_font, get_ui_font
 from .transformer import ViewportTransformer
 
 # ── Cursor Mapping ────────────────────────────────────────────────────
@@ -288,7 +287,7 @@ class AnnotationCanvasView(QWidget):
         width: int = 1,
     ):
         if color is None:
-            color = colors.box_active.name()
+            color = "#0000FF"
         self._temp_rect = (x1, y1, x2, y2, color, dash, width)
         self.update()
 
@@ -366,7 +365,7 @@ class AnnotationCanvasView(QWidget):
         p.setRenderHint(QPainter.RenderHint.Antialiasing)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        p.fillRect(self.rect(), colors.canvas_bg)
+        p.fillRect(self.rect(), self.palette().color(QPalette.ColorRole.Window))
 
         if not self.full_pil_img or not self._base_pixmap:
             p.end()
@@ -455,12 +454,14 @@ class AnnotationCanvasView(QWidget):
 
         # QFont + metrics created once for the entire level (not per component)
         pill_font_size = max(4, min(72, round(font_size * zoom)))
-        qfont = get_ui_font(size=pill_font_size, bold=True)
+        qfont = self.font()
+        qfont.setPointSize(pill_font_size)
+        qfont.setBold(True)
         pill_ascent = QFontMetrics(qfont).ascent()
 
         border_width = max(1, round(abs_box_border * zoom))
         pill_outline_width = max(1, round(abs_pill_outline * zoom))
-        inactive_color = colors.box_inactive
+        inactive_color = Qt.GlobalColor.darkGray
         box_pen = QPen(inactive_color, border_width)
         pill_outline_pen = QPen(inactive_color, pill_outline_width)
         pill_text_pen = QPen(inactive_color)
@@ -498,14 +499,14 @@ class AnnotationCanvasView(QWidget):
                     cut_lines,
                     pan_offset=self.pan_offset,
                 )
-                overlay_color = colors.child_bounds
+                overlay_color = Qt.GlobalColor.darkGray
                 dash_pen = QPen(overlay_color, 2)
                 dash_pen.setStyle(Qt.PenStyle.DashLine)
                 p.setPen(dash_pen)
                 p.setBrush(Qt.BrushStyle.NoBrush)
                 p.drawRect(QRectF(gcx1, gcy1, gcx2 - gcx1, gcy2 - gcy1))
 
-                font = get_body_font()
+                font = self.font()
                 font.setBold(True)
                 font.setItalic(True)
                 p.setFont(font)
@@ -519,18 +520,18 @@ class AnnotationCanvasView(QWidget):
 
             if is_visible:
                 comp_color = (
-                    colors.box_active
+                    QColor(Qt.GlobalColor.blue)
                     if is_selected
-                    else colors.box_inactive
+                    else QColor(Qt.GlobalColor.darkGray)
                 )
-                pill_fill_col = colors.pill_bg_visible
+                pill_fill_col = QColor(Qt.GlobalColor.white)
             else:
                 comp_color = (
-                    colors.box_active_hidden
+                    QColor(0, 0, 255, 120)
                     if is_selected
-                    else colors.box_inactive_hidden
+                    else QColor(169, 169, 169, 120)
                 )
-                pill_fill_col = colors.pill_bg_hidden
+                pill_fill_col = QColor(Qt.GlobalColor.lightGray)
 
             lw = border_width + 1 if is_selected else border_width
             box_pen.setColor(comp_color)
@@ -598,7 +599,7 @@ class AnnotationCanvasView(QWidget):
             p.drawText(QPointF(text_x, text_y), num_str)
 
             if self.show_labels and comp.label:
-                font = get_body_font()
+                font = self.font()
                 p.setFont(font)
                 p.setPen(pill_text_pen)
                 p.drawText(QPointF(cx1, cy2 + 13), comp.label)
