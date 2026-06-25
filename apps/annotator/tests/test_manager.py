@@ -373,36 +373,55 @@ class TestExportZip:
 
 
 class TestExportImages:
-    def test_export_images_with_annotations(self):
+    def test_export_images_annotated(self):
         ws = _workspace_with_image()
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
         ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
 
-        zip_bytes = ws.export_images("with_annotations")
+        zip_bytes = ws.export_images("annotated")
         with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
             names = zf.namelist()
             assert any("Parent_Box" in name for name in names)
             assert not any("Child_Box" in name for name in names)
+            assert all(not name.startswith("annotated/") for name in names)
 
-    def test_export_images_without_annotations(self):
+    def test_export_images_raw(self):
         ws = _workspace_with_image()
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
         ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
 
-        zip_bytes = ws.export_images("without_annotations")
+        zip_bytes = ws.export_images("raw")
         with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
             names = zf.namelist()
             assert any("Parent_Box" in name for name in names)
             assert any("Child_Box" in name for name in names)
+            assert all(not name.startswith("raw/") for name in names)
 
     def test_export_images_without_image_raises(self):
         ws = WorkspaceManager()
         with pytest.raises(InvalidStateError):
-            ws.export_images("with_annotations")
+            ws.export_images("annotated")
+
+    def test_export_images_both(self):
+        ws = _workspace_with_image()
+        parent_id = uuid.uuid4()
+        child_id = uuid.uuid4()
+        ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
+        ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+
+        zip_bytes = ws.export_images("both")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            # Verify annotated folder has the parent box, but not child (as it's a leaf)
+            assert any(name.startswith("annotated/") and "Parent_Box" in name for name in names)
+            assert not any(name.startswith("annotated/") and "Child_Box" in name for name in names)
+            # Verify raw folder has both
+            assert any(name.startswith("raw/") and "Parent_Box" in name for name in names)
+            assert any(name.startswith("raw/") and "Child_Box" in name for name in names)
 
 
 # ── Subscriber Notifications ──────────────────────────────────────────

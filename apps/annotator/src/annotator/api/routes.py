@@ -127,16 +127,17 @@ def create_router(
 
     @router.get("/workspace/export-images", tags=["Import/Export"])
     async def export_images(
-        mode: Literal["with_annotations", "without_annotations"] = "with_annotations"
+        mode: Literal["annotated", "raw", "both"] = "annotated"
     ):
         if not workspace.raw_image_bytes:
             raise InvalidStateError("No image in workspace")
         zip_bytes = await asyncio.to_thread(workspace.export_images, mode)
+        export_name = workspace.get_default_export_name(mode)
         return Response(
             content=zip_bytes,
             media_type="application/zip",
             headers={
-                "Content-Disposition": f"attachment; filename=component_images_{mode}.zip"
+                "Content-Disposition": f"attachment; filename={export_name}.zip"
             },
         )
 

@@ -35,6 +35,7 @@ class DialogService(ABC):
         title: str,
         filetypes: list[tuple[str, str]],
         defaultextension: str,
+        initial_filename: str = "",
     ) -> str | None:
         """Prompts the user to specify a path to save a file."""
         pass
@@ -83,11 +84,22 @@ class DialogService(ABC):
         pass
 
     @abstractmethod
-    def ask_export_images_mode(
-        self, parent: Any, on_mode_selected: Callable[[str | None], None]
+    def ask_export_images_options(
+        self,
+        parent: Any,
+        on_selected: Callable[[str | None, str | None], None],
     ) -> None:
-        """Prompts the user to select an export mode.
+        """Prompts the user to select export mode and format.
 
-        Calls on_mode_selected with 'with_annotations', 'without_annotations', or None if cancelled.
+        Calls on_selected with (mode, format), or (None, None) if cancelled.
         """
+        pass
+
+    @abstractmethod
+    def ask_directory(
+        self,
+        parent: Any,
+        title: str,
+    ) -> str | None:
+        """Prompts the user to select an existing directory."""
         pass

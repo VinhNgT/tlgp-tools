@@ -9,9 +9,11 @@ from collections.abc import Callable
 from PIL import Image
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
+    QButtonGroup,
     QDialog,
     QDialogButtonBox,
     QFileDialog,
+    QFrame,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -114,38 +116,78 @@ class _ScreenInfoDialog(QDialog):
 
 
 class _ExportImagesDialog(QDialog):
-    """Dialog to choose the export mode for component images."""
+    """Dialog to choose the export mode and format for component images."""
 
     def __init__(self, parent=None):
         super().__init__(parent, Qt.WindowType.Tool)
         self.setWindowTitle("Export Images")
-        self.resize(350, 150)
+        self.resize(380, 220)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(15, 15, 15, 15)
+        layout.setSpacing(10)
 
-        lbl = QLabel("Select Export Mode:")
-        layout.addWidget(lbl)
+        # 1. Mode selection
+        lbl_mode = QLabel("Select Export Mode:")
+        layout.addWidget(lbl_mode)
 
-        self.rad_with_ann = QRadioButton("Annotated (skips leaves, paints child annotations)")
-        self.rad_with_ann.setChecked(True)
-        layout.addWidget(self.rad_with_ann)
+        self.rad_annotated = QRadioButton("Annotated (skips leaves, paints child annotations)")
+        self.rad_annotated.setChecked(True)
+        layout.addWidget(self.rad_annotated)
 
-        self.rad_without_ann = QRadioButton("Raw (includes leaves, no annotations)")
-        layout.addWidget(self.rad_without_ann)
+        self.rad_raw = QRadioButton("Raw (includes leaves, no annotations)")
+        layout.addWidget(self.rad_raw)
+
+        self.rad_both = QRadioButton("Both (exports both annotated and raw modes)")
+        layout.addWidget(self.rad_both)
+
+        # Divider line
+        line = QFrame()
+        line.setFrameShape(QFrame.Shape.HLine)
+        line.setFrameShadow(QFrame.Shadow.Sunken)
+        layout.addWidget(line)
+
+        # 2. Format selection
+        lbl_format = QLabel("Select Export Format:")
+        layout.addWidget(lbl_format)
+
+        self.mode_group = QButtonGroup(self)
+        self.mode_group.addButton(self.rad_annotated)
+        self.mode_group.addButton(self.rad_raw)
+        self.mode_group.addButton(self.rad_both)
+
+        self.format_group = QButtonGroup(self)
+
+        self.rad_folder = QRadioButton("Folder Directory")
+        self.rad_folder.setChecked(True)
+        self.format_group.addButton(self.rad_folder)
+        layout.addWidget(self.rad_folder)
+
+        self.rad_zip = QRadioButton("ZIP Archive (.zip)")
+        self.format_group.addButton(self.rad_zip)
+        layout.addWidget(self.rad_zip)
 
         button_box = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok
             | QDialogButtonBox.StandardButton.Cancel
         )
+        button_box.button(QDialogButtonBox.StandardButton.Ok).setText("Export")
         button_box.accepted.connect(self.accept)
         button_box.rejected.connect(self.reject)
         layout.addWidget(button_box)
 
-    def get_mode(self) -> str:
-        if self.rad_with_ann.isChecked():
-            return "with_annotations"
-        return "without_annotations"
+    def get_options(self) -> tuple[str, str]:
+        # Mode
+        if self.rad_annotated.isChecked():
+            mode = "annotated"
+        elif self.rad_raw.isChecked():
+            mode = "raw"
+        else:
+            mode = "both"
+
+        # Format
+        format_val = "zip" if self.rad_zip.isChecked() else "folder"
+        return mode, format_val
 
 
 class QtDialogService(DialogService):
@@ -167,9 +209,10 @@ class QtDialogService(DialogService):
         title: str,
         filetypes: list[tuple[str, str]],
         defaultextension: str,
+        initial_filename: str = "",
     ) -> str | None:
         filter_str = self._filetypes_to_filter(filetypes)
-        path, _ = QFileDialog.getSaveFileName(parent, title, "", filter_str)
+        path, _ = QFileDialog.getSaveFileName(parent, title, initial_filename, filter_str)
         return path if path else None
 
     def show_error(self, parent: QWidget, title: str, message: str) -> None:
@@ -214,14 +257,24 @@ class QtDialogService(DialogService):
         dialog.accepted.connect(lambda: on_save(dialog.info_result))
         dialog.show()
 
-    def ask_export_images_mode(
-        self, parent: QWidget, on_mode_selected: Callable[[str | None], None]
+    def ask_export_images_options(
+        self,
+        parent: QWidget,
+        on_selected: Callable[[str | None, str | None], None],
     ) -> None:
         dialog = _ExportImagesDialog(parent)
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        dialog.accepted.connect(lambda: on_mode_selected(dialog.get_mode()))
-        dialog.rejected.connect(lambda: on_mode_selected(None))
+        dialog.accepted.connect(lambda: on_selected(*dialog.get_options()))
+        dialog.rejected.connect(lambda: on_selected(None, None))
         dialog.show()
+
+    def ask_directory(
+        self,
+        parent: QWidget,
+        title: str,
+    ) -> str | None:
+        path = QFileDialog.getExistingDirectory(parent, title)
+        return path if path else None
 
     @staticmethod
     def _filetypes_to_filter(filetypes: list[tuple[str, str]]) -> str:

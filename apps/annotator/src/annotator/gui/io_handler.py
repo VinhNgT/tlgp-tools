@@ -121,25 +121,56 @@ class IOCommandHandler:
         if not self.view.canvas.full_pil_img:
             return
 
-        def on_mode_selected(mode: str | None):
-            if not mode:
+        def on_options_selected(mode: str | None, format_val: str | None):
+            if not mode or not format_val:
                 return
-            path = self.dialog_service.ask_save_as_filename(
-                self.view,
-                title="Save component images",
-                filetypes=[("Zip files", "*.zip")],
-                defaultextension=".zip",
-            )
-            if not path:
-                return
-            dialog = self.dialog_service.show_importing_dialog(
-                self.view, message="Exporting component images..."
-            )
 
-            def do_export():
-                zip_bytes = self.workspace.export_images(mode)
-                with open(path, "wb") as f:
-                    f.write(zip_bytes)
+            export_name = self.workspace.get_default_export_name(mode)
+
+            if format_val == "zip":
+                default_filename = f"{export_name}.zip"
+
+                dest_file = self.dialog_service.ask_save_as_filename(
+                    self.view,
+                    title="Save Exported Images Zip",
+                    filetypes=[("Zip files", "*.zip")],
+                    defaultextension=".zip",
+                    initial_filename=default_filename,
+                )
+                if not dest_file:
+                    return
+
+                dialog = self.dialog_service.show_importing_dialog(
+                    self.view, message="Exporting component images..."
+                )
+
+                def do_export():
+                    zip_bytes = self.workspace.export_images(mode)
+                    with open(dest_file, "wb") as f:
+                        f.write(zip_bytes)
+            else:
+                dest_dir = self.dialog_service.ask_directory(
+                    self.view,
+                    title="Select Directory to Export Images",
+                )
+                if not dest_dir:
+                    return
+
+                dialog = self.dialog_service.show_importing_dialog(
+                    self.view, message="Exporting component images..."
+                )
+
+                def do_export():
+                    import io
+                    import zipfile
+                    import os
+
+                    export_path = os.path.join(dest_dir, export_name)
+                    os.makedirs(export_path, exist_ok=True)
+
+                    zip_bytes = self.workspace.export_images(mode)
+                    with zipfile.ZipFile(io.BytesIO(zip_bytes)) as zf:
+                        zf.extractall(export_path)
 
             future = self._io_pool.submit(do_export)
             future.add_done_callback(
@@ -154,7 +185,7 @@ class IOCommandHandler:
                 )
             )
 
-        self.dialog_service.ask_export_images_mode(self.view, on_mode_selected)
+        self.dialog_service.ask_export_images_options(self.view, on_options_selected)
 
     def _handle_io_result(
         self, future, dialog, error_title, error_prefix, success_msg=None

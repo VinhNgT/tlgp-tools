@@ -173,3 +173,80 @@ def test_dialog_service_show_screen_info_modeless(qapp):
         "screen_name": "Product Details",
         "description": "Main product info page",
     }
+
+
+def test_dialog_service_ask_directory(qapp, monkeypatch):
+    """Verify that ask_directory calls QFileDialog.getExistingDirectory and returns the selected path."""
+    from PySide6.QtWidgets import QFileDialog
+    monkeypatch.setattr(
+        QFileDialog, "getExistingDirectory", lambda parent, title: "/mock/directory"
+    )
+    service = QtDialogService()
+    path = service.ask_directory(None, "Select Folder")
+    assert path == "/mock/directory"
+
+
+def test_dialog_service_ask_export_images_options(qapp):
+    """Verify that ask_export_images_options properly instantiates _ExportImagesDialog, accepts choices, and triggers the callback."""
+    callback_called = False
+    callback_mode = None
+    callback_format = None
+
+    def on_selected(mode, format_val):
+        nonlocal callback_called, callback_mode, callback_format
+        callback_called = True
+        callback_mode = mode
+        callback_format = format_val
+
+    service = QtDialogService()
+    service.ask_export_images_options(None, on_selected)
+    QApplication.processEvents()
+
+    dialog = None
+    for widget in reversed(QApplication.topLevelWidgets()):
+        if widget.__class__.__name__ == "_ExportImagesDialog" and widget.isVisible():
+            dialog = widget
+            break
+
+    assert dialog is not None
+
+    # Check default values
+    assert dialog.rad_annotated.isChecked()
+    assert dialog.rad_folder.isChecked()
+
+    # Simulate selecting 'both' and 'zip' format
+    dialog.rad_both.setChecked(True)
+    dialog.rad_zip.setChecked(True)
+
+    # Accept the dialog
+    dialog.accept()
+    QApplication.processEvents()
+
+    assert callback_called
+    assert callback_mode == "both"
+    assert callback_format == "zip"
+
+
+def test_dialog_service_ask_save_as_filename(qapp, monkeypatch):
+    """Verify that ask_save_as_filename calls QFileDialog.getSaveFileName with initial_filename and returns the selected path."""
+    from PySide6.QtWidgets import QFileDialog
+    called_initial_filename = None
+
+    def mock_get_save_file_name(parent, title, initial_filename, filter_str):
+        nonlocal called_initial_filename
+        called_initial_filename = initial_filename
+        return "/mock/file.zip", "Zip files (*.zip)"
+
+    monkeypatch.setattr(QFileDialog, "getSaveFileName", mock_get_save_file_name)
+    service = QtDialogService()
+    path = service.ask_save_as_filename(
+        None,
+        "Save Zip",
+        [("Zip files", "*.zip")],
+        ".zip",
+        initial_filename="my_default.zip",
+    )
+    assert path == "/mock/file.zip"
+    assert called_initial_filename == "my_default.zip"
+
+

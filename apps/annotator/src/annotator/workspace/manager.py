@@ -501,13 +501,36 @@ class WorkspaceManager:
 
         return buf.getvalue()
 
+    def get_default_export_name(
+        self, mode: Literal["annotated", "raw", "both"]
+    ) -> str:
+        """Get the default filename (without extension) for exporting images, using the mode."""
+        with self._lock:
+            state_snapshot = self._state.model_copy(deep=True)
+        raw_filename = (
+            state_snapshot.image.filename
+            if (state_snapshot.image and state_snapshot.image.filename)
+            else "exported_images"
+        )
+        if "." in raw_filename:
+            base_name = raw_filename.rsplit(".", 1)[0]
+        else:
+            base_name = raw_filename
+
+        import re
+        folder_name = re.sub(r'[\\/*?:"<>|]', "_", base_name).strip()
+        if not folder_name:
+            folder_name = "exported_images"
+        return f"{folder_name}_{mode}"
+
     def export_images(
-        self, mode: Literal["with_annotations", "without_annotations"]
+        self, mode: Literal["annotated", "raw", "both"]
     ) -> bytes:
         """Export component cropped images as a ZIP file.
 
-        - with_annotations: Crop non-leaf components and draw children on them. Won't export leaves.
-        - without_annotations: Crop all components. Do not draw children. Includes leaves.
+        - annotated: Crop non-leaf components and draw children on them. Won't export leaves.
+        - raw: Crop all components. Do not draw children. Includes leaves.
+        - both: Export both options into separate subdirectories (annotated/ and raw/).
         """
         with self._lock:
             state_snapshot = self._state.model_copy(deep=True)
@@ -564,27 +587,33 @@ class WorkspaceManager:
 
                 exported_count = 0
                 for node in get_export_nodes():
-                    if mode == "with_annotations" and node["is_leaf"]:
-                        continue
+                    # 1. Annotated mode (paints children annotations, skips leaves)
+                    if mode in ("annotated", "both"):
+                        if not node["is_leaf"]:
+                            cropped_ann = img.crop(node["bounds"])
+                            if node["children"]:
+                                cropped_ann = paint_annotations(
+                                    img=cropped_ann,
+                                    children=node["children"],
+                                    offset_x=node["bounds"][0],
+                                    offset_y=node["bounds"][1],
+                                    parent_comp=node["parent_comp"],
+                                    full_img_width=state_snapshot.image.width,
+                                )
+                            img_buf = io.BytesIO()
+                            cropped_ann.save(img_buf, format="PNG")
+                            archive_path = f"annotated/{node['filename']}" if mode == "both" else node["filename"]
+                            zf.writestr(archive_path, img_buf.getvalue())
+                            exported_count += 1
 
-                    # Crop bounds
-                    cropped = img.crop(node["bounds"])
-
-                    if mode == "with_annotations" and node["children"]:
-                        cropped = paint_annotations(
-                            img=cropped,
-                            children=node["children"],
-                            offset_x=node["bounds"][0],
-                            offset_y=node["bounds"][1],
-                            parent_comp=node["parent_comp"],
-                            full_img_width=state_snapshot.image.width,
-                        )
-
-                    # Write to zip
-                    img_buf = io.BytesIO()
-                    cropped.save(img_buf, format="PNG")
-                    zf.writestr(node["filename"], img_buf.getvalue())
-                    exported_count += 1
+                    # 2. Raw mode (includes leaves, no annotations)
+                    if mode in ("raw", "both"):
+                        cropped_raw = img.crop(node["bounds"])
+                        img_buf = io.BytesIO()
+                        cropped_raw.save(img_buf, format="PNG")
+                        archive_path = f"raw/{node['filename']}" if mode == "both" else node["filename"]
+                        zf.writestr(archive_path, img_buf.getvalue())
+                        exported_count += 1
 
                 if exported_count == 0:
                     raise InvalidStateError("No images to export under the selected mode (e.g. no annotations found).")
