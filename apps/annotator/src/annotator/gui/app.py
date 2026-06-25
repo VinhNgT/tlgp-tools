@@ -291,15 +291,12 @@ class MainAppWindow(QMainWindow):
         self.act_fit.triggered.connect(lambda: self.canvas.fit_to_screen())
         view_menu.addAction(self.act_fit)
 
-
         view_menu.addSeparator()
 
         self.act_toggle_labels = QAction("Toggle Labels", self)
         self.act_toggle_labels.setShortcut(QKeySequence("T"))
         self.act_toggle_labels.setEnabled(False)
-        self.act_toggle_labels.triggered.connect(
-            lambda: self._toggle_labels_action()
-        )
+        self.act_toggle_labels.triggered.connect(lambda: self._toggle_labels_action())
         view_menu.addAction(self.act_toggle_labels)
 
         # 4. Tools Menu

@@ -20,6 +20,7 @@ logger = get_logger(__name__)
 
 class DocGenResult(TypedDict, total=False):
     """The structured JSON output from the doc-gen CLI."""
+
     valid: bool
     errors: list[str]
     warnings: list[str]

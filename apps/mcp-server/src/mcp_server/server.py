@@ -227,7 +227,9 @@ async def connect_to_annotator(ctx: Context, url: str) -> dict:
                 result["screen_name"] = state.screen.name or None
                 result["components"] = len(state.components)
             except Exception:
-                logger.warning("Connected but failed to fetch workspace summary", exc_info=True)
+                logger.warning(
+                    "Connected but failed to fetch workspace summary", exc_info=True
+                )
             return result
         else:
             return {

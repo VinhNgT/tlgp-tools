@@ -346,7 +346,6 @@ class AnnotationCanvasView(QWidget):
         if self.callbacks.on_drill_out:
             self.callbacks.on_drill_out()
 
-
     def toggle_labels_visibility(self):
         """Toggle rendering of annotation labels."""
         self.show_labels = not self.show_labels

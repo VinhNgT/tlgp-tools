@@ -75,4 +75,3 @@ def load_default_style() -> StyleConfig:
     """Helper to load standard StyleConfig from spec_format.toml."""
     cfg_path = Path(__file__).parent / "spec_format.toml"
     return StyleConfig(cfg_path)
-

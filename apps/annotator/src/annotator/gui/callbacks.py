@@ -12,12 +12,16 @@ class CanvasCallbacks:
 
     def __init__(self):
         self.on_component_moved: Callable[[str, int, int], None] | None = None
-        self.on_components_moved: Callable[[dict[str, tuple[int, int]]], None] | None = None
+        self.on_components_moved: (
+            Callable[[dict[str, tuple[int, int]]], None] | None
+        ) = None
         self.on_component_resized: Callable[[str, dict], None] | None = None
         self.on_component_created: Callable[[dict], None] | None = None
         self.on_active_interaction_changed: Callable[[dict | None], None] | None = None
         self.on_viewport_change_request: Callable[[float, tuple], None] | None = None
-        self.on_request_context_menu: Callable[[Any, Component | None], None] | None = None
+        self.on_request_context_menu: Callable[[Any, Component | None], None] | None = (
+            None
+        )
         self.on_drill_into: Callable[[UUID], None] | None = None
         self.on_drill_out: Callable[[], None] | None = None
         self.on_import_zip: Callable[[], None] | None = None

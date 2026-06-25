@@ -94,8 +94,7 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
             img = data.resolve_image(comp.imageFile)
             if not img.exists():
                 result.errors.append(
-                    f"Component '{comp.label}' (id={comp.id}): "
-                    f"image not found: {img}"
+                    f"Component '{comp.label}' (id={comp.id}): image not found: {img}"
                 )
         else:
             result.warnings.append(

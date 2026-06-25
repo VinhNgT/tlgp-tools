@@ -61,15 +61,15 @@ def _parse_analysis(raw: dict) -> AnalysisData | list[str]:
         return errors
 
 
-def _resolve_output_path(data: AnalysisData, analysis_path: Path, output_arg: str | None) -> Path:
+def _resolve_output_path(
+    data: AnalysisData, analysis_path: Path, output_arg: str | None
+) -> Path:
     """Determine the final .docx output path."""
     if output_arg:
         return Path(output_arg).resolve()
 
     safe_name = (
-        "".join(
-            c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-")
-        )
+        "".join(c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-"))
         .strip()
         .replace(" ", "_")
     )
@@ -94,10 +94,14 @@ def _print_summary(analysis: AnalysisData):
     logger.info("")
     logger.info("  Components:         %d non-leaf, %d leaf", len(non_leaf), len(leaf))
     logger.info(
-        "  UI elements:        %d (components) + %d (screen)", total_children, screen_children
+        "  UI elements:        %d (components) + %d (screen)",
+        total_children,
+        screen_children,
     )
     logger.info(
-        "  Interactions:       %d (components) + %d (screen)", total_interactions, screen_interactions
+        "  Interactions:       %d (components) + %d (screen)",
+        total_interactions,
+        screen_interactions,
     )
     logger.info("  APIs:               %d", len(analysis.all_apis))
     logger.info("")
@@ -195,7 +199,9 @@ def _run_json_mode(
     if analysis_path.resolve() != analysis_json_dest.resolve():
         shutil.copy2(analysis_path, analysis_json_dest)
 
-    result = DocGenResult.from_validation(vr, output_path=str(out), tables=len(doc.tables))
+    result = DocGenResult.from_validation(
+        vr, output_path=str(out), tables=len(doc.tables)
+    )
     sys.stdout.write(result.model_dump_json())
     return 0
 

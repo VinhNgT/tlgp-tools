@@ -76,6 +76,7 @@ class SelectHandler:
 
         # Cache descendants of all top level selected boxes
         state.drag_orig_descendants = {}
+
         def cache_descendants(c_id: UUID):
             comp = workspace.components.get(c_id)
             if comp:
@@ -264,7 +265,10 @@ class SelectHandler:
                     or transient_bounds.right != ox2
                     or transient_bounds.bottom != oy2
                 ):
-                    moves[str(c_id)] = (int(transient_bounds.x), int(transient_bounds.y))
+                    moves[str(c_id)] = (
+                        int(transient_bounds.x),
+                        int(transient_bounds.y),
+                    )
 
             if moves:
                 if getattr(canvas.callbacks, "on_components_moved", None):

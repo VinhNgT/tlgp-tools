@@ -246,9 +246,11 @@ class QtDialogService(DialogService):
         )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.accepted.connect(
-            lambda: on_save(dialog.cut_lines_result)
-            if dialog.cut_lines_result is not None
-            else None
+            lambda: (
+                on_save(dialog.cut_lines_result)
+                if dialog.cut_lines_result is not None
+                else None
+            )
         )
         dialog.show()
 
@@ -264,9 +266,9 @@ class QtDialogService(DialogService):
         )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
         dialog.accepted.connect(
-            lambda: on_save(dialog.info_result)
-            if dialog.info_result is not None
-            else None
+            lambda: (
+                on_save(dialog.info_result) if dialog.info_result is not None else None
+            )
         )
         dialog.show()
 

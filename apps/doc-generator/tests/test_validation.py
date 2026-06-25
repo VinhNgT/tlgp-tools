@@ -42,9 +42,7 @@ class TestValidateAnalysis:
                     description="desc",
                     imageFile="comp.png",
                     children=[
-                        ChildElement(
-                            stt=1, label="Button", controlType="Button"
-                        )
+                        ChildElement(stt=1, label="Button", controlType="Button")
                     ],
                 )
             ],
@@ -82,9 +80,7 @@ class TestValidateAnalysis:
         (tmp_path / "screen.png").touch()
         analysis = _minimal_analysis(
             tmp_path,
-            components=[
-                AnalysisComponent(id=1, label="Comp 1", description="")
-            ],
+            components=[AnalysisComponent(id=1, label="Comp 1", description="")],
         )
 
         result = validate_analysis(analysis)
@@ -120,7 +116,7 @@ class TestValidateAnalysis:
                 description="desc",
                 imageFiles=["screen.png"],
                 apis=[],
-            )
+            ),
         )
 
         result = validate_analysis(analysis)
@@ -135,9 +131,9 @@ class TestValidateAnalysis:
                 Discrepancy(
                     location="Header",
                     imageObservation="Blue button",
-                    codeObservation="Red button"
+                    codeObservation="Red button",
                 )
-            ]
+            ],
         )
 
         result = validate_analysis(analysis)
@@ -152,7 +148,7 @@ class TestValidateAnalysis:
                 description="desc",
                 imageFiles=[],
                 apis=[Api(number=1, method="GET", title="Test", url="/test")],
-            )
+            ),
         )
 
         result = validate_analysis(analysis)
@@ -164,7 +160,9 @@ class TestValidateAnalysis:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                AnalysisComponent(id=1, label="Comp 1", description="desc", imageFile=None)
+                AnalysisComponent(
+                    id=1, label="Comp 1", description="desc", imageFile=None
+                )
             ],
         )
 

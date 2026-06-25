@@ -37,7 +37,9 @@ async def test_launch_annotator_timeout_failure(monkeypatch, mock_httpx_client_c
 
 
 @pytest.mark.anyio
-async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch, mock_httpx_client_class):
+async def test_launch_annotator_import_screenshot(
+    tmp_path, monkeypatch, mock_httpx_client_class
+):
     mock_popen = MagicMock()
     mock_popen.return_value.pid = 1111
     mock_popen.return_value.stdout = io.BytesIO(b"")
@@ -65,7 +67,9 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch, mock_ht
 
 
 @pytest.mark.anyio
-async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch, mock_httpx_client_class):
+async def test_launch_annotator_import_workspace_zip(
+    tmp_path, monkeypatch, mock_httpx_client_class
+):
     mock_popen = MagicMock()
     mock_popen.return_value.pid = 2222
     mock_popen.return_value.stdout = io.BytesIO(b"")
@@ -93,7 +97,9 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch, mock
 
 
 @pytest.mark.anyio
-async def test_launch_annotator_resolves_dynamic_port(monkeypatch, mock_httpx_client_class):
+async def test_launch_annotator_resolves_dynamic_port(
+    monkeypatch, mock_httpx_client_class
+):
     mock_popen = MagicMock()
     mock_popen.return_value.pid = 3333
 

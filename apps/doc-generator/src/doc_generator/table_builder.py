@@ -112,9 +112,7 @@ def _set_cell_width(cell, twips: int):
     tcW = tcPr.find(qn("w:tcW"))
     if tcW is not None:
         tcPr.remove(tcW)
-    tcW = parse_xml(
-        f'<w:tcW {nsdecls("w")} w:w="{twips}" w:type="dxa"/>'
-    )
+    tcW = parse_xml(f'<w:tcW {nsdecls("w")} w:w="{twips}" w:type="dxa"/>')
     # Insert tcW as the first child of tcPr for schema compliance
     tcPr.insert(0, tcW)
 
@@ -194,9 +192,7 @@ def _set_fixed_table_layout(table: Table, col_widths_pt: list[float]):
         tblW.set(qn("w:w"), str(total_twips))
         tblW.set(qn("w:type"), "dxa")
     else:
-        tblW = parse_xml(
-            f'<w:tblW {nsdecls("w")} w:w="{total_twips}" w:type="dxa"/>'
-        )
+        tblW = parse_xml(f'<w:tblW {nsdecls("w")} w:w="{total_twips}" w:type="dxa"/>')
         tblPr.insert(0, tblW)
 
     # Disable autofit
@@ -204,9 +200,7 @@ def _set_fixed_table_layout(table: Table, col_widths_pt: list[float]):
     if tblLayout is not None:
         tblLayout.set(qn("w:type"), "fixed")
     else:
-        tblLayout = parse_xml(
-            f'<w:tblLayout {nsdecls("w")} w:type="fixed"/>'
-        )
+        tblLayout = parse_xml(f'<w:tblLayout {nsdecls("w")} w:type="fixed"/>')
         tblPr.append(tblLayout)
 
     # Replace gridCol elements with correct per-column widths

@@ -38,7 +38,9 @@ class TestSpecGeneratorService:
         )
         mock_proc.returncode = 0
 
-        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        with patch(
+            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec:
             service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
             result = await service.generate(analysis_path=str(analysis_file))
 
@@ -54,7 +56,7 @@ class TestSpecGeneratorService:
     @pytest.mark.anyio
     async def test_generate_validate_only_passes_flag(self, tmp_path):
         analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text('{}', encoding="utf-8")
+        analysis_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (
@@ -63,7 +65,9 @@ class TestSpecGeneratorService:
         )
         mock_proc.returncode = 0
 
-        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        with patch(
+            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec:
             service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
             result = await service.generate(
                 analysis_path=str(analysis_file),
@@ -77,7 +81,7 @@ class TestSpecGeneratorService:
     @pytest.mark.anyio
     async def test_generate_output_path_passes_flag(self, tmp_path):
         analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text('{}', encoding="utf-8")
+        analysis_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (
@@ -86,7 +90,9 @@ class TestSpecGeneratorService:
         )
         mock_proc.returncode = 0
 
-        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+        with patch(
+            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec:
             service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
             await service.generate(
                 analysis_path=str(analysis_file),
@@ -100,13 +106,15 @@ class TestSpecGeneratorService:
     @pytest.mark.anyio
     async def test_generate_invalid_json_stdout(self, tmp_path):
         analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text('{}', encoding="utf-8")
+        analysis_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (b"not json", b"some error")
         mock_proc.returncode = 1
 
-        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch(
+            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
+        ):
             service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
             result = await service.generate(analysis_path=str(analysis_file))
 
@@ -116,7 +124,7 @@ class TestSpecGeneratorService:
     @pytest.mark.anyio
     async def test_generate_missing_binary(self, tmp_path):
         analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text('{}', encoding="utf-8")
+        analysis_file.write_text("{}", encoding="utf-8")
 
         with patch("mcp_server.services.shutil.which", return_value=None):
             service = SpecGeneratorService()
@@ -128,7 +136,7 @@ class TestSpecGeneratorService:
     @pytest.mark.anyio
     async def test_generate_exports_workspace_zip_on_success(self, tmp_path):
         analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text('{}', encoding="utf-8")
+        analysis_file.write_text("{}", encoding="utf-8")
 
         docx_path = tmp_path / "out.docx"
         expected_result = {
@@ -146,7 +154,9 @@ class TestSpecGeneratorService:
         mock_client = MagicMock(spec=WorkspaceClient)
         mock_client.export_workspace = AsyncMock()
 
-        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch(
+            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
+        ):
             service = SpecGeneratorService(
                 client=mock_client,
                 doc_gen_bin="/usr/bin/doc-gen",
@@ -161,7 +171,7 @@ class TestSpecGeneratorService:
     @pytest.mark.anyio
     async def test_generate_with_progress_reporting(self, tmp_path):
         analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text('{}', encoding="utf-8")
+        analysis_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (
@@ -174,19 +184,17 @@ class TestSpecGeneratorService:
         ctx.report_progress = AsyncMock()
         ctx.log = AsyncMock()
 
-        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc):
+        with patch(
+            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
+        ):
             service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
             await service.generate(analysis_path=str(analysis_file), ctx=ctx)
 
         ctx.report_progress.assert_any_call(
             10, 100, "Loading and validating analysis data..."
         )
-        ctx.report_progress.assert_any_call(
-            60, 100, "Running document generation..."
-        )
-        ctx.report_progress.assert_any_call(
-            100, 100, "Spec generation complete."
-        )
+        ctx.report_progress.assert_any_call(60, 100, "Running document generation...")
+        ctx.report_progress.assert_any_call(100, 100, "Spec generation complete.")
 
 
 # ── launch_annotator ──────────────────────────────────────────
@@ -194,7 +202,9 @@ class TestSpecGeneratorService:
 
 class TestLaunchAnnotator:
     @pytest.mark.anyio
-    async def test_launch_annotator_success(self, tmp_path, monkeypatch, mock_httpx_client_class):
+    async def test_launch_annotator_success(
+        self, tmp_path, monkeypatch, mock_httpx_client_class
+    ):
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
         mock_popen.return_value.stdout = io.BytesIO(b"")

@@ -89,7 +89,11 @@ class DaemonManager:
                 log_deque.append(decoded)
 
                 # Check for port reporting
-                if port_future is not None and loop is not None and not port_future.done():
+                if (
+                    port_future is not None
+                    and loop is not None
+                    and not port_future.done()
+                ):
                     if decoded.startswith("PORT="):
                         try:
                             port_num = int(decoded.strip().split("=")[1])
@@ -144,12 +148,24 @@ class DaemonManager:
         # Start background stream pipe threads
         threading.Thread(
             target=self._pipe_stream,
-            args=(annotator_proc.stdout, self.annotator_logs, sys.stderr, port_future, loop),
+            args=(
+                annotator_proc.stdout,
+                self.annotator_logs,
+                sys.stderr,
+                port_future,
+                loop,
+            ),
             daemon=True,
         ).start()
         threading.Thread(
             target=self._pipe_stream,
-            args=(annotator_proc.stderr, self.annotator_logs, sys.stderr, port_future, loop),
+            args=(
+                annotator_proc.stderr,
+                self.annotator_logs,
+                sys.stderr,
+                port_future,
+                loop,
+            ),
             daemon=True,
         ).start()
 

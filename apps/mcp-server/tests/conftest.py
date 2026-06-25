@@ -16,6 +16,7 @@ def mock_httpx_client_class(monkeypatch):
     """Fixture that mocks httpx.AsyncClient with a configurable class.
     Tests can use this, or override it if they need custom behavior.
     """
+
     class MockAsyncClient:
         def __init__(self, *args, **kwargs):
             pass
@@ -48,6 +49,7 @@ def mock_httpx_client_class(monkeypatch):
 @pytest.fixture
 def mcp_ctx():
     """Create a mock MCP Context that provides lifespan_context."""
+
     def _make_ctx(
         client: WorkspaceClient | None = None,
         daemon_manager: DaemonManager | None = None,
@@ -62,4 +64,5 @@ def mcp_ctx():
             "spec_service": spec_service or MagicMock(spec=SpecGeneratorService),
         }
         return ctx
+
     return _make_ctx

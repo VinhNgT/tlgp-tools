@@ -1,6 +1,5 @@
 """Tests for formatting configuration loader."""
 
-
 import pytest
 from doc_generator.style_constants import StyleConfig, load_default_style
 
@@ -11,6 +10,7 @@ def test_load_default_style():
     assert style.FONT_FAMILY == "Times New Roman"
     assert style.FONT_SIZE_DEFAULT.pt == 12
     assert style.HEADING_COLOR is not None
+
 
 def test_missing_key_raises_value_error(tmp_path):
     """Verify that a missing required key raises a ValueError."""

@@ -49,7 +49,13 @@ class TestBuildDocumentMinimal:
         analysis = _minimal_analysis(tmp_path)
         doc = build_document(analysis)
         # Find paragraphs with heading style
-        headings = [p for p in doc.paragraphs if p.style is not None and p.style.name is not None and p.style.name.startswith("Heading")]
+        headings = [
+            p
+            for p in doc.paragraphs
+            if p.style is not None
+            and p.style.name is not None
+            and p.style.name.startswith("Heading")
+        ]
         assert len(headings) >= 1
         # Screen heading should contain "Màn hình Test Screen"
         screen_headings = [h for h in headings if "Test Screen" in h.text]

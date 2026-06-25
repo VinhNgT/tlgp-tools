@@ -19,17 +19,17 @@ def test_bounds_minimum_size_validation():
 
     # Invalid width
     with pytest.raises(ValidationError) as exc:
-        Bounds(x=0, y=0, w=3, h=10)
+        Bounds(x=0, y=0, w=3, h=10)  # type: ignore
     assert "Input should be greater than or equal to 4" in str(exc.value)
 
     # Invalid height
     with pytest.raises(ValidationError) as exc:
-        Bounds(x=0, y=0, w=10, h=3)
+        Bounds(x=0, y=0, w=10, h=3)  # type: ignore
     assert "Input should be greater than or equal to 4" in str(exc.value)
 
     # Invalid x, y
     with pytest.raises(ValidationError):
-        Bounds(x=-1, y=0, w=10, h=10)
+        Bounds(x=-1, y=0, w=10, h=10)  # type: ignore
 
 
 def test_component_uuid_relationships():
@@ -41,7 +41,7 @@ def test_component_uuid_relationships():
         number="1",
         label="Test",
         parentId=parent_id,
-        bounds=Bounds(x=0, y=0, w=10, h=10)
+        bounds=Bounds(x=0, y=0, w=10, h=10),
     )
 
     assert comp.id == child_id

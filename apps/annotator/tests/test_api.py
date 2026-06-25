@@ -55,13 +55,12 @@ class TestStateRoutes:
         assert "workspaceId" in data
         assert "components" in data
 
-
     @pytest.mark.anyio()
     async def test_get_state_invalid_state_error(self, client, workspace):
         with patch(
             "annotator.workspace.manager.WorkspaceManager.state",
             new_callable=PropertyMock,
-            side_effect=InvalidStateError("Test error")
+            side_effect=InvalidStateError("Test error"),
         ):
             resp = await client.get("/workspace/state")
 
@@ -69,6 +68,7 @@ class TestStateRoutes:
         data = resp.json()
         assert "detail" in data
         assert data["detail"] == "Test error"
+
 
 # ── Import/Export Routes ──────────────────────────────────────────────
 

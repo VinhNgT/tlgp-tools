@@ -316,5 +316,3 @@ def test_cut_editor_hover_ghost_line(qapp):
 
     # hover_y should be cleared to None
     assert dialog.state.hover_y is None
-
-

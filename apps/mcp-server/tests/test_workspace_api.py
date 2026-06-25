@@ -40,7 +40,9 @@ def test_api_client_error_serialization():
 
 class TestWorkspaceApi:
     @pytest.mark.anyio
-    async def test_get_workspace_state_success(self, monkeypatch, mock_httpx_client_class):
+    async def test_get_workspace_state_success(
+        self, monkeypatch, mock_httpx_client_class
+    ):
         workspace_id = str(uuid4())
 
         async def mock_request(self, method, url, *args, **kwargs):
@@ -85,7 +87,9 @@ class TestWorkspaceApi:
         assert await client.check_connection() is False
 
     @pytest.mark.anyio
-    async def test_get_workspace_state_http_status_error(self, monkeypatch, mock_httpx_client_class):
+    async def test_get_workspace_state_http_status_error(
+        self, monkeypatch, mock_httpx_client_class
+    ):
         req = httpx.Request("GET", "http://localhost/state")
         resp = httpx.Response(404, request=req, text="Not found details")
 
@@ -106,7 +110,9 @@ class TestWorkspaceApi:
         assert err.backend_detail == "Not found details"
 
     @pytest.mark.anyio
-    async def test_get_workspace_state_request_error(self, monkeypatch, mock_httpx_client_class):
+    async def test_get_workspace_state_request_error(
+        self, monkeypatch, mock_httpx_client_class
+    ):
         req = httpx.Request("GET", "http://localhost/state")
 
         async def mock_request(self, method, url, *args, **kwargs):
@@ -124,11 +130,10 @@ class TestWorkspaceApi:
         assert err.url is not None
         assert "localhost/state" in err.url
 
-
-
-
     @pytest.mark.anyio
-    async def test_export_workspace_zip_success(self, tmp_path, monkeypatch, mock_httpx_client_class):
+    async def test_export_workspace_zip_success(
+        self, tmp_path, monkeypatch, mock_httpx_client_class
+    ):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
             zf.writestr("workspace.json", '{"workspaceId": "abc"}')
@@ -153,9 +158,10 @@ class TestWorkspaceApi:
             assert "workspace.json" in zf.namelist()
             assert "screenshot.png" in zf.namelist()
 
-
     @pytest.mark.anyio
-    async def test_export_images_extracted_success(self, tmp_path, monkeypatch, mock_httpx_client_class):
+    async def test_export_images_extracted_success(
+        self, tmp_path, monkeypatch, mock_httpx_client_class
+    ):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
             zf.writestr("mapping.json", '{"components": {}}')
@@ -181,10 +187,12 @@ class TestWorkspaceApi:
         assert (out_dir / "comp1.png").exists()
 
     @pytest.mark.anyio
-    async def test_export_images_invalid_mapping_json(self, tmp_path, mock_httpx_client_class):
+    async def test_export_images_invalid_mapping_json(
+        self, tmp_path, mock_httpx_client_class
+    ):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
-            zf.writestr("mapping.json", 'invalid_json{')
+            zf.writestr("mapping.json", "invalid_json{")
             zf.writestr("comp1.png", b"comp_bytes")
 
         async def mock_request(self, method, url, *args, **kwargs):
@@ -204,4 +212,3 @@ class TestWorkspaceApi:
         assert (out_dir / "comp1.png").exists()
         assert "images" not in res
         assert "annotated_images" not in res
-

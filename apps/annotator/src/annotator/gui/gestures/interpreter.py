@@ -24,7 +24,9 @@ class GestureInterpreter:
     def __getattr__(self, name: str) -> Any:
         if hasattr(self.state, name):
             return getattr(self.state, name)
-        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
+        raise AttributeError(
+            f"'{self.__class__.__name__}' object has no attribute '{name}'"
+        )
 
     def __setattr__(self, name: str, value: Any) -> None:
         if name in ("state", "transformer"):

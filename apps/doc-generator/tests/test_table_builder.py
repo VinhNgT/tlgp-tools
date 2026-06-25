@@ -64,7 +64,9 @@ class TestGenericInfoTable:
 
     def test_header_content(self):
         doc = Document()
-        table = build_generic_info_table(doc, "Tên chức năng", "Tiêu đề", "Mô tả...", style)
+        table = build_generic_info_table(
+            doc, "Tên chức năng", "Tiêu đề", "Mô tả...", style
+        )
         assert table.cell(0, 0).text == "Tên chức năng"
         assert "Tiêu đề" in table.cell(0, 1).text
 
@@ -251,9 +253,7 @@ class TestFixedTableLayout:
         table = build_generic_info_table(doc, "L", "V", "D", style)
         tbl = table._tbl
         grid = tbl.find(qn("w:tblGrid"))
-        grid_widths = [
-            gc.get(qn("w:w")) for gc in grid.findall(qn("w:gridCol"))
-        ]
+        grid_widths = [gc.get(qn("w:w")) for gc in grid.findall(qn("w:gridCol"))]
         expected = [str(int(pt * 20)) for pt in style.INFO_COLS_PT]
         assert grid_widths == expected
 
@@ -263,6 +263,6 @@ class TestFixedTableLayout:
         build_generic_info_table(doc, "L", "V", "D", style)
         # No paragraphs should exist in the document body after a table
         for p in doc.paragraphs:
-            assert p.text != "" or p.style.name != "Normal", (
+            assert p.text != "" or (p.style is not None and p.style.name != "Normal"), (
                 "Found an empty Normal paragraph — likely a spacer paragraph"
             )

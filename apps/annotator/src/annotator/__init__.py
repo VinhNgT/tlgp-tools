@@ -1,2 +1,1 @@
 """Annotator desktop application."""
-

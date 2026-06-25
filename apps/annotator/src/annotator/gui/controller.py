@@ -20,9 +20,6 @@ from .state import UIStateStore
 logger = get_logger(__name__)
 
 
-
-
-
 class AppController:
     """Coordinates events between the workspace manager, observable state store, and passive views."""
 

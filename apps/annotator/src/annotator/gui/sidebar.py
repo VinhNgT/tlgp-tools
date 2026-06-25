@@ -74,7 +74,9 @@ class SidebarTreeView(QWidget):
             synced_ids: set[str] = set()
             new_ids: set[str] = set()
 
-            def sync_node(parent_item: QStandardItem | None, node_data: dict, index: int):
+            def sync_node(
+                parent_item: QStandardItem | None, node_data: dict, index: int
+            ):
                 node_id = node_data["id"]
                 node_text = node_data["text"]
 
@@ -90,7 +92,9 @@ class SidebarTreeView(QWidget):
                 if cached_item is None:
                     item = QStandardItem(node_text)
                     item.setData(node_id, Qt.ItemDataRole.UserRole)
-                    item.setData(node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1)
+                    item.setData(
+                        node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1
+                    )
                     item.setEditable(False)
                     container.insertRow(index, item)
                     self._item_map[node_id] = item
@@ -105,7 +109,9 @@ class SidebarTreeView(QWidget):
 
                     # Re-parent if needed
                     if cached_item.parent() != parent_item:
-                        old_parent = cached_item.parent() or self.model.invisibleRootItem()
+                        old_parent = (
+                            cached_item.parent() or self.model.invisibleRootItem()
+                        )
                         taken = old_parent.takeRow(cached_item.row())
                         if taken:
                             container.insertRow(index, taken)

@@ -487,7 +487,6 @@ class WorkspaceManager:
 
     def import_zip(self, file_bytes: bytes):
 
-
         with zipfile.ZipFile(io.BytesIO(file_bytes), "r") as zf:
             if "workspace.json" not in zf.namelist():
                 raise InvalidArchiveError("Invalid archive: Missing workspace.json")
@@ -578,19 +577,36 @@ class WorkspaceManager:
             folder_name = "exported_images"
         return f"{folder_name}_{mode}"
 
-    def _write_img_to_zip(self, zf: zipfile.ZipFile, img: Image.Image, archive_path: str):
+    def _write_img_to_zip(
+        self, zf: zipfile.ZipFile, img: Image.Image, archive_path: str
+    ):
         img_buf = io.BytesIO()
         img.save(img_buf, format="PNG")
         zf.writestr(archive_path, img_buf.getvalue())
 
-    def _update_export_mapping(self, mapping: dict, comp_id: uuid.UUID | None, archive_path: str, mode: str, submode: str):
+    def _update_export_mapping(
+        self,
+        mapping: dict,
+        comp_id: uuid.UUID | None,
+        archive_path: str,
+        mode: str,
+        submode: str,
+    ):
         target_map = mapping[submode] if mode == "both" else mapping
         if comp_id is None:
             target_map["root"] = archive_path
         else:
             target_map["components"][str(comp_id)] = archive_path
 
-    def _export_node_annotated(self, img: Image.Image, node: ExportNode, state_snapshot: WorkspaceState, zf: zipfile.ZipFile, mapping: dict, mode: str) -> bool:
+    def _export_node_annotated(
+        self,
+        img: Image.Image,
+        node: ExportNode,
+        state_snapshot: WorkspaceState,
+        zf: zipfile.ZipFile,
+        mapping: dict,
+        mode: str,
+    ) -> bool:
         if node["is_leaf"]:
             return False
         cropped_ann = img.crop(node["bounds"])
@@ -603,12 +619,23 @@ class WorkspaceManager:
                 parent_comp=node["parent_comp"],
                 full_img_width=state_snapshot.image.width,
             )
-        archive_path = f"annotated/{node['filename']}" if mode == "both" else node["filename"]
+        archive_path = (
+            f"annotated/{node['filename']}" if mode == "both" else node["filename"]
+        )
         self._write_img_to_zip(zf, cropped_ann, archive_path)
-        self._update_export_mapping(mapping, node["comp_id"], archive_path, mode, "annotated")
+        self._update_export_mapping(
+            mapping, node["comp_id"], archive_path, mode, "annotated"
+        )
         return True
 
-    def _export_node_raw(self, img: Image.Image, node: ExportNode, zf: zipfile.ZipFile, mapping: dict, mode: str) -> bool:
+    def _export_node_raw(
+        self,
+        img: Image.Image,
+        node: ExportNode,
+        zf: zipfile.ZipFile,
+        mapping: dict,
+        mode: str,
+    ) -> bool:
         cropped_raw = img.crop(node["bounds"])
         archive_path = f"raw/{node['filename']}" if mode == "both" else node["filename"]
         self._write_img_to_zip(zf, cropped_raw, archive_path)
@@ -698,7 +725,9 @@ class WorkspaceManager:
                 exported_count = 0
                 for node in get_export_nodes():
                     if mode in ("annotated", "both"):
-                        if self._export_node_annotated(img, node, state_snapshot, zf, mapping, mode):
+                        if self._export_node_annotated(
+                            img, node, state_snapshot, zf, mapping, mode
+                        ):
                             exported_count += 1
 
                     if mode in ("raw", "both"):
