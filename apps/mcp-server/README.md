@@ -121,9 +121,9 @@ The server exposes read-only data and reference guides to assist with generating
 ```text
 Agent ──MCP──▸ mcp-server
                      │
-                     ├── launch_annotator ──subprocess──▸ tlgp-annotation-tool (GUI)
+                     ├── launch_annotator ──subprocess──▸ annotator (GUI)
                      │
-                     ├── connect_to_annotator ──http──▸ tlgp-annotation-tool (API)
+                     ├── connect_to_annotator ──http──▸ annotator (API)
                      │
                      └── generate_spec_doc ──subprocess──▸ doc-generator
 ```
