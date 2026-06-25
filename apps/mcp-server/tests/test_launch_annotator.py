@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import io
 from unittest.mock import MagicMock
 
 import httpx
@@ -129,3 +130,46 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
     # Verify Popen args contains the workspace zip path
     args = mock_popen.call_args[0][0]
     assert str(dummy_zip.resolve()) in args
+
+
+@pytest.mark.anyio
+async def test_launch_annotator_resolves_dynamic_port(monkeypatch):
+    mock_popen = MagicMock()
+    mock_popen.return_value.pid = 3333
+
+    mock_popen.return_value.stdout = io.BytesIO(b"PORT=9191\n")
+    mock_popen.return_value.stderr = io.BytesIO(b"")
+
+    monkeypatch.setattr(
+        "mcp_server.manager.subprocess.Popen",
+        mock_popen,
+    )
+    monkeypatch.setattr(
+        "mcp_server.manager.shutil.which",
+        lambda name: "/usr/bin/uv",
+    )
+
+    class MockAsyncClient:
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, exc_type, exc_val, exc_tb):
+            pass
+
+        async def get(self, url, *args, **kwargs):
+            assert "9191" in url
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            return mock_res
+
+    monkeypatch.setattr(
+        "mcp_server.manager.httpx.AsyncClient",
+        MockAsyncClient,
+    )
+
+    manager = DaemonManager()
+    result = await manager.launch_annotator()
+    assert result["annotator_pid"] == 3333
+    assert result["annotator_ready"] is True
+    assert result["port"] == 9191
+    assert manager.annotator_url == "http://127.0.0.1:9191"

@@ -92,7 +92,9 @@ class WorkspaceClient:
     ) -> dict:
         """Download the full screenshot or a component image by extracting it from the export-images ZIP using mapping.json."""
         mode = "annotated" if show_children else "raw"
-        res = await self._request("GET", "/workspace/export-images", params={"mode": mode})
+        res = await self._request(
+            "GET", "/workspace/export-images", params={"mode": mode}
+        )
 
         out_path = os.path.abspath(output_path)
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
@@ -121,7 +123,9 @@ class WorkspaceClient:
     async def get_image_bytes(self, comp_id: str, show_children: bool = False) -> bytes:
         """Fetch the raw image bytes for a component by extracting it from the export-images ZIP using mapping.json."""
         mode = "annotated" if show_children else "raw"
-        res = await self._request("GET", "/workspace/export-images", params={"mode": mode})
+        res = await self._request(
+            "GET", "/workspace/export-images", params={"mode": mode}
+        )
 
         zip_buf = io.BytesIO(res.content)
         with zipfile.ZipFile(zip_buf, "r") as zf:
@@ -173,7 +177,9 @@ class WorkspaceClient:
         # Download ZIP of all crops
         # We match show_root_children/show_component_children to the modes
         mode = "annotated" if (show_root_children or show_component_children) else "raw"
-        res = await self._request("GET", "/workspace/export-images", params={"mode": mode})
+        res = await self._request(
+            "GET", "/workspace/export-images", params={"mode": mode}
+        )
 
         zip_buf = io.BytesIO(res.content)
         with zipfile.ZipFile(zip_buf, "r") as zf:

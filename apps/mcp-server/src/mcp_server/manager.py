@@ -60,6 +60,11 @@ class DaemonManager:
         # Active process tracking
         self.active_processes: list[subprocess.Popen] = []
 
+        # Target annotator URL
+        self.annotator_url = os.environ.get(
+            "TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000"
+        ).rstrip("/")
+
     def _pipe_stream(self, stream, log_deque, dest_stream) -> None:
         """Pipe lines from stream to the log deque and write atomic output to dest_stream."""
         try:
@@ -86,15 +91,13 @@ class DaemonManager:
         for proc in list(self.active_processes):
             if proc.poll() is None:
                 cmd = proc.args
-                cmd_str = " ".join(cmd) if isinstance(cmd, list) else str(cmd)
+                cmd_str = " ".join(str(x) for x in cmd) if isinstance(cmd, list) else str(cmd)
                 if "annotator" in cmd_str:
                     annotator_running = True
 
         # 2. Check annotator HTTP readiness
         # If client is passed, use it, otherwise instantiate a short-lived client
-        annotator_url = os.environ.get(
-            "TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000"
-        ).rstrip("/")
+        annotator_url = self.annotator_url
         try:
             if client is not None:
                 res = await client.get(f"{annotator_url}/workspace/state", timeout=0.5)
@@ -179,19 +182,39 @@ class DaemonManager:
             daemon=True,
         ).start()
 
+        # Wait for the PORT line in the logs
+        port_num = None
+        logger.info("Waiting for Annotator port reporting...")
+        for _ in range(50):
+            for log_line in list(self.annotator_logs):
+                if log_line.startswith("PORT="):
+                    try:
+                        port_num = int(log_line.strip().split("=")[1])
+                        break
+                    except ValueError:
+                        pass
+            if port_num is not None:
+                break
+            await asyncio.sleep(0.1)
+
+        if port_num is None:
+            logger.error(
+                "Annotator failed to report PORT via stdout. Defaulting to 8000."
+            )
+            port_num = 8000
+
+        self.annotator_url = f"http://127.0.0.1:{port_num}"
+        logger.info(f"Detected Annotator port: {port_num}")
+
         # Wait for the Annotator's HTTP API to become ready
         annotator_ready = False
-        annotator_url = os.environ.get(
-            "TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000"
-        ).rstrip("/")
-
-        logger.info("Polling Annotator HTTP readiness at %s...", annotator_url)
+        logger.info("Polling Annotator HTTP readiness at %s...", self.annotator_url)
 
         # Use provided client or short-lived client
         async def poll_readiness(c: httpx.AsyncClient) -> bool:
             for _ in range(30):
                 try:
-                    res = await c.get(f"{annotator_url}/workspace/state")
+                    res = await c.get(f"{self.annotator_url}/workspace/state")
                     if res.status_code == 200:
                         return True
                 except Exception:
@@ -213,4 +236,5 @@ class DaemonManager:
         return {
             "annotator_pid": annotator_proc.pid,
             "annotator_ready": annotator_ready,
+            "port": port_num,
         }

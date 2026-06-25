@@ -434,8 +434,6 @@ class TestDaemonControl:
         assert res["logs"] == "line2\n"
 
 
-
-
 class TestGenerateSpecDocWrapper:
     @pytest.mark.anyio
     async def test_generate_spec_doc_progress_and_elicitation(self, tmp_path):

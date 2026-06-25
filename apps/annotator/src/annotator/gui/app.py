@@ -7,7 +7,14 @@ All user interaction is delegated to the controller via callbacks.
 import os
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QUrl, Signal
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
+from PySide6.QtGui import (
+    QAction,
+    QActionGroup,
+    QCursor,
+    QDesktopServices,
+    QIcon,
+    QKeySequence,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
@@ -463,9 +470,8 @@ class MainAppWindow(QMainWindow):
             workspace_id = text.split("Workspace:", 1)[1].strip()
             self.properties.update_status("")  # Remove workspace ID on the right panel
             self.lbl_status_msg.hide()
-            self.lbl_workspace_prefix.show()
             self.lbl_workspace_id.setText(workspace_id)
-            self.lbl_workspace_id.show()
+            self.workspace_status_widget.show()
         else:
             self.properties.update_status(text, is_error)
             self.lbl_status_msg.setText(text)
@@ -474,8 +480,7 @@ class MainAppWindow(QMainWindow):
             else:
                 self.lbl_status_msg.setStyleSheet("color: #E0E0E0;")
             self.lbl_status_msg.show()
-            self.lbl_workspace_prefix.hide()
-            self.lbl_workspace_id.hide()
+            self.workspace_status_widget.hide()
 
     def _build_status_bar(self):
         self.status_bar = self.statusBar()
@@ -485,10 +490,14 @@ class MainAppWindow(QMainWindow):
         self.lbl_status_msg = QLabel("Ready")
         self.status_bar.addWidget(self.lbl_status_msg)
 
-        # Left side: workspace widgets (hidden by default)
-        self.lbl_workspace_prefix = QLabel("Workspace: ")
-        self.lbl_workspace_prefix.hide()
-        self.status_bar.addWidget(self.lbl_workspace_prefix)
+        # Left side: workspace widgets (grouped in a single widget for consistent layout spacing)
+        self.workspace_status_widget = QWidget()
+        ws_layout = QHBoxLayout(self.workspace_status_widget)
+        ws_layout.setContentsMargins(0, 0, 0, 0)
+        ws_layout.setSpacing(6)
+
+        self.lbl_workspace_prefix = QLabel("Workspace:")
+        ws_layout.addWidget(self.lbl_workspace_prefix)
 
         self.lbl_workspace_id = ClickableLabel("")
         self.lbl_workspace_id.setTextInteractionFlags(
@@ -496,8 +505,10 @@ class MainAppWindow(QMainWindow):
         )
         self.lbl_workspace_id.setToolTip("Click to copy Workspace ID")
         self.lbl_workspace_id.clicked.connect(self._copy_workspace_id_direct)
-        self.lbl_workspace_id.hide()
-        self.status_bar.addWidget(self.lbl_workspace_id)
+        ws_layout.addWidget(self.lbl_workspace_id)
+
+        self.workspace_status_widget.hide()
+        self.status_bar.addWidget(self.workspace_status_widget)
 
         # Right side: API indicators
         self.api_status_widget = QWidget()
@@ -511,8 +522,16 @@ class MainAppWindow(QMainWindow):
             "color: #2ECC71; font-size: 10pt; font-family: Arial;"
         )
 
-        # Static API URL label (non-clickable)
-        self.lbl_api_link = QLabel(f"API: {self.api_url}")
+        # Static API prefix label (non-clickable)
+        self.lbl_api_prefix = QLabel("API:")
+
+        # Clickable API link (only the actual URL, click to copy URL, no tooltip)
+        self.lbl_api_link = ClickableLabel(self.api_url)
+        self.lbl_api_link.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.lbl_api_link.setToolTip("Click to copy API URL")
+        self.lbl_api_link.clicked.connect(self._copy_api_url_direct)
 
         # Docs link (clickable)
         self.lbl_docs_link = QLabel(
@@ -521,6 +540,7 @@ class MainAppWindow(QMainWindow):
         self.lbl_docs_link.setOpenExternalLinks(True)
 
         api_layout.addWidget(self.lbl_api_dot)
+        api_layout.addWidget(self.lbl_api_prefix)
         api_layout.addWidget(self.lbl_api_link)
         api_layout.addWidget(self.lbl_docs_link)
 
@@ -528,16 +548,19 @@ class MainAppWindow(QMainWindow):
 
     def _copy_api_url(self, link):
         if link == "#copy":
-            QApplication.clipboard().setText(self.api_url)
-            self.status_bar.showMessage("API Base URL copied to clipboard!", 2000)
+            self._copy_api_url_direct()
+
+    def _copy_api_url_direct(self):
+        QApplication.clipboard().setText(self.api_url)
+        # Show a popup bubble at the mouse cursor position
+        QToolTip.showText(QCursor.pos(), "Copied!", self.lbl_api_link)
 
     def _copy_workspace_id_direct(self):
         ws_id = self.lbl_workspace_id.text()
         if ws_id:
             QApplication.clipboard().setText(ws_id)
-            # Show a popup bubble instead of replacing status bar text
-            pos = self.lbl_workspace_id.mapToGlobal(QPoint(0, -30))
-            QToolTip.showText(pos, "Copied!", self.lbl_workspace_id)
+            # Show a popup bubble at the mouse cursor position
+            QToolTip.showText(QCursor.pos(), "Copied!", self.lbl_workspace_id)
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:

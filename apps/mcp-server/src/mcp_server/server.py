@@ -151,11 +151,14 @@ async def launch_annotator(
     Returns:
         dict with annotator_pid and annotator_ready.
     """
-    return await get_daemon_manager().launch_annotator(
+    res = await get_daemon_manager().launch_annotator(
         screenshot_path=screenshot_path,
         workspace_zip=workspace_zip,
         client=get_client().client,
     )
+    if res.get("annotator_ready") and "port" in res:
+        get_client().base_url = f"http://127.0.0.1:{res['port']}"
+    return res
 
 
 @mcp.tool()
@@ -219,6 +222,33 @@ async def export_workspace(output_path: str) -> dict:
         dict with status and output_path.
     """
     return await get_client().export_workspace(output_path)
+
+
+@mcp.tool()
+async def connect_to_annotator(url: str) -> dict:
+    """Connect the MCP server to a running annotator instance at the specified URL.
+
+    Use this tool to point the MCP server to a dynamic port or existing annotator
+    instance (found in the status bar of the GUI).
+
+    Args:
+        url: The base URL of the running annotator instance (e.g. 'http://127.0.0.1:8000').
+    """
+    client = get_client()
+    client.base_url = url.rstrip("/")
+    get_daemon_manager().annotator_url = client.base_url
+    try:
+        state = await client.get_workspace_state()
+        return {
+            "status": "success",
+            "message": f"Successfully connected to the annotator instance at {url}",
+            "workspace_id": state.get("workspaceId"),
+        }
+    except Exception as e:
+        return {
+            "status": "error",
+            "message": f"Failed to connect to annotator at {url}: {e}",
+        }
 
 
 @mcp.tool()

@@ -7,6 +7,7 @@ the main thread. Both share a single WorkspaceManager instance.
 import asyncio
 import ctypes
 import os
+import socket
 import sys
 import threading
 
@@ -22,7 +23,28 @@ logger = get_logger(__name__)
 _SERVER_STARTUP_TIMEOUT = 5  # seconds
 
 
+def is_port_free(port: int) -> bool:
+    """Check if the given localhost port is free to bind."""
+    try:
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.bind(("127.0.0.1", port))
+            return True
+    except Exception:
+        return False
+
+
+def get_free_port() -> int:
+    """Find a free port on localhost dynamically."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+        s.bind(("127.0.0.1", 0))
+        return s.getsockname()[1]
+
+
 def main():
+    # Redirect stdout to stderr to prevent log pollution from third-party libraries
+    original_stdout = sys.stdout
+    sys.stdout = sys.stderr
+
     setup_logging(json_format=(os.environ.get("TLGP_ENV") == "prod"))
     setup_excepthook()
 
@@ -48,9 +70,26 @@ def main():
     app = create_app(workspace)
     ready_event = threading.Event()
 
+    # Resolve dynamic port
+    env_port = os.environ.get("TLGP_PORT")
+    port = None
+    if env_port:
+        try:
+            parsed_port = int(env_port)
+            if is_port_free(parsed_port):
+                port = parsed_port
+        except ValueError:
+            pass
+
+    if port is None:
+        port = get_free_port()
+
+    # Immediately write the selected port to the original stdout and flush
+    original_stdout.write(f"PORT={port}\n")
+    original_stdout.flush()
+
     def run_server():
         asyncio.set_event_loop(server_loop)
-        port = int(os.environ.get("TLGP_PORT", 8000))
         config = uvicorn.Config(
             app,
             host="127.0.0.1",
@@ -79,7 +118,6 @@ def main():
         )
         sys.exit(1)
 
-    port = int(os.environ.get("TLGP_PORT", 8000))
     logger.info(f"FastAPI server ready on http://127.0.0.1:{port}")
 
     # Load workspace session or raw image on startup if passed as CLI argument

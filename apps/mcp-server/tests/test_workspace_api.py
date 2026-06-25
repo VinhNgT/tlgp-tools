@@ -127,7 +127,10 @@ class TestWorkspaceApi:
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
             zf.writestr("images/compuuid.png", b"fake_png_data")
-            zf.writestr("mapping.json", '{"root": "root_raw.png", "components": {"comp-uuid": "images/compuuid.png"}}')
+            zf.writestr(
+                "mapping.json",
+                '{"root": "root_raw.png", "components": {"comp-uuid": "images/compuuid.png"}}',
+            )
 
         class MockResponse:
             status_code = 200
@@ -165,7 +168,10 @@ class TestWorkspaceApi:
         with zipfile.ZipFile(zip_buf, "w") as zf:
             zf.writestr("root_raw.png", b"image_bytes")
             zf.writestr("images/comp1.png", b"comp_bytes")
-            zf.writestr("mapping.json", '{"root": "root_raw.png", "components": {"comp1": "images/comp1.png"}}')
+            zf.writestr(
+                "mapping.json",
+                '{"root": "root_raw.png", "components": {"comp1": "images/comp1.png"}}',
+            )
 
         class MockResponse:
             status_code = 200
@@ -248,7 +254,10 @@ class TestWorkspaceApi:
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
             zf.writestr("images/compuuid.png", b"raw_bytes")
-            zf.writestr("mapping.json", '{"root": "root_raw.png", "components": {"comp-uuid": "images/compuuid.png"}}')
+            zf.writestr(
+                "mapping.json",
+                '{"root": "root_raw.png", "components": {"comp-uuid": "images/compuuid.png"}}',
+            )
 
         class MockResponse:
             status_code = 200
@@ -274,5 +283,3 @@ class TestWorkspaceApi:
         client = WorkspaceClient()
         res = await client.get_image_bytes("comp-uuid")
         assert res == b"raw_bytes"
-
-
