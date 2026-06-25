@@ -16,6 +16,7 @@ PillCorner = Literal["top_left", "top_right", "bottom_left", "bottom_right"]
 class Bounds(BaseModel):
     x: int = Field(..., ge=0)
     y: int = Field(..., ge=0)
+    # Minimum renderable annotation size in the UI to ensure pills remain selectable
     w: int = Field(..., ge=4)
     h: int = Field(..., ge=4)
 

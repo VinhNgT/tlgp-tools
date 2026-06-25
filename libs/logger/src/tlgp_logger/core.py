@@ -1,7 +1,16 @@
+"""Core structured logging configuration.
+
+Standardizes logs in both development and production. It intercepts standard library logs,
+handles formatting (colored developer logs or structured JSON), and redirects output
+to sys.stderr to prevent protocol/data stream corruption.
+"""
+
 import logging
 import sys
 
 import structlog
+
+_initialized = False
 
 
 def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
@@ -9,6 +18,10 @@ def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
     Configures structured logging for the application.
     Intercepts standard library logs and formats them via structlog.
     """
+    global _initialized
+    if _initialized:
+        return
+
     # Map string log level to standard logging level
     level = getattr(logging, log_level.upper(), logging.INFO)
 
@@ -53,6 +66,8 @@ def setup_logging(log_level: str = "INFO", json_format: bool = False) -> None:
     root_logger.handlers.clear()
     root_logger.addHandler(handler)
     root_logger.setLevel(level)
+
+    _initialized = True
 
 
 def get_logger(name: str | None = None) -> structlog.stdlib.BoundLogger:

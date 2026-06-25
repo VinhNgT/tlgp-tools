@@ -4,8 +4,17 @@ import sys
 from io import StringIO
 from unittest.mock import MagicMock
 
+import pytest
+import tlgp_logger.core
 from structlog.testing import capture_logs
 from tlgp_logger import get_logger, setup_excepthook, setup_logging
+
+
+@pytest.fixture(autouse=True)
+def reset_logging_initialized():
+    tlgp_logger.core._initialized = False
+    yield
+    tlgp_logger.core._initialized = False
 
 
 def test_logger_json_format():
