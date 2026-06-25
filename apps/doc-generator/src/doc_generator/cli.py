@@ -50,7 +50,7 @@ def _print_summary(analysis: AnalysisData):
     print("  TLGP Doc Generator — Dry Run Summary")
     print("=" * 50)
     print(f"  Section prefix:     {analysis.sectionPrefix}")
-    print(f"  Export dir:         {analysis.exportDir}")
+    print(f"  Export dir:         {analysis.imageDir}")
     print(f"  Screen:             {analysis.screen.name}")
     print()
     print(f"  Components:         {len(non_leaf)} non-leaf, {len(leaf)} leaf")

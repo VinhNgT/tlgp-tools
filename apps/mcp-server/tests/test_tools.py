@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from mcp_server.client import WorkspaceClient
 from mcp_server.manager import DaemonManager
-from mcp_server.server import generate_spec_doc
+from mcp_server.server import connect_to_annotator, generate_spec_doc
 from mcp_server.services import SpecGeneratorService
 from PIL import Image as PILImage
 
@@ -46,7 +46,7 @@ def _build_analysis(screen_dir: Path) -> dict:
     screen_name = screen_dir.name
     return {
         "sectionPrefix": "1.1",
-        "exportDir": str(screen_dir),
+        "imageDir": str(screen_dir),
         "components": [
             {
                 "id": 1,
@@ -347,7 +347,7 @@ class TestLaunchAnnotator:
         screenshot.write_bytes(b"dummy")
 
         manager = DaemonManager()
-        result = await manager.launch_annotator(screenshot_path=str(screenshot))
+        result = await manager.launch_annotator(path=str(screenshot))
         assert result["annotator_pid"] == 12345
         assert result["annotator_ready"] is True
         assert mock_popen.call_count == 1
@@ -367,35 +367,10 @@ class TestLaunchAnnotator:
 
         manager = DaemonManager()
         with pytest.raises(RuntimeError, match="uv is not installed"):
-            await manager.launch_annotator(screenshot_path=str(tmp_path / "out"))
+            await manager.launch_annotator(path=str(tmp_path / "out"))
 
 
-class TestWriteAnalysisJson:
-    def test_write_success(self, tmp_path):
-        export_dir = tmp_path / "export"
-        export_dir.mkdir()
-        data = {"exportDir": str(export_dir), "test": "data"}
 
-        service = SpecGeneratorService()
-        res = service.write_analysis_json(data, "test.json")
-        assert res["success"] is True
-        assert "analysis_path" in res
-
-        filepath = Path(res["analysis_path"])
-        assert filepath.exists()
-        assert json.loads(filepath.read_text(encoding="utf-8")) == data
-
-    def test_missing_export_dir(self):
-        service = SpecGeneratorService()
-        res = service.write_analysis_json({"test": "data"})
-        assert res["success"] is False
-        assert "Missing 'exportDir'" in res["error"]
-
-    def test_invalid_export_dir(self):
-        service = SpecGeneratorService()
-        res = service.write_analysis_json({"exportDir": "nonexistent_dir"})
-        assert res["success"] is False
-        assert "not a valid directory" in res["error"]
 
 
 class TestDaemonControl:
@@ -436,54 +411,38 @@ class TestDaemonControl:
 
 class TestGenerateSpecDocWrapper:
     @pytest.mark.anyio
-    async def test_generate_spec_doc_progress_and_elicitation(self, tmp_path):
+    async def test_generate_spec_doc_progress(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
-
-        # Force a component description to be empty to trigger elicitation
-        analysis["components"][0]["description"] = ""
+        import json
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text(json.dumps(analysis), encoding="utf-8")
 
         # Mock Context
         ctx = MagicMock()
         ctx.report_progress = AsyncMock()
         ctx.log = AsyncMock()
 
-        # Mock elicitation response
-        mock_elicit_result = MagicMock()
-        mock_elicit_result.action = "accept"
-        mock_elicit_result.data.description = "Elicited Header Description"
-        ctx.elicit = AsyncMock(return_value=mock_elicit_result)
-
         # Call generate_spec_doc wrapper
         result = await generate_spec_doc(
-            ctx=ctx, analysis=analysis, output_path=str(tmp_path / "out.docx")
+            ctx=ctx, analysis_path=str(analysis_file), output_path=str(tmp_path / "out.docx")
         )
 
         assert result["valid"] is True
 
         # Verify progress was reported
         ctx.report_progress.assert_any_call(
-            10, 100, "Loading and validating analysis data..."
+            60, 100, "Running document generation..."
         )
-        ctx.report_progress.assert_any_call(
-            30, 100, "Eliciting description for 'Header'..."
-        )
-        ctx.report_progress.assert_any_call(60, 100, "Running document generation...")
         ctx.report_progress.assert_any_call(100, 100, "Spec generation complete.")
-
-        # Verify elicitation was called
-        ctx.elicit.assert_called_once()
-
-        # Verify the description was updated in the resulting doc/JSON
-        analysis_json = tmp_path / "analysis.json"
-        assert analysis_json.exists()
-        saved = json.loads(analysis_json.read_text(encoding="utf-8"))
-        assert saved["components"][0]["description"] == "Elicited Header Description"
 
     @pytest.mark.anyio
     async def test_generate_spec_doc_exports_workspace_zip(self, tmp_path, monkeypatch):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
+        import json
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text(json.dumps(analysis), encoding="utf-8")
 
         # Mock WorkspaceClient.export_workspace
         async def mock_export_workspace(client_self, output_path: str):
@@ -500,7 +459,7 @@ class TestGenerateSpecDocWrapper:
         # Call generate_spec_doc wrapper
         out_docx = tmp_path / "out.docx"
         result = await generate_spec_doc(
-            ctx=ctx, analysis=analysis, output_path=str(out_docx)
+            ctx=ctx, analysis_path=str(analysis_file), output_path=str(out_docx)
         )
 
         assert result["valid"] is True
@@ -510,3 +469,39 @@ class TestGenerateSpecDocWrapper:
         workspace_zip = tmp_path / "workspace.zip"
         assert workspace_zip.exists()
         assert workspace_zip.read_bytes() == b"mock_zip_content"
+
+
+class TestConnectToAnnotator:
+    @pytest.mark.anyio
+    async def test_connect_to_annotator_success(self, monkeypatch):
+        mock_client = MagicMock()
+        mock_client.check_connection = AsyncMock(return_value=True)
+        monkeypatch.setattr(
+            "mcp_server.server.get_client",
+            lambda: mock_client,
+        )
+
+        res = await connect_to_annotator("http://127.0.0.1:9091")
+        assert res["status"] == "success"
+        assert "http://127.0.0.1:9091" in res["message"]
+
+    @pytest.mark.anyio
+    async def test_connect_to_annotator_no_url(self):
+        res = await connect_to_annotator("invalid-url")
+        assert res["status"] == "error"
+        assert "Failed to connect to annotator" in res["message"]
+
+    @pytest.mark.anyio
+    async def test_connect_to_annotator_api_failure(self, monkeypatch):
+        mock_client = MagicMock()
+        mock_client.check_connection = AsyncMock(
+            side_effect=Exception("Connection refused")
+        )
+        monkeypatch.setattr(
+            "mcp_server.server.get_client",
+            lambda: mock_client,
+        )
+
+        res = await connect_to_annotator("http://localhost:8080/path")
+        assert res["status"] == "error"
+        assert "Failed to connect to annotator" in res["message"]

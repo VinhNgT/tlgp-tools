@@ -21,7 +21,7 @@ def _minimal_analysis(tmp_path, **overrides) -> AnalysisData:
     screen_name = overrides.pop("screen_name", "Test Screen")
     defaults = {
         "sectionPrefix": "1.1",
-        "exportDir": str(tmp_path),
+        "imageDir": str(tmp_path),
         "screen": Screen(name=screen_name, description=screen_desc, apis=screen_apis),
     }
     defaults.update(overrides)

@@ -33,6 +33,15 @@ def get_workspace(request: Request) -> WorkspaceManager:
     return request.app.state.workspace
 
 
+# ── Status Routes ──────────────────────────────────────────────────────
+
+
+@router.get("/health", tags=["Status"])
+async def health_check() -> dict:
+    """Lightweight connection check endpoint."""
+    return {"status": "ok"}
+
+
 # ── State Routes ───────────────────────────────────────────────────────
 
 

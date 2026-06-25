@@ -4,12 +4,11 @@ MCP (Model Context Protocol) server that exposes the TLGP annotation and documen
 
 ## Overview
 
-This server exposes two tools — one per underlying package — and one orchestration prompt:
+This server exposes five tools and zero prompts:
 
 | Type | Count | Purpose |
 |---|---|---|
-| **Tools** | 2 | Launch the annotation GUI, generate .docx specification documents |
-| **Prompts** | 1 | Step-by-step workflow guiding the agent through the full pipeline |
+| **Tools** | 5 | Launch the annotator GUI, manage workspaces, export component crops, and generate spec documents |
 
 ## Installation
 
@@ -37,7 +36,7 @@ uv sync
 ```
 
 3. Save the file and click **Refresh** in the MCP Servers panel.
-4. The server should appear with 2 tools and 1 prompt.
+4. The server should appear with 5 tools.
 
 ### Android Studio (Gemini)
 
@@ -81,28 +80,16 @@ uv run tlgp-mcp
 Spawns the TLGP Annotation Tool GUI as a background process. The user annotates screenshots with component boxes and exports when finished.
 
 **Args:**
-- `output_dir` — directory where the tool saves exported files
-- `screenshot_path` — optional screenshot image path to pre-load
-- `session_path` — optional previously exported session JSON to re-edit (mutually exclusive with `screenshot_path`)
+- `path` — optional path to a raw screenshot image or a previously exported `.zip` workspace to pre-load.
 
 ### `generate_spec_doc`
 
-Validates analysis data, generates a formatted `.docx` specification document, and saves the final analysis JSON data alongside it as `analysis.json` for record-keeping. Accepts either a complete analysis dict (conforming to the AnalysisData schema) or a file path to an `analysis.json` file on disk. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
+Validates analysis data from a JSON file, generates a formatted `.docx` specification document, and saves the final analysis JSON data alongside it as `analysis.json` for record-keeping. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
 
 **Args:**
-- `analysis` — optional complete analysis data dict (see the `spec_doc_workflow` prompt for the full schema reference)
-- `analysis_path` — optional path to an `analysis.json` file. Highly recommended for large payloads to bypass IDE client serialization limitations.
-- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `exportDir`). The analysis JSON data will also be saved next to it.
+- `analysis_path` — path to the `analysis.json` file on disk.
+- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `imageDir`). The analysis JSON data will also be saved next to it.
 - `validate_only` — if `True`, validate without generating (useful for catching errors early)
-
-## Prompts
-
-### `spec_doc_workflow`
-
-Complete workflow for creating a screen specification document. Guides the agent through: launching the annotator → reading annotation exports → vision analysis → codebase analysis → validation → generation. Includes the full analysis schema reference, control type classification guide, annotation export format documentation, and a concrete example inline.
-
-**Args:**
-- `section_prefix` (default: `"1.1"`) — section number prefix for headings
 
 ## Architecture
 

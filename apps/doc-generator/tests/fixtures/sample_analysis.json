@@ -1,6 +1,6 @@
 {
   "sectionPrefix": "1.1",
-  "exportDir": "/Volumes/Lexar2TB/Dev/tlgp-tools/doc-generator/tests/fixtures",
+  "imageDir": "/Volumes/Lexar2TB/Dev/tlgp-tools/doc-generator/tests/fixtures",
   "components": [
     {
       "id": 1,

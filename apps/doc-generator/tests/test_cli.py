@@ -60,7 +60,7 @@ class TestCliDryRun:
     def test_dry_run_prints_summary(self, tmp_path, capsys):
         analysis = {
             "sectionPrefix": "1.1",
-            "exportDir": str(tmp_path),
+            "imageDir": str(tmp_path),
             "screen": {"name": "Test"},
             "components": [],
         }
@@ -80,7 +80,7 @@ class TestCliGeneration:
     def test_generates_docx(self, tmp_path):
         analysis = {
             "sectionPrefix": "1.1",
-            "exportDir": str(tmp_path),
+            "imageDir": str(tmp_path),
             "screen": {"name": "My Screen", "description": "D"},
             "components": [],
         }
@@ -97,7 +97,7 @@ class TestCliGeneration:
     def test_default_output_name(self, tmp_path):
         analysis = {
             "sectionPrefix": "1.1",
-            "exportDir": str(tmp_path),
+            "imageDir": str(tmp_path),
             "screen": {"name": "Product Detail"},
         }
         json_path = tmp_path / "analysis.json"
@@ -114,7 +114,7 @@ class TestCliImageWarnings:
     def test_dry_run_shows_missing_images(self, tmp_path, capsys):
         analysis = {
             "sectionPrefix": "1.1",
-            "exportDir": str(tmp_path),
+            "imageDir": str(tmp_path),
             "screen": {"name": "T", "imageFiles": ["missing.png"]},
             "components": [
                 {"id": 1, "label": "A", "imageFile": "also_missing.png"},

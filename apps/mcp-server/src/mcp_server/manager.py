@@ -100,13 +100,13 @@ class DaemonManager:
         annotator_url = self.annotator_url
         try:
             if client is not None:
-                res = await client.get(f"{annotator_url}/workspace/state", timeout=0.5)
+                res = await client.get(f"{annotator_url}/health", timeout=0.5)
                 if res.status_code == 200:
                     annotator_ready = True
                     annotator_running = True
             else:
                 async with httpx.AsyncClient() as c:
-                    res = await c.get(f"{annotator_url}/workspace/state", timeout=0.5)
+                    res = await c.get(f"{annotator_url}/health", timeout=0.5)
                     if res.status_code == 200:
                         annotator_ready = True
                         annotator_running = True
@@ -136,14 +136,10 @@ class DaemonManager:
 
     async def launch_annotator(
         self,
-        screenshot_path: str | None = None,
-        workspace_zip: str | None = None,
+        path: str | None = None,
         client: httpx.AsyncClient | None = None,
     ) -> dict:
         """Spawn the monolithic annotation tool as a background subprocess."""
-        if screenshot_path and workspace_zip:
-            raise ValueError("screenshot_path and workspace_zip are mutually exclusive")
-
         if not self.uv_bin:
             raise RuntimeError("uv is not installed or not on PATH")
 
@@ -153,10 +149,8 @@ class DaemonManager:
 
         logger.info("Spawning annotator daemon under Cwd: %s", annotator_dir)
         annotator_cmd = [self.uv_bin, "run", "annotator"]
-        if screenshot_path:
-            annotator_cmd.append(os.path.abspath(screenshot_path))
-        elif workspace_zip:
-            annotator_cmd.append(os.path.abspath(workspace_zip))
+        if path:
+            annotator_cmd.append(os.path.abspath(path))
 
         annotator_proc = subprocess.Popen(
             annotator_cmd,
@@ -214,7 +208,7 @@ class DaemonManager:
         async def poll_readiness(c: httpx.AsyncClient) -> bool:
             for _ in range(30):
                 try:
-                    res = await c.get(f"{self.annotator_url}/workspace/state")
+                    res = await c.get(f"{self.annotator_url}/health")
                     if res.status_code == 200:
                         return True
                 except Exception:

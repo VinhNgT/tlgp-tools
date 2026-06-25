@@ -79,7 +79,7 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
     dummy_screenshot.write_bytes(b"image_bytes")
 
     manager = DaemonManager()
-    result = await manager.launch_annotator(screenshot_path=str(dummy_screenshot))
+    result = await manager.launch_annotator(path=str(dummy_screenshot))
     assert result["annotator_pid"] == 1111
     assert result["annotator_ready"] is True
 
@@ -123,7 +123,7 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
     dummy_zip.write_bytes(b"zip_bytes")
 
     manager = DaemonManager()
-    result = await manager.launch_annotator(workspace_zip=str(dummy_zip))
+    result = await manager.launch_annotator(path=str(dummy_zip))
     assert result["annotator_pid"] == 2222
     assert result["annotator_ready"] is True
 

@@ -1,6 +1,6 @@
 {
   "sectionPrefix": "{section_prefix}",
-  "exportDir": "./workspace_xyz",
+  "imageDir": "./workspace_xyz",
   "components": [
     {
       "id": 1,

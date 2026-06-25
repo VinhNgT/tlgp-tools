@@ -106,7 +106,7 @@ class AnalysisData(BaseModel):
     """Root schema for analysis.json."""
 
     sectionPrefix: str = "1.1"
-    exportDir: str
+    imageDir: str
     components: list[Component] = []
     screen: Screen
     discrepancies: list[Discrepancy] = []
@@ -156,14 +156,14 @@ class AnalysisData(BaseModel):
 
         return self
 
-    @field_validator("exportDir")
+    @field_validator("imageDir")
     @classmethod
-    def validate_export_dir(cls, v: str) -> str:
+    def validate_image_dir(cls, v: str) -> str:
         path = Path(v)
         if not path.is_dir():
-            raise ValueError(f"exportDir does not exist: {v}")
+            raise ValueError(f"imageDir does not exist: {v}")
         return v
 
     def resolve_image(self, relative_path: str) -> Path:
-        """Resolve an image filename relative to exportDir."""
-        return Path(self.exportDir) / relative_path
+        """Resolve an image filename relative to imageDir."""
+        return Path(self.imageDir) / relative_path

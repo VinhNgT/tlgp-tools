@@ -218,7 +218,7 @@ class TestAnalysisData:
     def test_valid_with_real_dir(self, tmp_path):
         data = AnalysisData(
             sectionPrefix="1.1",
-            exportDir=str(tmp_path),
+            imageDir=str(tmp_path),
             screen=Screen(name="Test"),
         )
         assert data.sectionPrefix == "1.1"
@@ -227,16 +227,16 @@ class TestAnalysisData:
         assert data.discrepancies == []
 
     def test_invalid_export_dir_raises(self):
-        with pytest.raises(ValidationError, match="exportDir does not exist"):
+        with pytest.raises(ValidationError, match="imageDir does not exist"):
             AnalysisData(
-                exportDir="/nonexistent/path/12345",
+                imageDir="/nonexistent/path/12345",
                 screen=Screen(name="Test"),
             )
 
     def test_resolve_image(self, tmp_path):
         (tmp_path / "test.png").touch()
         data = AnalysisData(
-            exportDir=str(tmp_path),
+            imageDir=str(tmp_path),
             screen=Screen(name="Test"),
         )
         resolved = data.resolve_image("test.png")
@@ -245,11 +245,11 @@ class TestAnalysisData:
 
     def test_missing_screen_raises(self):
         with pytest.raises(ValidationError):
-            AnalysisData.model_validate({"exportDir": "/tmp"})  # missing screen
+            AnalysisData.model_validate({"imageDir": "/tmp"})  # missing screen
 
     def test_with_discrepancies(self, tmp_path):
         data = AnalysisData(
-            exportDir=str(tmp_path),
+            imageDir=str(tmp_path),
             screen=Screen(name="Test"),
             discrepancies=[
                 Discrepancy(
@@ -267,7 +267,7 @@ class TestAnalysisData:
             ValidationError, match="API number 1 is defined in multiple places"
         ):
             AnalysisData(
-                exportDir=str(tmp_path),
+                imageDir=str(tmp_path),
                 screen=Screen(
                     name="Test", apis=[Api(number=1, method="GET", title="X", url="/x")]
                 ),
@@ -286,7 +286,7 @@ class TestAnalysisData:
             ValidationError, match="API GET /x is defined in multiple places"
         ):
             AnalysisData(
-                exportDir=str(tmp_path),
+                imageDir=str(tmp_path),
                 screen=Screen(
                     name="Test", apis=[Api(number=1, method="GET", title="X", url="/x")]
                 ),
@@ -314,8 +314,8 @@ class TestJsonRoundTrip:
             pytest.skip("sample_analysis.json fixture not found")
 
         raw = json.loads(fixture_path.read_text(encoding="utf-8"))
-        # Override exportDir to use the actual fixture directory
-        raw["exportDir"] = str(fixture_dir)
+        # Override imageDir to use the actual fixture directory
+        raw["imageDir"] = str(fixture_dir)
         data = AnalysisData.model_validate(raw)
 
         assert data.sectionPrefix == "1.1"
@@ -327,7 +327,7 @@ class TestJsonRoundTrip:
     def test_serialize_and_deserialize(self, tmp_path):
         data = AnalysisData(
             sectionPrefix="2.3",
-            exportDir=str(tmp_path),
+            imageDir=str(tmp_path),
             screen=Screen(
                 name="Cart",
                 apis=[

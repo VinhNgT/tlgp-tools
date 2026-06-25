@@ -17,14 +17,6 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class ComponentDescription(BaseModel):
-    """Schema for eliciting component descriptions from the user."""
-
-    description: str = Field(
-        ..., description="A brief 1-sentence UX description of the component"
-    )
-
-
 class SpecGeneratorService:
     """Orchestrates validation, metadata elicitation, and compilation of specification documents."""
 
@@ -33,9 +25,8 @@ class SpecGeneratorService:
 
     async def generate(
         self,
+        analysis_path: str,
         ctx: Context | None = None,
-        analysis: dict | None = None,
-        analysis_path: str | None = None,
         output_path: str | None = None,
         validate_only: bool = False,
     ) -> dict:
@@ -45,85 +36,18 @@ class SpecGeneratorService:
                 10, 100, "Loading and validating analysis data..."
             )
 
-        if analysis_path:
-            try:
-                with open(analysis_path, encoding="utf-8") as f:
-                    analysis = json.load(f)
-            except Exception as e:
-                logger.error(
-                    "Failed to load analysis file from %s: %s", analysis_path, e
-                )
-                return {
-                    "valid": False,
-                    "errors": [f"Failed to read analysis_path: {e}"],
-                    "warnings": [],
-                }
-
-        if not analysis:
+        try:
+            with open(analysis_path, encoding="utf-8") as f:
+                analysis = json.load(f)
+        except Exception as e:
+            logger.error(
+                "Failed to load analysis file from %s: %s", analysis_path, e
+            )
             return {
                 "valid": False,
-                "errors": ["Either 'analysis' or 'analysis_path' must be provided"],
+                "errors": [f"Failed to read analysis_path: {e}"],
                 "warnings": [],
             }
-
-        # Handle description elicitation for non-leaf components
-        if not validate_only and ctx is not None:
-            try:
-                data = AnalysisData.model_validate(analysis)
-                non_leaf = [c for c in data.components if not c.isLeaf]
-
-                updated = False
-                for comp in non_leaf:
-                    if not comp.description:
-                        await ctx.report_progress(
-                            30, 100, f"Eliciting description for '{comp.label}'..."
-                        )
-                        logger.info(
-                            "Eliciting description for empty component '%s' (ID: %s)",
-                            comp.label,
-                            comp.id,
-                        )
-                        try:
-                            result = await ctx.elicit(
-                                message=f"The component '{comp.label}' (id={comp.id}) has an empty description. Please provide a UX description.",
-                                schema=ComponentDescription,
-                            )
-                            if result.action == "accept":
-                                comp.description = result.data.description
-                                for c_dict in analysis.get("components", []):
-                                    if c_dict.get("id") == comp.id:
-                                        c_dict["description"] = comp.description
-                                        updated = True
-                                        break
-                        except Exception as e:
-                            logger.error(
-                                "Description elicitation failed for component '%s': %s",
-                                comp.label,
-                                e,
-                            )
-                            await ctx.log(
-                                "error",
-                                f"Elicitation failed for component '{comp.label}': {e}",
-                            )
-
-                if updated and analysis_path:
-                    try:
-                        with open(analysis_path, "w", encoding="utf-8") as f:
-                            json.dump(analysis, f, indent=2, ensure_ascii=False)
-                    except Exception as e:
-                        logger.warning(
-                            "Failed to save updated analysis data to %s: %s",
-                            analysis_path,
-                            e,
-                        )
-                        await ctx.log(
-                            "warning",
-                            f"Failed to write updated analysis back to {analysis_path}: {e}",
-                        )
-
-            except ValidationError:
-                # Fall through to let strict validation function capture and report structured errors
-                pass
 
         if ctx:
             await ctx.report_progress(60, 100, "Running document generation...")
@@ -266,7 +190,7 @@ class SpecGeneratorService:
                 .strip()
                 .replace(" ", "_")
             )
-            out = Path(data.exportDir) / f"{safe_name}.docx"
+            out = Path(data.imageDir) / f"{safe_name}.docx"
 
         out.parent.mkdir(parents=True, exist_ok=True)
         doc.save(str(out))
@@ -290,38 +214,3 @@ class SpecGeneratorService:
             "images": image_count,
             "warnings": warnings,
         }
-
-    def write_analysis_json(self, data: dict, filename: str = "analysis.json") -> dict:
-        """Safely write analysis data structure to analysis.json in the export directory."""
-        export_dir_str = data.get("exportDir")
-        if not export_dir_str:
-            return {
-                "success": False,
-                "error": "Missing 'exportDir' key in the analysis data.",
-            }
-
-        export_dir = Path(export_dir_str)
-        if not export_dir.is_dir():
-            return {
-                "success": False,
-                "error": f"The exportDir '{export_dir_str}' is not a valid directory.",
-            }
-
-        try:
-            out_path = export_dir / filename
-            out_path.write_text(
-                json.dumps(data, indent=2, ensure_ascii=False),
-                encoding="utf-8",
-            )
-            return {
-                "success": True,
-                "analysis_path": str(out_path.resolve()),
-            }
-        except Exception as e:
-            logger.error(
-                "Failed to write analysis JSON file to export directory: %s", e
-            )
-            return {
-                "success": False,
-                "error": f"Failed to write analysis JSON file: {e}",
-            }

@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from mcp_server.prompts import get_spec_workflow_prompt, get_strict_guidelines_content
-from mcp_server.server import spec_doc_workflow
+
 
 SPEC_WORKFLOW_PROMPT = ""
 
@@ -25,7 +25,7 @@ class TestSpecWorkflowPrompt:
     def test_references_current_tools(self):
         tools = [
             "launch_annotator",
-            "download_workspace_assets",
+            "export_images",
             "generate_spec_doc",
         ]
         for tool in tools:
@@ -33,6 +33,7 @@ class TestSpecWorkflowPrompt:
 
     def test_does_not_reference_old_tools(self):
         old_tools = [
+            "export_workspace",
             "prepare_analysis",
             "update_analysis",
             "finalize",
@@ -42,6 +43,7 @@ class TestSpecWorkflowPrompt:
             "validate_analysis",
             "generate_docx",
             "get_workspace_state",
+            "download_workspace_assets",
         ]
         for tool in old_tools:
             assert tool not in SPEC_WORKFLOW_PROMPT, (
@@ -84,11 +86,9 @@ class TestSpecWorkflowPrompt:
         assert "validate_only" in SPEC_WORKFLOW_PROMPT
 
     def test_children_annotations_documented(self):
-        assert "show_root_children=True" in SPEC_WORKFLOW_PROMPT
-        assert "show_component_children=True" in SPEC_WORKFLOW_PROMPT
-        assert "show_root_children=False" in SPEC_WORKFLOW_PROMPT
-        assert "show_component_children=False" in SPEC_WORKFLOW_PROMPT
-        assert "children annotations" in SPEC_WORKFLOW_PROMPT.lower()
+        assert 'export_images' in SPEC_WORKFLOW_PROMPT
+        assert "clean crops" in SPEC_WORKFLOW_PROMPT.lower()
+        assert "annotated crops" in SPEC_WORKFLOW_PROMPT.lower()
 
     def test_dfs_ordering_documented(self):
         assert "dfs" in SPEC_WORKFLOW_PROMPT.lower()
@@ -108,22 +108,6 @@ class TestSpecWorkflowPrompt:
         assert "createDocument" not in SPEC_WORKFLOW_PROMPT
         assert "insertTable" not in SPEC_WORKFLOW_PROMPT
 
-    @pytest.mark.anyio
-    @patch("mcp_server.server.get_client")
-    async def test_spec_doc_workflow_renders(self, mock_get_client):
-        mock_client = MagicMock()
-        mock_client.get_workspace_state = AsyncMock(
-            return_value={"components": {}, "screen": {}}
-        )
-        mock_get_client.return_value = mock_client
-        res = await spec_doc_workflow("3.2")
-        assert isinstance(res, list)
-        assert len(res) == 2
-        assert "3.2" in res[0]
-        assert res[1]["role"] == "user"
-        assert res[1]["content"]["type"] == "resource"
-        assert res[1]["content"]["resource"]["uri"] == "tlgp://workspace/state"
-        mock_client.get_workspace_state.assert_called_once()
 
 
 class TestStrictGuidelines:
