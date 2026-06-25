@@ -21,57 +21,18 @@ class GestureInterpreter:
         self.state = GestureState(transformer)
         self.transformer = transformer
 
-    @property
-    def has_temp_rect(self) -> bool:
-        return self.state.has_temp_rect
+    def __getattr__(self, name: str) -> Any:
+        if hasattr(self.state, name):
+            return getattr(self.state, name)
+        raise AttributeError(f"'{self.__class__.__name__}' object has no attribute '{name}'")
 
-    @property
-    def is_dragging(self) -> bool:
-        return self.state.is_dragging
-
-    @property
-    def resize_handle(self) -> str | None:
-        return self.state.resize_handle
-
-    @property
-    def drag_mouse_start_abs(self) -> tuple[float, float]:
-        return self.state.drag_mouse_start_abs
-
-    @drag_mouse_start_abs.setter
-    def drag_mouse_start_abs(self, val: tuple[float, float]):
-        self.state.drag_mouse_start_abs = val
-
-    @property
-    def pan_start_mouse(self) -> tuple[float, float]:
-        return self.state.pan_start_mouse
-
-    @pan_start_mouse.setter
-    def pan_start_mouse(self, val: tuple[float, float]):
-        self.state.pan_start_mouse = val
-
-    @property
-    def last_click_time(self) -> float:
-        return self.state.last_click_time
-
-    @last_click_time.setter
-    def last_click_time(self, val: float):
-        self.state.last_click_time = val
-
-    @property
-    def last_click_cx(self) -> float:
-        return self.state.last_click_cx
-
-    @last_click_cx.setter
-    def last_click_cx(self, val: float):
-        self.state.last_click_cx = val
-
-    @property
-    def last_click_cy(self) -> float:
-        return self.state.last_click_cy
-
-    @last_click_cy.setter
-    def last_click_cy(self, val: float):
-        self.state.last_click_cy = val
+    def __setattr__(self, name: str, value: Any) -> None:
+        if name in ("state", "transformer"):
+            super().__setattr__(name, value)
+        elif hasattr(self.state, name):
+            setattr(self.state, name, value)
+        else:
+            super().__setattr__(name, value)
 
     def on_click(self, canvas: Any, event: GestureEvent, cx: float, cy: float):
         if not canvas.full_pil_img:

@@ -1,6 +1,10 @@
 """FastAPI routes for the Annotator API.
 
 Routes are async and delegate sync workspace calls via asyncio.to_thread().
+
+Note: The API surface is intentionally read-only by design. It is built to serve state
+and exports to the MCP client (or other local consumers). All mutations (creating
+components, moving boxes) must be performed interactively through the GUI.
 """
 
 from __future__ import annotations

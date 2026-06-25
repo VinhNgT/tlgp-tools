@@ -26,7 +26,7 @@ class DialogService(ABC):
         filetypes: list[tuple[str, str]],
     ) -> str | None:
         """Prompts the user to select an existing file path."""
-        pass
+        ...
 
     @abstractmethod
     def ask_save_as_filename(
@@ -38,27 +38,27 @@ class DialogService(ABC):
         initial_filename: str = "",
     ) -> str | None:
         """Prompts the user to specify a path to save a file."""
-        pass
+        ...
 
     @abstractmethod
     def show_error(self, parent: Any, title: str, message: str) -> None:
         """Displays a modal error message dialog."""
-        pass
+        ...
 
     @abstractmethod
     def show_warning(self, parent: Any, title: str, message: str) -> None:
         """Displays a modal warning message dialog."""
-        pass
+        ...
 
     @abstractmethod
     def show_info(self, parent: Any, title: str, message: str) -> None:
         """Displays a modal informational dialog."""
-        pass
+        ...
 
     @abstractmethod
     def show_importing_dialog(self, parent: Any, message: str) -> ProgressIndicator:
         """Displays a transient progress or importing indicator."""
-        pass
+        ...
 
     @abstractmethod
     def show_cut_editor(
@@ -70,7 +70,7 @@ class DialogService(ABC):
         on_save: Callable[[list[int]], None],
     ) -> None:
         """Opens the screen cut editor dialog."""
-        pass
+        ...
 
     @abstractmethod
     def show_screen_info(
@@ -81,7 +81,7 @@ class DialogService(ABC):
         on_save: Callable[[dict[str, str]], None],
     ) -> None:
         """Opens the screen info editor dialog."""
-        pass
+        ...
 
     @abstractmethod
     def ask_export_images_options(
@@ -93,7 +93,7 @@ class DialogService(ABC):
 
         Calls on_selected with (mode, format), or (None, None) if cancelled.
         """
-        pass
+        ...
 
     @abstractmethod
     def ask_directory(
@@ -102,4 +102,4 @@ class DialogService(ABC):
         title: str,
     ) -> str | None:
         """Prompts the user to select an existing directory."""
-        pass
+        ...

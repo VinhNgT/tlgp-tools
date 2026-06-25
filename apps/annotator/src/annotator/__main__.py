@@ -118,7 +118,7 @@ def main():
         )
         sys.exit(1)
 
-    logger.info(f"FastAPI server ready on http://127.0.0.1:{port}")
+    logger.info("FastAPI server ready on http://127.0.0.1:%s", port)
 
     # Load workspace session or raw image on startup if passed as CLI argument
     if len(sys.argv) > 1:

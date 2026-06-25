@@ -4,7 +4,7 @@ from typing import Any
 from uuid import UUID
 
 from PIL import Image
-from PySide6.QtCore import QObject, QTimer, Signal, Slot
+from PySide6.QtCore import QTimer
 from tlgp_logger import get_logger
 
 from annotator.models import Bounds, Component, Style
@@ -18,22 +18,7 @@ from .state import UIStateStore
 logger = get_logger(__name__)
 
 
-class _MainThreadInvoker(QObject):
-    """Thread-safe bridge for posting callables from worker threads to the main thread."""
 
-    _call = Signal(object)
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self._call.connect(self._execute)
-
-    def invoke(self, fn):
-        """Emit fn to be executed on the main thread."""
-        self._call.emit(fn)
-
-    @Slot(object)
-    def _execute(self, fn):
-        fn()
 
 
 class AppController:
@@ -64,6 +49,10 @@ class AppController:
 
         # Handle initial state sync
         self._apply_state_sync()
+
+    def shutdown(self):
+        if self.io_handler:
+            self.io_handler.shutdown()
 
     def _bind_view_callbacks(self):
         # App layout window callbacks
@@ -145,6 +134,22 @@ class AppController:
         )
 
         current_workspace_id = str(state.workspaceId) if state.workspaceId else None
+
+        self._sync_workspace_reset(current_workspace_id)
+        self._sync_image_load(state, current_workspace_id)
+
+        active_interaction = self._sync_transient_overrides(state)
+        self._sync_selection(state)
+
+        # Notify workspace state observers
+        self.store.update_state(
+            "workspace", workspace_state=state, active_interaction=active_interaction
+        )
+
+        # Sync visual navigation controls
+        self._sync_breadcrumbs()
+
+    def _sync_workspace_reset(self, current_workspace_id: str | None):
         if (
             self._loaded_workspace_id is not None
             and current_workspace_id != self._loaded_workspace_id
@@ -156,6 +161,7 @@ class AppController:
                 "viewport", parent_stack=[], zoom_factor=1.0, pan_offset=(0.0, 0.0)
             )
 
+    def _sync_image_load(self, state, current_workspace_id: str | None):
         if state.image:
             if (
                 current_workspace_id != self._loaded_workspace_id
@@ -178,7 +184,7 @@ class AppController:
             self.view.set_canvas_image(None)
             self._loaded_workspace_id = current_workspace_id
 
-        # Check and remove synchronized transient overrides from active_interaction
+    def _sync_transient_overrides(self, state) -> dict | None:
         active_interaction = self.store.state.active_interaction
         if active_interaction and not self.view.canvas.gestures.is_dragging:
             active_interaction = dict(active_interaction)
@@ -202,8 +208,9 @@ class AppController:
 
             if not active_interaction:
                 active_interaction = None
+        return active_interaction
 
-        # Re-resolve selection bounds with updated components list
+    def _sync_selection(self, state):
         canvas_sel = self.store.state.selected_component_ids
         for uid in list(self.pending_created_ids):
             if uid in state.components:
@@ -214,14 +221,6 @@ class AppController:
             if uid in state.components or uid in self.pending_created_ids
         ]
         self.store.update_state("selection", selected_component_ids=updated_sel)
-
-        # Notify workspace state observers
-        self.store.update_state(
-            "workspace", workspace_state=state, active_interaction=active_interaction
-        )
-
-        # Sync visual navigation controls
-        self._sync_breadcrumbs()
 
     def _on_workspace_updated(self):
         nodes = self._build_tree_nodes()

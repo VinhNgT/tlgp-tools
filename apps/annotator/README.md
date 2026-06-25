@@ -6,7 +6,7 @@ Desktop annotation tool for TLGP screen analysis. Users load a screenshot, draw 
 
 Single-process app with two threads:
 
-- **Main thread**: Tkinter GUI (canvas, sidebar, properties panel)
+- **Main thread**: PySide6 GUI (canvas, sidebar, properties panel)
 - **Server thread**: FastAPI + uvicorn (REST + WebSocket API for MCP)
 
 Both threads share a single `WorkspaceManager` instance protected by `threading.Lock` with immutable state snapshots (copy-on-write).
@@ -22,10 +22,10 @@ annotator/
 ├── api/             # Thin FastAPI transport layer
 │   ├── app.py       # create_app() factory, global error→HTTP mapping
 │   └── routes.py    # REST + WebSocket routes, WebSocketBroadcaster
-├── gui/             # Tkinter desktop GUI (flat, no subdirectories)
+├── gui/             # PySide6 desktop GUI
 │   ├── controller.py
 │   ├── canvas.py
-│   ├── gestures.py
+│   ├── gestures/    # Modular gesture handlers
 │   └── ...
 └── __main__.py      # Entry point — starts server thread + GUI main thread
 ```

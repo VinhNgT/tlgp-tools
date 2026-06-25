@@ -72,6 +72,8 @@ def start_gui(workspace_manager, port: int = 8000):
 
     workspace_manager.subscribe(on_workspace_changed)
 
+    app.aboutToQuit.connect(controller.shutdown)
+
     # Show and run
     view.showMaximized()
     sys.exit(app.exec())

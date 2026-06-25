@@ -6,12 +6,14 @@ Uses httpx.ASGITransport for testing without spawning a server.
 import io
 import uuid
 import zipfile
+from unittest.mock import PropertyMock, patch
 
 import httpx
 import pytest
 from annotator.api.app import create_app
 from annotator.models import Bounds
 from annotator.workspace import WorkspaceManager
+from annotator.workspace.errors import InvalidStateError
 from PIL import Image
 
 
@@ -53,6 +55,20 @@ class TestStateRoutes:
         assert "workspaceId" in data
         assert "components" in data
 
+
+    @pytest.mark.anyio()
+    async def test_get_state_invalid_state_error(self, client, workspace):
+        with patch(
+            "annotator.workspace.manager.WorkspaceManager.state",
+            new_callable=PropertyMock,
+            side_effect=InvalidStateError("Test error")
+        ):
+            resp = await client.get("/workspace/state")
+
+        assert resp.status_code == 409
+        data = resp.json()
+        assert "detail" in data
+        assert data["detail"] == "Test error"
 
 # ── Import/Export Routes ──────────────────────────────────────────────
 

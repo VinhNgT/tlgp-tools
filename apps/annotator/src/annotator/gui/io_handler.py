@@ -40,6 +40,9 @@ class IOCommandHandler:
         )
         self._invoker = _MainThreadInvoker(self.view)
 
+    def shutdown(self):
+        self._io_pool.shutdown(wait=False)
+
     def handle_import_zip(self):
         path = self.dialog_service.ask_open_filename(
             self.view, title="Select workspace zip", filetypes=[("Zip files", "*.zip")]
