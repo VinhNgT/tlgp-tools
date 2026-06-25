@@ -55,76 +55,96 @@ class SidebarTreeView(QWidget):
 
     def rebuild_tree(self, nodes: list[dict]):
         """Diffs and rebuilds tree nodes incrementally based on updated layout tree data."""
-        synced_ids: set[str] = set()
-        new_ids: set[str] = set()
+        # Capture currently selected component IDs to preserve them
+        selected_ids: list[UUID] = []
+        try:
+            for index in self.tree.selectionModel().selectedRows():
+                item = self.model.itemFromIndex(index)
+                if item:
+                    node_id = item.data(Qt.ItemDataRole.UserRole)
+                    if node_id:
+                        selected_ids.append(UUID(str(node_id)))
+        except Exception:
+            pass
 
-        def sync_node(parent_item: QStandardItem | None, node_data: dict, index: int):
-            node_id = node_data["id"]
-            node_text = node_data["text"]
+        self._is_programmatic = True
+        try:
+            synced_ids: set[str] = set()
+            new_ids: set[str] = set()
 
-            synced_ids.add(node_id)
+            def sync_node(parent_item: QStandardItem | None, node_data: dict, index: int):
+                node_id = node_data["id"]
+                node_text = node_data["text"]
 
-            cached_item = self._item_map.get(node_id)
-            container = (
-                parent_item
-                if parent_item is not None
-                else self.model.invisibleRootItem()
-            )
+                synced_ids.add(node_id)
 
-            if cached_item is None:
-                item = QStandardItem(node_text)
-                item.setData(node_id, Qt.ItemDataRole.UserRole)
-                item.setData(node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1)
-                item.setEditable(False)
-                container.insertRow(index, item)
-                self._item_map[node_id] = item
-                cached_item = item
-                new_ids.add(node_id)
-            else:
-                if cached_item.text() != node_text:
-                    cached_item.setText(node_text)
-                cached_item.setData(
-                    node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1
+                cached_item = self._item_map.get(node_id)
+                container = (
+                    parent_item
+                    if parent_item is not None
+                    else self.model.invisibleRootItem()
                 )
 
-                # Re-parent if needed
-                if cached_item.parent() != parent_item:
-                    old_parent = cached_item.parent() or self.model.invisibleRootItem()
-                    taken = old_parent.takeRow(cached_item.row())
-                    if taken:
-                        container.insertRow(index, taken)
-                elif cached_item.row() != index:
-                    taken = container.takeRow(cached_item.row())
-                    if taken:
-                        container.insertRow(index, taken)
+                if cached_item is None:
+                    item = QStandardItem(node_text)
+                    item.setData(node_id, Qt.ItemDataRole.UserRole)
+                    item.setData(node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1)
+                    item.setEditable(False)
+                    container.insertRow(index, item)
+                    self._item_map[node_id] = item
+                    cached_item = item
+                    new_ids.add(node_id)
+                else:
+                    if cached_item.text() != node_text:
+                        cached_item.setText(node_text)
+                    cached_item.setData(
+                        node_data.get("label", ""), Qt.ItemDataRole.UserRole + 1
+                    )
 
-            for i, child_node in enumerate(node_data.get("children", [])):
-                sync_node(cached_item, child_node, i)
+                    # Re-parent if needed
+                    if cached_item.parent() != parent_item:
+                        old_parent = cached_item.parent() or self.model.invisibleRootItem()
+                        taken = old_parent.takeRow(cached_item.row())
+                        if taken:
+                            container.insertRow(index, taken)
+                    elif cached_item.row() != index:
+                        taken = container.takeRow(cached_item.row())
+                        if taken:
+                            container.insertRow(index, taken)
 
-        for i, root_node in enumerate(nodes):
-            sync_node(None, root_node, i)
+                for i, child_node in enumerate(node_data.get("children", [])):
+                    sync_node(cached_item, child_node, i)
 
-        # Remove items not present in the new tree
-        to_delete = set(self._item_map.keys()) - synced_ids
-        for item_id in to_delete:
-            item = self._item_map.pop(item_id, None)
-            if item:
-                try:
-                    parent = item.parent() or self.model.invisibleRootItem()
-                    parent.removeRow(item.row())
-                except RuntimeError:
-                    pass
+            for i, root_node in enumerate(nodes):
+                sync_node(None, root_node, i)
 
-        # Only expand newly inserted items, preserving user's collapse state
-        for node_id in new_ids:
-            item = self._item_map.get(node_id)
-            if item:
-                try:
-                    self.tree.expand(item.index())
-                except RuntimeError:
-                    pass
+            # Remove items not present in the new tree
+            to_delete = set(self._item_map.keys()) - synced_ids
+            for item_id in to_delete:
+                item = self._item_map.pop(item_id, None)
+                if item:
+                    try:
+                        parent = item.parent() or self.model.invisibleRootItem()
+                        parent.removeRow(item.row())
+                    except RuntimeError:
+                        pass
 
-    def select_component(self, comp_id: UUID):
+            # Only expand newly inserted items, preserving user's collapse state
+            for node_id in new_ids:
+                item = self._item_map.get(node_id)
+                if item:
+                    try:
+                        self.tree.expand(item.index())
+                    except RuntimeError:
+                        pass
+        finally:
+            self._is_programmatic = False
+
+        # Restore selection without auto-scrolling
+        if selected_ids:
+            self.select_components(selected_ids, scroll_to=False)
+
+    def select_component(self, comp_id: UUID, scroll_to: bool = True):
         """Highlights specific component node without triggering selection update feedback loops."""
         comp_id_str = str(comp_id)
         item = self._item_map.get(comp_id_str)
@@ -136,13 +156,14 @@ class SidebarTreeView(QWidget):
                     idx,
                     self.tree.selectionModel().SelectionFlag.ClearAndSelect,
                 )
-                self.tree.scrollTo(idx)
+                if scroll_to:
+                    self.tree.scrollTo(idx)
             except Exception:
                 pass
             finally:
                 self._is_programmatic = False
 
-    def select_components(self, comp_ids: list[UUID]):
+    def select_components(self, comp_ids: list[UUID], scroll_to: bool = True):
         """Highlights specific component nodes without triggering selection update feedback loops."""
         self._is_programmatic = True
         try:
@@ -160,7 +181,7 @@ class SidebarTreeView(QWidget):
                     )
                     if first_idx is None:
                         first_idx = idx
-            if first_idx is not None:
+            if scroll_to and first_idx is not None:
                 self.tree.scrollTo(first_idx)
         except Exception:
             pass
