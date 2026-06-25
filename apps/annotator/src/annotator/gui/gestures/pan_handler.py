@@ -41,6 +41,7 @@ class PanScrollHandler:
 
     @staticmethod
     def on_scroll(
+        state: GestureState,
         canvas: Any,
         delta: int,
         mouse_x: float,
@@ -61,6 +62,9 @@ class PanScrollHandler:
                     canvas.callbacks.on_viewport_change_request(
                         new_zoom, (new_pan_x, new_pan_y)
                     )
+                    if state.space_panning:
+                        state.pan_start_offset = (new_pan_x, new_pan_y)
+                        state.pan_start_mouse = (mouse_x, mouse_y)
         else:
             # Pan
             px, py = canvas.pan_offset
@@ -73,6 +77,9 @@ class PanScrollHandler:
                 canvas.callbacks.on_viewport_change_request(
                     canvas.zoom_factor, (px, py)
                 )
+                if state.space_panning:
+                    state.pan_start_offset = (px, py)
+                    state.pan_start_mouse = (mouse_x, mouse_y)
 
     @staticmethod
     def on_trackpad_scroll(
@@ -113,6 +120,9 @@ class PanScrollHandler:
                     canvas.callbacks.on_viewport_change_request(
                         new_zoom, (new_pan_x, new_pan_y)
                     )
+                    if state.space_panning:
+                        state.pan_start_offset = (new_pan_x, new_pan_y)
+                        state.pan_start_mouse = (mouse_x, mouse_y)
         else:
             if (
                 getattr(state, "last_trackpad_zoom_time", 0.0) > 0.0
@@ -126,3 +136,6 @@ class PanScrollHandler:
                 canvas.callbacks.on_viewport_change_request(
                     canvas.zoom_factor, (px, py)
                 )
+                if state.space_panning:
+                    state.pan_start_offset = (px, py)
+                    state.pan_start_mouse = (mouse_x, mouse_y)

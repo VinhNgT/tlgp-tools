@@ -756,6 +756,9 @@ class AnnotationCanvasView(QWidget):
                         self.callbacks.on_viewport_change_request(
                             new_zoom, (new_pan_x, new_pan_y)
                         )
+                        if self.gestures.state.space_panning:
+                            self.gestures.state.pan_start_offset = (new_pan_x, new_pan_y)
+                            self.gestures.state.pan_start_mouse = (mouse_x, mouse_y)
                 event.accept()
                 return True
         return super().event(event)

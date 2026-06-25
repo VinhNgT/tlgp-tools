@@ -876,3 +876,106 @@ def test_parent_boundary_enforced_on_drag(qapp):
         Qt.KeyboardModifier.NoModifier,
     )
     QApplication.sendEvent(canvas, release_event)
+
+
+def test_scroll_while_panning(qapp):
+    from PySide6.QtCore import QPoint
+    from PySide6.QtGui import QWheelEvent
+
+    ws = WorkspaceManager()
+    ws.import_image(create_test_image(800, 600))
+
+    store = UIStateStore()
+    dialog_service = QtDialogService()
+    view = MainAppWindow()
+    AppController(ws, store, view, dialog_service)
+    canvas = view.canvas
+
+    canvas.resize(800, 600)
+    canvas.fit_to_screen()
+    canvas.deadzone_enabled = False
+
+    # Initial state
+    init_pan = canvas.pan_offset
+
+    # 1. Middle mouse press at (400, 300)
+    pos_press = QPointF(400.0, 300.0)
+    press_event = QMouseEvent(
+        QEvent.Type.MouseButtonPress,
+        pos_press,
+        pos_press,
+        Qt.MouseButton.MiddleButton,
+        Qt.MouseButton.MiddleButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, press_event)
+
+    assert canvas.gestures.state.space_panning is True
+    assert canvas.gestures.state.pan_start_mouse == (400.0, 300.0)
+    assert canvas.gestures.state.pan_start_offset == init_pan
+
+    # 2. Drag to (410, 320)
+    pos_drag1 = QPointF(410.0, 320.0)
+    drag_event1 = QMouseEvent(
+        QEvent.Type.MouseMove,
+        pos_drag1,
+        pos_drag1,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.MiddleButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, drag_event1)
+
+    # The pan offset should be updated by dx=10, dy=20
+    assert canvas.pan_offset == (init_pan[0] + 10.0, init_pan[1] + 20.0)
+
+    # 3. Simulate a wheel scroll event at (410, 320)
+    # Scroll vertically by 120 (delta = 120), which maps to delta * 0.5 = 60 pixels of pan
+    wheel_event = QWheelEvent(
+        QPointF(410.0, 320.0),
+        QPointF(410.0, 320.0),
+        QPoint(0, 0),
+        QPoint(0, 120),
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+        Qt.ScrollPhase.NoScrollPhase,
+        False,
+    )
+    QApplication.sendEvent(canvas, wheel_event)
+
+    # Scroll amount is delta * 0.5 = 60 pixels vertically.
+    # Since dy > 0, scroll_amount is positive, py += 60.
+    # Old pan_offset was init_pan + (10, 20), new pan_offset should be init_pan + (10.0, 80.0)
+    assert canvas.pan_offset == (init_pan[0] + 10.0, init_pan[1] + 80.0)
+
+    # The pan_start_offset and pan_start_mouse should have updated!
+    assert canvas.gestures.state.pan_start_offset == (init_pan[0] + 10.0, init_pan[1] + 80.0)
+    assert canvas.gestures.state.pan_start_mouse == (410.0, 320.0)
+
+    # 4. Drag slightly more to (412, 321) (dx=2, dy=1 relative to the scroll position)
+    pos_drag2 = QPointF(412.0, 321.0)
+    drag_event2 = QMouseEvent(
+        QEvent.Type.MouseMove,
+        pos_drag2,
+        pos_drag2,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.MiddleButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, drag_event2)
+
+    # The new pan offset should be pan_start_offset + (412 - 410, 321 - 320) = init_pan + (12.0, 81.0)
+    assert canvas.pan_offset == (init_pan[0] + 12.0, init_pan[1] + 81.0)
+
+    # Release
+    release_event = QMouseEvent(
+        QEvent.Type.MouseButtonRelease,
+        pos_drag2,
+        pos_drag2,
+        Qt.MouseButton.MiddleButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, release_event)
+
+    assert canvas.gestures.state.space_panning is False
