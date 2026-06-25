@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import json
 import os
+import threading
 import zipfile
 from typing import Literal, TypedDict
 
@@ -41,17 +42,28 @@ class WorkspaceClient:
             client: An optional pre-configured AsyncClient. If None, an AsyncClient is
                 instantiated lazily.
         """
-        self.base_url = (
+        self._lock = threading.Lock()
+        self._base_url = (
             base_url or os.environ.get("TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000")
         ).rstrip("/")
         self._client = client
         self._owns_client = client is None
 
     @property
+    def base_url(self) -> str:
+        with self._lock:
+            return self._base_url
+
+    @base_url.setter
+    def base_url(self, value: str) -> None:
+        with self._lock:
+            self._base_url = value.rstrip("/")
+
+    @property
     def client(self) -> httpx.AsyncClient:
         """Retrieve the shared AsyncClient, initializing it lazily if necessary."""
         if self._client is None:
-            self._client = httpx.AsyncClient()
+            self._client = httpx.AsyncClient(timeout=httpx.Timeout(30.0))
         return self._client
 
     async def close(self) -> None:

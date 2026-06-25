@@ -8,6 +8,7 @@ from __future__ import annotations
 import json
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from typing import TypedDict
 
 from mcp.server.fastmcp import Context, FastMCP
 from tlgp_logger import get_logger
@@ -29,17 +30,25 @@ logger = get_logger(__name__)
 # ============================================================
 
 
+class AppContext(TypedDict):
+    client: WorkspaceClient
+    daemon_manager: DaemonManager
+    spec_service: SpecGeneratorService
+
+
 @asynccontextmanager
-async def app_lifespan(server: FastMCP) -> AsyncIterator[dict]:
+async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Initialize and tear down shared services for the server's lifetime."""
     client = WorkspaceClient()
+    daemon_manager = DaemonManager()
     try:
         yield {
             "client": client,
-            "daemon_manager": DaemonManager(),
+            "daemon_manager": daemon_manager,
             "spec_service": SpecGeneratorService(client=client),
         }
     finally:
+        daemon_manager.cleanup()
         await client.close()
 
 

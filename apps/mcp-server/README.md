@@ -4,11 +4,12 @@ MCP (Model Context Protocol) server that exposes the TLGP annotation and documen
 
 ## Overview
 
-This server exposes five tools and zero prompts:
+This server exposes four tools and five resources:
 
 | Type | Count | Purpose |
 |---|---|---|
-| **Tools** | 5 | Launch the annotator GUI, manage workspaces, export component crops, and generate spec documents |
+| **Tools** | 4 | Launch the annotator GUI, manage workspaces, export component crops, and generate spec documents |
+| **Resources** | 5 | Read-only access to workflow guides, schema definitions, classification rules, example analysis, and the active workspace state |
 
 ## Installation
 
@@ -36,7 +37,7 @@ uv sync
 ```
 
 3. Save the file and click **Refresh** in the MCP Servers panel.
-4. The server should appear with 5 tools.
+4. The server should appear with 4 tools and 5 resources.
 
 ### Android Studio (Gemini)
 
@@ -82,6 +83,20 @@ Spawns the TLGP Annotation Tool GUI as a background process. The user annotates 
 **Args:**
 - `path` — optional path to a raw screenshot image or a previously exported `.zip` workspace to pre-load.
 
+### `export_images`
+
+Export cropped component images (both raw and annotated) from the workspace screenshot to a directory.
+
+**Args:**
+- `output_path` — Absolute path to the destination directory.
+
+### `connect_to_annotator`
+
+Connect the MCP server to a running annotator instance at the specified URL.
+
+**Args:**
+- `url` — The URL of the running annotator instance (e.g. `http://127.0.0.1:55432`).
+
 ### `generate_spec_doc`
 
 Validates analysis data from a JSON file, generates a formatted `.docx` specification document, and saves the final analysis JSON data alongside it as `analysis.json` for record-keeping. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
@@ -90,6 +105,16 @@ Validates analysis data from a JSON file, generates a formatted `.docx` specific
 - `analysis_path` — path to the `analysis.json` file on disk.
 - `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `imageDir`). The analysis JSON data will also be saved next to it.
 - `validate_only` — if `True`, validate without generating (useful for catching errors early)
+
+## Resources
+
+The server exposes read-only data and reference guides to assist with generating valid analysis JSON structures.
+
+- **`tlgp://workspace/state`**: The active annotation hierarchy state in a flattened JSON structure.
+- **`tlgp://spec/workflow`**: End-to-end workflow guide for creating specification documents.
+- **`tlgp://spec/schema`**: JSON Schema reference for the analysis JSON structure.
+- **`tlgp://spec/classification-guide`**: UI Control Type Classification Guide detailing what UI elements fall under which categories.
+- **`tlgp://spec/example-analysis`**: Complete example analysis JSON structure for reference.
 
 ## Architecture
 

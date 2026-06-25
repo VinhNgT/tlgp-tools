@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import zipfile
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import httpx
@@ -39,31 +40,18 @@ def test_api_client_error_serialization():
 
 class TestWorkspaceApi:
     @pytest.mark.anyio
-    async def test_get_workspace_state_success(self, monkeypatch):
+    async def test_get_workspace_state_success(self, monkeypatch, mock_httpx_client_class):
         workspace_id = str(uuid4())
 
-        class MockResponse:
-            status_code = 200
+        async def mock_request(self, method, url, *args, **kwargs):
+            assert method == "GET"
+            assert "workspace/state" in url
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            mock_res.json.return_value = {"version": 1, "workspaceId": workspace_id}
+            return mock_res
 
-            def raise_for_status(self):
-                pass
-
-            def json(self):
-                return {"version": 1, "workspaceId": workspace_id}
-
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                assert method == "GET"
-                assert "workspace/state" in url
-                return MockResponse()
-
-        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+        mock_httpx_client_class.request = mock_request
 
         client = WorkspaceClient()
         res = await client.get_workspace_state()
@@ -72,66 +60,39 @@ class TestWorkspaceApi:
         assert str(res.workspaceId) == workspace_id
 
     @pytest.mark.anyio
-    async def test_check_connection_success(self, monkeypatch):
-        class MockResponse:
-            status_code = 200
+    async def test_check_connection_success(self, monkeypatch, mock_httpx_client_class):
+        async def mock_request(self, method, url, *args, **kwargs):
+            assert method == "GET"
+            assert "health" in url
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            mock_res.json.return_value = {"status": "ok"}
+            return mock_res
 
-            def raise_for_status(self):
-                pass
-
-            def json(self):
-                return {"status": "ok"}
-
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                assert method == "GET"
-                assert "health" in url
-                return MockResponse()
-
-        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+        mock_httpx_client_class.request = mock_request
 
         client = WorkspaceClient()
         assert await client.check_connection() is True
 
     @pytest.mark.anyio
-    async def test_check_connection_failure(self, monkeypatch):
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
+    async def test_check_connection_failure(self, monkeypatch, mock_httpx_client_class):
+        async def mock_request(self, method, url, *args, **kwargs):
+            raise httpx.RequestError("Connection refused")
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                raise httpx.RequestError("Connection refused")
-
-        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+        mock_httpx_client_class.request = mock_request
 
         client = WorkspaceClient()
         assert await client.check_connection() is False
 
     @pytest.mark.anyio
-    async def test_get_workspace_state_http_status_error(self, monkeypatch):
+    async def test_get_workspace_state_http_status_error(self, monkeypatch, mock_httpx_client_class):
         req = httpx.Request("GET", "http://localhost/state")
         resp = httpx.Response(404, request=req, text="Not found details")
 
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
+        async def mock_request(self, method, url, *args, **kwargs):
+            raise httpx.HTTPStatusError("Not Found", request=req, response=resp)
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                raise httpx.HTTPStatusError("Not Found", request=req, response=resp)
-
-        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+        mock_httpx_client_class.request = mock_request
 
         client = WorkspaceClient()
         with pytest.raises(ApiClientError) as exc_info:
@@ -145,20 +106,13 @@ class TestWorkspaceApi:
         assert err.backend_detail == "Not found details"
 
     @pytest.mark.anyio
-    async def test_get_workspace_state_request_error(self, monkeypatch):
+    async def test_get_workspace_state_request_error(self, monkeypatch, mock_httpx_client_class):
         req = httpx.Request("GET", "http://localhost/state")
 
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
+        async def mock_request(self, method, url, *args, **kwargs):
+            raise httpx.RequestError("Connection refused", request=req)
 
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                raise httpx.RequestError("Connection refused", request=req)
-
-        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+        mock_httpx_client_class.request = mock_request
 
         client = WorkspaceClient()
         with pytest.raises(ApiClientError) as exc_info:
@@ -174,32 +128,21 @@ class TestWorkspaceApi:
 
 
     @pytest.mark.anyio
-    async def test_export_workspace_zip_success(self, tmp_path, monkeypatch):
+    async def test_export_workspace_zip_success(self, tmp_path, monkeypatch, mock_httpx_client_class):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
             zf.writestr("workspace.json", '{"workspaceId": "abc"}')
             zf.writestr("screenshot.png", b"image_bytes")
 
-        class MockResponse:
-            status_code = 200
-            content = zip_buf.getvalue()
+        async def mock_request(self, method, url, *args, **kwargs):
+            assert method == "GET"
+            assert "workspace/export" in url
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            mock_res.content = zip_buf.getvalue()
+            return mock_res
 
-            def raise_for_status(self):
-                pass
-
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                assert method == "GET"
-                assert "workspace/export" in url
-                return MockResponse()
-
-        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+        mock_httpx_client_class.request = mock_request
 
         out_zip = tmp_path / "workspace.zip"
         client = WorkspaceClient()
@@ -212,33 +155,22 @@ class TestWorkspaceApi:
 
 
     @pytest.mark.anyio
-    async def test_export_images_extracted_success(self, tmp_path, monkeypatch):
+    async def test_export_images_extracted_success(self, tmp_path, monkeypatch, mock_httpx_client_class):
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
             zf.writestr("mapping.json", '{"components": {}}')
             zf.writestr("comp1.png", b"comp_bytes")
 
-        class MockResponse:
-            status_code = 200
-            content = zip_buf.getvalue()
+        async def mock_request(self, method, url, *args, **kwargs):
+            assert method == "GET"
+            assert "workspace/export-images" in url
+            assert kwargs.get("params", {}).get("mode") == "both"
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            mock_res.content = zip_buf.getvalue()
+            return mock_res
 
-            def raise_for_status(self):
-                pass
-
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def request(self, method, url, *args, **kwargs):
-                assert method == "GET"
-                assert "workspace/export-images" in url
-                assert kwargs.get("params", {}).get("mode") == "both"
-                return MockResponse()
-
-        monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
+        mock_httpx_client_class.request = mock_request
 
         out_dir = tmp_path / "crops_extracted"
         client = WorkspaceClient()
@@ -247,4 +179,29 @@ class TestWorkspaceApi:
         assert res["output_path"] == str(out_dir.resolve())
         assert (out_dir / "mapping.json").exists()
         assert (out_dir / "comp1.png").exists()
+
+    @pytest.mark.anyio
+    async def test_export_images_invalid_mapping_json(self, tmp_path, mock_httpx_client_class):
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as zf:
+            zf.writestr("mapping.json", 'invalid_json{')
+            zf.writestr("comp1.png", b"comp_bytes")
+
+        async def mock_request(self, method, url, *args, **kwargs):
+            mock_res = MagicMock()
+            mock_res.status_code = 200
+            mock_res.content = zip_buf.getvalue()
+            return mock_res
+
+        mock_httpx_client_class.request = mock_request
+
+        out_dir = tmp_path / "crops_invalid"
+        client = WorkspaceClient()
+        res = await client.export_images(str(out_dir))
+
+        assert res["output_path"] == str(out_dir.resolve())
+        assert (out_dir / "mapping.json").exists()
+        assert (out_dir / "comp1.png").exists()
+        assert "images" not in res
+        assert "annotated_images" not in res
 

@@ -23,19 +23,22 @@ def get_spec_workflow_content() -> str:
     return workflow.replace("{strict_guidelines}", guidelines).strip()
 
 
+_PROMPT_MAP = {
+    "analysis.json Schema Reference": "schema_reference.md",
+    "UI Control Type Classification Guide": "classification_guide.md",
+    "Example: Complete Analysis Dict": "example_analysis.json",
+}
+
+
 def get_prompt_section(section_title: str) -> str:
     """Load the standalone files corresponding to each prompt section."""
-    if section_title == "analysis.json Schema Reference":
-        return (_PROMPT_DIR / "schema_reference.md").read_text(encoding="utf-8").strip()
-    elif section_title == "UI Control Type Classification Guide":
-        return (
-            (_PROMPT_DIR / "classification_guide.md")
-            .read_text(encoding="utf-8")
-            .strip()
-        )
-    elif section_title == "Example: Complete Analysis Dict":
-        example_json = (
-            (_PROMPT_DIR / "example_analysis.json").read_text(encoding="utf-8").strip()
-        )
-        return f"## Example: Complete Analysis Dict\n\n```json\n{example_json}\n```"
-    return ""
+    filename = _PROMPT_MAP.get(section_title)
+    if not filename:
+        return ""
+
+    content = (_PROMPT_DIR / filename).read_text(encoding="utf-8").strip()
+
+    if section_title == "Example: Complete Analysis Dict":
+        return f"## Example: Complete Analysis Dict\n\n```json\n{content}\n```"
+
+    return content

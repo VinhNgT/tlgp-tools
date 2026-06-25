@@ -65,12 +65,38 @@ class DaemonManager:
             "TLGP_ANNOTATOR_URL", "http://127.0.0.1:8000"
         ).rstrip("/")
 
-    def _pipe_stream(self, stream, log_deque, dest_stream) -> None:
+    def cleanup(self) -> None:
+        """Terminate all active background processes."""
+        for proc in self.active_processes:
+            try:
+                proc.terminate()
+            except Exception as e:
+                logger.warning("Failed to terminate process %s: %s", proc.pid, e)
+        self.active_processes.clear()
+
+    def _pipe_stream(
+        self,
+        stream,
+        log_deque,
+        dest_stream,
+        port_future: asyncio.Future | None = None,
+        loop: asyncio.AbstractEventLoop | None = None,
+    ) -> None:
         """Pipe lines from stream to the log deque and write atomic output to dest_stream."""
         try:
             for line in iter(stream.readline, b""):
                 decoded = line.decode("utf-8", errors="replace")
                 log_deque.append(decoded)
+
+                # Check for port reporting
+                if port_future is not None and loop is not None and not port_future.done():
+                    if decoded.startswith("PORT="):
+                        try:
+                            port_num = int(decoded.strip().split("=")[1])
+                            loop.call_soon_threadsafe(port_future.set_result, port_num)
+                        except ValueError:
+                            pass
+
                 with STDERR_LOCK:
                     dest_stream.write(decoded)
                     dest_stream.flush()
@@ -112,41 +138,33 @@ class DaemonManager:
 
         self.active_processes.append(annotator_proc)
 
+        loop = asyncio.get_running_loop()
+        port_future = loop.create_future()
+
         # Start background stream pipe threads
         threading.Thread(
             target=self._pipe_stream,
-            args=(annotator_proc.stdout, self.annotator_logs, sys.stderr),
+            args=(annotator_proc.stdout, self.annotator_logs, sys.stderr, port_future, loop),
             daemon=True,
         ).start()
         threading.Thread(
             target=self._pipe_stream,
-            args=(annotator_proc.stderr, self.annotator_logs, sys.stderr),
+            args=(annotator_proc.stderr, self.annotator_logs, sys.stderr, port_future, loop),
             daemon=True,
         ).start()
 
         # Wait for the PORT line in the logs
-        port_num = None
         logger.info("Waiting for Annotator port reporting...")
-        for _ in range(50):
-            for log_line in list(self.annotator_logs):
-                if log_line.startswith("PORT="):
-                    try:
-                        port_num = int(log_line.strip().split("=")[1])
-                        break
-                    except ValueError:
-                        pass
-            if port_num is not None:
-                break
-            await asyncio.sleep(0.1)
-
-        if port_num is None:
+        try:
+            port_num = await asyncio.wait_for(port_future, timeout=5.0)
+        except TimeoutError:
             logger.error(
                 "Annotator failed to report PORT via stdout. Defaulting to 8000."
             )
             port_num = 8000
 
         self.annotator_url = f"http://127.0.0.1:{port_num}"
-        logger.info(f"Detected Annotator port: {port_num}")
+        logger.info("Detected Annotator port: %s", port_num)
 
         # Wait for the Annotator's HTTP API to become ready
         annotator_ready = False

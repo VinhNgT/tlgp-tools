@@ -9,7 +9,7 @@ from mcp_server.manager import DaemonManager
 
 
 @pytest.mark.anyio
-async def test_launch_annotator_timeout_failure(monkeypatch):
+async def test_launch_annotator_timeout_failure(monkeypatch, mock_httpx_client_class):
     # Mock subprocess.Popen
     mock_popen = MagicMock()
     mock_popen.return_value.pid = 9999
@@ -25,20 +25,10 @@ async def test_launch_annotator_timeout_failure(monkeypatch):
     )
 
     # Mock AsyncClient so get always fails
-    class MockAsyncClient:
-        async def __aenter__(self):
-            return self
+    async def mock_get(self, url, *args, **kwargs):
+        raise httpx.RequestError("Annotator not ready")
 
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-        async def get(self, url, *args, **kwargs):
-            raise httpx.RequestError("Annotator not ready")
-
-    monkeypatch.setattr(
-        "mcp_server.manager.httpx.AsyncClient",
-        MockAsyncClient,
-    )
+    mock_httpx_client_class.get = mock_get
 
     manager = DaemonManager()
     result = await manager.launch_annotator()
@@ -47,7 +37,7 @@ async def test_launch_annotator_timeout_failure(monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
+async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch, mock_httpx_client_class):
     mock_popen = MagicMock()
     mock_popen.return_value.pid = 1111
     mock_popen.return_value.stdout = io.BytesIO(b"")
@@ -59,24 +49,6 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "mcp_server.manager.shutil.which",
         lambda name: "/usr/bin/uv",
-    )
-
-    # Mock AsyncClient to succeed on get
-    class MockAsyncClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-        async def get(self, url, *args, **kwargs):
-            mock_res = MagicMock()
-            mock_res.status_code = 200
-            return mock_res
-
-    monkeypatch.setattr(
-        "mcp_server.manager.httpx.AsyncClient",
-        MockAsyncClient,
     )
 
     dummy_screenshot = tmp_path / "screenshot.png"
@@ -93,7 +65,7 @@ async def test_launch_annotator_import_screenshot(tmp_path, monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
+async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch, mock_httpx_client_class):
     mock_popen = MagicMock()
     mock_popen.return_value.pid = 2222
     mock_popen.return_value.stdout = io.BytesIO(b"")
@@ -105,24 +77,6 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
     monkeypatch.setattr(
         "mcp_server.manager.shutil.which",
         lambda name: "/usr/bin/uv",
-    )
-
-    # Mock AsyncClient to succeed on get
-    class MockAsyncClient:
-        async def __aenter__(self):
-            return self
-
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-        async def get(self, url, *args, **kwargs):
-            mock_res = MagicMock()
-            mock_res.status_code = 200
-            return mock_res
-
-    monkeypatch.setattr(
-        "mcp_server.manager.httpx.AsyncClient",
-        MockAsyncClient,
     )
 
     dummy_zip = tmp_path / "workspace.zip"
@@ -139,7 +93,7 @@ async def test_launch_annotator_import_workspace_zip(tmp_path, monkeypatch):
 
 
 @pytest.mark.anyio
-async def test_launch_annotator_resolves_dynamic_port(monkeypatch):
+async def test_launch_annotator_resolves_dynamic_port(monkeypatch, mock_httpx_client_class):
     mock_popen = MagicMock()
     mock_popen.return_value.pid = 3333
 
@@ -155,23 +109,13 @@ async def test_launch_annotator_resolves_dynamic_port(monkeypatch):
         lambda name: "/usr/bin/uv",
     )
 
-    class MockAsyncClient:
-        async def __aenter__(self):
-            return self
+    async def mock_get(self, url, *args, **kwargs):
+        assert "9191" in url
+        mock_res = MagicMock()
+        mock_res.status_code = 200
+        return mock_res
 
-        async def __aexit__(self, exc_type, exc_val, exc_tb):
-            pass
-
-        async def get(self, url, *args, **kwargs):
-            assert "9191" in url
-            mock_res = MagicMock()
-            mock_res.status_code = 200
-            return mock_res
-
-    monkeypatch.setattr(
-        "mcp_server.manager.httpx.AsyncClient",
-        MockAsyncClient,
-    )
+    mock_httpx_client_class.get = mock_get
 
     manager = DaemonManager()
     result = await manager.launch_annotator()

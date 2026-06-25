@@ -12,28 +12,6 @@ from mcp_server.manager import DaemonManager
 from mcp_server.server import connect_to_annotator
 from mcp_server.services import SpecGeneratorService
 
-# ============================================================
-# Helpers
-# ============================================================
-
-
-def _make_ctx_with_lifespan(
-    client: WorkspaceClient | None = None,
-    daemon_manager: DaemonManager | None = None,
-    spec_service: SpecGeneratorService | None = None,
-) -> MagicMock:
-    """Create a mock MCP Context that provides lifespan_context."""
-    ctx = MagicMock()
-    ctx.report_progress = AsyncMock()
-    ctx.log = AsyncMock()
-    ctx.request_context.lifespan_context = {
-        "client": client or MagicMock(spec=WorkspaceClient),
-        "daemon_manager": daemon_manager or MagicMock(spec=DaemonManager),
-        "spec_service": spec_service or MagicMock(spec=SpecGeneratorService),
-    }
-    return ctx
-
-
 # ── SpecGeneratorService (subprocess invocation) ──────────────
 
 
@@ -216,7 +194,7 @@ class TestSpecGeneratorService:
 
 class TestLaunchAnnotator:
     @pytest.mark.anyio
-    async def test_launch_annotator_success(self, tmp_path, monkeypatch):
+    async def test_launch_annotator_success(self, tmp_path, monkeypatch, mock_httpx_client_class):
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
         mock_popen.return_value.stdout = io.BytesIO(b"")
@@ -228,29 +206,6 @@ class TestLaunchAnnotator:
         monkeypatch.setattr(
             "mcp_server.manager.shutil.which",
             lambda name: "/usr/local/bin/uv",
-        )
-
-        # Mock httpx.AsyncClient to avoid actual HTTP calls and timeouts
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def get(self, url, *args, **kwargs):
-                mock_res = MagicMock()
-                mock_res.status_code = 200
-                return mock_res
-
-            async def post(self, url, *args, **kwargs):
-                mock_res = MagicMock()
-                mock_res.status_code = 200
-                return mock_res
-
-        monkeypatch.setattr(
-            "mcp_server.manager.httpx.AsyncClient",
-            MockAsyncClient,
         )
 
         # Create dummy screenshot to pass validation
@@ -285,7 +240,7 @@ class TestLaunchAnnotator:
 
 class TestConnectToAnnotator:
     @pytest.mark.anyio
-    async def test_connect_success(self):
+    async def test_connect_success(self, mcp_ctx):
         mock_client = MagicMock(spec=WorkspaceClient)
         mock_client.check_connection = AsyncMock(return_value=True)
         mock_client.get_workspace_state = AsyncMock(
@@ -297,7 +252,7 @@ class TestConnectToAnnotator:
 
         mock_daemon = MagicMock(spec=DaemonManager)
 
-        ctx = _make_ctx_with_lifespan(client=mock_client, daemon_manager=mock_daemon)
+        ctx = mcp_ctx(client=mock_client, daemon_manager=mock_daemon)
 
         res = await connect_to_annotator(ctx, "http://127.0.0.1:9091")
         assert res["status"] == "success"
@@ -305,14 +260,14 @@ class TestConnectToAnnotator:
         assert mock_client.base_url == "http://127.0.0.1:9091"
 
     @pytest.mark.anyio
-    async def test_connect_failure(self):
+    async def test_connect_failure(self, mcp_ctx):
         mock_client = MagicMock(spec=WorkspaceClient)
         mock_client.check_connection = AsyncMock(
             side_effect=Exception("Connection refused")
         )
 
         mock_daemon = MagicMock(spec=DaemonManager)
-        ctx = _make_ctx_with_lifespan(client=mock_client, daemon_manager=mock_daemon)
+        ctx = mcp_ctx(client=mock_client, daemon_manager=mock_daemon)
 
         res = await connect_to_annotator(ctx, "http://localhost:8080")
         assert res["status"] == "error"
