@@ -1,3 +1,5 @@
+"""Hierarchical tree view and workspace management sidebar."""
+
 from uuid import UUID
 
 from PySide6.QtCore import QEvent, QModelIndex, QObject, Qt

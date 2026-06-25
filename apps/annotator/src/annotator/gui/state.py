@@ -1,3 +1,5 @@
+"""Observable UI state store for decoupled view synchronization."""
+
 from collections import defaultdict
 from collections.abc import Callable
 from dataclasses import dataclass, field

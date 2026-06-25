@@ -1,3 +1,5 @@
+"""Heuristics and algorithms for determining logical reading order of UI components."""
+
 from typing import Final
 from uuid import UUID
 

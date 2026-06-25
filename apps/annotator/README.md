@@ -17,8 +17,9 @@ annotator/
 ├── workspace/       # Domain logic (sync, thread-safe)
 │   ├── manager.py   # WorkspaceManager — threading.Lock, immutable snapshots
 │   ├── ordering.py  # Reading-order sort + auto-numbering
+│   ├── validation.py # Workspace boundary validation and constraint checking
 │   └── errors.py    # WorkspaceError hierarchy
-├── rendering.py     # paint_annotations() — shared by GUI canvas and API export
+├── rendering.py     # paint_annotations() — shared by GUI canvas and API export endpoint
 ├── api/             # Thin FastAPI transport layer
 │   ├── app.py       # create_app() factory, global error→HTTP mapping
 │   └── routes.py    # REST + WebSocket routes, WebSocketBroadcaster

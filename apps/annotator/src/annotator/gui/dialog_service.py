@@ -1,3 +1,5 @@
+"""Abstract dialog service and concrete Qt implementation for native dialogs."""
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable
 from typing import Any, Protocol

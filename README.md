@@ -10,15 +10,16 @@ The monorepo is structured into applications (`apps/`) and shared libraries (`li
 
 | Path | Name | Description |
 |:---|:---|:---|
-| [`apps/annotator`](file:///E:/tlgp-tools/apps/annotator) | `annotator` | Monolithic desktop application containing a Tkinter GUI for drawing bounding boxes and marking component hierarchy, with an embedded FastAPI backend service for state synchronization and tool control via HTTP/WebSockets. |
-| [`apps/doc-generator`](file:///E:/tlgp-tools/apps/doc-generator) | `doc-generator` | Command-line utility to compile structured analysis data (`analysis.json`) into fully-formatted `.docx` specification documents. |
-| [`apps/mcp-server`](file:///E:/tlgp-tools/apps/mcp-server) | `mcp-server` | Model Context Protocol (MCP) server wrapping the toolchain (annotator launch & document generator) for AI agents. |
+| `apps/annotator` | `annotator` | Desktop application containing a PySide6 GUI for drawing bounding boxes and marking component hierarchy, with an embedded FastAPI backend service for state synchronization and tool control via HTTP/WebSockets. |
+| `apps/doc-generator` | `doc-generator` | Command-line utility to compile structured analysis data (`analysis.json`) into fully-formatted `.docx` specification documents. |
+| `apps/mcp-server` | `mcp-server` | Model Context Protocol (MCP) server wrapping the toolchain (annotator launch & document generator) for AI agents. |
 
 ### Shared Libraries (`libs/`)
 
 | Path | Name | Description |
 |:---|:---|:---|
-| [`libs/logger`](file:///E:/tlgp-tools/libs/logger) | `tlgp-logger` | Centralized structured logger using `structlog` with automated formatting (JSON/Console) and unhandled exception hooks. |
+| `libs/contracts` | `tlgp-contracts` | Shared Pydantic schemas defining the boundary contracts between TLGP modules (annotator ↔ MCP server). |
+| `libs/logger` | `tlgp-logger` | Centralized structured logger using `structlog` with automated formatting (JSON/Console) and unhandled exception hooks. |
 
 ---
 
@@ -35,7 +36,7 @@ uv sync
 ## Usage
 
 ### 1. Launch the Annotation Tool
-Start the interactive annotator. This launches a monolithic process that runs both the backend API engine (on a background thread) and the Tkinter GUI frontend:
+Start the interactive annotator. This launches a process that runs both the backend API engine (on a background thread) and the PySide6 GUI frontend:
 
 ```bash
 uv run annotator
@@ -77,3 +78,13 @@ uv run ruff check
 # Format source files
 uv run ruff format
 ```
+
+---
+
+## Development & Guidelines
+
+This repository follows strict code quality and architectural conventions to maintain maintainability at scale.
+Before contributing or spawning autonomous agents to modify this repository, please review the rules defined in the `.agents/rules/` directory:
+
+- `.agents/rules/coding-guide.md`: Architectural guidelines, SOLID principles, testing requirements, and error-handling paradigms.
+- `.agents/rules/general-guide.md`: General collaboration and developer experience guidelines.

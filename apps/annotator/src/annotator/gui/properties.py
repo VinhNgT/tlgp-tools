@@ -1,3 +1,5 @@
+"""Property inspector panel for editing component metadata and API tables."""
+
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (

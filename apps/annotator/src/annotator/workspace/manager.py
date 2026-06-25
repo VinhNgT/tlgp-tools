@@ -1,3 +1,5 @@
+"""Core workspace state manager and monolithic entrypoint for mutating annotation state."""
+
 import io
 import json
 import re

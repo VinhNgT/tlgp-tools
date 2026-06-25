@@ -1,3 +1,5 @@
+"""Workspace boundary validation and constraint checking."""
+
 from annotator.models import Bounds, Component
 from annotator.workspace.errors import InvalidStateError
 

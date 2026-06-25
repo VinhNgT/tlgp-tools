@@ -1,3 +1,5 @@
+"""Annotator domain models."""
+
 from .core import (
     Bounds,
     Component,

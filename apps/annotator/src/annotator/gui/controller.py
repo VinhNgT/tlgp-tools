@@ -1,3 +1,5 @@
+"""Main application controller bridging the workspace domain and Qt GUI views."""
+
 import io
 import uuid
 from typing import Any

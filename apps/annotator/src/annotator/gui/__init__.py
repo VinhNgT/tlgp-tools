@@ -1,3 +1,5 @@
+"""PySide6 GUI initialization and dependency wiring."""
+
 import ctypes
 import os
 import sys

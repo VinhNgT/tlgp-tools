@@ -7,7 +7,7 @@ Every field maps to a specific location in the generated .docx document.
 | Field | Type | Description |
 |---|---|---|
 | `sectionPrefix` | `str` | Section number prefix for component headings (e.g., "1.1") |
-| `imageDir` | `str` | Absolute path to the directory containing cropped images |
+| `imageDir` | `str` | Path (absolute or relative) to the directory containing cropped images |
 | `components` | `list[Component]` | All annotated components. Must be sorted in post-order DFS sequence (child components first, parent components later) |
 | `screen` | `Screen` | Screen-level metadata |
 | `discrepancies` | `list[Discrepancy]` | Conflicts between screenshots and code |

@@ -1,3 +1,5 @@
+"""Tree traversal and hierarchical data structures for component boundaries."""
+
 from collections.abc import Generator
 from uuid import UUID
 

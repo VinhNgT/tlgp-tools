@@ -1,3 +1,5 @@
+"""Viewport coordinate transformation utilities for canvas zooming and panning."""
+
 from uuid import UUID
 
 from .viewport_context import ViewportContext

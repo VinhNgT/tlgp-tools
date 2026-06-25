@@ -33,6 +33,30 @@
           "action": "Click vào nút Back",
           "reaction": "Hệ thống quay về màn hình trước đó"
         }
+      ],
+      "apis": [
+        {
+          "number": 2,
+          "method": "GET",
+          "title": "Lấy thông báo chưa đọc",
+          "url": "/api/v1/notifications/unread",
+          "requestParams": [],
+          "requestBodyType": "",
+          "requestDescription": "",
+          "responseType": "UnreadCountDto",
+          "responseFields": [
+            {
+              "name": "count",
+              "meaning": "Số lượng thông báo",
+              "required": "Có",
+              "dataType": "int",
+              "limit": "",
+              "defaultValue": "0"
+            }
+          ],
+          "responseDescription": "",
+          "subDtos": []
+        }
       ]
     },
     {

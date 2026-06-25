@@ -118,14 +118,16 @@ The server exposes read-only data and reference guides to assist with generating
 
 ## Architecture
 
-```
+```text
 Agent ──MCP──▸ mcp-server
                      │
                      ├── launch_annotator ──subprocess──▸ tlgp-annotation-tool (GUI)
                      │
-                     └── generate_spec_doc ──import──▸ doc-generator
+                     ├── connect_to_annotator ──http──▸ tlgp-annotation-tool (API)
+                     │
+                     └── generate_spec_doc ──subprocess──▸ doc-generator
 ```
 
-- The MCP server imports `doc-generator` directly for validation and document generation.
-- The annotation tool runs as a detached subprocess (GUI cannot run inside an MCP tool call).
+- The MCP server invokes `doc-generator` as a subprocess via the CLI to validate data and generate documents, communicating via a structured JSON contract over stdout.
+- The annotation tool GUI runs as a detached subprocess (since GUI applications cannot block inside an MCP tool call).
 - All document formatting is driven by `spec_format.toml` in the doc-generator package.

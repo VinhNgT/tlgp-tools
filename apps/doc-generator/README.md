@@ -5,8 +5,12 @@ Generate fully formatted TLGP screen specification `.docx` files from `analysis.
 ## Usage
 
 ```bash
-uv run doc-gen analysis.json [-o output.docx] [--dry-run]
+uv run doc-gen analysis.json [-o output.docx] [--dry-run] [--validate-only] [--json]
 ```
+
+- `--dry-run`: Print a summary without generating the document.
+- `--validate-only`: Validate the analysis data without generating the `.docx`.
+- `--json`: Output a single JSON result object to stdout (machine-readable mode used by the MCP server).
 
 ## Input
 
@@ -24,3 +28,9 @@ The script reads an `analysis.json` file containing the structured screen analys
 ## Formatting
 
 All visual properties (fonts, colors, table widths, borders, cell padding) are defined in [`spec_format.toml`](src/doc_generator/spec_format.toml). Edit this file to change any formatting — no Python code changes needed.
+
+## Testing
+
+```bash
+uv run pytest apps/doc-generator/
+```
