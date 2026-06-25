@@ -21,3 +21,13 @@ def test_get_theme_resolves_available_font(qapp):
 
     expected_style = f"font-family: {selected_font}, sans-serif;"
     assert expected_style in theme_stylesheet
+
+
+def test_theme_includes_primary_button(qapp):
+    """Verify that get_theme() contains the PrimaryButton and QRadioButton selector rules."""
+    theme_stylesheet = get_theme()
+    assert "QToolButton#PrimaryButton" in theme_stylesheet
+    assert "QPushButton#PrimaryButton" in theme_stylesheet
+    assert "background-color: #18A0FB;" in theme_stylesheet
+    assert "QRadioButton {" in theme_stylesheet
+    assert "QRadioButton::indicator {" in theme_stylesheet

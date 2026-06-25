@@ -317,6 +317,20 @@ class MainAppWindow(QMainWindow):
         )
         tb.addAction(self.btn_screen_info)
 
+        tb.addSeparator()
+
+        # Export images button
+        self.btn_export_images = QAction("Export images", self)
+        self.btn_export_images.setToolTip("Export screenshots and component images")
+        self.btn_export_images.setEnabled(False)
+        self.btn_export_images.triggered.connect(
+            lambda: self._fire(self.callbacks.on_export_images_request)
+        )
+        tb.addAction(self.btn_export_images)
+        btn_widget = tb.widgetForAction(self.btn_export_images)
+        if btn_widget:
+            btn_widget.setObjectName("PrimaryButton")
+
     def _build_central_area(self, transformer: ViewportTransformer | None):
         splitter = QSplitter(Qt.Orientation.Horizontal)
         self.setCentralWidget(splitter)
@@ -366,6 +380,7 @@ class MainAppWindow(QMainWindow):
         self.btn_cut_lines.setEnabled(has_img)
         self.chk_show_labels.setEnabled(has_img)
         self.btn_screen_info.setEnabled(has_img)
+        self.btn_export_images.setEnabled(has_img)
         self.btn_fit.setEnabled(has_img)
 
         for action in self._mode_actions.values():

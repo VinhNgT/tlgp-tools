@@ -91,3 +91,23 @@ def test_show_labels_checkbox(qapp):
     # Verify canvas show_labels is True and checkbox is checked again
     assert view.canvas.show_labels is True
     assert view.chk_show_labels.isChecked() is True
+
+
+def test_export_images_button(qapp):
+    # Setup workspace without image first
+    ws = WorkspaceManager()
+    store = UIStateStore()
+    dialog_service = QtDialogService()
+    view = MainAppWindow()
+    AppController(ws, store, view, dialog_service)
+
+    # Initially it should be disabled
+    assert view.btn_export_images.text() == "Export images"
+    assert view.btn_export_images.isEnabled() is False
+
+    # Import image
+    pil_img = Image.new("RGB", (800, 600))
+    view.set_canvas_image(pil_img)
+
+    # Now it should be enabled
+    assert view.btn_export_images.isEnabled() is True

@@ -93,6 +93,28 @@ QPushButton:disabled, QToolButton:disabled {
     border: 1px solid #38383A;
 }
 
+QPushButton#PrimaryButton, QToolButton#PrimaryButton {
+    background-color: #18A0FB;
+    border: 1px solid #18A0FB;
+    color: #FFFFFF;
+}
+
+QPushButton#PrimaryButton:hover, QToolButton#PrimaryButton:hover {
+    background-color: #40B0FF;
+    border: 1px solid #40B0FF;
+}
+
+QPushButton#PrimaryButton:pressed, QToolButton#PrimaryButton:pressed {
+    background-color: #0A8FD9;
+    border: 1px solid #0A8FD9;
+}
+
+QPushButton#PrimaryButton:disabled, QToolButton#PrimaryButton:disabled {
+    background-color: #252627;
+    color: #757575;
+    border: 1px solid #38383A;
+}
+
 QLineEdit, QTextEdit {
     background-color: #1A1A1B;
     border: 1px solid #48484A;
@@ -134,6 +156,27 @@ QCheckBox::indicator:checked {
 }
 
 QCheckBox::indicator:hover {
+    border: 1px solid #18A0FB;
+}
+
+QRadioButton {
+    spacing: 6px;
+}
+
+QRadioButton::indicator {
+    width: 14px;
+    height: 14px;
+    border: 1px solid #5A5A5C;
+    border-radius: 8px;
+    background-color: #1E1E1E;
+}
+
+QRadioButton::indicator:checked {
+    background-color: #18A0FB;
+    border: 1px solid #18A0FB;
+}
+
+QRadioButton::indicator:hover {
     border: 1px solid #18A0FB;
 }
 
