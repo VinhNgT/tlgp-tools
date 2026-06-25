@@ -195,7 +195,7 @@ class QtDialogService(DialogService):
 
     def ask_open_filename(
         self,
-        parent: QWidget,
+        parent: QWidget | None,
         title: str,
         filetypes: list[tuple[str, str]],
     ) -> str | None:
@@ -205,7 +205,7 @@ class QtDialogService(DialogService):
 
     def ask_save_as_filename(
         self,
-        parent: QWidget,
+        parent: QWidget | None,
         title: str,
         filetypes: list[tuple[str, str]],
         defaultextension: str,
@@ -215,22 +215,22 @@ class QtDialogService(DialogService):
         path, _ = QFileDialog.getSaveFileName(parent, title, initial_filename, filter_str)
         return path if path else None
 
-    def show_error(self, parent: QWidget, title: str, message: str) -> None:
+    def show_error(self, parent: QWidget | None, title: str, message: str) -> None:
         QMessageBox.critical(parent, title, message)
 
-    def show_warning(self, parent: QWidget, title: str, message: str) -> None:
+    def show_warning(self, parent: QWidget | None, title: str, message: str) -> None:
         QMessageBox.warning(parent, title, message)
 
-    def show_info(self, parent: QWidget, title: str, message: str) -> None:
+    def show_info(self, parent: QWidget | None, title: str, message: str) -> None:
         QMessageBox.information(parent, title, message)
 
-    def show_importing_dialog(self, parent: QWidget, message: str) -> ProgressIndicator:
+    def show_importing_dialog(self, parent: QWidget | None, message: str) -> ProgressIndicator:
         dialog = _ImportingDialog(parent, message=message)
         return _QtProgressIndicator(dialog)
 
     def show_cut_editor(
         self,
-        parent: QWidget,
+        parent: QWidget | None,
         image: Image.Image,
         initial_cuts: list[int],
         components: list[Component],
@@ -245,7 +245,7 @@ class QtDialogService(DialogService):
 
     def show_screen_info(
         self,
-        parent: QWidget,
+        parent: QWidget | None,
         screen_name: str,
         description: str,
         on_save: Callable[[dict[str, str]], None],
@@ -259,7 +259,7 @@ class QtDialogService(DialogService):
 
     def ask_export_images_options(
         self,
-        parent: QWidget,
+        parent: QWidget | None,
         on_selected: Callable[[str | None, str | None], None],
     ) -> None:
         dialog = _ExportImagesDialog(parent)
@@ -270,7 +270,7 @@ class QtDialogService(DialogService):
 
     def ask_directory(
         self,
-        parent: QWidget,
+        parent: QWidget | None,
         title: str,
     ) -> str | None:
         path = QFileDialog.getExistingDirectory(parent, title)

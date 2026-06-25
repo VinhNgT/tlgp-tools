@@ -1,5 +1,8 @@
 """Handler for IO commands decoupled from the main controller."""
 
+import io
+import os
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 
 from PySide6.QtCore import QObject, Signal, Slot
@@ -161,10 +164,6 @@ class IOCommandHandler:
                 )
 
                 def do_export():
-                    import io
-                    import zipfile
-                    import os
-
                     export_path = os.path.join(dest_dir, export_name)
                     os.makedirs(export_path, exist_ok=True)
 

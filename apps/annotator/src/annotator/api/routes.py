@@ -7,9 +7,9 @@ from __future__ import annotations
 
 import asyncio
 import io
-from typing import Literal
 import uuid
 import zipfile
+from typing import Literal
 
 from fastapi import (
     APIRouter,
@@ -18,14 +18,12 @@ from fastapi.responses import Response
 from PIL import Image
 from pydantic import BaseModel
 
-from annotator.models import Bounds, Style
 from annotator.models.tree import TreeUtils
 from annotator.rendering import paint_annotations
 from annotator.workspace import WorkspaceManager
 from annotator.workspace.errors import (
     ComponentNotFoundError,
     InvalidStateError,
-    UndoRedoError,
 )
 
 # ── Request Models ─────────────────────────────────────────────────────

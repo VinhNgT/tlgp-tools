@@ -9,8 +9,8 @@ from annotator.gui.state import UIStateStore
 from annotator.models import Bounds, Style
 from annotator.workspace import WorkspaceManager
 from PIL import Image
-from PySide6.QtCore import QEvent, QPointF, QRect, Qt
-from PySide6.QtGui import QKeyEvent, QMouseEvent, QPaintEvent
+from PySide6.QtCore import QEvent, QPoint, QPointF, QRect, Qt
+from PySide6.QtGui import QKeyEvent, QMouseEvent, QPaintEvent, QWheelEvent
 from PySide6.QtWidgets import QApplication
 
 
@@ -879,9 +879,6 @@ def test_parent_boundary_enforced_on_drag(qapp):
 
 
 def test_scroll_while_panning(qapp):
-    from PySide6.QtCore import QPoint
-    from PySide6.QtGui import QWheelEvent
-
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
 

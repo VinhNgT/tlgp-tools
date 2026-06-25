@@ -1,4 +1,5 @@
 import io
+import re
 import threading
 import uuid
 import zipfile
@@ -16,6 +17,8 @@ from annotator.models import (
     Style,
     WorkspaceState,
 )
+from annotator.models.tree import TreeUtils
+from annotator.rendering import paint_annotations
 
 from .errors import (
     ComponentNotFoundError,
@@ -517,7 +520,6 @@ class WorkspaceManager:
         else:
             base_name = raw_filename
 
-        import re
         folder_name = re.sub(r'[\\/*?:"<>|]', "_", base_name).strip()
         if not folder_name:
             folder_name = "exported_images"
@@ -541,11 +543,6 @@ class WorkspaceManager:
 
         if not image_bytes:
             raise InvalidStateError("No image bytes in RAM")
-
-        from typing import Literal
-        from annotator.rendering import paint_annotations
-        from annotator.models.tree import TreeUtils
-        import re
 
         def sanitize_filename(name: str) -> str:
             # Replace invalid filename characters with underscores

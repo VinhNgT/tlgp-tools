@@ -1,9 +1,11 @@
+from typing import Any
+
 from annotator.gui.cut_editor import CutEditorDialog
 from annotator.gui.qt_dialogs import QtDialogService
 from PIL import Image
 from PySide6.QtCore import QEvent, QPointF, Qt
 from PySide6.QtGui import QMouseEvent
-from PySide6.QtWidgets import QApplication
+from PySide6.QtWidgets import QApplication, QFileDialog
 
 
 def test_cut_editor_initialization(qapp):
@@ -123,7 +125,7 @@ def test_dialog_service_show_cut_editor_modeless(qapp):
     service.show_cut_editor(None, image, initial_cuts, components, on_save)
     QApplication.processEvents()
 
-    dialog = None
+    dialog: Any = None
     for widget in reversed(QApplication.topLevelWidgets()):
         if widget.__class__.__name__ == "CutEditorDialog" and widget.isVisible():
             dialog = widget
@@ -157,7 +159,7 @@ def test_dialog_service_show_screen_info_modeless(qapp):
     )
     QApplication.processEvents()
 
-    dialog = None
+    dialog: Any = None
     for widget in reversed(QApplication.topLevelWidgets()):
         if widget.__class__.__name__ == "_ScreenInfoDialog" and widget.isVisible():
             dialog = widget
@@ -177,7 +179,6 @@ def test_dialog_service_show_screen_info_modeless(qapp):
 
 def test_dialog_service_ask_directory(qapp, monkeypatch):
     """Verify that ask_directory calls QFileDialog.getExistingDirectory and returns the selected path."""
-    from PySide6.QtWidgets import QFileDialog
     monkeypatch.setattr(
         QFileDialog, "getExistingDirectory", lambda parent, title: "/mock/directory"
     )
@@ -202,7 +203,7 @@ def test_dialog_service_ask_export_images_options(qapp):
     service.ask_export_images_options(None, on_selected)
     QApplication.processEvents()
 
-    dialog = None
+    dialog: Any = None
     for widget in reversed(QApplication.topLevelWidgets()):
         if widget.__class__.__name__ == "_ExportImagesDialog" and widget.isVisible():
             dialog = widget
@@ -229,7 +230,6 @@ def test_dialog_service_ask_export_images_options(qapp):
 
 def test_dialog_service_ask_save_as_filename(qapp, monkeypatch):
     """Verify that ask_save_as_filename calls QFileDialog.getSaveFileName with initial_filename and returns the selected path."""
-    from PySide6.QtWidgets import QFileDialog
     called_initial_filename = None
 
     def mock_get_save_file_name(parent, title, initial_filename, filter_str):
