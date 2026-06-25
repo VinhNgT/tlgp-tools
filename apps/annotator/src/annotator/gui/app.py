@@ -130,32 +130,47 @@ class GlobalFocusAndSelectionFilter(QObject):
 
     def eventFilter(self, obj: QObject, event: QEvent) -> bool:
         if event.type() == QEvent.Type.MouseButtonPress:
-            is_widget = isinstance(obj, QWidget)
-
-            # 1. Unfocus any active text input widget on outside click
-            focused = QApplication.focusWidget()
-            if focused and focused.__class__.__name__ in (
-                "QLineEdit",
-                "QTextEdit",
-                "QPlainTextEdit",
-            ):
-                if not is_widget or obj != focused:
-                    try:
-                        if not is_widget or not focused.isAncestorOf(obj):
+            if isinstance(obj, QWidget):
+                # 1. Unfocus any active text input widget on outside click
+                focused = QApplication.focusWidget()
+                if focused and focused.__class__.__name__ in (
+                    "QLineEdit",
+                    "QTextEdit",
+                    "QPlainTextEdit",
+                ):
+                    if obj != focused:
+                        try:
+                            if not focused.isAncestorOf(obj):
+                                focused.clearFocus()
+                        except TypeError:
                             focused.clearFocus()
-                    except TypeError:
-                        focused.clearFocus()
 
-            # 2. Deselect/clear highlight on any selectable QLabels on outside click
-            main_win = self.parent()
-            if main_win:
-                for label in main_win.findChildren(QLabel):
-                    if (
-                        label.textInteractionFlags()
-                        & Qt.TextInteractionFlag.TextSelectableByMouse
-                    ):
-                        if not is_widget or (
-                            obj != label and not label.isAncestorOf(obj)
+                # 2. Deselect/clear highlight on any selectable QLabels on outside click
+                main_win = self.parent()
+                if main_win:
+                    for label in main_win.findChildren(QLabel):
+                        if (
+                            label.textInteractionFlags()
+                            & Qt.TextInteractionFlag.TextSelectableByMouse
+                        ):
+                            if obj != label and not label.isAncestorOf(obj):
+                                label.setSelection(0, 0)
+            else:
+                # obj is not a QWidget (it is a pure QObject)
+                focused = QApplication.focusWidget()
+                if focused and focused.__class__.__name__ in (
+                    "QLineEdit",
+                    "QTextEdit",
+                    "QPlainTextEdit",
+                ):
+                    focused.clearFocus()
+
+                main_win = self.parent()
+                if main_win:
+                    for label in main_win.findChildren(QLabel):
+                        if (
+                            label.textInteractionFlags()
+                            & Qt.TextInteractionFlag.TextSelectableByMouse
                         ):
                             label.setSelection(0, 0)
 
@@ -187,7 +202,9 @@ class MainAppWindow(QMainWindow):
 
         # Install global focus-out event filter to unfocus inputs on click outside
         self.focus_filter = GlobalFocusAndSelectionFilter(self)
-        QApplication.instance().installEventFilter(self.focus_filter)
+        app = QApplication.instance()
+        if app is not None:
+            app.installEventFilter(self.focus_filter)
 
         # ── Build UI ──────────────────────────────────────────────
         self._build_menu_bar()
