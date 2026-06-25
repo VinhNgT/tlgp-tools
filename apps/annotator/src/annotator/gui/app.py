@@ -4,7 +4,9 @@ Provides the toolbar, menu bar, sidebar splitter, and canvas area.
 All user interaction is delegated to the controller via callbacks.
 """
 
+import json
 import os
+import urllib.request
 
 from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QUrl, Signal
 from PySide6.QtGui import (
@@ -18,6 +20,7 @@ from PySide6.QtGui import (
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
+    QDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -26,6 +29,7 @@ from PySide6.QtWidgets import (
     QPushButton,
     QSizePolicy,
     QSplitter,
+    QTextEdit,
     QToolBar,
     QToolTip,
     QVBoxLayout,
@@ -589,10 +593,6 @@ class MainAppWindow(QMainWindow):
             QToolTip.showText(QCursor.pos(), "Copied!", self.lbl_workspace_id)
 
     def _show_json_state(self):
-        import urllib.request
-        import json
-        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit
-
         try:
             req = urllib.request.Request(f"{self.api_url}/workspace/state")
             with urllib.request.urlopen(req) as response:

@@ -1,5 +1,6 @@
 """State machine container for the gesture handlers."""
 
+from typing import Any
 from uuid import UUID
 
 from annotator.gui.transformer import ViewportTransformer
@@ -25,6 +26,8 @@ class GestureState:
         self.drag_mouse_start_abs: tuple[float, float] = (0.0, 0.0)
         self.drag_orig_bounds: tuple[float, float, float, float] = (0.0, 0.0, 0.0, 0.0)
         self.drag_orig_descendants: dict[UUID, tuple[float, float, float, float]] = {}
+        self.drag_orig_boxes: dict[UUID, tuple[float, float, float, float]] = {}
+        self.click_deferred_selection: Any = None
 
         # Marquee / Draw state
         self.has_temp_rect: bool = False

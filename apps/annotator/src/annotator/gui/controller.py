@@ -96,6 +96,7 @@ class AppController:
         self.view.canvas.callbacks.on_drill_into = self._on_canvas_drill_into
         self.view.canvas.callbacks.on_drill_out = self._on_canvas_drill_out
         self.view.canvas.callbacks.on_component_moved = self._on_component_moved
+        self.view.canvas.callbacks.on_components_moved = self._on_components_moved
         self.view.canvas.callbacks.on_component_resized = self._on_component_resized
         self.view.canvas.callbacks.on_component_created = self._on_component_created
         self.view.canvas.callbacks.on_request_context_menu = (
@@ -121,6 +122,7 @@ class AppController:
 
         # Sidebar callbacks
         self.view.tree.on_component_selected = self._on_tree_component_selected
+        self.view.tree.on_components_selected = self._on_tree_components_selected
         self.view.tree.on_context_menu_request = self._on_sidebar_context_menu
         self.view.tree.on_rename_request = self._on_sidebar_rename_request
 
@@ -267,7 +269,7 @@ class AppController:
         self._sync_properties()
         selected_ids = self.store.state.selected_component_ids
         if selected_ids:
-            self.view.tree.select_component(selected_ids[-1])
+            self.view.tree.select_components(selected_ids)
         else:
             self.view.tree.clear_selection()
         self.view.canvas.set_selection_state(
@@ -530,6 +532,9 @@ class AppController:
     def _on_component_moved(self, comp_id: str, x: int, y: int):
         self.workspace.move_component(UUID(comp_id), x, y)
 
+    def _on_components_moved(self, moves: dict[str, tuple[int, int]]):
+        self.workspace.move_components({UUID(k): v for k, v in moves.items()})
+
     def _on_component_resized(self, comp_id: str, bounds: dict):
         self.workspace.update_component(UUID(comp_id), bounds=Bounds(**bounds))
 
@@ -591,6 +596,22 @@ class AppController:
             ancestors = self.get_ancestor_chain(comp_id)
             self.store.update_state("viewport", parent_stack=ancestors)
             self.store.update_state("selection", selected_component_ids=[comp_id])
+
+    def _on_tree_components_selected(self, comp_ids: list[UUID]):
+        state = self.store.state.workspace_state
+        if not state:
+            return
+        valid_ids = []
+        for comp_id in comp_ids:
+            if comp_id in state.components:
+                valid_ids.append(comp_id)
+        if valid_ids:
+            last_comp_id = valid_ids[-1]
+            ancestors = self.get_ancestor_chain(last_comp_id)
+            self.store.update_state("viewport", parent_stack=ancestors)
+            self.store.update_state("selection", selected_component_ids=valid_ids)
+        else:
+            self.store.update_state("selection", selected_component_ids=[])
 
     def _on_property_changed(self, comp_id: str, **kwargs):
         # Translate simple kwargs to Style/Visibility updates

@@ -9,6 +9,7 @@ class CanvasCallbacks:
 
     def __init__(self):
         self.on_component_moved: Callable[[str, int, int], None] | None = None
+        self.on_components_moved: Callable[[dict[str, tuple[int, int]]], None] | None = None
         self.on_component_resized: Callable[[str, dict], None] | None = None
         self.on_component_created: Callable[[dict], None] | None = None
         self.on_active_interaction_changed: Callable[[dict | None], None] | None = None

@@ -36,7 +36,7 @@ class SidebarTreeView(QWidget):
         self.tree.setModel(self.model)
         self.tree.setHeaderHidden(True)
         self.tree.setEditTriggers(QAbstractItemView.EditTrigger.NoEditTriggers)
-        self.tree.setSelectionMode(QAbstractItemView.SelectionMode.SingleSelection)
+        self.tree.setSelectionMode(QAbstractItemView.SelectionMode.ExtendedSelection)
         self.tree.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
         self.tree.setAnimated(False)
         self.tree.setIndentation(16)
@@ -47,6 +47,7 @@ class SidebarTreeView(QWidget):
         self.tree.doubleClicked.connect(self._on_double_click)
 
         self.on_component_selected = None
+        self.on_components_selected = None
         self.on_context_menu_request = None
         self.on_rename_request = None
         self._is_programmatic = False
@@ -141,6 +142,31 @@ class SidebarTreeView(QWidget):
             finally:
                 self._is_programmatic = False
 
+    def select_components(self, comp_ids: list[UUID]):
+        """Highlights specific component nodes without triggering selection update feedback loops."""
+        self._is_programmatic = True
+        try:
+            sel_model = self.tree.selectionModel()
+            sel_model.clearSelection()
+            first_idx = None
+            for comp_id in comp_ids:
+                comp_id_str = str(comp_id)
+                item = self._item_map.get(comp_id_str)
+                if item:
+                    idx = item.index()
+                    sel_model.select(
+                        idx,
+                        sel_model.SelectionFlag.Select | sel_model.SelectionFlag.Rows,
+                    )
+                    if first_idx is None:
+                        first_idx = idx
+            if first_idx is not None:
+                self.tree.scrollTo(first_idx)
+        except Exception:
+            pass
+        finally:
+            self._is_programmatic = False
+
     def clear_selection(self):
         """Clears node selection highlighting cleanly."""
         self._is_programmatic = True
@@ -154,15 +180,20 @@ class SidebarTreeView(QWidget):
     def _on_tree_select(self, selected, deselected):
         if self._is_programmatic:
             return
-        indexes = selected.indexes()
-        if indexes and self.on_component_selected:
-            item = self.model.itemFromIndex(indexes[0])
+        indexes = self.tree.selectionModel().selectedRows()
+        comp_ids = []
+        for index in indexes:
+            item = self.model.itemFromIndex(index)
             if item:
                 try:
                     comp_id = UUID(item.data(Qt.ItemDataRole.UserRole))
-                    self.on_component_selected(comp_id)
+                    comp_ids.append(comp_id)
                 except ValueError:
                     pass
+        if self.on_components_selected:
+            self.on_components_selected(comp_ids)
+        elif self.on_component_selected and len(comp_ids) == 1:
+            self.on_component_selected(comp_ids[0])
 
     def _on_right_click(self, pos):
         index = self.tree.indexAt(pos)

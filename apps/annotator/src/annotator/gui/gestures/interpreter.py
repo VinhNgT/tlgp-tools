@@ -143,6 +143,7 @@ class GestureInterpreter:
                     ) % len(self.state.cycle_components)
                     new_box = self.state.cycle_components[self.state.last_cycle_index]
                     canvas.set_selection([new_box])
+                    self.state.click_deferred_selection = None
                     SelectHandler.initiate_drag(
                         self.state, canvas, cx, cy, ctx, new_box
                     )
@@ -167,8 +168,13 @@ class GestureInterpreter:
                     else:
                         new_sel.append(clicked)
                     canvas.set_selection(new_sel)
+                    self.state.click_deferred_selection = None
                 else:
-                    canvas.set_selection([clicked])
+                    if clicked in selected_boxes:
+                        self.state.click_deferred_selection = clicked
+                    else:
+                        self.state.click_deferred_selection = None
+                        canvas.set_selection([clicked])
 
                 SelectHandler.initiate_drag(self.state, canvas, cx, cy, ctx, clicked)
             else:
@@ -200,6 +206,8 @@ class GestureInterpreter:
         if self.state.has_temp_rect:
             DrawHandler.on_drag(self.state, canvas, cx, cy, ctx, boundary)
             return
+
+        self.state.click_deferred_selection = None
 
         selected_boxes = canvas.get_selected_components()
         SelectHandler.on_drag(self.state, canvas, cx, cy, ctx, boundary, selected_boxes)
@@ -243,6 +251,11 @@ class GestureInterpreter:
 
         if not event_generated and self.state.has_temp_rect:
             pass  # Already cleared by DrawHandler.on_release
+
+        deferred = getattr(self.state, "click_deferred_selection", None)
+        if deferred is not None:
+            canvas.set_selection([deferred])
+            self.state.click_deferred_selection = None
 
         self.state.is_dragging = False
         self.state.resize_handle = None

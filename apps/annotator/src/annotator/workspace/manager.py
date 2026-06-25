@@ -236,6 +236,49 @@ class WorkspaceManager:
 
         self.mutate(mutation)
 
+    def move_components(self, moves: dict[uuid.UUID, tuple[int, int]]):
+        if not self.state.image:
+            raise InvalidStateError("No screenshot/image loaded in workspace")
+
+        def mutation(state: WorkspaceState):
+            all_descendants = set()
+            for comp_id, (x, y) in moves.items():
+                if comp_id not in state.components:
+                    raise ComponentNotFoundError(
+                        "Component not found", component_id=str(comp_id)
+                    )
+                comp = state.components[comp_id]
+                dx = x - comp.bounds.x
+                dy = y - comp.bounds.y
+                comp.bounds.x = x
+                comp.bounds.y = y
+                if dx != 0 or dy != 0:
+                    self._shift_descendants(state, comp_id, dx, dy)
+                recalculate_tree(state, changed_id=comp_id)
+
+                def collect_descendants(c_id: uuid.UUID):
+                    all_descendants.add(c_id)
+                    comp = state.components.get(c_id)
+                    if comp:
+                        for child_id in comp.childrenIds:
+                            collect_descendants(child_id)
+
+                collect_descendants(comp_id)
+
+            for cid in all_descendants:
+                c = state.components[cid]
+                intersecting_cut = CutValidator.get_intersecting_cut(
+                    c.bounds, state.cutLines
+                )
+                if intersecting_cut is not None:
+                    raise InvalidStateError(
+                        f"Component '{c.label}' intersects existing cut line at Y={intersecting_cut}",
+                        component_id=str(cid),
+                        cut_y=intersecting_cut,
+                    )
+
+        self.mutate(mutation)
+
     def update_component(
         self,
         comp_id: uuid.UUID,
