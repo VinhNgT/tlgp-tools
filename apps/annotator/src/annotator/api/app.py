@@ -9,6 +9,7 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from annotator.api.routes import router
 from annotator.workspace import WorkspaceManager
 from annotator.workspace.errors import (
     BoundaryViolationError,
@@ -59,9 +60,6 @@ def create_app(
     app.state.workspace = workspace
 
     # Wire routes
-    from .routes import create_router  # noqa: PLC0415
-
-    router = create_router(workspace)
     app.include_router(router)
 
     return app

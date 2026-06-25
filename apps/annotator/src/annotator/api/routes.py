@@ -13,11 +13,14 @@ from typing import Literal
 
 from fastapi import (
     APIRouter,
+    Depends,
+    Request,
 )
-from fastapi.responses import Response
+from fastapi.responses import Response, StreamingResponse
 from PIL import Image
 from pydantic import BaseModel
 
+from annotator.models.core import WorkspaceState
 from annotator.models.tree import TreeUtils
 from annotator.rendering import paint_annotations
 from annotator.workspace import WorkspaceManager
@@ -96,124 +99,138 @@ def generate_image_bytes(
         return buf.getvalue()
 
 
-# ── Router Factory ────────────────────────────────────────────────────
+# ── Router Definition ──────────────────────────────────────────────────
 
 
-def create_router(
-    workspace: WorkspaceManager,
-) -> APIRouter:
-    """Create the API router."""
-    router = APIRouter()
+router = APIRouter()
 
-    # ── State Routes ───────────────────────────────────────────────
 
-    @router.get("/workspace/state", tags=["State"])
-    async def get_state():
-        # workspace.state returns an immutable snapshot — safe without to_thread
-        return workspace.state.model_dump(mode="json")
+def get_workspace(request: Request) -> WorkspaceManager:
+    """Retrieve the workspace manager from the FastAPI application state."""
+    return request.app.state.workspace
 
-    @router.get("/workspace/export", tags=["Import/Export"])
-    async def export_workspace():
-        zip_bytes = await asyncio.to_thread(workspace.export_zip)
-        return Response(
-            content=zip_bytes,
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": "attachment; filename=annotation_export.zip"
-            },
+
+# ── State Routes ───────────────────────────────────────────────────────
+
+
+@router.get("/workspace/state", response_model=WorkspaceState, tags=["State"])
+async def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
+    # workspace.state returns an immutable snapshot — safe without to_thread
+    return workspace.state
+
+
+@router.get("/workspace/export", tags=["Import/Export"])
+async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
+    zip_bytes = await asyncio.to_thread(workspace.export_zip)
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": "attachment; filename=annotation_export.zip"
+        },
+    )
+
+
+@router.get("/workspace/export-images", tags=["Import/Export"])
+async def export_images(
+    mode: Literal["annotated", "raw", "both"] = "annotated",
+    workspace: WorkspaceManager = Depends(get_workspace),
+):
+    if not workspace.raw_image_bytes:
+        raise InvalidStateError("No image in workspace")
+    zip_bytes = await asyncio.to_thread(workspace.export_images, mode)
+    export_name = workspace.get_default_export_name(mode)
+    return StreamingResponse(
+        io.BytesIO(zip_bytes),
+        media_type="application/zip",
+        headers={
+            "Content-Disposition": f"attachment; filename={export_name}.zip"
+        },
+    )
+
+
+# ── Image Endpoints ────────────────────────────────────────────────────
+
+
+@router.get("/images/{comp_id}", tags=["Image"])
+async def get_image(
+    comp_id: str,
+    show_children: bool = False,
+    workspace: WorkspaceManager = Depends(get_workspace),
+):
+    if not workspace.raw_image_bytes:
+        raise InvalidStateError("No image in RAM")
+    img_bytes = await asyncio.to_thread(
+        generate_image_bytes, comp_id, workspace, show_children
+    )
+    return Response(content=img_bytes, media_type="image/png")
+
+
+@router.post("/workspace/export-batch", tags=["Import/Export"])
+async def export_batch(
+    req: BatchExportRequest,
+    workspace: WorkspaceManager = Depends(get_workspace),
+):
+    if not workspace.raw_image_bytes:
+        raise InvalidStateError(
+            "No image in RAM", workspace_id=str(workspace.state.workspaceId)
         )
 
-    @router.get("/workspace/export-images", tags=["Import/Export"])
-    async def export_images(
-        mode: Literal["annotated", "raw", "both"] = "annotated"
-    ):
-        if not workspace.raw_image_bytes:
-            raise InvalidStateError("No image in workspace")
-        zip_bytes = await asyncio.to_thread(workspace.export_images, mode)
-        export_name = workspace.get_default_export_name(mode)
-        return Response(
-            content=zip_bytes,
-            media_type="application/zip",
-            headers={
-                "Content-Disposition": f"attachment; filename={export_name}.zip"
-            },
-        )
-
-    # ── Image Endpoints ────────────────────────────────────────────
-
-    @router.get("/images/{comp_id}", tags=["Image"])
-    async def get_image(comp_id: str, show_children: bool = False):
-        if not workspace.raw_image_bytes:
-            raise InvalidStateError("No image in RAM")
-        img_bytes = await asyncio.to_thread(
-            generate_image_bytes, comp_id, workspace, show_children
-        )
-        return Response(content=img_bytes, media_type="image/png")
-
-    @router.post("/workspace/export-batch", tags=["Import/Export"])
-    async def export_batch(req: BatchExportRequest):
-        if not workspace.raw_image_bytes:
-            raise InvalidStateError(
-                "No image in RAM", workspace_id=str(workspace.state.workspaceId)
-            )
-
-        def _build_batch_zip() -> bytes:
-            buf = io.BytesIO()
-            with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
-                if req.include_state:
-                    zf.writestr(
-                        "workspace.json", workspace.state.model_dump_json(indent=2)
-                    )
-                if req.include_root:
-                    if workspace.state.cutLines:
-                        with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
-                            img_w, img_h = img.width, img.height
-                            boundaries = [0, *sorted(workspace.state.cutLines), img_h]
-                            for part_idx in range(len(boundaries) - 1):
-                                seg_y_start = boundaries[part_idx]
-                                seg_y_end = boundaries[part_idx + 1]
-                                if seg_y_end <= seg_y_start:
-                                    continue
-                                cropped = img.crop((0, seg_y_start, img_w, seg_y_end))
-                                children = []
-                                if req.show_root_children:
-                                    root_children = TreeUtils.get_children(
-                                        workspace.state, None
-                                    )
-                                    for child in root_children:
-                                        center_y = (
-                                            child.bounds.top + child.bounds.bottom
-                                        ) / 2
-                                        if seg_y_start <= center_y < seg_y_end:
-                                            children.append(child)
-                                if children:
-                                    cropped = paint_annotations(
-                                        cropped, children, 0, seg_y_start, None, img_w
-                                    )
-                                buf_part = io.BytesIO()
-                                cropped.save(buf_part, format="PNG")
-                                zf.writestr(
-                                    f"raw_part{part_idx + 1}.png", buf_part.getvalue()
+    def _build_batch_zip() -> bytes:
+        buf = io.BytesIO()
+        with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            if req.include_state:
+                zf.writestr(
+                    "workspace.json", workspace.state.model_dump_json(indent=2)
+                )
+            if req.include_root:
+                if workspace.state.cutLines:
+                    with Image.open(io.BytesIO(workspace.raw_image_bytes)) as img:
+                        img_w, img_h = img.width, img.height
+                        boundaries = [0, *sorted(workspace.state.cutLines), img_h]
+                        for part_idx in range(len(boundaries) - 1):
+                            seg_y_start = boundaries[part_idx]
+                            seg_y_end = boundaries[part_idx + 1]
+                            if seg_y_end <= seg_y_start:
+                                continue
+                            cropped = img.crop((0, seg_y_start, img_w, seg_y_end))
+                            children = []
+                            if req.show_root_children:
+                                root_children = TreeUtils.get_children(
+                                    workspace.state, None
                                 )
-                    else:
-                        zf.writestr(
-                            "raw.png",
-                            generate_image_bytes(
-                                "root", workspace, req.show_root_children
-                            ),
-                        )
-                for item in req.components:
+                                for child in root_children:
+                                    center_y = (
+                                        child.bounds.top + child.bounds.bottom
+                                    ) / 2
+                                    if seg_y_start <= center_y < seg_y_end:
+                                        children.append(child)
+                            if children:
+                                cropped = paint_annotations(
+                                    cropped, children, 0, seg_y_start, None, img_w
+                                )
+                            buf_part = io.BytesIO()
+                            cropped.save(buf_part, format="PNG")
+                            zf.writestr(
+                                f"raw_part{part_idx + 1}.png", buf_part.getvalue()
+                            )
+                else:
                     zf.writestr(
-                        f"images/{item.id}.png",
-                        generate_image_bytes(item.id, workspace, item.show_children),
+                        "raw.png",
+                        generate_image_bytes(
+                            "root", workspace, req.show_root_children
+                        ),
                     )
-            return buf.getvalue()
+            for item in req.components:
+                zf.writestr(
+                    f"images/{item.id}.png",
+                    generate_image_bytes(item.id, workspace, item.show_children),
+                )
+        return buf.getvalue()
 
-        zip_content = await asyncio.to_thread(_build_batch_zip)
-        return Response(
-            content=zip_content,
-            media_type="application/zip",
-            headers={"Content-Disposition": "attachment; filename=batch_export.zip"},
-        )
-
-    return router
+    zip_content = await asyncio.to_thread(_build_batch_zip)
+    return StreamingResponse(
+        io.BytesIO(zip_content),
+        media_type="application/zip",
+        headers={"Content-Disposition": "attachment; filename=batch_export.zip"},
+    )
