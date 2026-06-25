@@ -15,7 +15,6 @@ from doc_generator.table_builder import (
 )
 from docx import Document
 from docx.oxml.ns import qn
-from docx.shared import Pt
 
 style: StyleConfig
 
@@ -221,27 +220,49 @@ class TestApiTable:
             assert _get_cell_shading(table.cell(0, c)) == style.HEADER_BG_HEX
 
 
-# ── Table Spacing ─────────────────────────────────────────────────────
+# ── Fixed Table Layout ────────────────────────────────────────────────
 
 
-class TestTableSpacing:
-    def test_spacing_added_after_info_table(self):
+class TestFixedTableLayout:
+    def test_table_width_is_fixed_dxa(self):
+        """Table width must be set to exact twips, not auto."""
         doc = Document()
-        build_generic_info_table(doc, "L", "V", "Description", style)
-        # There should be at least one paragraph added for spacing
-        spacer_para = doc.paragraphs[-1]
-        assert spacer_para.paragraph_format.space_before == Pt(0)
-        assert spacer_para.paragraph_format.space_after == Pt(
-            style.SPACE_AFTER_TABLE_PT
-        )
-        assert spacer_para.paragraph_format.line_spacing == Pt(1)
+        table = build_generic_info_table(doc, "L", "V", "D", style)
+        tbl = table._tbl
+        tblPr = tbl.find(qn("w:tblPr"))
+        tblW = tblPr.find(qn("w:tblW"))
+        assert tblW.get(qn("w:type")) == "dxa"
+        expected_twips = sum(int(pt * 20) for pt in style.INFO_COLS_PT)
+        assert tblW.get(qn("w:w")) == str(expected_twips)
 
-    def test_spacing_added_after_ui_table(self):
+    def test_table_layout_is_fixed(self):
+        """Autofit must be disabled via tblLayout type=fixed."""
         doc = Document()
-        build_ui_elements_table(doc, [], style)
-        spacer_para = doc.paragraphs[-1]
-        assert spacer_para.paragraph_format.space_before == Pt(0)
-        assert spacer_para.paragraph_format.space_after == Pt(
-            style.SPACE_AFTER_TABLE_PT
-        )
-        assert spacer_para.paragraph_format.line_spacing == Pt(1)
+        table = build_generic_info_table(doc, "L", "V", "D", style)
+        tbl = table._tbl
+        tblPr = tbl.find(qn("w:tblPr"))
+        tblLayout = tblPr.find(qn("w:tblLayout"))
+        assert tblLayout is not None
+        assert tblLayout.get(qn("w:type")) == "fixed"
+
+    def test_grid_columns_match_cell_widths(self):
+        """tblGrid gridCol values must match tcW for rendering consistency."""
+        doc = Document()
+        table = build_generic_info_table(doc, "L", "V", "D", style)
+        tbl = table._tbl
+        grid = tbl.find(qn("w:tblGrid"))
+        grid_widths = [
+            gc.get(qn("w:w")) for gc in grid.findall(qn("w:gridCol"))
+        ]
+        expected = [str(int(pt * 20)) for pt in style.INFO_COLS_PT]
+        assert grid_widths == expected
+
+    def test_no_spacer_paragraphs_after_table(self):
+        """Tables must not inject empty spacer paragraphs into the document."""
+        doc = Document()
+        build_generic_info_table(doc, "L", "V", "D", style)
+        # No paragraphs should exist in the document body after a table
+        for p in doc.paragraphs:
+            assert p.text != "" or p.style.name != "Normal", (
+                "Found an empty Normal paragraph — likely a spacer paragraph"
+            )

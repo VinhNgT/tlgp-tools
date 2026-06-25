@@ -8,7 +8,7 @@ import docx
 from docx.document import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
-from docx.shared import Inches
+from docx.shared import Inches, Pt
 
 from doc_generator.image_handler import insert_image
 from doc_generator.models import AnalysisComponent, AnalysisData, Api, Screen
@@ -225,6 +225,36 @@ def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int
 
 
 # ============================================================
+# Style configuration
+# ============================================================
+
+
+def _configure_document_styles(doc: Document, style: StyleConfig):
+    """Configure paragraph and heading styles for consistent vertical rhythm.
+
+    Spacing is applied at the style level so the document uses proper
+    Word style definitions — the same approach a professional would use
+    when creating a document by hand.
+    """
+    # Normal style: font and paragraph spacing
+    normal_style: Any = doc.styles["Normal"]
+    normal_style.font.name = style.FONT_FAMILY
+    normal_style.font.size = style.FONT_SIZE_DEFAULT
+    normal_style.paragraph_format.space_before = Pt(style.NORMAL_SPACE_BEFORE_PT)
+    normal_style.paragraph_format.space_after = Pt(style.NORMAL_SPACE_AFTER_PT)
+
+    # Heading 3: section titles (e.g., "1.1.1. Component X")
+    h3_style: Any = doc.styles["Heading 3"]
+    h3_style.paragraph_format.space_before = Pt(style.H3_SPACE_BEFORE_PT)
+    h3_style.paragraph_format.space_after = Pt(style.H3_SPACE_AFTER_PT)
+
+    # Heading 4: sub-section titles (e.g., "1.1.1.1 Thông tin chung")
+    h4_style: Any = doc.styles["Heading 4"]
+    h4_style.paragraph_format.space_before = Pt(style.H4_SPACE_BEFORE_PT)
+    h4_style.paragraph_format.space_after = Pt(style.H4_SPACE_AFTER_PT)
+
+
+# ============================================================
 # Public API
 # ============================================================
 
@@ -240,11 +270,8 @@ def build_document(analysis: AnalysisData) -> Document:
     doc = docx.Document()
     style_config = load_default_style()
 
-    # Set default font
-    style = doc.styles["Normal"]
-    style_any: Any = style
-    style_any.font.name = style_config.FONT_FAMILY
-    style_any.font.size = style_config.FONT_SIZE_DEFAULT
+    # Configure all document styles
+    _configure_document_styles(doc, style_config)
 
     # Set page margins (1 inch all around)
     for section in doc.sections:

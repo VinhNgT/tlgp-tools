@@ -22,9 +22,6 @@ class StyleConfig:
             self.FONT_FAMILY: str = cfg["global"]["font_family"]
             self.FONT_SIZE_DEFAULT: Pt = Pt(cfg["global"]["font_size_pt"])
             self.FONT_SIZE_API: Pt = Pt(cfg["table"]["api"]["font_size_pt"])
-            self.SPACE_AFTER_TABLE_PT: float = float(
-                cfg["global"].get("space_after_table_pt", 12.0)
-            )
 
             heading_hex = cfg["global"]["heading_color"].lstrip("#")
             self.HEADING_COLOR = RGBColor(
@@ -61,6 +58,15 @@ class StyleConfig:
                 "headers"
             ]
             self.API_TABLE_HEADERS: list[str] = cfg["table"]["api"]["headers"]
+
+            # Paragraph and heading spacing
+            spacing = cfg["spacing"]
+            self.H3_SPACE_BEFORE_PT: float = spacing["h3_space_before_pt"]
+            self.H3_SPACE_AFTER_PT: float = spacing["h3_space_after_pt"]
+            self.H4_SPACE_BEFORE_PT: float = spacing["h4_space_before_pt"]
+            self.H4_SPACE_AFTER_PT: float = spacing["h4_space_after_pt"]
+            self.NORMAL_SPACE_BEFORE_PT: float = spacing["normal_space_before_pt"]
+            self.NORMAL_SPACE_AFTER_PT: float = spacing["normal_space_after_pt"]
         except KeyError as e:
             raise ValueError(f"Missing required styling configuration key: {e}") from e
 
@@ -69,3 +75,4 @@ def load_default_style() -> StyleConfig:
     """Helper to load standard StyleConfig from spec_format.toml."""
     cfg_path = Path(__file__).parent / "spec_format.toml"
     return StyleConfig(cfg_path)
+
