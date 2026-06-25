@@ -245,7 +245,11 @@ class QtDialogService(DialogService):
             parent, image=image, initial_cuts=initial_cuts, components=components
         )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        dialog.accepted.connect(lambda: on_save(dialog.cut_lines_result))
+        dialog.accepted.connect(
+            lambda: on_save(dialog.cut_lines_result)
+            if dialog.cut_lines_result is not None
+            else None
+        )
         dialog.show()
 
     def show_screen_info(
@@ -259,7 +263,11 @@ class QtDialogService(DialogService):
             parent, screen_name=screen_name, description=description
         )
         dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
-        dialog.accepted.connect(lambda: on_save(dialog.info_result))
+        dialog.accepted.connect(
+            lambda: on_save(dialog.info_result)
+            if dialog.info_result is not None
+            else None
+        )
         dialog.show()
 
     def ask_export_images_options(

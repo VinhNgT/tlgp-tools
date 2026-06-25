@@ -11,7 +11,7 @@ from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
-from docx.shared import Pt
+from docx.shared import Emu, Pt
 from docx.table import Table
 
 from doc_generator.models import (
@@ -26,9 +26,9 @@ from doc_generator.style_constants import StyleConfig
 # ============================================================
 
 
-def _pt_to_emu(pt: float) -> int:
+def _pt_to_emu(pt: float) -> Emu:
     """Convert points to EMU (English Metric Units)."""
-    return int(pt * 12700)
+    return Emu(int(pt * 12700))
 
 
 def _set_cell_border(cell, top=None, bottom=None, left=None, right=None):

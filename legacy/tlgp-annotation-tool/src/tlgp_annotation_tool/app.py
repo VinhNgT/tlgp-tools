@@ -526,9 +526,9 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
             else:
                 self.canvas._start_active_interaction()
                 if delta_y != 0:
-                    self.canvas.yview_scroll(-delta_y, "units")
+                    self.canvas.yview_scroll(int(-delta_y), "units")
                 if delta_x != 0:
-                    self.canvas.xview_scroll(-delta_x, "units")
+                    self.canvas.xview_scroll(int(-delta_x), "units")
                 self.canvas.check_viewport_crop()
             return "break"
 
@@ -1003,8 +1003,7 @@ class TlgpAnnotationApp(tb.Window, tkinterdnd2.TkinterDnD.DnDWrapper):
         self.zoom_label.config(text=f"{pct}%")
 
     def show_shortcuts_help(self):
-        dialog = tb.Toplevel(self)
-        dialog.title("Keyboard Shortcuts")
+        dialog = tb.Toplevel(title="Keyboard Shortcuts", master=self)
         dialog.geometry("500x620")
         dialog.resizable(False, False)
         dialog.transient(self)

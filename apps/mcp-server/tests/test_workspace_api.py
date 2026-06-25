@@ -4,12 +4,13 @@ from __future__ import annotations
 
 import io
 import zipfile
-from pathlib import Path
+from uuid import uuid4
 
 import httpx
 import pytest
 from mcp_server.client import WorkspaceClient
 from mcp_server.exceptions import ApiClientError
+from tlgp_contracts import WorkspaceState
 
 
 def test_api_client_error_serialization():
@@ -39,6 +40,8 @@ def test_api_client_error_serialization():
 class TestWorkspaceApi:
     @pytest.mark.anyio
     async def test_get_workspace_state_success(self, monkeypatch):
+        workspace_id = str(uuid4())
+
         class MockResponse:
             status_code = 200
 
@@ -46,7 +49,7 @@ class TestWorkspaceApi:
                 pass
 
             def json(self):
-                return {"version": 1, "sessionId": "abc"}
+                return {"version": 1, "workspaceId": workspace_id}
 
         class MockAsyncClient:
             async def __aenter__(self):
@@ -56,7 +59,6 @@ class TestWorkspaceApi:
                 pass
 
             async def request(self, method, url, *args, **kwargs):
-                # We mock HTTP request method
                 assert method == "GET"
                 assert "workspace/state" in url
                 return MockResponse()
@@ -65,8 +67,9 @@ class TestWorkspaceApi:
 
         client = WorkspaceClient()
         res = await client.get_workspace_state()
-        assert res["version"] == 1
-        assert res["sessionId"] == "abc"
+        assert isinstance(res, WorkspaceState)
+        assert res.version == 1
+        assert str(res.workspaceId) == workspace_id
 
     @pytest.mark.anyio
     async def test_check_connection_success(self, monkeypatch):
@@ -200,9 +203,8 @@ class TestWorkspaceApi:
 
         out_zip = tmp_path / "workspace.zip"
         client = WorkspaceClient()
-        res = await client.export_workspace(str(out_zip))
+        await client.export_workspace(str(out_zip))
 
-        assert res["status"] == "success"
         assert out_zip.exists()
         with zipfile.ZipFile(out_zip, "r") as zf:
             assert "workspace.json" in zf.namelist()
@@ -242,8 +244,7 @@ class TestWorkspaceApi:
         client = WorkspaceClient()
         res = await client.export_images(str(out_dir))
 
-        assert res["status"] == "success"
+        assert res["output_path"] == str(out_dir.resolve())
         assert (out_dir / "mapping.json").exists()
         assert (out_dir / "comp1.png").exists()
-        assert "mapping.json" in res["exported_files"]
 

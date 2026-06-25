@@ -4,7 +4,8 @@ members = [
     "apps/mcp-server",
     "apps/doc-generator",
     "apps/annotator",
-    "libs/logger"
+    "libs/logger",
+    "libs/contracts",
 ]
 
 [dependency-groups]

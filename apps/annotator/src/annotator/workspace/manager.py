@@ -4,8 +4,8 @@ import re
 import threading
 import uuid
 import zipfile
-from collections.abc import Callable
-from typing import Literal
+from collections.abc import Callable, Generator
+from typing import Any, Literal, TypedDict
 
 import jsonpatch
 from PIL import Image
@@ -31,6 +31,15 @@ from .errors import (
 )
 from .ordering import ROOTS_CHANGED, recalculate_tree
 from .validation import MIN_CUT_GAP, CutValidator
+
+
+class ExportNode(TypedDict):
+    is_leaf: bool
+    bounds: tuple[int, int, int, int]
+    children: list[Component]
+    parent_comp: Component | None
+    filename: str
+    comp_id: uuid.UUID | None
 
 
 class WorkspaceManager:
@@ -593,7 +602,7 @@ class WorkspaceManager:
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             with Image.open(io.BytesIO(image_bytes)) as img:
 
-                def get_export_nodes():
+                def get_export_nodes() -> Generator[ExportNode]:
                     # Yield root node
                     root_children = TreeUtils.get_children(state_snapshot, None)
                     root_base = (
@@ -639,7 +648,7 @@ class WorkspaceManager:
                             "comp_id": comp_id,
                         }
 
-                mapping = {}
+                mapping: dict[str, Any] = {}
                 if mode == "both":
                     mapping["annotated"] = {"root": None, "components": {}}
                     mapping["raw"] = {"root": None, "components": {}}

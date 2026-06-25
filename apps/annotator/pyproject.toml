@@ -12,6 +12,7 @@ dependencies = [
     "PySide6>=6.8",
     "uvicorn>=0.49.0",
     "tlgp-logger",
+    "tlgp-contracts",
 ]
 
 [project.scripts]
@@ -19,6 +20,7 @@ annotator = "annotator.__main__:main"
 
 [tool.uv.sources]
 tlgp-logger = { workspace = true }
+tlgp-contracts = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

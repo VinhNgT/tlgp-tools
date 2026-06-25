@@ -5,8 +5,8 @@ from tlgp_annotation_tool.app import TlgpAnnotationApp
 
 
 def main():
-    sys.stdout.reconfigure(encoding="utf-8")
-    sys.stderr.reconfigure(encoding="utf-8")
+    getattr(sys.stdout, "reconfigure")(encoding="utf-8")  # noqa: B009
+    getattr(sys.stderr, "reconfigure")(encoding="utf-8")  # noqa: B009
 
     parser = argparse.ArgumentParser(description="TLGP Annotation Tool")
     parser.add_argument(

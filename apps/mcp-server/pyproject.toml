@@ -12,6 +12,7 @@ dependencies = [
     "doc-generator",
     "httpx>=0.27.0",
     "tlgp-logger",
+    "tlgp-contracts",
 ]
 
 [project.scripts]
@@ -21,6 +22,7 @@ tlgp-mcp = "mcp_server.__main__:main"
 [tool.uv.sources]
 doc-generator = { workspace = true }
 tlgp-logger = { workspace = true }
+tlgp-contracts = { workspace = true }
 
 [build-system]
 requires = ["hatchling"]

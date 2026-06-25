@@ -82,58 +82,6 @@ class DaemonManager:
             except Exception:
                 pass
 
-    async def get_status(self, client: httpx.AsyncClient | None = None) -> dict:
-        """Retrieve the running status of the annotator process."""
-        annotator_running = False
-        annotator_ready = False
-
-        # 1. Check process list status
-        for proc in list(self.active_processes):
-            if proc.poll() is None:
-                cmd = proc.args
-                cmd_str = " ".join(str(x) for x in cmd) if isinstance(cmd, list) else str(cmd)
-                if "annotator" in cmd_str:
-                    annotator_running = True
-
-        # 2. Check annotator HTTP readiness
-        # If client is passed, use it, otherwise instantiate a short-lived client
-        annotator_url = self.annotator_url
-        try:
-            if client is not None:
-                res = await client.get(f"{annotator_url}/health", timeout=0.5)
-                if res.status_code == 200:
-                    annotator_ready = True
-                    annotator_running = True
-            else:
-                async with httpx.AsyncClient() as c:
-                    res = await c.get(f"{annotator_url}/health", timeout=0.5)
-                    if res.status_code == 200:
-                        annotator_ready = True
-                        annotator_running = True
-        except Exception:
-            pass
-
-        return {
-            "annotator": {
-                "running": annotator_running,
-                "ready": annotator_ready,
-            }
-        }
-
-    def read_daemon_logs(self, daemon: str = "annotator", lines: int = 100) -> dict:
-        """Read requested tailing lines from the selected daemon's log buffer."""
-        # Both map to annotator_logs now
-        buf = self.annotator_logs
-
-        snapshot = list(buf)
-        requested_logs = snapshot[-lines:] if lines > 0 else snapshot
-
-        return {
-            "daemon": daemon,
-            "line_count": len(requested_logs),
-            "logs": "".join(requested_logs),
-        }
-
     async def launch_annotator(
         self,
         path: str | None = None,

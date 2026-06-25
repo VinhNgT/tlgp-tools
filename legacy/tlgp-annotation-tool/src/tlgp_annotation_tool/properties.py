@@ -44,6 +44,7 @@ class CornerSelector(tk.Canvas):
     def get_colors(self):
         try:
             style = tb.Style.get_instance()
+            assert style is not None
             primary = style.colors.primary
             bg = style.colors.inputbg or "#222222"
             border = style.colors.border or "#444444"

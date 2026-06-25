@@ -8,8 +8,10 @@ from typing import TYPE_CHECKING
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import AnalysisData
-from pydantic import BaseModel, Field, ValidationError
+from pydantic import ValidationError
 from tlgp_logger import get_logger
+
+from mcp_server.client import WorkspaceClient
 
 if TYPE_CHECKING:
     from mcp.server.fastmcp import Context
@@ -20,8 +22,8 @@ logger = get_logger(__name__)
 class SpecGeneratorService:
     """Orchestrates validation, metadata elicitation, and compilation of specification documents."""
 
-    def __init__(self):
-        pass
+    def __init__(self, client: WorkspaceClient | None = None):
+        self._client = client
 
     async def generate(
         self,
@@ -58,7 +60,7 @@ class SpecGeneratorService:
             validate_only=validate_only,
         )
 
-        if not validate_only and result.get("valid"):
+        if not validate_only and result.get("valid") and self._client is not None:
             docx_path = Path(result["output_path"])
             workspace_zip_path = docx_path.parent / "workspace.zip"
             if ctx:
@@ -66,13 +68,7 @@ class SpecGeneratorService:
                     "info", f"Exporting workspace state to {workspace_zip_path}..."
                 )
             try:
-                from mcp_server.client import WorkspaceClient  # noqa: PLC0415
-
-                client = WorkspaceClient()
-                try:
-                    await client.export_workspace(str(workspace_zip_path))
-                finally:
-                    await client.close()
+                await self._client.export_workspace(str(workspace_zip_path))
             except Exception as e:
                 logger.error("Failed to export workspace.zip next to docx: %s", e)
                 if ctx:
@@ -212,5 +208,6 @@ class SpecGeneratorService:
             "output_path": str(out),
             "tables": table_count,
             "images": image_count,
+            "discrepancies": len(data.discrepancies),
             "warnings": warnings,
         }

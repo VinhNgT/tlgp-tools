@@ -6,8 +6,10 @@ import io
 import json
 import os
 import zipfile
+from typing import Literal
 
 import httpx
+from tlgp_contracts import WorkspaceState
 from tlgp_logger import get_logger
 
 from mcp_server.exceptions import ApiClientError
@@ -82,10 +84,10 @@ class WorkspaceClient:
                 method=e.request.method if hasattr(e, "request") else None,
             ) from e
 
-    async def get_workspace_state(self) -> dict:
+    async def get_workspace_state(self) -> WorkspaceState:
         """Fetch the current flat-map JSON WorkspaceState from the running Annotator."""
         res = await self._request("GET", "/workspace/state")
-        return res.json()
+        return WorkspaceState.model_validate(res.json())
 
     async def check_connection(self) -> bool:
         """Verify the connection is active using the lightweight /health endpoint."""
@@ -96,7 +98,7 @@ class WorkspaceClient:
             return False
 
 
-    async def export_workspace(self, output_path: str) -> dict:
+    async def export_workspace(self, output_path: str) -> None:
         """Export the current workspace (state JSON and raw screenshot) as a zip file.
 
         Args:
@@ -112,11 +114,6 @@ class WorkspaceClient:
         with open(out_path, "wb") as f:
             f.write(res.content)
 
-        return {
-            "status": "success",
-            "output_path": out_path,
-        }
-
     async def export_images(
         self,
         output_path: str,
@@ -127,6 +124,9 @@ class WorkspaceClient:
         Args:
             output_path: Directory path to extract the cropped images.
             mode: Export mode ('annotated', 'raw', or 'both').
+
+        Returns:
+            dict with output_path and image count summary from mapping.json.
         """
         res = await self._request(
             "GET", "/workspace/export-images", params={"mode": mode}
@@ -137,8 +137,25 @@ class WorkspaceClient:
         zip_buf = io.BytesIO(res.content)
         with zipfile.ZipFile(zip_buf, "r") as zf:
             zf.extractall(out_path)
-        return {
-            "status": "success",
-            "output_dir": out_path,
-            "exported_files": os.listdir(out_path),
-        }
+
+        result: dict = {"output_path": out_path}
+
+        # Parse mapping.json for image count summary
+        mapping_path = os.path.join(out_path, "mapping.json")
+        if os.path.exists(mapping_path):
+            try:
+                with open(mapping_path, encoding="utf-8") as f:
+                    mapping = json.load(f)
+                if mode == "both":
+                    result["annotated_images"] = len(
+                        mapping.get("annotated", {}).get("components", {})
+                    )
+                    result["raw_images"] = len(
+                        mapping.get("raw", {}).get("components", {})
+                    )
+                else:
+                    result["images"] = len(mapping.get("components", {}))
+            except Exception:
+                pass
+
+        return result

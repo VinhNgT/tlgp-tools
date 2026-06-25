@@ -18,7 +18,7 @@ class CornerSelector(QWidget):
         super().__init__(parent)
         self.setFixedSize(64, 64)
         self._on_corner_selected = on_corner_selected_callback
-        self.selected_corner = "top_left"
+        self.selected_corner: str | None = "top_left"
         self.enabled = True
         self.setMouseTracking(True)
 
@@ -146,7 +146,7 @@ class ComponentPropertiesView(QWidget):
 
         self._selected_box_id = None
         self._current_label = ""
-        self._current_pill_corner = "top_left"
+        self._current_pill_corner: str | None = "top_left"
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)

@@ -62,8 +62,8 @@ def get_font(size: int):
 
 
 def get_text_dimensions(
-    draw: ImageDraw.Draw | None, text: str, font
-) -> tuple[int, int, int]:
+    draw: ImageDraw.ImageDraw | None, text: str, font
+) -> tuple[float, float, float]:
     """Safely get text width, height, and top offset across different Pillow versions.
 
     If `draw` is None, falls back to font-based measurement or character estimation.

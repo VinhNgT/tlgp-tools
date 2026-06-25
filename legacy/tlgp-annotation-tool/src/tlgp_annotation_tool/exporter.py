@@ -1,5 +1,6 @@
 import json
 import os
+from typing import Any
 
 from PIL import Image
 
@@ -13,9 +14,9 @@ def _export_level_images(
     depth: int,
     output_dir: str,
     safe_name: str,
-    parent_box: AnnotationBox = None,
+    parent_box: AnnotationBox | None = None,
     parent_path: str = "",
-    cut_lines: list[int] = None,
+    cut_lines: list[int] | None = None,
 ):
     """Recursively exports one annotated image per parent that has children.
 
@@ -185,7 +186,7 @@ def export_session(session: ScreenSession, output_dir: str):
     comp_dicts = [comp.to_dict() for comp in session.components]
     _annotate_image_files(comp_dicts, safe_name)
 
-    data = {
+    data: dict[str, Any] = {
         "screen_name": session.screen_name,
         "description": session.description,
         "original_image": session.original_image,

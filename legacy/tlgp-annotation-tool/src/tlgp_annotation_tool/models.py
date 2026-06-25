@@ -1,4 +1,5 @@
 from dataclasses import dataclass, field
+from typing import Any
 
 
 @dataclass
@@ -53,7 +54,7 @@ class AnnotationBox:
 
     def to_dict(self, parent_x: int = 0, parent_y: int = 0) -> dict:
         """Recursively serialize to dict. Coordinates are relative to the parent."""
-        result = {
+        result: dict[str, Any] = {
             "id": self.id,
             "label": self.label,
             "bounds": {

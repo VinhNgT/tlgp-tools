@@ -714,10 +714,11 @@ class AnnotationCanvasView(QWidget):
 
     def event(self, event: QEvent) -> bool:
         if event.type() == QEvent.Type.NativeGesture:
-            if event.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
+            event_any: Any = event
+            if event_any.gestureType() == Qt.NativeGestureType.ZoomNativeGesture:
                 self._last_native_gesture_time = time.time()
                 old_zoom = self.zoom_factor
-                scale = 1.0 + event.value()
+                scale = 1.0 + event_any.value()
                 new_zoom = max(0.1, min(4.0, old_zoom * scale))
                 if new_zoom != old_zoom:
                     local_pos = self.mapFromGlobal(QCursor.pos())
@@ -736,7 +737,7 @@ class AnnotationCanvasView(QWidget):
                                 new_pan_y,
                             )
                             self.gestures.state.pan_start_mouse = (mouse_x, mouse_y)
-                event.accept()
+                event_any.accept()
                 return True
         return super().event(event)
 

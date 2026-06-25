@@ -53,7 +53,7 @@ class ViewportTransformer:
         # at all hierarchy levels, including when drilled down into a component.
         return len(cut_lines) > 0
 
-    def gap_offset_for_y(self, abs_y: int) -> int:
+    def gap_offset_for_y(self, abs_y: float) -> int:
         """Calculates cumulative visual gap shift in pixels located above absolute coordinate abs_y."""
         if not self._segments or len(self._segments) <= 1:
             return 0
@@ -74,11 +74,11 @@ class ViewportTransformer:
 
     def get_segment_y_bounds(
         self,
-        abs_y: int,
+        abs_y: float,
         parent_stack: list[UUID],
         cut_lines: list[int],
-        boundary: tuple[int, int, int, int],
-    ) -> tuple[int, int]:
+        boundary: tuple[float, float, float, float],
+    ) -> tuple[float, float]:
         """Returns visual bounding box limits of the active horizontal segment strip containing y coordinate."""
         if not self.has_active_cuts(parent_stack, cut_lines) or not self._segments:
             _, by1, _, by2 = boundary
@@ -106,8 +106,8 @@ class ViewportTransformer:
 
     def to_canvas(
         self,
-        abs_x: int,
-        abs_y: int,
+        abs_x: float,
+        abs_y: float,
         zoom_factor: float,
         parent_stack: list[UUID],
         cut_lines: list[int],
@@ -145,7 +145,7 @@ class ViewportTransformer:
     # ── ViewportContext convenience methods ──────────────────────────
 
     def to_canvas_ctx(
-        self, abs_x: int, abs_y: int, ctx: ViewportContext
+        self, abs_x: float, abs_y: float, ctx: ViewportContext
     ) -> tuple[float, float]:
         """Converts absolute raw coordinates to visual canvas space using a ViewportContext."""
         return self.to_canvas(
@@ -174,10 +174,10 @@ class ViewportTransformer:
 
     def get_segment_y_bounds_ctx(
         self,
-        abs_y: int,
+        abs_y: float,
         ctx: ViewportContext,
-        boundary: tuple[int, int, int, int],
-    ) -> tuple[int, int]:
+        boundary: tuple[float, float, float, float],
+    ) -> tuple[float, float]:
         """Returns segment Y bounds using a ViewportContext."""
         return self.get_segment_y_bounds(
             abs_y, list(ctx.parent_stack), list(ctx.cut_lines), boundary

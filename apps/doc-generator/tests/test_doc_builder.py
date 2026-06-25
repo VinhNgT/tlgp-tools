@@ -1,4 +1,4 @@
-"""Tests for doc_builder — end-to-end document generation."""
+from typing import Any
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import (
@@ -49,7 +49,7 @@ class TestBuildDocumentMinimal:
         analysis = _minimal_analysis(tmp_path)
         doc = build_document(analysis)
         # Find paragraphs with heading style
-        headings = [p for p in doc.paragraphs if p.style.name.startswith("Heading")]
+        headings = [p for p in doc.paragraphs if p.style is not None and p.style.name is not None and p.style.name.startswith("Heading")]
         assert len(headings) >= 1
         # Screen heading should contain "Màn hình Test Screen"
         screen_headings = [h for h in headings if "Test Screen" in h.text]
@@ -58,7 +58,8 @@ class TestBuildDocumentMinimal:
     def test_default_font_is_times_new_roman(self, tmp_path):
         analysis = _minimal_analysis(tmp_path)
         doc = build_document(analysis)
-        assert doc.styles["Normal"].font.name == "Times New Roman"
+        normal_style: Any = doc.styles["Normal"]
+        assert normal_style.font.name == "Times New Roman"
 
 
 class TestBuildDocumentWithComponents:

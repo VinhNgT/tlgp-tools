@@ -1,66 +1,26 @@
-from typing import Literal
-from uuid import UUID
+"""Annotator domain models — re-exported from the shared contracts package.
 
-from pydantic import BaseModel, Field
+The canonical schema definitions live in `tlgp_contracts.workspace`.
+This module re-exports them so that existing annotator code continues to
+work via `from annotator.models import WorkspaceState` without changes.
+"""
 
-PillCorner = Literal["top_left", "top_right", "bottom_left", "bottom_right"]
+from tlgp_contracts.workspace import (
+    Bounds,
+    Component,
+    ImageInfo,
+    PillCorner,
+    ScreenInfo,
+    Style,
+    WorkspaceState,
+)
 
-
-class Bounds(BaseModel):
-    x: int = Field(..., ge=0)
-    y: int = Field(..., ge=0)
-    w: int = Field(..., ge=4)
-    h: int = Field(..., ge=4)
-
-    @property
-    def left(self) -> int:
-        return self.x
-
-    @property
-    def right(self) -> int:
-        return self.x + self.w
-
-    @property
-    def top(self) -> int:
-        return self.y
-
-    @property
-    def bottom(self) -> int:
-        return self.y + self.h
-
-
-class Style(BaseModel):
-    pillCorner: PillCorner = "top_left"
-
-
-class Component(BaseModel):
-    id: UUID
-    number: str
-    label: str
-    parentId: UUID | None = None
-    childrenIds: list[UUID] = Field(default_factory=list)
-    bounds: Bounds
-    style: Style = Field(default_factory=Style)
-
-
-class ScreenInfo(BaseModel):
-    name: str = ""
-    description: str = ""
-
-
-class ImageInfo(BaseModel):
-    filename: str
-    width: int
-    height: int
-
-
-class WorkspaceState(BaseModel):
-    version: int = 1
-    workspaceId: UUID
-    revision: int = 0
-    readOnly: bool = False
-    screen: ScreenInfo = Field(default_factory=ScreenInfo)
-    image: ImageInfo | None = None
-    cutLines: list[int] = Field(default_factory=list)
-    rootComponents: list[UUID] = Field(default_factory=list)
-    components: dict[UUID, Component] = Field(default_factory=dict)
+__all__ = [
+    "Bounds",
+    "Component",
+    "ImageInfo",
+    "PillCorner",
+    "ScreenInfo",
+    "Style",
+    "WorkspaceState",
+]

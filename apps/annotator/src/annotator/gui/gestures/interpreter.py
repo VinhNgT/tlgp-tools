@@ -278,8 +278,8 @@ class GestureInterpreter:
         )
         if clicked and clicked not in selected_boxes:
             canvas.set_selection([clicked])
-        if canvas.callbacks.on_context_menu_request:
-            canvas.callbacks.on_context_menu_request(event.screen_x, event.screen_y)
+        if canvas.callbacks.on_request_context_menu:
+            canvas.callbacks.on_request_context_menu(event, clicked)
 
     def on_control_click(
         self, canvas: Any, event: GestureEvent, cx: float, cy: float

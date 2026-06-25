@@ -6,9 +6,6 @@ Exposes tools for screenshot annotation and .docx specification document generat
 from __future__ import annotations
 
 import json
-import re
-
-from typing import Literal
 
 from mcp.server.fastmcp import Context, FastMCP
 from tlgp_logger import get_logger
@@ -17,6 +14,7 @@ from mcp_server.client import WorkspaceClient
 from mcp_server.manager import DaemonManager
 from mcp_server.prompts import (
     get_prompt_section,
+    get_spec_workflow_content,
     get_strict_guidelines_content,
 )
 from mcp_server.services import SpecGeneratorService
@@ -49,10 +47,14 @@ def get_daemon_manager() -> DaemonManager:
 
 
 def get_spec_service() -> SpecGeneratorService:
-    """Lazily construct and return the specification service."""
+    """Lazily construct and return the specification service.
+
+    Injects the shared WorkspaceClient so the service uses the correct
+    dynamic base URL for workspace exports.
+    """
     global _spec_service
     if _spec_service is None:
-        _spec_service = SpecGeneratorService()
+        _spec_service = SpecGeneratorService(client=get_client())
     return _spec_service
 
 
@@ -68,6 +70,7 @@ mcp = FastMCP(
         f"{get_strict_guidelines_content()}\n\n"
         "REQUIRED REFERENCE GUIDES & DATA:\n"
         "Prior to performing any analysis or constructing parameters, read the resource guides:\n"
+        "   - 'tlgp://spec/workflow' (End-to-end spec creation workflow)\n"
         "   - 'tlgp://spec/schema' (JSON Schema structure)\n"
         "   - 'tlgp://spec/classification-guide' (UI Control type rules)\n"
         "   - 'tlgp://spec/example-analysis' (Complete example analysis data structure)\n"
@@ -85,9 +88,13 @@ mcp = FastMCP(
 async def get_workspace_state_resource() -> str:
     """Read-only access to the latest flat-map JSON WorkspaceState."""
     state = await get_client().get_workspace_state()
-    return json.dumps(state, indent=2, ensure_ascii=False)
+    return json.dumps(state.model_dump(mode="json"), indent=2, ensure_ascii=False)
 
 
+@mcp.resource("tlgp://spec/workflow")
+def get_spec_workflow_resource() -> str:
+    """End-to-end workflow guide for creating specification documents."""
+    return get_spec_workflow_content()
 
 
 @mcp.resource("tlgp://spec/schema")
@@ -127,7 +134,7 @@ async def launch_annotator(
         path: Optional path to a raw screenshot image or a previously exported .zip workspace to load.
 
     Returns:
-        dict with annotator_pid and annotator_ready.
+        dict with annotator_ready, annotator_pid, port.
     """
     res = await get_daemon_manager().launch_annotator(
         path=path,
@@ -136,10 +143,6 @@ async def launch_annotator(
     if res.get("annotator_ready") and "port" in res:
         get_client().base_url = f"http://127.0.0.1:{res['port']}"
     return res
-
-
-
-
 
 
 @mcp.tool()
@@ -152,8 +155,6 @@ async def export_images(
         output_path: Absolute path to the destination directory.
     """
     return await get_client().export_images(output_path, mode="both")
-
-
 
 
 @mcp.tool()
@@ -200,10 +201,18 @@ async def connect_to_annotator(url: str) -> dict:
     try:
         is_ok = await client.check_connection()
         if is_ok:
-            return {
+            result: dict = {
                 "status": "success",
                 "message": f"Successfully connected to the annotator instance at {url}",
             }
+            # Fetch workspace summary as debug info
+            try:
+                state = await client.get_workspace_state()
+                result["screen_name"] = state.screen.name or "(unnamed)"
+                result["components"] = len(state.components)
+            except Exception:
+                pass
+            return result
         else:
             return {
                 "status": "error",
@@ -214,5 +223,3 @@ async def connect_to_annotator(url: str) -> dict:
             "status": "error",
             "message": f"Failed to connect to annotator at {url}: {e}",
         }
-
-

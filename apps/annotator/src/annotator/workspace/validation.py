@@ -8,23 +8,23 @@ class BoundsValidator:
     """Pure domain service encapsulating component coordinate boundary validation and clamping math."""
 
     @staticmethod
-    def clamp_val(val: int, lo: int, hi: int) -> int:
+    def clamp_val(val: float, lo: float, hi: float) -> float:
         """Clamps a value within lower and upper bounds."""
         return max(lo, min(hi, val))
 
     @staticmethod
     def clamp_box_position(
-        ox1: int,
-        oy1: int,
-        w: int,
-        h: int,
-        dx: int,
-        dy: int,
-        bx1: int,
-        by1: int,
-        bx2: int,
-        by2: int,
-    ) -> tuple[int, int]:
+        ox1: float,
+        oy1: float,
+        w: float,
+        h: float,
+        dx: float,
+        dy: float,
+        bx1: float,
+        by1: float,
+        bx2: float,
+        by2: float,
+    ) -> tuple[float, float]:
         """Calculates and clamps the new top-left coordinates for a box of width w and height h moving by (dx, dy)."""
         rx1 = max(bx1, min(bx2 - w, ox1 + dx))
         ry1 = max(by1, min(by2 - h, oy1 + dy))
@@ -32,20 +32,20 @@ class BoundsValidator:
 
     @staticmethod
     def clamp_resize(
-        ox1: int,
-        oy1: int,
-        ox2: int,
-        oy2: int,
-        dx: int,
-        dy: int,
+        ox1: float,
+        oy1: float,
+        ox2: float,
+        oy2: float,
+        dx: float,
+        dy: float,
         handle: str,
-        bx1: int,
-        by1: int,
-        bx2: int,
-        by2: int,
-        min_size: int = 4,
-        children_union: tuple[int, int, int, int] | None = None,
-    ) -> tuple[int, int, int, int]:
+        bx1: float,
+        by1: float,
+        bx2: float,
+        by2: float,
+        min_size: float = 4,
+        children_union: tuple[float, float, float, float] | None = None,
+    ) -> tuple[float, float, float, float]:
         """Calculates and clamps the new coordinates (rx1, ry1, rx2, ry2) during resizing."""
         rx1, ry1, rx2, ry2 = ox1, oy1, ox2, oy2
 

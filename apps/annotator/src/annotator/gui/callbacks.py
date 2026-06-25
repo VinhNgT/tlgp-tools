@@ -1,7 +1,10 @@
 """Callback containers for the GUI components."""
 
 from collections.abc import Callable
+from typing import Any
 from uuid import UUID
+
+from annotator.models import Component
 
 
 class CanvasCallbacks:
@@ -14,11 +17,14 @@ class CanvasCallbacks:
         self.on_component_created: Callable[[dict], None] | None = None
         self.on_active_interaction_changed: Callable[[dict | None], None] | None = None
         self.on_viewport_change_request: Callable[[float, tuple], None] | None = None
-        self.on_request_context_menu: Callable[[int, int], None] | None = None
+        self.on_request_context_menu: Callable[[Any, Component | None], None] | None = None
         self.on_drill_into: Callable[[UUID], None] | None = None
         self.on_drill_out: Callable[[], None] | None = None
         self.on_import_zip: Callable[[], None] | None = None
         self.on_import_image: Callable[[], None] | None = None
+        self.on_selection_ids_changed: Callable[[list[UUID]], None] | None = None
+        self.on_canvas_mode_change_request: Callable[[str], None] | None = None
+        self.on_viewport_size_changed: Callable[[int, int], None] | None = None
 
 
 class AppCallbacks:

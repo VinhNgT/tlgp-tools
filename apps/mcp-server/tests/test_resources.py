@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
+from uuid import uuid4
 
 import pytest
 from mcp_server.server import (
@@ -11,16 +12,16 @@ from mcp_server.server import (
     get_spec_schema_resource,
     get_workspace_state_resource,
 )
+from tlgp_contracts import WorkspaceState
 
 
 class TestMcpResources:
     @pytest.mark.anyio
     @patch("mcp_server.server.get_client")
     async def test_get_workspace_state_resource(self, mock_get_client):
+        mock_state = WorkspaceState(workspaceId=uuid4())
         mock_client = MagicMock()
-        mock_client.get_workspace_state = AsyncMock(
-            return_value={"components": {}, "screen": {}}
-        )
+        mock_client.get_workspace_state = AsyncMock(return_value=mock_state)
         mock_get_client.return_value = mock_client
 
         result = await get_workspace_state_resource()

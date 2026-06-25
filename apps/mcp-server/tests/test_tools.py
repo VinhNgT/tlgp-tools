@@ -373,40 +373,6 @@ class TestLaunchAnnotator:
 
 
 
-class TestDaemonControl:
-    @pytest.mark.anyio
-    async def test_get_daemon_status(self, monkeypatch):
-        manager = DaemonManager()
-        manager.active_processes.clear()
-
-        class MockAsyncClient:
-            async def __aenter__(self):
-                return self
-
-            async def __aexit__(self, exc_type, exc_val, exc_tb):
-                pass
-
-            async def get(self, *args, **kwargs):
-                mock_res = MagicMock()
-                mock_res.status_code = 200
-                return mock_res
-
-        monkeypatch.setattr("httpx.AsyncClient", MockAsyncClient)
-
-        status = await manager.get_status()
-        assert status["annotator"]["running"] is True
-
-    def test_read_daemon_logs(self):
-        manager = DaemonManager()
-        manager.annotator_logs.clear()
-
-        manager.annotator_logs.append("line1\n")
-        manager.annotator_logs.append("line2\n")
-
-        res = manager.read_daemon_logs("annotator", lines=1)
-        assert res["daemon"] == "annotator"
-        assert res["line_count"] == 1
-        assert res["logs"] == "line2\n"
 
 
 class TestGenerateSpecDocWrapper:
@@ -414,7 +380,6 @@ class TestGenerateSpecDocWrapper:
     async def test_generate_spec_doc_progress(self, tmp_path):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
-        import json
         analysis_file = tmp_path / "analysis.json"
         analysis_file.write_text(json.dumps(analysis), encoding="utf-8")
 
@@ -440,14 +405,12 @@ class TestGenerateSpecDocWrapper:
     async def test_generate_spec_doc_exports_workspace_zip(self, tmp_path, monkeypatch):
         screen_dir = _create_export_dir(tmp_path)
         analysis = _build_analysis(screen_dir)
-        import json
         analysis_file = tmp_path / "analysis.json"
         analysis_file.write_text(json.dumps(analysis), encoding="utf-8")
 
         # Mock WorkspaceClient.export_workspace
         async def mock_export_workspace(client_self, output_path: str):
             Path(output_path).write_bytes(b"mock_zip_content")
-            return {"status": "success", "output_path": output_path}
 
         monkeypatch.setattr(WorkspaceClient, "export_workspace", mock_export_workspace)
 

@@ -4,6 +4,7 @@ import io
 import os
 import zipfile
 from concurrent.futures import ThreadPoolExecutor
+from typing import Literal
 
 from PySide6.QtCore import QObject, Signal, Slot
 
@@ -124,7 +125,9 @@ class IOCommandHandler:
         if not self.view.canvas.full_pil_img:
             return
 
-        def on_options_selected(mode: str | None, format_val: str | None):
+        def on_options_selected(
+            mode: Literal["annotated", "both", "raw"] | None, format_val: str | None
+        ):
             if not mode or not format_val:
                 return
 

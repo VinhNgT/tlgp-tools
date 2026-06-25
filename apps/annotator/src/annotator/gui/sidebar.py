@@ -292,5 +292,5 @@ class SidebarTreeView(QWidget):
                     return True
                 return super().eventFilter(obj, event)
 
-        editor.escape_filter = EscapeEventFilter(cancel_edit)
-        editor.installEventFilter(editor.escape_filter)
+        setattr(editor, "escape_filter", EscapeEventFilter(cancel_edit))  # noqa: B010
+        editor.installEventFilter(getattr(editor, "escape_filter"))  # noqa: B009

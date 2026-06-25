@@ -413,6 +413,7 @@ class AnnotationCanvas(tk.Canvas):
         # Build segments and create gapped composite image when cuts are active
         self._segments = self._build_segments()
         if self._has_active_cuts() and len(self._segments) > 1:
+            assert self.current_pil_img is not None
             cuts_key = (
                 tuple(self.controller.session.cut_lines),
                 id(self.current_pil_img),
@@ -426,6 +427,7 @@ class AnnotationCanvas(tk.Canvas):
         else:
             display_img = self.current_pil_img
 
+        assert display_img is not None
         vw = self.winfo_width()
         vh = self.winfo_height()
         if vw <= 1 or vh <= 1:
@@ -940,7 +942,7 @@ class AnnotationCanvas(tk.Canvas):
                     hit_boxes = self._get_all_hit_boxes(cx, cy)
                     if len(hit_boxes) > 1:
                         self._cycle_boxes = hit_boxes
-                        if primary_sel in hit_boxes:
+                        if primary_sel is not None and primary_sel in hit_boxes:
                             self._last_cycle_index = hit_boxes.index(primary_sel)
                         else:
                             self._last_cycle_index = 0
@@ -1049,6 +1051,8 @@ class AnnotationCanvas(tk.Canvas):
         bx1, by1, bx2, by2 = self._boundary()
 
         if (self.mode == "draw" or self.mode == "select") and self.temp_rect_id:
+            assert self.draw_start_x is not None
+            assert self.draw_start_y is not None
             ax, ay = self.to_abs(self.draw_start_x, self.draw_start_y)
             bx, by = self.to_abs(cx, cy)
             ax = self._clamp(ax, bx1, bx2)
@@ -1076,6 +1080,7 @@ class AnnotationCanvas(tk.Canvas):
             if self._deadzone_active:
                 return
 
+            assert self._drag_mouse_start_abs is not None
             mouse_abs = self.to_abs(cx, cy)
             start_abs = self._drag_mouse_start_abs
             total_dx = mouse_abs[0] - start_abs[0]
@@ -1094,7 +1099,7 @@ class AnnotationCanvas(tk.Canvas):
         ox1, oy1 = self._drag_orig_x1, self._drag_orig_y1
         ox2, oy2 = self._drag_orig_x2, self._drag_orig_y2
         h = self.resize_handle
-
+        assert h is not None
         nx1, ny1, nx2, ny2 = ox1, oy1, ox2, oy2
         if "l" in h:
             nx1 = ox1 + dx
@@ -1181,6 +1186,8 @@ class AnnotationCanvas(tk.Canvas):
                 self.temp_rect_id = None
 
                 bx1, by1, bx2, by2 = self._boundary()
+                assert self.draw_start_x is not None
+                assert self.draw_start_y is not None
                 ax1, ay1 = self.to_abs(self.draw_start_x, self.draw_start_y)
                 ax2, ay2 = self.to_abs(cx, cy)
 
@@ -1236,6 +1243,8 @@ class AnnotationCanvas(tk.Canvas):
             self.delete(self.temp_rect_id)
             self.temp_rect_id = None
 
+            assert self.draw_start_x is not None
+            assert self.draw_start_y is not None
             if abs(cx - self.draw_start_x) > 5 and abs(cy - self.draw_start_y) > 5:
                 bx1, by1, bx2, by2 = self._boundary()
                 ax1, ay1 = self.to_abs(self.draw_start_x, self.draw_start_y)
@@ -1275,8 +1284,9 @@ class AnnotationCanvas(tk.Canvas):
         self._is_dragging = False
         self.resize_handle = None
 
-        if getattr(self, "_collapse_selection_on_release", None) is not None:
-            self.controller.set_selection([self._collapse_selection_on_release])
+        collapse_box = getattr(self, "_collapse_selection_on_release", None)
+        if collapse_box is not None:
+            self.controller.set_selection([collapse_box])
             self._collapse_selection_on_release = None
 
     def on_mouse_move(self, event):
@@ -1374,6 +1384,7 @@ class AnnotationCanvas(tk.Canvas):
         out_left = (img_x1 < rc_x1 + margin) and (rc_x1 > 0)
         out_top = (img_y1 < rc_y1 + margin) and (rc_y1 > 0)
         disp_img = self._gapped_img if self._gapped_img else self.current_pil_img
+        assert disp_img is not None
         out_right = (img_x2 > rc_x2 - margin) and (rc_x2 < disp_img.width)
         out_bottom = (img_y2 > rc_y2 - margin) and (rc_y2 < disp_img.height)
 

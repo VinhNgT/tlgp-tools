@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from docx import Document
+from typing import Any
+
+import docx
+from docx.document import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.shared import Inches
@@ -224,13 +227,14 @@ def build_document(analysis: AnalysisData) -> Document:
     2. Screen overview section
     3. API documentation
     """
-    doc = Document()
+    doc = docx.Document()
     style_config = load_default_style()
 
     # Set default font
     style = doc.styles["Normal"]
-    style.font.name = style_config.FONT_FAMILY
-    style.font.size = style_config.FONT_SIZE_DEFAULT
+    style_any: Any = style
+    style_any.font.name = style_config.FONT_FAMILY
+    style_any.font.size = style_config.FONT_SIZE_DEFAULT
 
     # Set page margins (1 inch all around)
     for section in doc.sections:
