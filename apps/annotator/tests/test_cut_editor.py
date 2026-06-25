@@ -248,3 +248,73 @@ def test_dialog_service_ask_save_as_filename(qapp, monkeypatch):
     )
     assert path == "/mock/file.zip"
     assert called_initial_filename == "my_default.zip"
+
+
+def test_cut_editor_hover_ghost_line(qapp):
+    """Verify that moving mouse over the screenshot updates hover_y only in adding mode, and leaving clears it."""
+    image = Image.new("RGB", (800, 1000), color=(128, 128, 128))
+    initial_cuts = [100, 200]
+    components = []
+
+    dialog = CutEditorDialog(None, image, initial_cuts, components)
+    canvas = dialog.canvas_widget
+    canvas.fit_and_render()
+    canvas.zoom_factor = 1.0
+    canvas._scroll_offset = 0.0
+    assert canvas._base_pixmap is not None
+
+    # Hover is initially None
+    assert dialog.state.hover_y is None
+
+    # Simulate mouse move inside the screenshot bounds (x=100, y=450)
+    pos_inside = QPointF(100.0, 450.0)
+    move_event1 = QMouseEvent(
+        QEvent.Type.MouseMove,
+        pos_inside,
+        pos_inside,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, move_event1)
+
+    # In idle mode, hover_y should remain None
+    assert dialog.state.hover_y is None
+
+    # Switch to adding mode
+    dialog._start_add_mode()
+    assert dialog.state.mode == "adding"
+
+    # Move inside again in adding mode
+    QApplication.sendEvent(canvas, move_event1)
+
+    # hover_y should be updated to round(450) = 450
+    assert dialog.state.hover_y == 450
+
+    # Simulate mouse move outside screenshot width bounds (x=900, y=450)
+    pos_outside_x = QPointF(900.0, 450.0)
+    move_event2 = QMouseEvent(
+        QEvent.Type.MouseMove,
+        pos_outside_x,
+        pos_outside_x,
+        Qt.MouseButton.NoButton,
+        Qt.MouseButton.NoButton,
+        Qt.KeyboardModifier.NoModifier,
+    )
+    QApplication.sendEvent(canvas, move_event2)
+
+    # hover_y should be cleared to None
+    assert dialog.state.hover_y is None
+
+    # Hover inside again
+    QApplication.sendEvent(canvas, move_event1)
+    assert dialog.state.hover_y == 450
+
+    # Simulate leaving the widget
+    leave_event = QEvent(QEvent.Type.Leave)
+    QApplication.sendEvent(canvas, leave_event)
+
+    # hover_y should be cleared to None
+    assert dialog.state.hover_y is None
+
+

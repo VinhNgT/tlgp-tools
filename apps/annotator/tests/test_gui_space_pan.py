@@ -56,7 +56,7 @@ def test_space_pan_keyboard_highlight(qapp):
     assert store.state.current_mode == "select"
     assert view.canvas.current_mode == "select"
     assert view._mode_actions["select"].isChecked()
-    assert view.canvas.space_pan_active is False
+    assert not view.canvas.space_pan_active
 
 
 def test_show_labels_checkbox(qapp):
@@ -71,16 +71,16 @@ def test_show_labels_checkbox(qapp):
     AppController(ws, store, view, dialog_service)
 
     # Initial state should be: labels shown, chk_show_labels checked and enabled
-    assert view.canvas.show_labels is True
-    assert view.chk_show_labels.isChecked() is True
-    assert view.chk_show_labels.isEnabled() is True
+    assert view.canvas.show_labels
+    assert view.chk_show_labels.isChecked()
+    assert view.chk_show_labels.isEnabled()
 
     # Simulate user toggling the checkbox
     view.chk_show_labels.setChecked(False)
 
     # Verify canvas show_labels is False and checkbox is unchecked
-    assert view.canvas.show_labels is False
-    assert view.chk_show_labels.isChecked() is False
+    assert not view.canvas.show_labels
+    assert not view.chk_show_labels.isChecked()
 
     # Simulate keyboard shortcut 'T'
     press_event = QKeyEvent(

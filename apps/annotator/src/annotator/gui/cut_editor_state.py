@@ -9,7 +9,7 @@ class CutEditorState:
     """Holds the UI state for the cut editor dialog."""
 
     cut_lines: list[int] = field(default_factory=list)
-    hover_y: float | None = None
+    hover_y: int | None = None
     drag_index: int = -1
     last_valid_drag_y: int = 0
     mode: str = "idle"

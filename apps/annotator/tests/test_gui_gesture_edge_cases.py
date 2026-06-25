@@ -181,7 +181,7 @@ def test_trackpad_scroll_zoom(qapp):
         ctrl=True,
         phase=Qt.ScrollPhase.ScrollBegin,
     )
-    assert canvas.gestures.state.trackpad_zoom_active is True
+    assert canvas.gestures.state.trackpad_zoom_active
     assert canvas.zoom_factor > 1.0  # Zoomed in
 
     last_zoom = canvas.zoom_factor
@@ -211,7 +211,7 @@ def test_trackpad_scroll_zoom(qapp):
         ctrl=False,  # Ctrl/Command released
         phase=Qt.ScrollPhase.ScrollUpdate,
     )
-    assert canvas.gestures.state.trackpad_zoom_active is True
+    assert canvas.gestures.state.trackpad_zoom_active
     assert canvas.zoom_factor > last_zoom  # Continues to zoom in
     assert canvas.pan_offset[0] != 50.0  # Panning was not triggered
 
@@ -225,7 +225,7 @@ def test_trackpad_scroll_zoom(qapp):
         ctrl=False,
         phase=Qt.ScrollPhase.ScrollEnd,
     )
-    assert canvas.gestures.state.trackpad_zoom_active is None
+    assert getattr(canvas.gestures.state, "trackpad_zoom_active") is None  # noqa: B009
 
 
 def test_native_gesture_zoom(qapp):

@@ -8,7 +8,7 @@ coordinate list.
 from __future__ import annotations
 
 from PIL import Image
-from PySide6.QtCore import QPointF, QRectF, Qt, QTimer
+from PySide6.QtCore import QEvent, QPointF, QRectF, Qt, QTimer
 from PySide6.QtGui import (
     QColor,
     QMouseEvent,
@@ -129,6 +129,34 @@ class _CutCanvasWidget(QWidget):
             p.setPen(QPen(color))
             p.drawText(QPointF(disp_w - 50, cy - 6), f"Y={y}")
 
+        # Draw ghost line
+        if self.state.hover_y is not None and self.state.mode == "adding":
+            cy = self._to_canvas_y(self.state.hover_y)
+            is_valid = True
+            intersecting = CutValidator.get_intersecting_component(
+                self.state.hover_y, self.dialog.existing_components
+            )
+            if intersecting:
+                is_valid = False
+            elif not CutValidator.is_valid_position(
+                self.state.hover_y,
+                self.dialog.source_image.height,
+                self.state.cut_lines,
+                MIN_CUT_GAP,
+            ):
+                is_valid = False
+
+            color = QColor(12, 140, 233, 120) if is_valid else QColor(255, 0, 0, 120)
+            pen = QPen(color, 1.5, Qt.PenStyle.DashLine)
+            p.setPen(pen)
+            p.drawLine(QPointF(0, cy), QPointF(disp_w, cy))
+
+            label_font = self.font()
+            label_font.setItalic(True)
+            p.setFont(label_font)
+            p.setPen(QPen(color))
+            p.drawText(QPointF(disp_w - 50, cy - 6), f"Y={self.state.hover_y}")
+
         p.end()
 
     def mousePressEvent(self, event: QMouseEvent):
@@ -180,7 +208,27 @@ class _CutCanvasWidget(QWidget):
         self.dialog.refresh_listbox()
 
     def mouseMoveEvent(self, event: QMouseEvent):
+        canvas_x = event.position().x()
         canvas_y = event.position().y()
+        img_y = self._to_img_y(canvas_y)
+
+        # Check if hovering over screenshot bounds
+        is_hovering = False
+        if self._base_pixmap:
+            img_w = self.dialog.source_image.width
+            img_h = self.dialog.source_image.height
+            zoom = self.zoom_factor
+            if 0 <= canvas_x <= img_w * zoom and 0 <= img_y < img_h:
+                is_hovering = True
+
+        if is_hovering and self.state.mode == "adding":
+            if self.state.hover_y != img_y:
+                self.state.hover_y = img_y
+                self.update()
+        else:
+            if self.state.hover_y is not None:
+                self.state.hover_y = None
+                self.update()
 
         if self.state.mode == "dragging" and self.state.drag_index >= 0:
             new_y = self._to_img_y(canvas_y)
@@ -236,6 +284,12 @@ class _CutCanvasWidget(QWidget):
             self.state.mode = "idle"
             self.state.drag_index = -1
             self.setCursor(Qt.CursorShape.ArrowCursor)
+
+    def leaveEvent(self, event: QEvent):
+        if self.state.hover_y is not None:
+            self.state.hover_y = None
+            self.update()
+        super().leaveEvent(event)
 
     def wheelEvent(self, event: QWheelEvent):
         pixel_delta = event.pixelDelta()

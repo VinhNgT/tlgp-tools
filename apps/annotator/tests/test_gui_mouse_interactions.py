@@ -150,7 +150,7 @@ def test_mouse_deadzone_bypass_on_hold(qapp):
     QApplication.sendEvent(canvas, release_event)
 
     assert canvas._press_pos is None
-    assert canvas._deadzone_bypassed is False
+    assert not canvas._deadzone_bypassed
 
 
 def test_mouse_instant_click(qapp):
@@ -306,8 +306,8 @@ def test_ctrl_mouse_drag_marquee_select(qapp):
     QApplication.sendEvent(canvas, move_event)
 
     # Now the deadzone is bypassed, and it should start drawing the selection marquee (temp rect)
-    assert canvas._deadzone_bypassed is True
-    assert canvas.gestures.has_temp_rect is True
+    assert canvas._deadzone_bypassed
+    assert canvas.gestures.has_temp_rect
 
     # 3. Release the mouse
     release_event = QMouseEvent(
@@ -321,7 +321,7 @@ def test_ctrl_mouse_drag_marquee_select(qapp):
     QApplication.sendEvent(canvas, release_event)
 
     # After release, temp rect should be cleared
-    assert canvas.gestures.has_temp_rect is False
+    assert not canvas.gestures.has_temp_rect
 
 
 def test_zoom_focus_target_with_cuts(qapp):
@@ -525,8 +525,8 @@ def test_properties_cleared_after_unselecting(qapp):
     assert view.properties.prop_entries["y"].text() == ""
     assert view.properties.prop_entries["w"].text() == ""
     assert view.properties.prop_entries["h"].text() == ""
-    assert view.properties.entry_name.isEnabled() is False
-    assert view.properties.corner_selector.selected_corner is None
+    assert not view.properties.entry_name.isEnabled()
+    assert getattr(view.properties.corner_selector, "selected_corner") is None  # noqa: B009
 
 
 def test_welcome_widget_import_callbacks(qapp):
@@ -553,10 +553,10 @@ def test_welcome_widget_import_callbacks(qapp):
     view.callbacks.on_import_image_request = on_img
 
     view.welcome.btn_zip.click()
-    assert called_zip is True
+    assert called_zip
 
     view.welcome.btn_img.click()
-    assert called_img is True
+    assert called_img
 
 
 def test_canvas_paint_event(qapp):
@@ -978,4 +978,4 @@ def test_scroll_while_panning(qapp):
     )
     QApplication.sendEvent(canvas, release_event)
 
-    assert canvas.gestures.state.space_panning is False
+    assert not canvas.gestures.state.space_panning
