@@ -42,7 +42,7 @@ async def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
     return workspace.state
 
 
-@router.get("/workspace/export", tags=["Import/Export"])
+@router.get("/workspace/export", tags=["Export"])
 async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
     zip_bytes = await asyncio.to_thread(workspace.export_zip)
     return StreamingResponse(
@@ -52,7 +52,7 @@ async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace))
     )
 
 
-@router.get("/workspace/export-images", tags=["Import/Export"])
+@router.get("/workspace/export-images", tags=["Export"])
 async def export_images(
     mode: Literal["annotated", "raw", "both"] = "annotated",
     workspace: WorkspaceManager = Depends(get_workspace),
