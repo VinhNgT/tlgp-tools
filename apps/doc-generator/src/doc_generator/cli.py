@@ -26,7 +26,7 @@ def _load_analysis_raw(path: Path) -> dict:
     logging the error and (in non-JSON mode) exiting.
     """
     if not path.exists():
-        logger.error(f"File not found: {path}")
+        logger.error("File not found: %s", path)
         return None
 
     try:
@@ -61,6 +61,21 @@ def _parse_analysis(raw: dict) -> AnalysisData | list[str]:
         return errors
 
 
+def _resolve_output_path(data: AnalysisData, analysis_path: Path, output_arg: str | None) -> Path:
+    """Determine the final .docx output path."""
+    if output_arg:
+        return Path(output_arg).resolve()
+
+    safe_name = (
+        "".join(
+            c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-")
+        )
+        .strip()
+        .replace(" ", "_")
+    )
+    return analysis_path.parent / f"{safe_name}.docx"
+
+
 def _print_summary(analysis: AnalysisData):
     """Print a dry-run summary."""
     non_leaf = [c for c in analysis.components if not c.isLeaf]
@@ -70,22 +85,22 @@ def _print_summary(analysis: AnalysisData):
     screen_children = len(analysis.screen.topLevelChildren)
     screen_interactions = len(analysis.screen.interactions)
 
-    print("=" * 50)
-    print("  TLGP Doc Generator — Dry Run Summary")
-    print("=" * 50)
-    print(f"  Section prefix:     {analysis.sectionPrefix}")
-    print(f"  Export dir:         {analysis.imageDir}")
-    print(f"  Screen:             {analysis.screen.name}")
-    print()
-    print(f"  Components:         {len(non_leaf)} non-leaf, {len(leaf)} leaf")
-    print(
-        f"  UI elements:        {total_children} (components) + {screen_children} (screen)"
+    logger.info("=" * 50)
+    logger.info("  TLGP Doc Generator — Dry Run Summary")
+    logger.info("=" * 50)
+    logger.info("  Section prefix:     %s", analysis.sectionPrefix)
+    logger.info("  Export dir:         %s", analysis.imageDir)
+    logger.info("  Screen:             %s", analysis.screen.name)
+    logger.info("")
+    logger.info("  Components:         %d non-leaf, %d leaf", len(non_leaf), len(leaf))
+    logger.info(
+        "  UI elements:        %d (components) + %d (screen)", total_children, screen_children
     )
-    print(
-        f"  Interactions:       {total_interactions} (components) + {screen_interactions} (screen)"
+    logger.info(
+        "  Interactions:       %d (components) + %d (screen)", total_interactions, screen_interactions
     )
-    print(f"  APIs:               {len(analysis.all_apis)}")
-    print()
+    logger.info("  APIs:               %d", len(analysis.all_apis))
+    logger.info("")
 
     # Count images
     image_count = 0
@@ -102,13 +117,13 @@ def _print_summary(analysis: AnalysisData):
         if not img.exists():
             missing_images.append(str(img))
 
-    print(f"  Images:             {image_count} referenced")
+    logger.info("  Images:             %d referenced", image_count)
     if missing_images:
-        print(f"  ⚠️  Missing images:  {len(missing_images)}")
+        logger.info("  ⚠️  Missing images:  %d", len(missing_images))
         for m in missing_images:
-            print(f"     - {m}")
+            logger.info("     - %s", m)
     else:
-        print("  ✅ All images found")
+        logger.info("  ✅ All images found")
 
     # Estimate tables
     table_count = 0
@@ -127,8 +142,8 @@ def _print_summary(analysis: AnalysisData):
             table_count += 1
         table_count += sum(1 for s in api.subDtos if s.fields)
 
-    print(f"  Tables:             {table_count} total")
-    print("=" * 50)
+    logger.info("  Tables:             %d total", table_count)
+    logger.info("=" * 50)
 
 
 def _run_json_mode(
@@ -170,17 +185,7 @@ def _run_json_mode(
     # Build document
     doc = build_document(data)
 
-    if output_path:
-        out = Path(output_path).resolve()
-    else:
-        safe_name = (
-            "".join(
-                c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-")
-            )
-            .strip()
-            .replace(" ", "_")
-        )
-        out = Path(data.imageDir) / f"{safe_name}.docx"
+    out = _resolve_output_path(data, analysis_path, output_path)
 
     out.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(out))
@@ -259,12 +264,8 @@ def main():
     doc = build_document(analysis)
 
     # Determine output path
-    if args.output:
-        output_path = Path(args.output).resolve()
-    else:
-        # Default: <screen_name>.docx next to the JSON
-        safe_name = analysis.screen.name.replace(" ", "_")
-        output_path = analysis_path.parent / f"{safe_name}.docx"
+    output_path = _resolve_output_path(analysis, analysis_path, args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     doc.save(str(output_path))
 

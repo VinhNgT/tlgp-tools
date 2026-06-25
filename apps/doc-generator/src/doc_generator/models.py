@@ -26,27 +26,6 @@ class Interaction(BaseModel):
     reaction: str
 
 
-class AnalysisComponent(BaseModel):
-    """A non-leaf or leaf annotated component."""
-
-    id: int
-    label: str
-    description: str = ""
-    isLeaf: bool = False
-    imageFile: str | None = None
-    children: list[ChildElement] = []
-    interactions: list[Interaction] = []
-    apis: list[Api] = []
-
-    @model_validator(mode="after")
-    def validate_leaf_apis(self) -> AnalysisComponent:
-        if self.isLeaf and self.apis:
-            raise ValueError(
-                f"Component '{self.label}' (id={self.id}) is a leaf component and cannot have API documentation."
-            )
-        return self
-
-
 class ApiParam(BaseModel):
     """A single field in a request/response API table."""
 
@@ -80,6 +59,27 @@ class Api(BaseModel):
     responseFields: list[ApiParam] = []
     responseDescription: str = ""
     subDtos: list[SubDto] = []
+
+
+class AnalysisComponent(BaseModel):
+    """A non-leaf or leaf annotated component."""
+
+    id: int
+    label: str
+    description: str = ""
+    isLeaf: bool = False
+    imageFile: str | None = None
+    children: list[ChildElement] = []
+    interactions: list[Interaction] = []
+    apis: list[Api] = []
+
+    @model_validator(mode="after")
+    def validate_leaf_apis(self) -> AnalysisComponent:
+        if self.isLeaf and self.apis:
+            raise ValueError(
+                f"Component '{self.label}' (id={self.id}) is a leaf component and cannot have API documentation."
+            )
+        return self
 
 
 class Screen(BaseModel):

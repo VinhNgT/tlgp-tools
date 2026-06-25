@@ -9,9 +9,8 @@ from doc_generator.models import (
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
     build_api_table,
-    build_info_table,
+    build_generic_info_table,
     build_interaction_table,
-    build_screen_level_info_table,
     build_ui_elements_table,
 )
 from docx import Document
@@ -57,54 +56,39 @@ def _get_cell_border_color(cell, edge: str) -> str | None:
 # ── Info Table ────────────────────────────────────────────────────────
 
 
-class TestInfoTable:
+class TestGenericInfoTable:
     def test_dimensions(self):
         doc = Document()
-        table = build_info_table(doc, "Header", "Description text", style)
+        table = build_generic_info_table(doc, "L", "V", "Description text", style)
         assert len(table.rows) == 2
         assert len(table.columns) == 2
 
     def test_header_content(self):
         doc = Document()
-        table = build_info_table(doc, "Tiêu đề", "Mô tả...", style)
+        table = build_generic_info_table(doc, "Tên chức năng", "Tiêu đề", "Mô tả...", style)
         assert table.cell(0, 0).text == "Tên chức năng"
         assert "Tiêu đề" in table.cell(0, 1).text
 
     def test_data_content(self):
         doc = Document()
-        table = build_info_table(doc, "X", "Detailed description", style)
+        table = build_generic_info_table(doc, "X", "Y", "Detailed description", style)
         assert table.cell(1, 0).text == "Mô tả"
         assert table.cell(1, 1).text == "Detailed description"
 
     def test_header_row_has_background(self):
         doc = Document()
-        table = build_info_table(doc, "A", "B", style)
+        table = build_generic_info_table(doc, "A", "B", "C", style)
         # Both header cells should have background
         assert _get_cell_shading(table.cell(0, 0)) == style.HEADER_BG_HEX
         assert _get_cell_shading(table.cell(0, 1)) == style.HEADER_BG_HEX
 
     def test_borders_applied(self):
         doc = Document()
-        table = build_info_table(doc, "A", "B", style)
+        table = build_generic_info_table(doc, "A", "B", "C", style)
         for row in table.rows:
             for cell in row.cells:
                 assert _get_cell_border_color(cell, "top") == style.BORDER_COLOR_HEX
                 assert _get_cell_border_color(cell, "bottom") == style.BORDER_COLOR_HEX
-
-
-# ── Screen Level Info Table ───────────────────────────────────────────
-
-
-class TestScreenLevelInfoTable:
-    def test_screen_name_in_header(self):
-        doc = Document()
-        table = build_screen_level_info_table(doc, "Chi tiết SP", "Desc", style)
-        assert "Chi tiết SP" in table.cell(0, 1).text
-
-    def test_first_col_header(self):
-        doc = Document()
-        table = build_screen_level_info_table(doc, "X", "Y", style)
-        assert table.cell(0, 0).text == "Tên màn hình"
 
 
 # ── UI Elements Table ─────────────────────────────────────────────────
@@ -243,7 +227,7 @@ class TestApiTable:
 class TestTableSpacing:
     def test_spacing_added_after_info_table(self):
         doc = Document()
-        build_info_table(doc, "Header", "Description", style)
+        build_generic_info_table(doc, "L", "V", "Description", style)
         # There should be at least one paragraph added for spacing
         spacer_para = doc.paragraphs[-1]
         assert spacer_para.paragraph_format.space_before == Pt(0)

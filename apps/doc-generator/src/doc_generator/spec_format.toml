@@ -1,7 +1,7 @@
 # TLGP Specification Document — Formatting Source of Truth
 #
 # This file defines every visual property of the generated .docx documents.
-# The doc-generator reads these values at import time via style_constants.py.
+# The doc-generator loads these values explicitly via style_constants.py.
 # The MCP server exposes this file as the `tlgp://spec/formatting` resource.
 #
 # To change any formatting (fonts, colors, widths), edit this file.

@@ -71,9 +71,9 @@ class TestCliDryRun:
             main()
 
         captured = capsys.readouterr()
-        assert "Dry Run Summary" in captured.out
-        assert "Test" in captured.out
-        assert "Components:" in captured.out
+        assert "Dry Run Summary" in captured.err
+        assert "Test" in captured.err
+        assert "Components:" in captured.err
 
 
 class TestCliGeneration:
@@ -127,4 +127,4 @@ class TestCliImageWarnings:
             main()
 
         captured = capsys.readouterr()
-        assert "Missing images" in captured.out
+        assert "Missing images" in captured.err

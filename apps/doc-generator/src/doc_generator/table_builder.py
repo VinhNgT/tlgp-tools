@@ -191,50 +191,25 @@ def _add_table_spacing(doc: Document, style: StyleConfig):
 # ============================================================
 
 
-def build_info_table(
-    doc: Document, label: str, description: str, style: StyleConfig
-) -> Table:
-    """Build a 2×2 Info Table for a component section."""
-    table = doc.add_table(rows=2, cols=2)
-    _style_cell_text(
-        table.cell(0, 0),
-        "Tên chức năng",
-        style,
-        bold=True,
-        alignment=WD_ALIGN_PARAGRAPH.CENTER,
-    )
-    _style_cell_text(
-        table.cell(0, 1),
-        f"Component {label}",
-        style,
-        bold=True,
-        alignment=WD_ALIGN_PARAGRAPH.CENTER,
-    )
-    _style_cell_text(table.cell(1, 0), "Mô tả", style)
-    _style_cell_text(table.cell(1, 1), description, style)
-    _style_table(table, style.INFO_COLS_PT, style)
-    _add_table_spacing(doc, style)
-    return table
-
-
-def build_screen_level_info_table(
+def build_generic_info_table(
     doc: Document,
-    screen_name: str,
+    header_label: str,
+    header_value: str,
     description: str,
     style: StyleConfig,
 ) -> Table:
-    """Build a 2×2 Info Table for the screen overview section."""
+    """Build a 2×2 Info Table for a section."""
     table = doc.add_table(rows=2, cols=2)
     _style_cell_text(
         table.cell(0, 0),
-        "Tên màn hình",
+        header_label,
         style,
         bold=True,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,
     )
     _style_cell_text(
         table.cell(0, 1),
-        f"Màn hình {screen_name}",
+        header_value,
         style,
         bold=True,
         alignment=WD_ALIGN_PARAGRAPH.CENTER,

@@ -15,9 +15,8 @@ from doc_generator.models import AnalysisComponent, AnalysisData, Api, Screen
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
     build_api_table,
-    build_info_table,
+    build_generic_info_table,
     build_interaction_table,
-    build_screen_level_info_table,
     build_ui_elements_table,
 )
 
@@ -83,6 +82,59 @@ def _add_normal_text(doc: Document, text: str, style: StyleConfig):
 # ============================================================
 
 
+def _add_content_section(
+    doc: Document,
+    title: str,
+    section_number: str,
+    info_label: str,
+    info_value: str,
+    info_description: str,
+    image_files: list[str],
+    children: list,
+    interactions: list,
+    apis: list,
+    analysis: AnalysisData,
+    style: StyleConfig,
+):
+    """Build a complete section with all sub-sections (used for both components and screens)."""
+    # H3: Title
+    _add_h3(doc, f"{section_number}. {title}", style)
+
+    # H4: 1. General info
+    _add_h4(doc, f"{section_number}.1 Thông tin chung về chức năng", style)
+    build_generic_info_table(doc, info_label, info_value, info_description, style)
+
+    # H4: 2. Screen image
+    _add_h4(doc, f"{section_number}.2 Màn hình chức năng", style)
+    for img_file in image_files:
+        if img_file:
+            image_path = analysis.resolve_image(img_file)
+            insert_image(doc, image_path, full_width=True)
+
+    # H4: 3. UI elements
+    if children:
+        _add_h4(
+            doc,
+            f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình",
+            style,
+        )
+        build_ui_elements_table(doc, children, style)
+
+    # H4: 4. Interaction events
+    if interactions:
+        step_count = len(interactions)
+        _add_h4(
+            doc,
+            f"{section_number}.4 Xử lý luồng sự kiện tương tác ({step_count} bước)",
+            style,
+        )
+        build_interaction_table(doc, interactions, style)
+
+    # Render APIs at the end of the section
+    for idx, api in enumerate(apis):
+        _add_api_section(doc, api, style, idx + 1)
+
+
 def _add_component_section(
     doc: Document,
     component: AnalysisComponent,
@@ -91,41 +143,20 @@ def _add_component_section(
     style: StyleConfig,
 ):
     """Build a complete component section with all sub-sections."""
-    # H3: Component title
-    _add_h3(doc, f"{section_number}. Component {component.label}", style)
-
-    # H4: 1. General info
-    _add_h4(doc, f"{section_number}.1 Thông tin chung về chức năng", style)
-    build_info_table(doc, component.label, component.description, style)
-
-    # H4: 2. Screen image
-    _add_h4(doc, f"{section_number}.2 Màn hình chức năng", style)
-    if component.imageFile:
-        image_path = analysis.resolve_image(component.imageFile)
-        insert_image(doc, image_path, full_width=True)
-
-    # H4: 3. UI elements
-    if component.children:
-        _add_h4(
-            doc,
-            f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình",
-            style,
-        )
-        build_ui_elements_table(doc, component.children, style)
-
-    # H4: 4. Interaction events
-    if component.interactions:
-        step_count = len(component.interactions)
-        _add_h4(
-            doc,
-            f"{section_number}.4 Xử lý luồng sự kiện tương tác ({step_count} bước)",
-            style,
-        )
-        build_interaction_table(doc, component.interactions, style)
-
-    # Render APIs at the end of the component section
-    for idx, api in enumerate(component.apis):
-        _add_api_section(doc, api, style, idx + 1)
+    _add_content_section(
+        doc,
+        title=f"Component {component.label}",
+        section_number=section_number,
+        info_label="Tên chức năng",
+        info_value=f"Component {component.label}",
+        info_description=component.description,
+        image_files=[component.imageFile] if component.imageFile else [],
+        children=component.children,
+        interactions=component.interactions,
+        apis=component.apis,
+        analysis=analysis,
+        style=style,
+    )
 
 
 def _add_screen_section(
@@ -136,41 +167,20 @@ def _add_screen_section(
     style: StyleConfig,
 ):
     """Build the screen overview section."""
-    # H3: Screen title
-    _add_h3(doc, f"{section_number}. Màn hình {screen.name}", style)
-
-    # H4: 1. General info
-    _add_h4(doc, f"{section_number}.1 Thông tin chung về chức năng", style)
-    build_screen_level_info_table(doc, screen.name, screen.description, style)
-
-    # H4: 2. Screen image(s)
-    _add_h4(doc, f"{section_number}.2 Màn hình chức năng", style)
-    for img_file in screen.imageFiles:
-        image_path = analysis.resolve_image(img_file)
-        insert_image(doc, image_path, full_width=True)
-
-    # H4: 3. UI elements (top-level children)
-    if screen.topLevelChildren:
-        _add_h4(
-            doc,
-            f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình",
-            style,
-        )
-        build_ui_elements_table(doc, screen.topLevelChildren, style)
-
-    # H4: 4. Interaction events
-    if screen.interactions:
-        step_count = len(screen.interactions)
-        _add_h4(
-            doc,
-            f"{section_number}.4 Xử lý luồng sự kiện tương tác ({step_count} bước)",
-            style,
-        )
-        build_interaction_table(doc, screen.interactions, style)
-
-    # Render APIs at the end of the screen section
-    for idx, api in enumerate(screen.apis):
-        _add_api_section(doc, api, style, idx + 1)
+    _add_content_section(
+        doc,
+        title=f"Màn hình {screen.name}",
+        section_number=section_number,
+        info_label="Tên màn hình",
+        info_value=f"Màn hình {screen.name}",
+        info_description=screen.description,
+        image_files=screen.imageFiles,
+        children=screen.topLevelChildren,
+        interactions=screen.interactions,
+        apis=screen.apis,
+        analysis=analysis,
+        style=style,
+    )
 
 
 def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int):
