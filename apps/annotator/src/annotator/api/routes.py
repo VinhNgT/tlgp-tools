@@ -48,9 +48,7 @@ async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace))
     return StreamingResponse(
         io.BytesIO(zip_bytes),
         media_type="application/zip",
-        headers={
-            "Content-Disposition": "attachment; filename=annotation_export.zip"
-        },
+        headers={"Content-Disposition": "attachment; filename=annotation_export.zip"},
     )
 
 
@@ -66,7 +64,5 @@ async def export_images(
     return StreamingResponse(
         io.BytesIO(zip_bytes),
         media_type="application/zip",
-        headers={
-            "Content-Disposition": f"attachment; filename={export_name}.zip"
-        },
+        headers={"Content-Disposition": f"attachment; filename={export_name}.zip"},
     )

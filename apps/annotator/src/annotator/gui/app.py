@@ -6,12 +6,13 @@ All user interaction is delegated to the controller via callbacks.
 
 import os
 
-from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt
-from PySide6.QtGui import QAction, QActionGroup, QIcon, QKeySequence
+from PySide6.QtCore import QEvent, QObject, QPoint, QSize, Qt, QUrl, Signal
+from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
     QCheckBox,
     QFrame,
+    QHBoxLayout,
     QLabel,
     QMainWindow,
     QMenu,
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QSizePolicy,
     QSplitter,
     QToolBar,
+    QToolTip,
     QVBoxLayout,
     QWidget,
 )
@@ -85,6 +87,31 @@ class WelcomeWidget(QWidget):
             self.on_import_image()
 
 
+class ClickableLabel(QLabel):
+    """A QLabel that emits a clicked signal on left mouse release and supports hover styling."""
+
+    clicked = Signal()
+
+    def enterEvent(self, event):
+        font = self.font()
+        font.setUnderline(True)
+        self.setFont(font)
+        self.setCursor(Qt.CursorShape.PointingHandCursor)
+        super().enterEvent(event)
+
+    def leaveEvent(self, event):
+        font = self.font()
+        font.setUnderline(False)
+        self.setFont(font)
+        self.setCursor(Qt.CursorShape.ArrowCursor)
+        super().leaveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        if event.button() == Qt.MouseButton.LeftButton:
+            self.clicked.emit()
+        super().mouseReleaseEvent(event)
+
+
 class GlobalFocusAndSelectionFilter(QObject):
     """Universal event filter that clears input focus and label text selections
     when clicking outside of them anywhere in the application.
@@ -130,8 +157,12 @@ class MainAppWindow(QMainWindow):
     All user interactions are delegated to the controller via callback attributes.
     """
 
-    def __init__(self, transformer: ViewportTransformer | None = None):
+    def __init__(
+        self, transformer: ViewportTransformer | None = None, port: int = 8000
+    ):
         super().__init__()
+        self.port = port
+        self.api_url = f"http://127.0.0.1:{port}"
         self.setWindowTitle("Annotator")
 
         icon_path = os.path.join(os.path.dirname(__file__), "icon.png")
@@ -151,6 +182,7 @@ class MainAppWindow(QMainWindow):
         self._build_menu_bar()
         self._build_toolbar()
         self._build_central_area(transformer)
+        self._build_status_bar()
 
     def _build_menu_bar(self):
         menubar = self.menuBar()
@@ -229,6 +261,32 @@ class MainAppWindow(QMainWindow):
             lambda: self._fire(self.callbacks.on_delete_request)
         )
         edit_menu.addAction(self.act_delete)
+
+        api_menu = menubar.addMenu("&API")
+
+        act_swagger = QAction("Open Swagger API Docs (FastAPI)", self)
+        act_swagger.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl(f"{self.api_url}/docs"))
+        )
+        api_menu.addAction(act_swagger)
+
+        act_redoc = QAction("Open Redoc API Docs", self)
+        act_redoc.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl(f"{self.api_url}/redoc"))
+        )
+        api_menu.addAction(act_redoc)
+
+        api_menu.addSeparator()
+
+        act_copy_url = QAction("Copy API Base URL", self)
+        act_copy_url.triggered.connect(lambda: self._copy_api_url("#copy"))
+        api_menu.addAction(act_copy_url)
+
+        act_json_state = QAction("View Workspace API JSON State", self)
+        act_json_state.triggered.connect(
+            lambda: QDesktopServices.openUrl(QUrl(f"{self.api_url}/workspace/state"))
+        )
+        api_menu.addAction(act_json_state)
 
     def _build_toolbar(self):
         tb = QToolBar("Main Toolbar")
@@ -401,7 +459,85 @@ class MainAppWindow(QMainWindow):
             action.setChecked(True)
 
     def update_status(self, text: str, is_error: bool = False):
-        self.properties.update_status(text, is_error)
+        if text.startswith("Workspace:"):
+            workspace_id = text.split("Workspace:", 1)[1].strip()
+            self.properties.update_status("")  # Remove workspace ID on the right panel
+            self.lbl_status_msg.hide()
+            self.lbl_workspace_prefix.show()
+            self.lbl_workspace_id.setText(workspace_id)
+            self.lbl_workspace_id.show()
+        else:
+            self.properties.update_status(text, is_error)
+            self.lbl_status_msg.setText(text)
+            if is_error:
+                self.lbl_status_msg.setStyleSheet("color: #FF6B6B;")
+            else:
+                self.lbl_status_msg.setStyleSheet("color: #E0E0E0;")
+            self.lbl_status_msg.show()
+            self.lbl_workspace_prefix.hide()
+            self.lbl_workspace_id.hide()
+
+    def _build_status_bar(self):
+        self.status_bar = self.statusBar()
+        self.status_bar.setSizeGripEnabled(False)
+
+        # Left side: general message
+        self.lbl_status_msg = QLabel("Ready")
+        self.status_bar.addWidget(self.lbl_status_msg)
+
+        # Left side: workspace widgets (hidden by default)
+        self.lbl_workspace_prefix = QLabel("Workspace: ")
+        self.lbl_workspace_prefix.hide()
+        self.status_bar.addWidget(self.lbl_workspace_prefix)
+
+        self.lbl_workspace_id = ClickableLabel("")
+        self.lbl_workspace_id.setTextInteractionFlags(
+            Qt.TextInteractionFlag.TextSelectableByMouse
+        )
+        self.lbl_workspace_id.setToolTip("Click to copy Workspace ID")
+        self.lbl_workspace_id.clicked.connect(self._copy_workspace_id_direct)
+        self.lbl_workspace_id.hide()
+        self.status_bar.addWidget(self.lbl_workspace_id)
+
+        # Right side: API indicators
+        self.api_status_widget = QWidget()
+        api_layout = QHBoxLayout(self.api_status_widget)
+        api_layout.setContentsMargins(0, 0, 0, 0)
+        api_layout.setSpacing(6)
+
+        # Green indicator dot
+        self.lbl_api_dot = QLabel("●")
+        self.lbl_api_dot.setStyleSheet(
+            "color: #2ECC71; font-size: 10pt; font-family: Arial;"
+        )
+
+        # Static API URL label (non-clickable)
+        self.lbl_api_link = QLabel(f"API: {self.api_url}")
+
+        # Docs link (clickable)
+        self.lbl_docs_link = QLabel(
+            f"<a href='{self.api_url}/docs' style='color: #18A0FB; text-decoration: none;'>[API Docs]</a>"
+        )
+        self.lbl_docs_link.setOpenExternalLinks(True)
+
+        api_layout.addWidget(self.lbl_api_dot)
+        api_layout.addWidget(self.lbl_api_link)
+        api_layout.addWidget(self.lbl_docs_link)
+
+        self.status_bar.addPermanentWidget(self.api_status_widget)
+
+    def _copy_api_url(self, link):
+        if link == "#copy":
+            QApplication.clipboard().setText(self.api_url)
+            self.status_bar.showMessage("API Base URL copied to clipboard!", 2000)
+
+    def _copy_workspace_id_direct(self):
+        ws_id = self.lbl_workspace_id.text()
+        if ws_id:
+            QApplication.clipboard().setText(ws_id)
+            # Show a popup bubble instead of replacing status bar text
+            pos = self.lbl_workspace_id.mapToGlobal(QPoint(0, -30))
+            QToolTip.showText(pos, "Copied!", self.lbl_workspace_id)
 
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:

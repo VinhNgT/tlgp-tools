@@ -26,7 +26,7 @@ class _WorkspaceSignalBridge(QObject):
     workspace_changed = Signal()
 
 
-def start_gui(workspace_manager):
+def start_gui(workspace_manager, port: int = 8000):
     """Create the Qt application, wire all components, and run the event loop."""
     if sys.platform == "win32":
         try:
@@ -58,7 +58,7 @@ def start_gui(workspace_manager):
     dialog_service = QtDialogService()
 
     # Create main window view
-    view = MainAppWindow(transformer)
+    view = MainAppWindow(transformer, port=port)
 
     # Instantiate controller linking workspace, state store, and views
     controller = AppController(workspace_manager, store, view, dialog_service)

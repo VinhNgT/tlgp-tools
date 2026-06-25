@@ -248,5 +248,3 @@ def test_dialog_service_ask_save_as_filename(qapp, monkeypatch):
     )
     assert path == "/mock/file.zip"
     assert called_initial_filename == "my_default.zip"
-
-

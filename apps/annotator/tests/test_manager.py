@@ -378,7 +378,9 @@ class TestExportImages:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
-        ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+        ws.add_component(
+            child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id
+        )
 
         zip_bytes = ws.export_images("annotated")
         with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
@@ -392,7 +394,9 @@ class TestExportImages:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
-        ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+        ws.add_component(
+            child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id
+        )
 
         zip_bytes = ws.export_images("raw")
         with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
@@ -411,17 +415,27 @@ class TestExportImages:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         ws.add_component(parent_id, "Parent_Box", Bounds(x=10, y=10, w=100, h=100))
-        ws.add_component(child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+        ws.add_component(
+            child_id, "Child_Box", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id
+        )
 
         zip_bytes = ws.export_images("both")
         with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
             names = zf.namelist()
             # Verify annotated folder has the parent box, but not child (as it's a leaf)
-            assert any(name.startswith("annotated/") and "Parent_Box" in name for name in names)
-            assert not any(name.startswith("annotated/") and "Child_Box" in name for name in names)
+            assert any(
+                name.startswith("annotated/") and "Parent_Box" in name for name in names
+            )
+            assert not any(
+                name.startswith("annotated/") and "Child_Box" in name for name in names
+            )
             # Verify raw folder has both
-            assert any(name.startswith("raw/") and "Parent_Box" in name for name in names)
-            assert any(name.startswith("raw/") and "Child_Box" in name for name in names)
+            assert any(
+                name.startswith("raw/") and "Parent_Box" in name for name in names
+            )
+            assert any(
+                name.startswith("raw/") and "Child_Box" in name for name in names
+            )
 
 
 # ── Subscriber Notifications ──────────────────────────────────────────

@@ -946,7 +946,10 @@ def test_scroll_while_panning(qapp):
     assert canvas.pan_offset == (init_pan[0] + 10.0, init_pan[1] + 80.0)
 
     # The pan_start_offset and pan_start_mouse should have updated!
-    assert canvas.gestures.state.pan_start_offset == (init_pan[0] + 10.0, init_pan[1] + 80.0)
+    assert canvas.gestures.state.pan_start_offset == (
+        init_pan[0] + 10.0,
+        init_pan[1] + 80.0,
+    )
     assert canvas.gestures.state.pan_start_mouse == (410.0, 320.0)
 
     # 4. Drag slightly more to (412, 321) (dx=2, dy=1 relative to the scroll position)

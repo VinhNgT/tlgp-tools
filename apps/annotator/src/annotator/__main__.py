@@ -101,7 +101,7 @@ def main():
             logger.error("Startup path does not exist: %s", path)
 
     # GUI on main thread — server is guaranteed running
-    start_gui(workspace)
+    start_gui(workspace, port)
 
 
 if __name__ == "__main__":

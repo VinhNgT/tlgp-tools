@@ -212,6 +212,16 @@ QMenu::separator {
 #AnnotationCanvas, #WelcomeScreen {
     background-color: #111111;
 }
+
+QStatusBar {
+    background-color: #2C2D2E;
+    border-top: 1px solid #383838;
+    color: #8C8C8C;
+}
+
+QStatusBar::item {
+    border: none;
+}
 """
 
 

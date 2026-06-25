@@ -505,9 +505,7 @@ class WorkspaceManager:
 
         return buf.getvalue()
 
-    def get_default_export_name(
-        self, mode: Literal["annotated", "raw", "both"]
-    ) -> str:
+    def get_default_export_name(self, mode: Literal["annotated", "raw", "both"]) -> str:
         """Get the default filename (without extension) for exporting images, using the mode."""
         with self._lock:
             state_snapshot = self._state.model_copy(deep=True)
@@ -526,9 +524,7 @@ class WorkspaceManager:
             folder_name = "exported_images"
         return f"{folder_name}_{mode}"
 
-    def export_images(
-        self, mode: Literal["annotated", "raw", "both"]
-    ) -> bytes:
+    def export_images(self, mode: Literal["annotated", "raw", "both"]) -> bytes:
         """Export component cropped images as a ZIP file.
 
         - annotated: Crop non-leaf components and draw children on them. Won't export leaves.
@@ -553,17 +549,27 @@ class WorkspaceManager:
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             with Image.open(io.BytesIO(image_bytes)) as img:
+
                 def get_export_nodes():
                     # Yield root node
                     root_children = TreeUtils.get_children(state_snapshot, None)
-                    root_base = state_snapshot.image.filename.rsplit('.', 1)[0] if state_snapshot.image.filename else "root"
+                    root_base = (
+                        state_snapshot.image.filename.rsplit(".", 1)[0]
+                        if state_snapshot.image.filename
+                        else "root"
+                    )
                     yield {
                         "is_leaf": len(root_children) == 0,
-                        "bounds": (0, 0, state_snapshot.image.width, state_snapshot.image.height),
+                        "bounds": (
+                            0,
+                            0,
+                            state_snapshot.image.width,
+                            state_snapshot.image.height,
+                        ),
                         "children": root_children,
                         "parent_comp": None,
                         "filename": f"root_{sanitize_filename(root_base)}.png",
-                        "comp_id": None
+                        "comp_id": None,
                     }
 
                     # Yield component nodes
@@ -578,11 +584,16 @@ class WorkspaceManager:
 
                         yield {
                             "is_leaf": len(children) == 0,
-                            "bounds": (comp.bounds.left, comp.bounds.top, comp.bounds.right, comp.bounds.bottom),
+                            "bounds": (
+                                comp.bounds.left,
+                                comp.bounds.top,
+                                comp.bounds.right,
+                                comp.bounds.bottom,
+                            ),
                             "children": children,
                             "parent_comp": comp,
                             "filename": f"{'_'.join(name_parts)}.png",
-                            "comp_id": comp_id
+                            "comp_id": comp_id,
                         }
 
                 mapping = {}
@@ -610,7 +621,11 @@ class WorkspaceManager:
                                 )
                             img_buf = io.BytesIO()
                             cropped_ann.save(img_buf, format="PNG")
-                            archive_path = f"annotated/{node['filename']}" if mode == "both" else node["filename"]
+                            archive_path = (
+                                f"annotated/{node['filename']}"
+                                if mode == "both"
+                                else node["filename"]
+                            )
                             zf.writestr(archive_path, img_buf.getvalue())
                             exported_count += 1
 
@@ -621,16 +636,24 @@ class WorkspaceManager:
                                     mapping["root"] = archive_path
                             else:
                                 if mode == "both":
-                                    mapping["annotated"]["components"][str(node["comp_id"])] = archive_path
+                                    mapping["annotated"]["components"][
+                                        str(node["comp_id"])
+                                    ] = archive_path
                                 else:
-                                    mapping["components"][str(node["comp_id"])] = archive_path
+                                    mapping["components"][str(node["comp_id"])] = (
+                                        archive_path
+                                    )
 
                     # 2. Raw mode (includes leaves, no annotations)
                     if mode in ("raw", "both"):
                         cropped_raw = img.crop(node["bounds"])
                         img_buf = io.BytesIO()
                         cropped_raw.save(img_buf, format="PNG")
-                        archive_path = f"raw/{node['filename']}" if mode == "both" else node["filename"]
+                        archive_path = (
+                            f"raw/{node['filename']}"
+                            if mode == "both"
+                            else node["filename"]
+                        )
                         zf.writestr(archive_path, img_buf.getvalue())
                         exported_count += 1
 
@@ -641,12 +664,18 @@ class WorkspaceManager:
                                 mapping["root"] = archive_path
                         else:
                             if mode == "both":
-                                mapping["raw"]["components"][str(node["comp_id"])] = archive_path
+                                mapping["raw"]["components"][str(node["comp_id"])] = (
+                                    archive_path
+                                )
                             else:
-                                mapping["components"][str(node["comp_id"])] = archive_path
+                                mapping["components"][str(node["comp_id"])] = (
+                                    archive_path
+                                )
 
                 if exported_count == 0:
-                    raise InvalidStateError("No images to export under the selected mode (e.g. no annotations found).")
+                    raise InvalidStateError(
+                        "No images to export under the selected mode (e.g. no annotations found)."
+                    )
 
                 # Write self-describing mapping.json to ZIP root
                 zf.writestr("mapping.json", json.dumps(mapping, indent=2))

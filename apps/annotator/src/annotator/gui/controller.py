@@ -77,7 +77,9 @@ class AppController:
             self.io_handler.handle_import_image
         )
         self.view.callbacks.on_export_zip_request = self.io_handler.handle_export_zip
-        self.view.callbacks.on_export_images_request = self.io_handler.handle_export_images
+        self.view.callbacks.on_export_images_request = (
+            self.io_handler.handle_export_images
+        )
         self.view.callbacks.on_open_cut_editor_request = (
             self._on_open_cut_editor_request
         )

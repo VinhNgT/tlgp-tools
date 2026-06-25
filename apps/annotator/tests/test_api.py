@@ -53,6 +53,7 @@ class TestStateRoutes:
         assert "workspaceId" in data
         assert "components" in data
 
+
 # ── Import/Export Routes ──────────────────────────────────────────────
 
 
@@ -68,12 +69,17 @@ class TestImportExportRoutes:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         workspace.add_component(parent_id, "Parent", Bounds(x=10, y=10, w=100, h=100))
-        workspace.add_component(child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+        workspace.add_component(
+            child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id
+        )
 
         resp = await client.get("/workspace/export-images?mode=annotated")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/zip"
-        assert resp.headers["content-disposition"] == "attachment; filename=screenshot_annotated.zip"
+        assert (
+            resp.headers["content-disposition"]
+            == "attachment; filename=screenshot_annotated.zip"
+        )
 
         with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:
             names = zf.namelist()
@@ -86,12 +92,17 @@ class TestImportExportRoutes:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         workspace.add_component(parent_id, "Parent", Bounds(x=10, y=10, w=100, h=100))
-        workspace.add_component(child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+        workspace.add_component(
+            child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id
+        )
 
         resp = await client.get("/workspace/export-images?mode=raw")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/zip"
-        assert resp.headers["content-disposition"] == "attachment; filename=screenshot_raw.zip"
+        assert (
+            resp.headers["content-disposition"]
+            == "attachment; filename=screenshot_raw.zip"
+        )
 
         with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:
             names = zf.namelist()
@@ -104,22 +115,25 @@ class TestImportExportRoutes:
         parent_id = uuid.uuid4()
         child_id = uuid.uuid4()
         workspace.add_component(parent_id, "Parent", Bounds(x=10, y=10, w=100, h=100))
-        workspace.add_component(child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id)
+        workspace.add_component(
+            child_id, "Child", Bounds(x=20, y=20, w=50, h=50), parent_id=parent_id
+        )
 
         resp = await client.get("/workspace/export-images?mode=both")
         assert resp.status_code == 200
         assert resp.headers["content-type"] == "application/zip"
-        assert resp.headers["content-disposition"] == "attachment; filename=screenshot_both.zip"
+        assert (
+            resp.headers["content-disposition"]
+            == "attachment; filename=screenshot_both.zip"
+        )
 
         with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:
             names = zf.namelist()
-            assert any(name.startswith("annotated/") and "Parent" in name for name in names)
-            assert not any(name.startswith("annotated/") and "Child" in name for name in names)
+            assert any(
+                name.startswith("annotated/") and "Parent" in name for name in names
+            )
+            assert not any(
+                name.startswith("annotated/") and "Child" in name for name in names
+            )
             assert any(name.startswith("raw/") and "Parent" in name for name in names)
             assert any(name.startswith("raw/") and "Child" in name for name in names)
-
-
-
-
-
-

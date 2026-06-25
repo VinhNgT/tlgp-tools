@@ -131,7 +131,9 @@ class _ExportImagesDialog(QDialog):
         lbl_mode = QLabel("Select Export Mode:")
         layout.addWidget(lbl_mode)
 
-        self.rad_annotated = QRadioButton("Annotated (skips leaves, paints child annotations)")
+        self.rad_annotated = QRadioButton(
+            "Annotated (skips leaves, paints child annotations)"
+        )
         self.rad_annotated.setChecked(True)
         layout.addWidget(self.rad_annotated)
 
@@ -168,8 +170,7 @@ class _ExportImagesDialog(QDialog):
         layout.addWidget(self.rad_zip)
 
         button_box = QDialogButtonBox(
-            QDialogButtonBox.StandardButton.Ok
-            | QDialogButtonBox.StandardButton.Cancel
+            QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
         )
         button_box.button(QDialogButtonBox.StandardButton.Ok).setText("Export")
         button_box.accepted.connect(self.accept)
@@ -212,7 +213,9 @@ class QtDialogService(DialogService):
         initial_filename: str = "",
     ) -> str | None:
         filter_str = self._filetypes_to_filter(filetypes)
-        path, _ = QFileDialog.getSaveFileName(parent, title, initial_filename, filter_str)
+        path, _ = QFileDialog.getSaveFileName(
+            parent, title, initial_filename, filter_str
+        )
         return path if path else None
 
     def show_error(self, parent: QWidget | None, title: str, message: str) -> None:
@@ -224,7 +227,9 @@ class QtDialogService(DialogService):
     def show_info(self, parent: QWidget | None, title: str, message: str) -> None:
         QMessageBox.information(parent, title, message)
 
-    def show_importing_dialog(self, parent: QWidget | None, message: str) -> ProgressIndicator:
+    def show_importing_dialog(
+        self, parent: QWidget | None, message: str
+    ) -> ProgressIndicator:
         dialog = _ImportingDialog(parent, message=message)
         return _QtProgressIndicator(dialog)
 

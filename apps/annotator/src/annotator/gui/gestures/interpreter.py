@@ -297,7 +297,9 @@ class GestureInterpreter:
         ctrl: bool,
     ):
         self.state.ignore_momentum = False
-        PanScrollHandler.on_scroll(self.state, canvas, delta, mouse_x, mouse_y, shift, ctrl)
+        PanScrollHandler.on_scroll(
+            self.state, canvas, delta, mouse_x, mouse_y, shift, ctrl
+        )
 
     def on_trackpad_scroll(
         self,
