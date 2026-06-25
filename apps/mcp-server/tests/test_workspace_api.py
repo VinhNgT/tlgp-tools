@@ -124,9 +124,14 @@ class TestWorkspaceApi:
 
     @pytest.mark.anyio
     async def test_download_image_success(self, tmp_path, monkeypatch):
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as zf:
+            zf.writestr("images/compuuid.png", b"fake_png_data")
+            zf.writestr("mapping.json", '{"root": "root_raw.png", "components": {"comp-uuid": "images/compuuid.png"}}')
+
         class MockResponse:
             status_code = 200
-            content = b"fake_png_data"
+            content = zip_buf.getvalue()
 
             def raise_for_status(self):
                 pass
@@ -140,7 +145,7 @@ class TestWorkspaceApi:
 
             async def request(self, method, url, *args, **kwargs):
                 assert method == "GET"
-                assert "images/comp-uuid" in url
+                assert "workspace/export-images" in url
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
@@ -158,9 +163,9 @@ class TestWorkspaceApi:
         # 1. Create a dummy in-memory zip containing workspace assets
         zip_buf = io.BytesIO()
         with zipfile.ZipFile(zip_buf, "w") as zf:
-            zf.writestr("workspace.json", '{"sessionId": "abc"}')
-            zf.writestr("raw.png", "image_bytes")
-            zf.writestr("images/comp1.png", "comp_bytes")
+            zf.writestr("root_raw.png", b"image_bytes")
+            zf.writestr("images/comp1.png", b"comp_bytes")
+            zf.writestr("mapping.json", '{"root": "root_raw.png", "components": {"comp1": "images/comp1.png"}}')
 
         class MockResponse:
             status_code = 200
@@ -181,11 +186,13 @@ class TestWorkspaceApi:
                 pass
 
             async def request(self, method, url, *args, **kwargs):
-                # Can be GET for workspace state or POST for export-batch
-                if method == "GET":
-                    assert "workspace/state" in url
-                elif method == "POST":
-                    assert "workspace/export-batch" in url
+                assert method == "GET"
+                if "workspace/state" in url:
+                    pass
+                elif "workspace/export-images" in url:
+                    pass
+                else:
+                    raise AssertionError(f"Unexpected GET URL: {url}")
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)
@@ -238,9 +245,14 @@ class TestWorkspaceApi:
 
     @pytest.mark.anyio
     async def test_get_image_bytes_success(self, monkeypatch):
+        zip_buf = io.BytesIO()
+        with zipfile.ZipFile(zip_buf, "w") as zf:
+            zf.writestr("images/compuuid.png", b"raw_bytes")
+            zf.writestr("mapping.json", '{"root": "root_raw.png", "components": {"comp-uuid": "images/compuuid.png"}}')
+
         class MockResponse:
             status_code = 200
-            content = b"raw_bytes"
+            content = zip_buf.getvalue()
 
             def raise_for_status(self):
                 pass
@@ -254,7 +266,7 @@ class TestWorkspaceApi:
 
             async def request(self, method, url, *args, **kwargs):
                 assert method == "GET"
-                assert "images/comp-uuid" in url
+                assert "workspace/export-images" in url
                 return MockResponse()
 
         monkeypatch.setattr(httpx, "AsyncClient", MockAsyncClient)

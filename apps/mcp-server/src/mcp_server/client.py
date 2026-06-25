@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import json
 import os
 import zipfile
 
@@ -89,22 +90,56 @@ class WorkspaceClient:
     async def download_image(
         self, comp_id: str, output_path: str, show_children: bool = False
     ) -> dict:
-        """Download the full screenshot or a component image, writing it to output_path."""
-        res = await self._request(
-            "GET", f"/images/{comp_id}", params={"show_children": show_children}
-        )
+        """Download the full screenshot or a component image by extracting it from the export-images ZIP using mapping.json."""
+        mode = "annotated" if show_children else "raw"
+        res = await self._request("GET", "/workspace/export-images", params={"mode": mode})
+
         out_path = os.path.abspath(output_path)
         os.makedirs(os.path.dirname(out_path), exist_ok=True)
-        with open(out_path, "wb") as f:
-            f.write(res.content)
+
+        zip_buf = io.BytesIO(res.content)
+        with zipfile.ZipFile(zip_buf, "r") as zf:
+            mapping = json.loads(zf.read("mapping.json").decode("utf-8"))
+
+            if comp_id == "root":
+                target_name = mapping.get("root")
+            else:
+                target_name = mapping.get("components", {}).get(comp_id)
+
+            if not target_name:
+                raise ApiClientError(
+                    message=f"Component image not found in export archive mapping: {comp_id}",
+                    url=None,
+                    method="GET",
+                )
+
+            with open(out_path, "wb") as f:
+                f.write(zf.read(target_name))
+
         return {"status": "success", "output_path": out_path}
 
     async def get_image_bytes(self, comp_id: str, show_children: bool = False) -> bytes:
-        """Fetch the raw image bytes for a component from the Annotator."""
-        res = await self._request(
-            "GET", f"/images/{comp_id}", params={"show_children": show_children}
-        )
-        return res.content
+        """Fetch the raw image bytes for a component by extracting it from the export-images ZIP using mapping.json."""
+        mode = "annotated" if show_children else "raw"
+        res = await self._request("GET", "/workspace/export-images", params={"mode": mode})
+
+        zip_buf = io.BytesIO(res.content)
+        with zipfile.ZipFile(zip_buf, "r") as zf:
+            mapping = json.loads(zf.read("mapping.json").decode("utf-8"))
+
+            if comp_id == "root":
+                target_name = mapping.get("root")
+            else:
+                target_name = mapping.get("components", {}).get(comp_id)
+
+            if not target_name:
+                raise ApiClientError(
+                    message=f"Component image not found in export archive mapping: {comp_id}",
+                    url=None,
+                    method="GET",
+                )
+
+            return zf.read(target_name)
 
     async def export_workspace(self, output_path: str) -> dict:
         """Export the current workspace to a zip archive at output_path."""
@@ -128,25 +163,41 @@ class WorkspaceClient:
         out_path = os.path.abspath(output_dir)
         os.makedirs(out_path, exist_ok=True)
 
-        if component_ids is None:
-            state = await self.get_workspace_state()
-            component_ids = list(state.get("components", {}).keys())
+        state = await self.get_workspace_state()
 
-        payload = {
-            "include_state": include_state,
-            "include_root": include_root,
-            "show_root_children": show_root_children,
-            "components": [
-                {"id": comp_id, "show_children": show_component_children}
-                for comp_id in component_ids
-            ],
-        }
+        if include_state:
+            state_file = os.path.join(out_path, "workspace.json")
+            with open(state_file, "w", encoding="utf-8") as f:
+                json.dump(state, f, indent=2)
 
-        res = await self._request("POST", "/workspace/export-batch", json=payload)
+        # Download ZIP of all crops
+        # We match show_root_children/show_component_children to the modes
+        mode = "annotated" if (show_root_children or show_component_children) else "raw"
+        res = await self._request("GET", "/workspace/export-images", params={"mode": mode})
 
         zip_buf = io.BytesIO(res.content)
         with zipfile.ZipFile(zip_buf, "r") as zf:
-            zf.extractall(out_path)
+            mapping = json.loads(zf.read("mapping.json").decode("utf-8"))
+
+            # Extract root image if requested
+            if include_root:
+                root_name = mapping.get("root")
+                if root_name:
+                    with open(os.path.join(out_path, "raw.png"), "wb") as f:
+                        f.write(zf.read(root_name))
+
+            # Extract component images
+            images_dir = os.path.join(out_path, "images")
+            os.makedirs(images_dir, exist_ok=True)
+
+            if component_ids is None:
+                component_ids = list(state.get("components", {}).keys())
+
+            for comp_id in component_ids:
+                target_name = mapping.get("components", {}).get(comp_id)
+                if target_name:
+                    with open(os.path.join(images_dir, f"{comp_id}.png"), "wb") as f:
+                        f.write(zf.read(target_name))
 
         return {
             "status": "success",

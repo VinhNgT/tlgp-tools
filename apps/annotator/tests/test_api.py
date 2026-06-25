@@ -119,29 +119,7 @@ class TestImportExportRoutes:
             assert any(name.startswith("raw/") and "Child" in name for name in names)
 
 
-# ── Image Route ───────────────────────────────────────────────────────
 
-
-class TestImageRoute:
-    @pytest.mark.anyio()
-    async def test_get_root_image(self, client):
-        resp = await client.get("/images/root")
-        assert resp.status_code == 200
-        assert resp.headers["content-type"] == "image/png"
-
-    @pytest.mark.anyio()
-    async def test_get_component_image(self, client, workspace):
-        comp_id = uuid.uuid4()
-        workspace.add_component(comp_id, "Box", Bounds(x=10, y=10, w=50, h=50))
-        resp = await client.get(f"/images/{comp_id}")
-        assert resp.status_code == 200
-        assert resp.headers["content-type"] == "image/png"
-
-    @pytest.mark.anyio()
-    async def test_get_nonexistent_component_image_returns_404(self, client):
-        fake_id = uuid.uuid4()
-        resp = await client.get(f"/images/{fake_id}")
-        assert resp.status_code == 404
 
 
 

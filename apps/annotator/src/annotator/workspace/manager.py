@@ -1,4 +1,5 @@
 import io
+import json
 import re
 import threading
 import uuid
@@ -561,7 +562,8 @@ class WorkspaceManager:
                         "bounds": (0, 0, state_snapshot.image.width, state_snapshot.image.height),
                         "children": root_children,
                         "parent_comp": None,
-                        "filename": f"root_{sanitize_filename(root_base)}.png"
+                        "filename": f"root_{sanitize_filename(root_base)}.png",
+                        "comp_id": None
                     }
 
                     # Yield component nodes
@@ -579,8 +581,17 @@ class WorkspaceManager:
                             "bounds": (comp.bounds.left, comp.bounds.top, comp.bounds.right, comp.bounds.bottom),
                             "children": children,
                             "parent_comp": comp,
-                            "filename": f"{'_'.join(name_parts)}.png"
+                            "filename": f"{'_'.join(name_parts)}.png",
+                            "comp_id": comp_id
                         }
+
+                mapping = {}
+                if mode == "both":
+                    mapping["annotated"] = {"root": None, "components": {}}
+                    mapping["raw"] = {"root": None, "components": {}}
+                else:
+                    mapping["root"] = None
+                    mapping["components"] = {}
 
                 exported_count = 0
                 for node in get_export_nodes():
@@ -603,6 +614,17 @@ class WorkspaceManager:
                             zf.writestr(archive_path, img_buf.getvalue())
                             exported_count += 1
 
+                            if node["comp_id"] is None:
+                                if mode == "both":
+                                    mapping["annotated"]["root"] = archive_path
+                                else:
+                                    mapping["root"] = archive_path
+                            else:
+                                if mode == "both":
+                                    mapping["annotated"]["components"][str(node["comp_id"])] = archive_path
+                                else:
+                                    mapping["components"][str(node["comp_id"])] = archive_path
+
                     # 2. Raw mode (includes leaves, no annotations)
                     if mode in ("raw", "both"):
                         cropped_raw = img.crop(node["bounds"])
@@ -612,7 +634,21 @@ class WorkspaceManager:
                         zf.writestr(archive_path, img_buf.getvalue())
                         exported_count += 1
 
+                        if node["comp_id"] is None:
+                            if mode == "both":
+                                mapping["raw"]["root"] = archive_path
+                            else:
+                                mapping["root"] = archive_path
+                        else:
+                            if mode == "both":
+                                mapping["raw"]["components"][str(node["comp_id"])] = archive_path
+                            else:
+                                mapping["components"][str(node["comp_id"])] = archive_path
+
                 if exported_count == 0:
                     raise InvalidStateError("No images to export under the selected mode (e.g. no annotations found).")
+
+                # Write self-describing mapping.json to ZIP root
+                zf.writestr("mapping.json", json.dumps(mapping, indent=2))
 
         return buf.getvalue()
