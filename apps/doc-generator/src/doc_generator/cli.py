@@ -14,20 +14,32 @@ from tlgp_logger import get_logger, setup_logging
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import AnalysisData
+from doc_generator.validation import validate_analysis
 
 logger = get_logger(__name__)
 
 
-def _load_analysis(path: Path) -> AnalysisData:
-    """Load and validate analysis.json."""
+def _load_analysis_raw(path: Path) -> dict:
+    """Load raw JSON dict from the analysis file path.
+
+    Returns the parsed dict on success. On failure, returns None after
+    logging the error and (in non-JSON mode) exiting.
+    """
     if not path.exists():
         logger.error(f"File not found: {path}")
-        sys.exit(1)
+        return None
 
     try:
-        raw = json.loads(path.read_text(encoding="utf-8"))
+        return json.loads(path.read_text(encoding="utf-8"))
     except json.JSONDecodeError as e:
         logger.error("Invalid JSON", error=str(e))
+        return None
+
+
+def _load_analysis(path: Path) -> AnalysisData:
+    """Load and validate analysis.json, exiting on error (for human-readable mode)."""
+    raw = _load_analysis_raw(path)
+    if raw is None:
         sys.exit(1)
 
     try:
@@ -35,6 +47,18 @@ def _load_analysis(path: Path) -> AnalysisData:
     except ValidationError as e:
         logger.error("Schema validation failed", error=str(e))
         sys.exit(1)
+
+
+def _parse_analysis(raw: dict) -> AnalysisData | list[str]:
+    """Parse raw dict into AnalysisData, returning error list on failure."""
+    try:
+        return AnalysisData.model_validate(raw)
+    except ValidationError as e:
+        errors = []
+        for err in e.errors():
+            loc = " → ".join(str(loc) for loc in err["loc"])
+            errors.append(f"{loc}: {err['msg']}")
+        return errors
 
 
 def _print_summary(analysis: AnalysisData):
@@ -107,6 +131,77 @@ def _print_summary(analysis: AnalysisData):
     print("=" * 50)
 
 
+def _run_json_mode(
+    analysis_path: Path,
+    output_path: str | None,
+    validate_only: bool,
+) -> int:
+    """Execute in JSON mode: all output is a single JSON object on stdout.
+
+    Returns the process exit code (0 for success, 1 for failure).
+    """
+    raw = _load_analysis_raw(analysis_path)
+    if raw is None:
+        json.dump(
+            {"valid": False, "errors": [f"Failed to read {analysis_path}"], "warnings": []},
+            sys.stdout,
+            ensure_ascii=False,
+        )
+        return 1
+
+    parsed = _parse_analysis(raw)
+    if isinstance(parsed, list):
+        json.dump(
+            {"valid": False, "errors": parsed, "warnings": []},
+            sys.stdout,
+            ensure_ascii=False,
+        )
+        return 1
+
+    data: AnalysisData = parsed
+
+    # Run validation
+    vr = validate_analysis(data)
+
+    if not vr.valid:
+        json.dump(vr.to_dict(), sys.stdout, ensure_ascii=False)
+        return 1
+
+    if validate_only:
+        json.dump(vr.to_dict(), sys.stdout, ensure_ascii=False)
+        return 0
+
+    # Build document
+    doc = build_document(data)
+
+    if output_path:
+        out = Path(output_path).resolve()
+    else:
+        safe_name = (
+            "".join(
+                c for c in data.screen.name if c.isalnum() or c in (" ", "_", "-")
+            )
+            .strip()
+            .replace(" ", "_")
+        )
+        out = Path(data.imageDir) / f"{safe_name}.docx"
+
+    out.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(out))
+
+    # Save analysis JSON alongside the docx
+    analysis_json_dest = out.parent / "analysis.json"
+    if analysis_path.resolve() != analysis_json_dest.resolve():
+        shutil.copy2(analysis_path, analysis_json_dest)
+
+    result = vr.to_dict()
+    result["output_path"] = str(out)
+    result["tables"] = len(doc.tables)
+
+    json.dump(result, sys.stdout, ensure_ascii=False)
+    return 0
+
+
 def main():
     env = os.environ.get("TLGP_ENV", "dev")
     setup_logging(json_format=(env == "prod"))
@@ -130,6 +225,17 @@ def main():
         action="store_true",
         help="Print summary without generating the .docx",
     )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="json_mode",
+        help="Output a single JSON result object to stdout (machine-readable mode)",
+    )
+    parser.add_argument(
+        "--validate-only",
+        action="store_true",
+        help="Validate analysis data without generating the .docx (implies --json)",
+    )
 
     args = parser.parse_args()
 
@@ -138,6 +244,17 @@ def main():
         sys.exit(0)
 
     analysis_path = Path(args.analysis_json).resolve()
+
+    # --validate-only implies --json
+    if args.validate_only:
+        args.json_mode = True
+
+    # JSON mode: structured output for machine consumption
+    if args.json_mode:
+        exit_code = _run_json_mode(analysis_path, args.output, args.validate_only)
+        sys.exit(exit_code)
+
+    # Human-readable mode
     analysis = _load_analysis(analysis_path)
 
     if args.dry_run:
@@ -159,7 +276,6 @@ def main():
     doc.save(str(output_path))
 
     # Copy analysis.json alongside the .docx for record-keeping
-    # (consistent with the MCP tool behavior)
     analysis_dest = output_path.parent / "analysis.json"
     if analysis_path.resolve() != analysis_dest.resolve():
         shutil.copy2(analysis_path, analysis_dest)

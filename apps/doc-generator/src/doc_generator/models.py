@@ -26,7 +26,7 @@ class Interaction(BaseModel):
     reaction: str
 
 
-class Component(BaseModel):
+class AnalysisComponent(BaseModel):
     """A non-leaf or leaf annotated component."""
 
     id: int
@@ -39,7 +39,7 @@ class Component(BaseModel):
     apis: list[Api] = []
 
     @model_validator(mode="after")
-    def validate_leaf_apis(self) -> Component:
+    def validate_leaf_apis(self) -> AnalysisComponent:
         if self.isLeaf and self.apis:
             raise ValueError(
                 f"Component '{self.label}' (id={self.id}) is a leaf component and cannot have API documentation."
@@ -107,7 +107,7 @@ class AnalysisData(BaseModel):
 
     sectionPrefix: str = "1.1"
     imageDir: str
-    components: list[Component] = []
+    components: list[AnalysisComponent] = []
     screen: Screen
     discrepancies: list[Discrepancy] = []
 

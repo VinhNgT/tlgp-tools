@@ -11,7 +11,7 @@ from docx.oxml.ns import nsdecls, qn
 from docx.shared import Inches
 
 from doc_generator.image_handler import insert_image
-from doc_generator.models import AnalysisData, Api, Component, Screen
+from doc_generator.models import AnalysisComponent, AnalysisData, Api, Screen
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
     build_api_table,
@@ -85,7 +85,7 @@ def _add_normal_text(doc: Document, text: str, style: StyleConfig):
 
 def _add_component_section(
     doc: Document,
-    component: Component,
+    component: AnalysisComponent,
     section_number: str,
     analysis: AnalysisData,
     style: StyleConfig,

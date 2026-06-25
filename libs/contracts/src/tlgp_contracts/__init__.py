@@ -4,6 +4,7 @@ from .workspace import (
     Bounds,
     Component,
     ImageExportManifest,
+    ImageExportManifestBoth,
     ImageInfo,
     PillCorner,
     ScreenInfo,
@@ -15,9 +16,11 @@ __all__ = [
     "Bounds",
     "Component",
     "ImageExportManifest",
+    "ImageExportManifestBoth",
     "ImageInfo",
     "PillCorner",
     "ScreenInfo",
     "Style",
     "WorkspaceState",
 ]
+

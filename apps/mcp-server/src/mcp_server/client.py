@@ -9,7 +9,7 @@ import zipfile
 from typing import Literal
 
 import httpx
-from tlgp_contracts import WorkspaceState
+from tlgp_contracts import ImageExportManifest, ImageExportManifestBoth, WorkspaceState
 from tlgp_logger import get_logger
 
 from mcp_server.exceptions import ApiClientError
@@ -97,7 +97,6 @@ class WorkspaceClient:
         except Exception:
             return False
 
-
     async def export_workspace(self, output_path: str) -> None:
         """Export the current workspace (state JSON and raw screenshot) as a zip file.
 
@@ -140,22 +139,25 @@ class WorkspaceClient:
 
         result: dict = {"output_path": out_path}
 
-        # Parse mapping.json for image count summary
+        # Parse mapping.json using typed contract models
         mapping_path = os.path.join(out_path, "mapping.json")
         if os.path.exists(mapping_path):
             try:
                 with open(mapping_path, encoding="utf-8") as f:
                     mapping = json.load(f)
                 if mode == "both":
-                    result["annotated_images"] = len(
-                        mapping.get("annotated", {}).get("components", {})
-                    )
-                    result["raw_images"] = len(
-                        mapping.get("raw", {}).get("components", {})
-                    )
+                    manifest = ImageExportManifestBoth.model_validate(mapping)
+                    result["annotated_images"] = len(manifest.annotated.components)
+                    result["raw_images"] = len(manifest.raw.components)
                 else:
-                    result["images"] = len(mapping.get("components", {}))
+                    manifest = ImageExportManifest.model_validate(mapping)
+                    result["images"] = len(manifest.components)
             except Exception:
-                pass
+                logger.warning(
+                    "Failed to parse mapping.json in exported images at %s",
+                    mapping_path,
+                    exc_info=True,
+                )
 
         return result
+

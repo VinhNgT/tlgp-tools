@@ -5,11 +5,11 @@ from pathlib import Path
 
 import pytest
 from doc_generator.models import (
+    AnalysisComponent,
     AnalysisData,
     Api,
     ApiParam,
     ChildElement,
-    Component,
     Discrepancy,
     Interaction,
     Screen,
@@ -49,19 +49,19 @@ class TestInteraction:
             Interaction.model_validate({"action": "Click"})  # missing reaction
 
 
-# ── Component ─────────────────────────────────────────────────────────
+# ── AnalysisComponent ─────────────────────────────────────────────────
 
 
-class TestComponent:
+class TestAnalysisComponent:
     def test_minimal(self):
-        c = Component(id=1, label="Header")
+        c = AnalysisComponent(id=1, label="Header")
         assert c.isLeaf is False
         assert c.imageFile is None
         assert c.children == []
         assert c.interactions == []
 
     def test_with_children_and_interactions(self):
-        c = Component(
+        c = AnalysisComponent(
             id=1,
             label="Header",
             children=[ChildElement(stt=1, label="Back", controlType="Icon")],
@@ -71,7 +71,7 @@ class TestComponent:
         assert len(c.interactions) == 1
 
     def test_leaf_component(self):
-        c = Component(id=1, label="Leaf", isLeaf=True)
+        c = AnalysisComponent(id=1, label="Leaf", isLeaf=True)
         assert c.isLeaf is True
 
     def test_leaf_component_with_apis_raises(self):
@@ -79,7 +79,7 @@ class TestComponent:
             ValidationError,
             match="is a leaf component and cannot have API documentation",
         ):
-            Component(
+            AnalysisComponent(
                 id=1,
                 label="Leaf",
                 isLeaf=True,
@@ -272,7 +272,7 @@ class TestAnalysisData:
                     name="Test", apis=[Api(number=1, method="GET", title="X", url="/x")]
                 ),
                 components=[
-                    Component(
+                    AnalysisComponent(
                         id=1,
                         label="Comp",
                         isLeaf=False,
@@ -291,7 +291,7 @@ class TestAnalysisData:
                     name="Test", apis=[Api(number=1, method="GET", title="X", url="/x")]
                 ),
                 components=[
-                    Component(
+                    AnalysisComponent(
                         id=1,
                         label="Comp",
                         isLeaf=False,
@@ -335,7 +335,7 @@ class TestJsonRoundTrip:
                 ],
             ),
             components=[
-                Component(
+                AnalysisComponent(
                     id=1,
                     label="Header",
                     children=[

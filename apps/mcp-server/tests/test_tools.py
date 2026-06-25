@@ -2,304 +2,212 @@
 
 from __future__ import annotations
 
-import io
 import json
-from pathlib import Path
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from mcp_server.client import WorkspaceClient
 from mcp_server.manager import DaemonManager
-from mcp_server.server import connect_to_annotator, generate_spec_doc
+from mcp_server.server import connect_to_annotator
 from mcp_server.services import SpecGeneratorService
-from PIL import Image as PILImage
 
 # ============================================================
 # Helpers
 # ============================================================
 
 
-def _make_png_bytes() -> bytes:
-    """Create a valid 1x1 white PNG for image validation tests."""
-    buf = io.BytesIO()
-    PILImage.new("RGB", (1, 1), color=(255, 255, 255)).save(buf, format="PNG")
-    return buf.getvalue()
-
-
-def _create_export_dir(tmp_path, screen_name="Test_Screen") -> Path:
-    """Create a minimal annotation export directory with images."""
-    screen_dir = tmp_path / screen_name
-    screen_dir.mkdir()
-
-    png_bytes = _make_png_bytes()
-
-    # Root annotated image
-    (screen_dir / f"{screen_name}_annotated.png").write_bytes(png_bytes)
-    # Component 1 annotated image
-    (screen_dir / f"{screen_name}_1_annotated.png").write_bytes(png_bytes)
-
-    return screen_dir
-
-
-def _build_analysis(screen_dir: Path) -> dict:
-    """Build a minimal valid analysis dict for testing."""
-    screen_name = screen_dir.name
-    return {
-        "sectionPrefix": "1.1",
-        "imageDir": str(screen_dir),
-        "components": [
-            {
-                "id": 1,
-                "label": "Header",
-                "description": "Thanh tiêu đề",
-                "isLeaf": False,
-                "imageFile": f"{screen_name}_1_annotated.png",
-                "children": [
-                    {
-                        "stt": 1,
-                        "label": "Back",
-                        "controlType": "Icon",
-                        "required": "",
-                        "maxLength": "",
-                        "editable": "",
-                        "description": "Nút quay lại",
-                    },
-                    {
-                        "stt": 2,
-                        "label": "Title",
-                        "controlType": "Text",
-                        "required": "",
-                        "maxLength": "",
-                        "editable": "",
-                        "description": "Tên màn hình",
-                    },
-                ],
-                "interactions": [
-                    {"action": "Click Back", "reaction": "Quay về"},
-                ],
-            },
-            {
-                "id": 2,
-                "label": "Banner",
-                "description": "",
-                "isLeaf": True,
-                "imageFile": None,
-                "children": [],
-                "interactions": [],
-            },
-        ],
-        "screen": {
-            "name": "Test Screen",
-            "description": "Màn hình test",
-            "imageFiles": [f"{screen_name}_annotated.png"],
-            "topLevelChildren": [
-                {
-                    "stt": 1,
-                    "label": "Header",
-                    "controlType": "Component",
-                    "required": "",
-                    "maxLength": "",
-                    "editable": "",
-                    "description": "Thanh tiêu đề",
-                },
-                {
-                    "stt": 2,
-                    "label": "Banner",
-                    "controlType": "Image",
-                    "required": "",
-                    "maxLength": "",
-                    "editable": "",
-                    "description": "Ảnh banner",
-                },
-            ],
-            "interactions": [],
-        },
-        "discrepancies": [],
+def _make_ctx_with_lifespan(
+    client: WorkspaceClient | None = None,
+    daemon_manager: DaemonManager | None = None,
+    spec_service: SpecGeneratorService | None = None,
+) -> MagicMock:
+    """Create a mock MCP Context that provides lifespan_context."""
+    ctx = MagicMock()
+    ctx.report_progress = AsyncMock()
+    ctx.log = AsyncMock()
+    ctx.request_context.lifespan_context = {
+        "client": client or MagicMock(spec=WorkspaceClient),
+        "daemon_manager": daemon_manager or MagicMock(spec=DaemonManager),
+        "spec_service": spec_service or MagicMock(spec=SpecGeneratorService),
     }
+    return ctx
 
 
-# ── generate_spec_doc ─────────────────────────────────────────
+# ── SpecGeneratorService (subprocess invocation) ──────────────
 
 
-class TestGenerateSpecDoc:
-    def test_valid_generates_docx(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
+class TestSpecGeneratorService:
+    @pytest.mark.anyio
+    async def test_generate_invokes_cli_and_parses_result(self, tmp_path):
+        """Mocked subprocess returns valid JSON → service returns parsed result."""
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text('{"dummy": true}', encoding="utf-8")
 
-        result = service.generate_spec_doc_impl(analysis)
+        expected_result = {
+            "valid": True,
+            "output_path": str(tmp_path / "out.docx"),
+            "errors": [],
+            "warnings": [],
+            "tables": 5,
+            "images": 2,
+        }
+
+        mock_proc = AsyncMock()
+        mock_proc.communicate.return_value = (
+            json.dumps(expected_result).encode(),
+            b"",
+        )
+        mock_proc.returncode = 0
+
+        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            result = await service.generate(analysis_path=str(analysis_file))
 
         assert result["valid"] is True
-        assert "output_path" in result
-        assert result["tables"] > 0
-        assert Path(result["output_path"]).exists()
+        assert result["output_path"] == str(tmp_path / "out.docx")
 
-    def test_validate_only(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
+        # Verify CLI was called with --json
+        call_args = mock_exec.call_args[0]
+        assert call_args[0] == "/usr/bin/doc-gen"
+        assert str(analysis_file) in call_args
+        assert "--json" in call_args
 
-        result = service.generate_spec_doc_impl(analysis, validate_only=True)
+    @pytest.mark.anyio
+    async def test_generate_validate_only_passes_flag(self, tmp_path):
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text('{}', encoding="utf-8")
+
+        mock_proc = AsyncMock()
+        mock_proc.communicate.return_value = (
+            json.dumps({"valid": True, "warnings": []}).encode(),
+            b"",
+        )
+        mock_proc.returncode = 0
+
+        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            result = await service.generate(
+                analysis_path=str(analysis_file),
+                validate_only=True,
+            )
 
         assert result["valid"] is True
-        assert "output_path" not in result
-        assert result["components"] == 2
-        assert result["non_leaf"] == 1
-        assert result["ui_elements"] == 2
-        assert result["apis"] == 0
-        assert result["images"] >= 1
+        call_args = mock_exec.call_args[0]
+        assert "--validate-only" in call_args
 
-    def test_schema_validation_failure(self):
-        service = SpecGeneratorService()
-        result = service.generate_spec_doc_impl({"sectionPrefix": "1.1"})
+    @pytest.mark.anyio
+    async def test_generate_output_path_passes_flag(self, tmp_path):
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text('{}', encoding="utf-8")
+
+        mock_proc = AsyncMock()
+        mock_proc.communicate.return_value = (
+            json.dumps({"valid": True}).encode(),
+            b"",
+        )
+        mock_proc.returncode = 0
+
+        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc) as mock_exec:
+            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            await service.generate(
+                analysis_path=str(analysis_file),
+                output_path="/out/spec.docx",
+            )
+
+        call_args = mock_exec.call_args[0]
+        assert "-o" in call_args
+        assert "/out/spec.docx" in call_args
+
+    @pytest.mark.anyio
+    async def test_generate_invalid_json_stdout(self, tmp_path):
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text('{}', encoding="utf-8")
+
+        mock_proc = AsyncMock()
+        mock_proc.communicate.return_value = (b"not json", b"some error")
+        mock_proc.returncode = 1
+
+        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc):
+            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            result = await service.generate(analysis_path=str(analysis_file))
 
         assert result["valid"] is False
         assert len(result["errors"]) > 0
 
-    def test_invalid_analysis_type(self):
-        service = SpecGeneratorService()
-        result = service.generate_spec_doc_impl({"components": "not_a_list"})
+    @pytest.mark.anyio
+    async def test_generate_missing_binary(self, tmp_path):
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text('{}', encoding="utf-8")
+
+        with patch("mcp_server.services.shutil.which", return_value=None):
+            service = SpecGeneratorService()
+            result = await service.generate(analysis_path=str(analysis_file))
 
         assert result["valid"] is False
-
-    def test_missing_image_is_error(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
-
-        # Remove the component image
-        (screen_dir / f"{screen_dir.name}_1_annotated.png").unlink()
-
-        result = service.generate_spec_doc_impl(analysis)
-
-        assert result["valid"] is False
-        assert any("image not found" in e for e in result["errors"])
-
-    def test_missing_screen_image_is_error(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
-
-        # Remove the screen image
-        (screen_dir / f"{screen_dir.name}_annotated.png").unlink()
-
-        result = service.generate_spec_doc_impl(analysis)
-
-        assert result["valid"] is False
-        assert any("Screen image not found" in e for e in result["errors"])
-
-    def test_warnings_for_empty_fields(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
-
-        # Clear some fields to trigger warnings
-        analysis["components"][0]["children"][0]["controlType"] = ""
-        analysis["components"][0]["description"] = ""
-
-        result = service.generate_spec_doc_impl(analysis)
-
-        assert result["valid"] is True
-        assert len(result["warnings"]) > 0
-
-    def test_no_apis_warning(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
-
-        result = service.generate_spec_doc_impl(analysis)
-
-        assert any("No APIs defined" in w for w in result["warnings"])
-
-    def test_discrepancy_warnings(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        analysis["discrepancies"] = [
-            {
-                "location": "Header",
-                "imageObservation": "Share button visible",
-                "codeObservation": "No handler",
-            },
-        ]
-        service = SpecGeneratorService()
-
-        result = service.generate_spec_doc_impl(analysis)
-
-        assert result["valid"] is True
-        assert any("Discrepancy" in w for w in result["warnings"])
-
-    def test_custom_output_path(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
-
-        custom_out = tmp_path / "custom_output.docx"
-        result = service.generate_spec_doc_impl(analysis, output_path=str(custom_out))
-
-        assert result["valid"] is True
-        assert result["output_path"] == str(custom_out)
-        assert custom_out.exists()
-
-        # Verify analysis JSON is written alongside the custom docx path
-        analysis_json = tmp_path / "analysis.json"
-        assert analysis_json.exists()
-        saved = json.loads(analysis_json.read_text(encoding="utf-8"))
-        assert saved["sectionPrefix"] == "1.1"
-
-    def test_analysis_json_side_effect(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
-
-        service.generate_spec_doc_impl(analysis)
-
-        analysis_json = screen_dir / "analysis.json"
-        assert analysis_json.exists()
-        saved = json.loads(analysis_json.read_text(encoding="utf-8"))
-        assert saved["sectionPrefix"] == "1.1"
-
-    def test_no_message_in_response(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
-
-        result = service.generate_spec_doc_impl(analysis)
-
-        assert "message" not in result
-        assert result["valid"] is True
-
-    def test_nonexistent_export_dir(self, tmp_path):
-        analysis = _build_analysis(tmp_path / "nonexistent")
-        service = SpecGeneratorService()
-
-        result = service.generate_spec_doc_impl(analysis)
-
-        assert result["valid"] is False
+        assert "doc-gen binary not found" in result["errors"][0]
 
     @pytest.mark.anyio
-    async def test_generate_with_analysis_path(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        service = SpecGeneratorService()
+    async def test_generate_exports_workspace_zip_on_success(self, tmp_path):
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text('{}', encoding="utf-8")
 
-        # Write analysis to file
-        analysis_json_file = tmp_path / "test_analysis.json"
-        analysis_json_file.write_text(
-            json.dumps(analysis, ensure_ascii=False), encoding="utf-8"
+        docx_path = tmp_path / "out.docx"
+        expected_result = {
+            "valid": True,
+            "output_path": str(docx_path),
+        }
+
+        mock_proc = AsyncMock()
+        mock_proc.communicate.return_value = (
+            json.dumps(expected_result).encode(),
+            b"",
+        )
+        mock_proc.returncode = 0
+
+        mock_client = MagicMock(spec=WorkspaceClient)
+        mock_client.export_workspace = AsyncMock()
+
+        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc):
+            service = SpecGeneratorService(
+                client=mock_client,
+                doc_gen_bin="/usr/bin/doc-gen",
+            )
+            result = await service.generate(analysis_path=str(analysis_file))
+
+        assert result["valid"] is True
+        mock_client.export_workspace.assert_awaited_once_with(
+            str(tmp_path / "workspace.zip")
         )
 
-        result = await service.generate(analysis_path=str(analysis_json_file))
-
-        assert result["valid"] is True
-        assert Path(result["output_path"]).exists()
-
     @pytest.mark.anyio
-    async def test_analysis_path_does_not_exist(self):
-        service = SpecGeneratorService()
-        result = await service.generate(analysis_path="nonexistent_file.json")
+    async def test_generate_with_progress_reporting(self, tmp_path):
+        analysis_file = tmp_path / "analysis.json"
+        analysis_file.write_text('{}', encoding="utf-8")
 
-        assert result["valid"] is False
-        assert "Failed to read analysis_path" in result["errors"][0]
+        mock_proc = AsyncMock()
+        mock_proc.communicate.return_value = (
+            json.dumps({"valid": True}).encode(),
+            b"",
+        )
+        mock_proc.returncode = 0
+
+        ctx = MagicMock()
+        ctx.report_progress = AsyncMock()
+        ctx.log = AsyncMock()
+
+        with patch("mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc):
+            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            await service.generate(analysis_path=str(analysis_file), ctx=ctx)
+
+        ctx.report_progress.assert_any_call(
+            10, 100, "Loading and validating analysis data..."
+        )
+        ctx.report_progress.assert_any_call(
+            60, 100, "Running document generation..."
+        )
+        ctx.report_progress.assert_any_call(
+            100, 100, "Spec generation complete."
+        )
 
 
 # ── launch_annotator ──────────────────────────────────────────
@@ -370,101 +278,40 @@ class TestLaunchAnnotator:
             await manager.launch_annotator(path=str(tmp_path / "out"))
 
 
-
-
-
-
-
-class TestGenerateSpecDocWrapper:
-    @pytest.mark.anyio
-    async def test_generate_spec_doc_progress(self, tmp_path):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text(json.dumps(analysis), encoding="utf-8")
-
-        # Mock Context
-        ctx = MagicMock()
-        ctx.report_progress = AsyncMock()
-        ctx.log = AsyncMock()
-
-        # Call generate_spec_doc wrapper
-        result = await generate_spec_doc(
-            ctx=ctx, analysis_path=str(analysis_file), output_path=str(tmp_path / "out.docx")
-        )
-
-        assert result["valid"] is True
-
-        # Verify progress was reported
-        ctx.report_progress.assert_any_call(
-            60, 100, "Running document generation..."
-        )
-        ctx.report_progress.assert_any_call(100, 100, "Spec generation complete.")
-
-    @pytest.mark.anyio
-    async def test_generate_spec_doc_exports_workspace_zip(self, tmp_path, monkeypatch):
-        screen_dir = _create_export_dir(tmp_path)
-        analysis = _build_analysis(screen_dir)
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text(json.dumps(analysis), encoding="utf-8")
-
-        # Mock WorkspaceClient.export_workspace
-        async def mock_export_workspace(client_self, output_path: str):
-            Path(output_path).write_bytes(b"mock_zip_content")
-
-        monkeypatch.setattr(WorkspaceClient, "export_workspace", mock_export_workspace)
-
-        # Mock Context
-        ctx = MagicMock()
-        ctx.report_progress = AsyncMock()
-        ctx.log = AsyncMock()
-
-        # Call generate_spec_doc wrapper
-        out_docx = tmp_path / "out.docx"
-        result = await generate_spec_doc(
-            ctx=ctx, analysis_path=str(analysis_file), output_path=str(out_docx)
-        )
-
-        assert result["valid"] is True
-        assert out_docx.exists()
-
-        # Verify workspace.zip is exported next to out.docx
-        workspace_zip = tmp_path / "workspace.zip"
-        assert workspace_zip.exists()
-        assert workspace_zip.read_bytes() == b"mock_zip_content"
+# ── connect_to_annotator ─────────────────────────────────────
 
 
 class TestConnectToAnnotator:
     @pytest.mark.anyio
-    async def test_connect_to_annotator_success(self, monkeypatch):
-        mock_client = MagicMock()
+    async def test_connect_success(self):
+        mock_client = MagicMock(spec=WorkspaceClient)
         mock_client.check_connection = AsyncMock(return_value=True)
-        monkeypatch.setattr(
-            "mcp_server.server.get_client",
-            lambda: mock_client,
+        mock_client.get_workspace_state = AsyncMock(
+            return_value=MagicMock(
+                screen=MagicMock(name="Test"),
+                components={},
+            )
         )
 
-        res = await connect_to_annotator("http://127.0.0.1:9091")
+        mock_daemon = MagicMock(spec=DaemonManager)
+
+        ctx = _make_ctx_with_lifespan(client=mock_client, daemon_manager=mock_daemon)
+
+        res = await connect_to_annotator(ctx, "http://127.0.0.1:9091")
         assert res["status"] == "success"
         assert "http://127.0.0.1:9091" in res["message"]
+        assert mock_client.base_url == "http://127.0.0.1:9091"
 
     @pytest.mark.anyio
-    async def test_connect_to_annotator_no_url(self):
-        res = await connect_to_annotator("invalid-url")
-        assert res["status"] == "error"
-        assert "Failed to connect to annotator" in res["message"]
-
-    @pytest.mark.anyio
-    async def test_connect_to_annotator_api_failure(self, monkeypatch):
-        mock_client = MagicMock()
+    async def test_connect_failure(self):
+        mock_client = MagicMock(spec=WorkspaceClient)
         mock_client.check_connection = AsyncMock(
             side_effect=Exception("Connection refused")
         )
-        monkeypatch.setattr(
-            "mcp_server.server.get_client",
-            lambda: mock_client,
-        )
 
-        res = await connect_to_annotator("http://localhost:8080/path")
+        mock_daemon = MagicMock(spec=DaemonManager)
+        ctx = _make_ctx_with_lifespan(client=mock_client, daemon_manager=mock_daemon)
+
+        res = await connect_to_annotator(ctx, "http://localhost:8080")
         assert res["status"] == "error"
         assert "Failed to connect to annotator" in res["message"]

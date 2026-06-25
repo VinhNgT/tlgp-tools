@@ -6,6 +6,8 @@ Exposes tools for screenshot annotation and .docx specification document generat
 from __future__ import annotations
 
 import json
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 from mcp.server.fastmcp import Context, FastMCP
 from tlgp_logger import get_logger
@@ -21,41 +23,39 @@ from mcp_server.services import SpecGeneratorService
 
 logger = get_logger(__name__)
 
+
 # ============================================================
-# Core Services & Clients
+# Lifespan — server-scoped dependency management
 # ============================================================
 
-_client: WorkspaceClient | None = None
-_daemon_manager: DaemonManager | None = None
-_spec_service: SpecGeneratorService | None = None
+
+@asynccontextmanager
+async def app_lifespan(server: FastMCP) -> AsyncIterator[dict]:
+    """Initialize and tear down shared services for the server's lifetime."""
+    client = WorkspaceClient()
+    try:
+        yield {
+            "client": client,
+            "daemon_manager": DaemonManager(),
+            "spec_service": SpecGeneratorService(client=client),
+        }
+    finally:
+        await client.close()
 
 
-def get_client() -> WorkspaceClient:
-    """Lazily construct and return the workspace client."""
-    global _client
-    if _client is None:
-        _client = WorkspaceClient()
-    return _client
+def _get_client(ctx: Context) -> WorkspaceClient:
+    """Retrieve the shared WorkspaceClient from the lifespan context."""
+    return ctx.request_context.lifespan_context["client"]
 
 
-def get_daemon_manager() -> DaemonManager:
-    """Lazily construct and return the daemon manager."""
-    global _daemon_manager
-    if _daemon_manager is None:
-        _daemon_manager = DaemonManager()
-    return _daemon_manager
+def _get_daemon_manager(ctx: Context) -> DaemonManager:
+    """Retrieve the shared DaemonManager from the lifespan context."""
+    return ctx.request_context.lifespan_context["daemon_manager"]
 
 
-def get_spec_service() -> SpecGeneratorService:
-    """Lazily construct and return the specification service.
-
-    Injects the shared WorkspaceClient so the service uses the correct
-    dynamic base URL for workspace exports.
-    """
-    global _spec_service
-    if _spec_service is None:
-        _spec_service = SpecGeneratorService(client=get_client())
-    return _spec_service
+def _get_spec_service(ctx: Context) -> SpecGeneratorService:
+    """Retrieve the shared SpecGeneratorService from the lifespan context."""
+    return ctx.request_context.lifespan_context["spec_service"]
 
 
 # ============================================================
@@ -64,6 +64,7 @@ def get_spec_service() -> SpecGeneratorService:
 
 mcp = FastMCP(
     "tlgp-tools",
+    lifespan=app_lifespan,
     instructions=(
         "TLGP Tools MCP server. Provides tools for annotating screenshots and compiling .docx specification documents.\n\n"
         "SYSTEM DIRECTIVES & BOUNDARIES:\n"
@@ -85,9 +86,9 @@ mcp = FastMCP(
 
 
 @mcp.resource("tlgp://workspace/state")
-async def get_workspace_state_resource() -> str:
+async def get_workspace_state_resource(ctx: Context) -> str:
     """Read-only access to the latest flat-map JSON WorkspaceState."""
-    state = await get_client().get_workspace_state()
+    state = await _get_client(ctx).get_workspace_state()
     return json.dumps(state.model_dump(mode="json"), indent=2, ensure_ascii=False)
 
 
@@ -122,6 +123,7 @@ def get_spec_example_analysis_resource() -> str:
 
 @mcp.tool()
 async def launch_annotator(
+    ctx: Context,
     path: str | None = None,
 ) -> dict:
     """Launch the TLGP Annotation Tool GUI.
@@ -136,17 +138,20 @@ async def launch_annotator(
     Returns:
         dict with annotator_ready, annotator_pid, port.
     """
-    res = await get_daemon_manager().launch_annotator(
+    client = _get_client(ctx)
+    daemon_manager = _get_daemon_manager(ctx)
+    res = await daemon_manager.launch_annotator(
         path=path,
-        client=get_client().client,
+        client=client.client,
     )
     if res.get("annotator_ready") and "port" in res:
-        get_client().base_url = f"http://127.0.0.1:{res['port']}"
+        client.base_url = f"http://127.0.0.1:{res['port']}"
     return res
 
 
 @mcp.tool()
 async def export_images(
+    ctx: Context,
     output_path: str,
 ) -> dict:
     """Export cropped component images (both raw and annotated) from the workspace screenshot to a directory.
@@ -154,7 +159,7 @@ async def export_images(
     Args:
         output_path: Absolute path to the destination directory.
     """
-    return await get_client().export_images(output_path, mode="both")
+    return await _get_client(ctx).export_images(output_path, mode="both")
 
 
 @mcp.tool()
@@ -180,7 +185,7 @@ async def generate_spec_doc(
     Returns:
         dict with valid, output_path, tables, images, warnings, errors.
     """
-    return await get_spec_service().generate(
+    return await _get_spec_service(ctx).generate(
         analysis_path=analysis_path,
         ctx=ctx,
         output_path=output_path,
@@ -189,15 +194,15 @@ async def generate_spec_doc(
 
 
 @mcp.tool()
-async def connect_to_annotator(url: str) -> dict:
+async def connect_to_annotator(ctx: Context, url: str) -> dict:
     """Connect the MCP server to a running annotator instance at the specified URL.
 
     Args:
         url: The URL of the running annotator instance (e.g. 'http://127.0.0.1:55432').
     """
-    client = get_client()
+    client = _get_client(ctx)
     client.base_url = url
-    get_daemon_manager().annotator_url = url
+    _get_daemon_manager(ctx).annotator_url = url
     try:
         is_ok = await client.check_connection()
         if is_ok:

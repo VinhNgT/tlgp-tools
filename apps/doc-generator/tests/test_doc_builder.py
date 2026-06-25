@@ -2,11 +2,11 @@ from typing import Any
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import (
+    AnalysisComponent,
     AnalysisData,
     Api,
     ApiParam,
     ChildElement,
-    Component,
     Interaction,
     Screen,
     SubDto,
@@ -67,7 +67,7 @@ class TestBuildDocumentWithComponents:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                Component(
+                AnalysisComponent(
                     id=1,
                     label="Header",
                     description="Header component",
@@ -78,7 +78,7 @@ class TestBuildDocumentWithComponents:
                         Interaction(action="Click", reaction="Go back"),
                     ],
                 ),
-                Component(
+                AnalysisComponent(
                     id=2,
                     label="Footer",
                     description="Footer component",
@@ -94,8 +94,8 @@ class TestBuildDocumentWithComponents:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                Component(id=1, label="Visible", isLeaf=False),
-                Component(id=2, label="Hidden Leaf", isLeaf=True),
+                AnalysisComponent(id=1, label="Visible", isLeaf=False),
+                AnalysisComponent(id=2, label="Hidden Leaf", isLeaf=True),
             ],
         )
         doc = build_document(analysis)
@@ -107,7 +107,7 @@ class TestBuildDocumentWithComponents:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                Component(
+                AnalysisComponent(
                     id=1,
                     label="Nav",
                     description="Nav bar",
@@ -128,7 +128,7 @@ class TestBuildDocumentWithComponents:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                Component(id=1, label="Empty", description="No children"),
+                AnalysisComponent(id=1, label="Empty", description="No children"),
             ],
         )
         doc = build_document(analysis)
@@ -263,7 +263,7 @@ class TestBuildDocumentWithApis:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                Component(
+                AnalysisComponent(
                     id=1,
                     label="Header",
                     description="Header component",
@@ -289,7 +289,7 @@ class TestBuildDocumentWithImages:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                Component(
+                AnalysisComponent(
                     id=1,
                     label="Nav",
                     description="Nav bar",
@@ -311,7 +311,7 @@ class TestBuildDocumentWithImages:
         analysis = _minimal_analysis(
             tmp_path,
             components=[
-                Component(
+                AnalysisComponent(
                     id=1,
                     label="Nav",
                     description="Nav bar",
@@ -331,7 +331,7 @@ class TestBuildDocumentSectionNumbering:
             tmp_path,
             sectionPrefix="3.2",
             components=[
-                Component(id=1, label="Header", description="H"),
+                AnalysisComponent(id=1, label="Header", description="H"),
             ],
         )
         doc = build_document(analysis)
@@ -344,9 +344,9 @@ class TestBuildDocumentSectionNumbering:
             tmp_path,
             sectionPrefix="1.1",
             components=[
-                Component(id=1, label="A", description="A"),
-                Component(id=2, label="B", description="B"),
-                Component(id=3, label="C", description="C", isLeaf=True),
+                AnalysisComponent(id=1, label="A", description="A"),
+                AnalysisComponent(id=2, label="B", description="B"),
+                AnalysisComponent(id=3, label="C", description="C", isLeaf=True),
             ],
         )
         doc = build_document(analysis)

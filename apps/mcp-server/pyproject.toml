@@ -9,7 +9,6 @@ authors = [
 requires-python = ">=3.14"
 dependencies = [
     "mcp[cli]>=1.0",
-    "doc-generator",
     "httpx>=0.27.0",
     "tlgp-logger",
     "tlgp-contracts",
@@ -20,7 +19,6 @@ mcp-server-cmd = "mcp_server.__main__:main"
 tlgp-mcp = "mcp_server.__main__:main"
 
 [tool.uv.sources]
-doc-generator = { workspace = true }
 tlgp-logger = { workspace = true }
 tlgp-contracts = { workspace = true }
 
