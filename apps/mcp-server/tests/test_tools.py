@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import io
 import json
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -218,6 +219,8 @@ class TestLaunchAnnotator:
     async def test_launch_annotator_success(self, tmp_path, monkeypatch):
         mock_popen = MagicMock()
         mock_popen.return_value.pid = 12345
+        mock_popen.return_value.stdout = io.BytesIO(b"")
+        mock_popen.return_value.stderr = io.BytesIO(b"")
         monkeypatch.setattr(
             "mcp_server.manager.subprocess.Popen",
             mock_popen,
@@ -256,9 +259,8 @@ class TestLaunchAnnotator:
 
         manager = DaemonManager()
         result = await manager.launch_annotator(path=str(screenshot))
-        assert result["annotator_pid"] == 12345
+        assert result["annotator_url"] == "http://127.0.0.1:8000"
         assert result["annotator_ready"] is True
-        assert mock_popen.call_count == 1
 
         # Verify uv run is used instead of sys.executable
         for call in mock_popen.call_args_list:

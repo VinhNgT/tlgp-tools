@@ -79,13 +79,9 @@ class WorkspaceState(BaseModel):
 class ImageExportManifest(BaseModel):
     """Schema for the mapping.json file inside workspace image export ZIPs.
 
-    When mode is 'annotated' or 'raw':
+    This represents the 'annotated' or 'raw' mode export mapping, where:
         root: path to the root image (or None)
         components: dict mapping component UUID string → archive path
-
-    When mode is 'both':
-        annotated: {root: ..., components: {...}}
-        raw: {root: ..., components: {...}}
     """
 
     root: str | None = None

@@ -6,7 +6,7 @@ import io
 import json
 import os
 import zipfile
-from typing import Literal
+from typing import Literal, TypedDict
 
 import httpx
 from tlgp_contracts import ImageExportManifest, ImageExportManifestBoth, WorkspaceState
@@ -15,6 +15,13 @@ from tlgp_logger import get_logger
 from mcp_server.exceptions import ApiClientError
 
 logger = get_logger(__name__)
+
+
+class ImageExportResult(TypedDict, total=False):
+    output_path: str
+    annotated_images: int
+    raw_images: int
+    images: int
 
 
 class WorkspaceClient:
@@ -117,7 +124,7 @@ class WorkspaceClient:
         self,
         output_path: str,
         mode: Literal["annotated", "raw", "both"] = "both",
-    ) -> dict:
+    ) -> ImageExportResult:
         """Export cropped component images from the workspace to a directory.
 
         Args:

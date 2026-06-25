@@ -6,7 +6,7 @@ import asyncio
 import json
 import shutil
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypedDict
 
 from tlgp_logger import get_logger
 
@@ -16,6 +16,22 @@ if TYPE_CHECKING:
     from mcp.server.fastmcp import Context
 
 logger = get_logger(__name__)
+
+
+class DocGenResult(TypedDict, total=False):
+    """The structured JSON output from the doc-gen CLI."""
+    valid: bool
+    errors: list[str]
+    warnings: list[str]
+    components: int
+    non_leaf: int
+    ui_elements: int
+    interactions: int
+    apis: int
+    images: int
+    discrepancies: int
+    output_path: str | None
+    tables: int | None
 
 
 class SpecGeneratorService:
@@ -39,7 +55,7 @@ class SpecGeneratorService:
         ctx: Context | None = None,
         output_path: str | None = None,
         validate_only: bool = False,
-    ) -> dict:
+    ) -> DocGenResult:
         """Validate, and optionally generate, the specification document.
 
         Delegates to the ``doc-gen`` CLI with ``--json`` for structured output.

@@ -176,7 +176,6 @@ class DaemonManager:
             logger.info("Annotator HTTP API ready.")
 
         return {
-            "annotator_pid": annotator_proc.pid,
+            "annotator_url": self.annotator_url,
             "annotator_ready": annotator_ready,
-            "port": port_num,
         }

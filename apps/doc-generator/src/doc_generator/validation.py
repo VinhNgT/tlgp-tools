@@ -6,18 +6,17 @@ image existence, content completeness warnings, discrepancy reporting.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from pydantic import BaseModel, Field
 
 from doc_generator.models import AnalysisData
 
 
-@dataclass
-class ValidationResult:
+class ValidationResult(BaseModel):
     """Structured outcome of analysis data validation."""
 
     valid: bool = True
-    errors: list[str] = field(default_factory=list)
-    warnings: list[str] = field(default_factory=list)
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
 
     # Summary statistics (populated regardless of validity)
     components: int = 0
@@ -28,20 +27,47 @@ class ValidationResult:
     images: int = 0
     discrepancies: int = 0
 
-    def to_dict(self) -> dict:
-        """Serialize to a JSON-compatible dict."""
-        return {
-            "valid": self.valid,
-            "errors": self.errors,
-            "warnings": self.warnings,
-            "components": self.components,
-            "non_leaf": self.non_leaf,
-            "ui_elements": self.ui_elements,
-            "interactions": self.interactions,
-            "apis": self.apis,
-            "images": self.images,
-            "discrepancies": self.discrepancies,
-        }
+
+class DocGenResult(BaseModel):
+    """The complete structured JSON output emitted by the doc-gen CLI."""
+
+    valid: bool = True
+    errors: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+    components: int = 0
+    non_leaf: int = 0
+    ui_elements: int = 0
+    interactions: int = 0
+    apis: int = 0
+    images: int = 0
+    discrepancies: int = 0
+
+    output_path: str | None = None
+    tables: int | None = None
+
+    @classmethod
+    def from_validation(
+        cls,
+        vr: ValidationResult,
+        output_path: str | None = None,
+        tables: int | None = None,
+    ) -> DocGenResult:
+        """Construct from a ValidationResult and generation artifacts."""
+        return cls(
+            valid=vr.valid,
+            errors=vr.errors,
+            warnings=vr.warnings,
+            components=vr.components,
+            non_leaf=vr.non_leaf,
+            ui_elements=vr.ui_elements,
+            interactions=vr.interactions,
+            apis=vr.apis,
+            images=vr.images,
+            discrepancies=vr.discrepancies,
+            output_path=output_path,
+            tables=tables,
+        )
 
 
 def validate_analysis(data: AnalysisData) -> ValidationResult:

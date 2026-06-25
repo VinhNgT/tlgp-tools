@@ -14,7 +14,7 @@ from tlgp_logger import get_logger, setup_logging
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import AnalysisData
-from doc_generator.validation import validate_analysis
+from doc_generator.validation import DocGenResult, validate_analysis
 
 logger = get_logger(__name__)
 
@@ -142,20 +142,14 @@ def _run_json_mode(
     """
     raw = _load_analysis_raw(analysis_path)
     if raw is None:
-        json.dump(
-            {"valid": False, "errors": [f"Failed to read {analysis_path}"], "warnings": []},
-            sys.stdout,
-            ensure_ascii=False,
-        )
+        result = DocGenResult(valid=False, errors=[f"Failed to read {analysis_path}"])
+        sys.stdout.write(result.model_dump_json())
         return 1
 
     parsed = _parse_analysis(raw)
     if isinstance(parsed, list):
-        json.dump(
-            {"valid": False, "errors": parsed, "warnings": []},
-            sys.stdout,
-            ensure_ascii=False,
-        )
+        result = DocGenResult(valid=False, errors=parsed)
+        sys.stdout.write(result.model_dump_json())
         return 1
 
     data: AnalysisData = parsed
@@ -164,11 +158,13 @@ def _run_json_mode(
     vr = validate_analysis(data)
 
     if not vr.valid:
-        json.dump(vr.to_dict(), sys.stdout, ensure_ascii=False)
+        result = DocGenResult.from_validation(vr)
+        sys.stdout.write(result.model_dump_json())
         return 1
 
     if validate_only:
-        json.dump(vr.to_dict(), sys.stdout, ensure_ascii=False)
+        result = DocGenResult.from_validation(vr)
+        sys.stdout.write(result.model_dump_json())
         return 0
 
     # Build document
@@ -194,11 +190,8 @@ def _run_json_mode(
     if analysis_path.resolve() != analysis_json_dest.resolve():
         shutil.copy2(analysis_path, analysis_json_dest)
 
-    result = vr.to_dict()
-    result["output_path"] = str(out)
-    result["tables"] = len(doc.tables)
-
-    json.dump(result, sys.stdout, ensure_ascii=False)
+    result = DocGenResult.from_validation(vr, output_path=str(out), tables=len(doc.tables))
+    sys.stdout.write(result.model_dump_json())
     return 0
 
 

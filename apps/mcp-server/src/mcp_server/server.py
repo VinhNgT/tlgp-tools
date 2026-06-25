@@ -136,7 +136,7 @@ async def launch_annotator(
         path: Optional path to a raw screenshot image or a previously exported .zip workspace to load.
 
     Returns:
-        dict with annotator_ready, annotator_pid, port.
+        dict with annotator_ready, annotator_url.
     """
     client = _get_client(ctx)
     daemon_manager = _get_daemon_manager(ctx)
@@ -144,8 +144,8 @@ async def launch_annotator(
         path=path,
         client=client.client,
     )
-    if res.get("annotator_ready") and "port" in res:
-        client.base_url = f"http://127.0.0.1:{res['port']}"
+    if res.get("annotator_ready") and "annotator_url" in res:
+        client.base_url = res["annotator_url"]
     return res
 
 
@@ -209,22 +209,28 @@ async def connect_to_annotator(ctx: Context, url: str) -> dict:
             result: dict = {
                 "status": "success",
                 "message": f"Successfully connected to the annotator instance at {url}",
+                "screen_name": None,
+                "components": 0,
             }
             # Fetch workspace summary as debug info
             try:
                 state = await client.get_workspace_state()
-                result["screen_name"] = state.screen.name or "(unnamed)"
+                result["screen_name"] = state.screen.name or None
                 result["components"] = len(state.components)
             except Exception:
-                pass
+                logger.warning("Connected but failed to fetch workspace summary", exc_info=True)
             return result
         else:
             return {
                 "status": "error",
                 "message": f"Failed to connect to annotator at {url}: health check failed",
+                "screen_name": None,
+                "components": 0,
             }
     except Exception as e:
         return {
             "status": "error",
             "message": f"Failed to connect to annotator at {url}: {e}",
+            "screen_name": None,
+            "components": 0,
         }
