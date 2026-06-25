@@ -570,8 +570,8 @@ class AppController:
 
         items.append(
             {
-                "label": "Focus Target",
-                "command": self.view.canvas.zoom_focus_target,
+                "label": "Fit to Screen (F)",
+                "command": self.view.canvas.fit_to_screen,
             }
         )
         items.append(

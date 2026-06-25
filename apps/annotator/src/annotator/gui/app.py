@@ -194,6 +194,7 @@ class MainAppWindow(QMainWindow):
     def _build_menu_bar(self):
         menubar = self.menuBar()
 
+        # 1. File Menu
         file_menu = menubar.addMenu("&File")
 
         act_import_zip = QAction("Import Workspace (.zip)", self)
@@ -226,21 +227,12 @@ class MainAppWindow(QMainWindow):
 
         file_menu.addSeparator()
 
-        self.act_screen_info = QAction("Screen Info…", self)
-        self.act_screen_info.setEnabled(False)
-        self.act_screen_info.triggered.connect(
-            lambda: self._fire(self.callbacks.on_open_screen_info_request)
-        )
-        file_menu.addAction(self.act_screen_info)
+        act_quit = QAction("Quit", self)
+        act_quit.setShortcut(QKeySequence("Ctrl+Q"))
+        act_quit.triggered.connect(self.close)
+        file_menu.addAction(act_quit)
 
-        self.act_cuts = QAction("Edit Cut Lines…", self)
-        self.act_cuts.setShortcut(QKeySequence("Ctrl+L"))
-        self.act_cuts.setEnabled(False)
-        self.act_cuts.triggered.connect(
-            lambda: self._fire(self.callbacks.on_open_cut_editor_request)
-        )
-        file_menu.addAction(self.act_cuts)
-
+        # 2. Edit Menu
         edit_menu = menubar.addMenu("&Edit")
 
         self.act_undo = QAction("Undo", self)
@@ -269,31 +261,62 @@ class MainAppWindow(QMainWindow):
         )
         edit_menu.addAction(self.act_delete)
 
-        api_menu = menubar.addMenu("&API")
+        # 3. View Menu
+        view_menu = menubar.addMenu("&View")
 
-        act_swagger = QAction("Open Swagger API Docs (FastAPI)", self)
+        self.act_fit = QAction("Fit to Screen", self)
+        self.act_fit.setShortcut(QKeySequence("F"))
+        self.act_fit.setEnabled(False)
+        self.act_fit.triggered.connect(lambda: self.canvas.fit_to_screen())
+        view_menu.addAction(self.act_fit)
+
+
+        view_menu.addSeparator()
+
+        self.act_toggle_labels = QAction("Toggle Labels", self)
+        self.act_toggle_labels.setShortcut(QKeySequence("T"))
+        self.act_toggle_labels.setEnabled(False)
+        self.act_toggle_labels.triggered.connect(
+            lambda: self._toggle_labels_action()
+        )
+        view_menu.addAction(self.act_toggle_labels)
+
+        # 4. Tools Menu
+        tools_menu = menubar.addMenu("&Tools")
+
+        self.act_cuts = QAction("Edit Cut Lines…", self)
+        self.act_cuts.setShortcut(QKeySequence("Ctrl+L"))
+        self.act_cuts.setEnabled(False)
+        self.act_cuts.triggered.connect(
+            lambda: self._fire(self.callbacks.on_open_cut_editor_request)
+        )
+        tools_menu.addAction(self.act_cuts)
+
+        self.act_screen_info = QAction("Screen Info…", self)
+        self.act_screen_info.setEnabled(False)
+        self.act_screen_info.triggered.connect(
+            lambda: self._fire(self.callbacks.on_open_screen_info_request)
+        )
+        tools_menu.addAction(self.act_screen_info)
+
+        # 5. Developer Menu
+        dev_menu = menubar.addMenu("&Developer")
+
+        act_swagger = QAction("Open API Docs (Swagger)", self)
         act_swagger.triggered.connect(
             lambda: QDesktopServices.openUrl(QUrl(f"{self.api_url}/docs"))
         )
-        api_menu.addAction(act_swagger)
+        dev_menu.addAction(act_swagger)
 
-        act_redoc = QAction("Open Redoc API Docs", self)
-        act_redoc.triggered.connect(
-            lambda: QDesktopServices.openUrl(QUrl(f"{self.api_url}/redoc"))
-        )
-        api_menu.addAction(act_redoc)
+        act_json_state = QAction("View Workspace JSON State", self)
+        act_json_state.triggered.connect(self._show_json_state)
+        dev_menu.addAction(act_json_state)
 
-        api_menu.addSeparator()
+        dev_menu.addSeparator()
 
         act_copy_url = QAction("Copy API Base URL", self)
         act_copy_url.triggered.connect(lambda: self._copy_api_url("#copy"))
-        api_menu.addAction(act_copy_url)
-
-        act_json_state = QAction("View Workspace API JSON State", self)
-        act_json_state.triggered.connect(
-            lambda: QDesktopServices.openUrl(QUrl(f"{self.api_url}/workspace/state"))
-        )
-        api_menu.addAction(act_json_state)
+        dev_menu.addAction(act_copy_url)
 
     def _build_toolbar(self):
         tb = QToolBar("Main Toolbar")
@@ -458,6 +481,9 @@ class MainAppWindow(QMainWindow):
         self.act_undo.setEnabled(has_img)
         self.act_redo.setEnabled(has_img)
         self.act_delete.setEnabled(has_img)
+        self.act_fit.setEnabled(has_img)
+
+        self.act_toggle_labels.setEnabled(has_img)
 
     def set_mode_str(self, mode: str):
         """Update toolbar mode buttons to match the given mode."""
@@ -562,6 +588,36 @@ class MainAppWindow(QMainWindow):
             # Show a popup bubble at the mouse cursor position
             QToolTip.showText(QCursor.pos(), "Copied!", self.lbl_workspace_id)
 
+    def _show_json_state(self):
+        import urllib.request
+        import json
+        from PySide6.QtWidgets import QDialog, QVBoxLayout, QTextEdit
+
+        try:
+            req = urllib.request.Request(f"{self.api_url}/workspace/state")
+            with urllib.request.urlopen(req) as response:
+                data = json.loads(response.read().decode())
+                formatted_json = json.dumps(data, indent=2)
+        except Exception as e:
+            formatted_json = f"Failed to fetch JSON state:\n{e}"
+
+        dialog = QDialog(self, Qt.WindowType.Tool)
+        dialog.setAttribute(Qt.WidgetAttribute.WA_DeleteOnClose)
+        dialog.setWindowTitle("Workspace JSON State")
+        dialog.resize(600, 600)
+
+        layout = QVBoxLayout(dialog)
+        text_edit = QTextEdit()
+        text_edit.setReadOnly(True)
+        text_edit.setPlainText(formatted_json)
+
+        font = text_edit.font()
+        font.setFamily("Courier")
+        text_edit.setFont(font)
+
+        layout.addWidget(text_edit)
+        dialog.show()
+
     def update_breadcrumbs(self, breadcrumbs: list[str]):
         if breadcrumbs:
             path = " › ".join(["Root", *breadcrumbs])
@@ -649,10 +705,7 @@ class MainAppWindow(QMainWindow):
 
         # Canvas shortcuts
         if key == Qt.Key.Key_F:
-            if mods & Qt.KeyboardModifier.ShiftModifier:
-                self.canvas.zoom_focus_target()
-            else:
-                self.canvas.fit_to_screen()
+            self.canvas.fit_to_screen()
             return
         if key == Qt.Key.Key_T:
             self.canvas.toggle_labels_visibility()
@@ -686,6 +739,11 @@ class MainAppWindow(QMainWindow):
     def _on_show_labels_toggled(self, checked: bool):
         if self.canvas.show_labels != checked:
             self.canvas.toggle_labels_visibility()
+
+    def _toggle_labels_action(self):
+        self.canvas.toggle_labels_visibility()
+        if hasattr(self, "chk_show_labels"):
+            self.chk_show_labels.setChecked(self.canvas.show_labels)
 
     @staticmethod
     def _fire(callback):

@@ -324,7 +324,7 @@ def test_ctrl_mouse_drag_marquee_select(qapp):
     assert not canvas.gestures.has_temp_rect
 
 
-def test_zoom_focus_target_with_cuts(qapp):
+def test_fit_to_screen_with_cuts(qapp):
     ws = WorkspaceManager()
     ws.import_image(create_test_image(800, 600))
     ws.update_cut_lines([150])  # Adds a cut line at y = 150
@@ -351,7 +351,7 @@ def test_zoom_focus_target_with_cuts(qapp):
 
     canvas.callbacks.on_viewport_change_request = on_viewport_change
 
-    canvas.zoom_focus_target()
+    canvas.fit_to_screen()
 
     assert len(viewport_changes) == 1
     zoom, (pan_x, pan_y) = viewport_changes[0]

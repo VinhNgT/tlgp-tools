@@ -346,32 +346,6 @@ class AnnotationCanvasView(QWidget):
         if self.callbacks.on_drill_out:
             self.callbacks.on_drill_out()
 
-    def zoom_focus_target(self):
-        """Zoom and pan to focus on the selected component."""
-        self.gestures.state.ignore_momentum = True
-        ws = self.workspace_state
-        ctx = self.make_viewport_ctx()
-        if not ws or not self.selected_component_ids:
-            self.fit_to_screen()
-            return
-        comp = ws.components.get(self.selected_component_ids[-1])
-        if not comp:
-            self.fit_to_screen()
-            return
-
-        vw, vh = self.width(), self.height()
-        new_zoom, pad_x, pad_y = ViewportCalculator.calculate_fit(
-            vw,
-            vh,
-            comp,
-            self.full_pil_img.width if self.full_pil_img else 0,
-            self.full_pil_img.height if self.full_pil_img else 0,
-            ctx,
-            self.transformer,
-        )
-
-        if self.callbacks.on_viewport_change_request:
-            self.callbacks.on_viewport_change_request(new_zoom, (pad_x, pad_y))
 
     def toggle_labels_visibility(self):
         """Toggle rendering of annotation labels."""
