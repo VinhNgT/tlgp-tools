@@ -675,11 +675,11 @@ class WorkspaceManager:
                 def get_export_nodes() -> Generator[ExportNode]:
                     # Yield root node(s) — split by cut lines into segments
                     root_children = TreeUtils.get_children(state_snapshot, None)
-                    root_base = (
-                        state_snapshot.image.filename.rsplit(".", 1)[0]
-                        if state_snapshot.image.filename
-                        else "root"
-                    )
+                    if state_snapshot.image.filename:
+                        base_filename = state_snapshot.image.filename.replace('\\', '/').split('/')[-1]
+                        root_base = base_filename.rsplit(".", 1)[0]
+                    else:
+                        root_base = "root"
                     img_w = state_snapshot.image.width
                     img_h = state_snapshot.image.height
                     cuts = sorted(state_snapshot.cutLines)

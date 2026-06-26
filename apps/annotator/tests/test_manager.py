@@ -437,6 +437,22 @@ class TestExportImages:
                 name.startswith("raw/") and "Child_Box" in name for name in names
             )
 
+    def test_export_images_strips_path_from_root_segments(self):
+        ws = _workspace_with_image(800, 600)
+        # Manually force the filename to look like a full path
+        ws.mutate(lambda s: setattr(s.image, "filename", "C:\\Users\\Bob\\My File.png"))
+        zip_bytes = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            # The name should start with root_, and should not contain \\ or /
+            root_images = [n for n in names if n.startswith("root_")]
+            assert len(root_images) == 1
+            assert "C:" not in root_images[0]
+            assert "Users" not in root_images[0]
+            assert "\\" not in root_images[0]
+            assert "/" not in root_images[0]
+            assert "My File" in root_images[0]
+
     def test_export_images_with_single_cut_line_splits_root(self):
         ws = _workspace_with_image(800, 600)
         upper_id = uuid.uuid4()

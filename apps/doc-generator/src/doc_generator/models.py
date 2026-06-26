@@ -60,6 +60,29 @@ class Api(BaseModel):
     responseDescription: str = ""
     subDtos: list[SubDto] = []
 
+    @field_validator("number")
+    @classmethod
+    def validate_number(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError(f"API number must be >= 1, got {v}")
+        return v
+
+    @field_validator("method")
+    @classmethod
+    def validate_method(cls, v: str) -> str:
+        v = v.strip().upper()
+        allowed = {"GET", "POST", "PUT", "DELETE", "PATCH"}
+        if v not in allowed:
+            raise ValueError(f"API method must be one of {allowed}, got '{v}'")
+        return v
+
+    @field_validator("url")
+    @classmethod
+    def validate_url(cls, v: str) -> str:
+        if not v.startswith("/"):
+            raise ValueError(f"API url must start with '/', got '{v}'")
+        return v
+
 
 class AnalysisComponent(BaseModel):
     """A non-leaf or leaf annotated component."""
@@ -74,11 +97,16 @@ class AnalysisComponent(BaseModel):
     apis: list[Api] = []
 
     @model_validator(mode="after")
-    def validate_leaf_apis(self) -> AnalysisComponent:
-        if self.isLeaf and self.apis:
-            raise ValueError(
-                f"Component '{self.label}' (id={self.id}) is a leaf component and cannot have API documentation."
-            )
+    def validate_leaf_constraints(self) -> AnalysisComponent:
+        if self.isLeaf:
+            if self.apis:
+                raise ValueError(
+                    f"Component '{self.label}' (id={self.id}) is a leaf component and cannot have API documentation."
+                )
+            if self.children:
+                raise ValueError(
+                    f"Component '{self.label}' (id={self.id}) is a leaf component and cannot have children."
+                )
         return self
 
 
@@ -120,9 +148,10 @@ class AnalysisData(BaseModel):
         return res
 
     @model_validator(mode="after")
-    def validate_unique_apis(self) -> AnalysisData:
+    def validate_uniqueness_constraints(self) -> AnalysisData:
         api_numbers: dict[int, list[str]] = {}
         api_endpoints: dict[tuple[str, str], list[str]] = {}
+        component_ids: dict[int, list[str]] = {}
 
         def add_api(api: Api, owner: str):
             api_numbers.setdefault(api.number, []).append(owner)
@@ -133,12 +162,19 @@ class AnalysisData(BaseModel):
         for api in self.screen.apis:
             add_api(api, f"Screen '{self.screen.name}'")
 
-        # Component APIs
+        # Component APIs and IDs
         for comp in self.components:
+            component_ids.setdefault(comp.id, []).append(comp.label)
             for api in comp.apis:
                 add_api(api, f"Component '{comp.label}' (id={comp.id})")
 
         errors = []
+        for comp_id, labels in component_ids.items():
+            if len(labels) > 1:
+                errors.append(
+                    f"Component ID {comp_id} is duplicated across components: {', '.join(labels)}"
+                )
+
         for num, owners in api_numbers.items():
             if len(owners) > 1:
                 errors.append(

@@ -80,7 +80,7 @@ class IOCommandHandler:
 
         def do_import():
             with open(path, "rb") as f:
-                self.workspace.import_image(f.read(), path)
+                self.workspace.import_image(f.read(), os.path.basename(path))
 
         future = self._io_pool.submit(do_import)
         future.add_done_callback(
