@@ -3,7 +3,7 @@
 from collections.abc import Generator
 from uuid import UUID
 
-from .core import Component, WorkspaceState
+from .workspace import Component, WorkspaceState
 
 
 class TreeUtils:

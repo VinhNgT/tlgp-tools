@@ -5,7 +5,7 @@ import uuid
 import pydantic
 import pytest
 from annotator.models import Bounds, Component, Style, WorkspaceState
-from annotator.models.tree import TreeUtils
+from tlgp_contracts import TreeUtils
 
 # ── Bounds ─────────────────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ from typing import Any, Literal, TypedDict
 
 import jsonpatch
 from PIL import Image
+from tlgp_contracts import TreeUtils
 
 from annotator.models import (
     Bounds,
@@ -20,7 +21,6 @@ from annotator.models import (
     Style,
     WorkspaceState,
 )
-from annotator.models.tree import TreeUtils
 from annotator.rendering import paint_annotations
 
 from .errors import (

@@ -1,5 +1,6 @@
 """TLGP Contracts — shared Pydantic schemas defining module boundaries."""
 
+from .tree import TreeUtils
 from .workspace import (
     Bounds,
     Component,
@@ -21,5 +22,6 @@ __all__ = [
     "PillCorner",
     "ScreenInfo",
     "Style",
+    "TreeUtils",
     "WorkspaceState",
 ]

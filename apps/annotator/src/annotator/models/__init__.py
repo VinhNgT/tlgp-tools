@@ -9,7 +9,6 @@ from .core import (
     Style,
     WorkspaceState,
 )
-from .tree import TreeUtils
 
 __all__ = [
     "Bounds",
@@ -18,6 +17,5 @@ __all__ = [
     "PillCorner",
     "ScreenInfo",
     "Style",
-    "TreeUtils",
     "WorkspaceState",
 ]
