@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from mcp_server.prompts import get_spec_workflow, get_strict_guidelines
+from mcp_server.prompts import get_spec_workflow
 
 SPEC_WORKFLOW_CONTENT = ""
 
@@ -22,7 +22,7 @@ class TestSpecWorkflowContent:
     def test_references_current_tools(self):
         tools = [
             "launch_annotator",
-            "export_images",
+            "prepare_analysis",
             "generate_spec_doc",
         ]
         for tool in tools:
@@ -31,12 +31,12 @@ class TestSpecWorkflowContent:
     def test_does_not_reference_old_tools(self):
         old_tools = [
             "export_workspace",
-            "prepare_analysis",
+            "export_images",
+            "scaffold_analysis",
             "update_analysis",
             "finalize",
             "list_exports",
             "parse_annotations",
-            "scaffold_analysis",
             "validate_analysis",
             "generate_docx",
             "get_workspace_state",
@@ -58,20 +58,28 @@ class TestSpecWorkflowContent:
         assert "Step 2" in SPEC_WORKFLOW_CONTENT
         assert "Step 3" in SPEC_WORKFLOW_CONTENT
         assert "Step 4" in SPEC_WORKFLOW_CONTENT
-        assert "Step 5" in SPEC_WORKFLOW_CONTENT
+        assert "Step 4" in SPEC_WORKFLOW_CONTENT
 
-    def test_no_more_than_5_steps(self):
-        assert "Step 6" not in SPEC_WORKFLOW_CONTENT
+    def test_no_more_than_4_steps(self):
+        assert "Step 5" not in SPEC_WORKFLOW_CONTENT
 
     def test_includes_resource_references(self):
         resources = [
             "tlgp://spec/classification-guide",
-            "tlgp://spec/schema",
             "tlgp://spec/example-analysis",
-            "tlgp://workspace/state",
         ]
         for res in resources:
             assert res in SPEC_WORKFLOW_CONTENT, f"Missing resource reference: {res}"
+
+    def test_does_not_reference_deleted_resources(self):
+        deleted = [
+            "tlgp://spec/schema",
+            "tlgp://workspace/state",
+        ]
+        for res in deleted:
+            assert res not in SPEC_WORKFLOW_CONTENT, (
+                f"Deleted resource still referenced: {res}"
+            )
 
     def test_vietnamese_language_rule(self):
         assert "Vietnamese" in SPEC_WORKFLOW_CONTENT
@@ -80,57 +88,56 @@ class TestSpecWorkflowContent:
         assert "validate_only" in SPEC_WORKFLOW_CONTENT
 
     def test_export_images_documented(self):
-        assert "export_images" in SPEC_WORKFLOW_CONTENT
-        # Updated to match the new annotated/ and raw/ subdirectory terminology
-        assert "raw/" in SPEC_WORKFLOW_CONTENT
         assert "annotated/" in SPEC_WORKFLOW_CONTENT
+        assert "raw/" in SPEC_WORKFLOW_CONTENT
 
-    def test_guidelines_not_duplicated_in_workflow(self):
-        """Guidelines are delivered via MCP server instructions, not duplicated here."""
-        assert "Vietnamese Translation Rule" not in SPEC_WORKFLOW_CONTENT
-        assert "Strict Read-Only Mode" not in SPEC_WORKFLOW_CONTENT
-        assert "DFS Document Ordering" not in SPEC_WORKFLOW_CONTENT
+    def test_rules_section_exists(self):
+        """Behavioral rules are now inline in the workflow, not a separate file."""
+        assert "## Rules" in SPEC_WORKFLOW_CONTENT
+        assert "Vietnamese" in SPEC_WORKFLOW_CONTENT
+        assert "Vision-Derived Naming" in SPEC_WORKFLOW_CONTENT
 
     def test_no_external_service_references(self):
         assert "createDocument" not in SPEC_WORKFLOW_CONTENT
         assert "insertTable" not in SPEC_WORKFLOW_CONTENT
 
     def test_no_stale_download_parameters(self):
-        """Verify old show_root_children/show_component_children params are gone."""
         assert "show_root_children" not in SPEC_WORKFLOW_CONTENT
         assert "show_component_children" not in SPEC_WORKFLOW_CONTENT
 
-    def test_vision_derived_naming_referenced(self):
-        """Step 4 references Guideline 12 for vision-derived naming."""
-        assert "Guideline 12" in SPEC_WORKFLOW_CONTENT
-        assert "bounding box" in SPEC_WORKFLOW_CONTENT.lower()
-
-    def test_explicit_mapping_instructions(self):
-        """Workflow must explain UUID-to-integer mapping and mapping.json for cheap agents."""
-        assert "mapping.json" in SPEC_WORKFLOW_CONTENT
-        assert "sequential integer" in SPEC_WORKFLOW_CONTENT.lower()
+    def test_prepare_step_documented(self):
+        """Step 2 must reference the prepare_analysis tool."""
+        assert "prepare_analysis" in SPEC_WORKFLOW_CONTENT
         assert "imageDir" in SPEC_WORKFLOW_CONTENT
         assert "topLevelChildren" in SPEC_WORKFLOW_CONTENT
 
 
-class TestStrictGuidelines:
-    def test_content_is_nonempty(self):
-        content = get_strict_guidelines()
-        assert isinstance(content, str)
-        assert len(content) > 100
-        assert "Vietnamese Translation Rule" in content
-        assert "Strict Read-Only Mode" in content
-        assert "DFS Document Ordering" in content
-        assert "Annotated vs Raw" in content
-        assert "Leaf Components" in content
+class TestExampleAnalysisValidation:
+    def test_example_analysis_passes_validation(self, tmp_path):
+        import json
+        from mcp_server.prompts import _read
+        from doc_generator.models import AnalysisData
+        from doc_generator.validation import validate_analysis
 
-    def test_no_stale_download_parameters(self):
-        content = get_strict_guidelines()
-        assert "show_root_children" not in content
-        assert "show_component_children" not in content
+        # Read the raw JSON
+        raw_json = _read("example_analysis.json")
+        data_dict = json.loads(raw_json)
 
-    def test_vision_derived_naming_guideline(self):
-        content = get_strict_guidelines()
-        assert "Vision-Derived Naming" in content
-        assert "suggestions only" in content.lower()
-        assert "bounding box" in content.lower()
+        # Override imageDir and create files
+        data_dict["imageDir"] = str(tmp_path)
+        
+        annotated_dir = tmp_path / "annotated"
+        annotated_dir.mkdir()
+        (annotated_dir / "root_screenshot.png").touch()
+        (annotated_dir / "1_Thanh_tiêu_đề_a1b2c3d4.png").touch()
+        (annotated_dir / "3_Khối_chọn_thuộc_tính_c5d6e7f8.png").touch()
+
+        analysis_data = AnalysisData(**data_dict)
+        result = validate_analysis(analysis_data)
+
+        # Assert validation is successful with zero errors, expecting only discrepancy warnings
+        assert result.valid is True
+        assert len(result.errors) == 0
+        other_warnings = [w for w in result.warnings if "Discrepancy at" not in w]
+        assert len(other_warnings) == 0, f"Unexpected warnings found: {other_warnings}"
+

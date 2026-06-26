@@ -11,7 +11,6 @@ from mcp_server.server import (
     _lifespan_state,
     get_spec_classification_guide_resource,
     get_spec_example_analysis_resource,
-    get_spec_schema_resource,
     get_workspace_state_resource,
 )
 from tlgp_contracts import WorkspaceState
@@ -32,11 +31,6 @@ class TestMcpResources:
             mock_client.get_workspace_state.assert_called_once()
         finally:
             _lifespan_state.client = None
-
-    def test_get_spec_schema_resource(self):
-        result = get_spec_schema_resource()
-        assert "Schema Reference" in result
-        assert "imageDir" in result
 
     def test_get_spec_classification_guide_resource(self):
         result = get_spec_classification_guide_resource()

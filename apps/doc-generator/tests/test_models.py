@@ -295,7 +295,7 @@ class TestAnalysisData:
                         id=1,
                         label="Comp",
                         isLeaf=False,
-                        apis=[Api(number=2, method="get", title="Y", url=" /x ")],
+                        apis=[Api(number=2, method="get", title="Y", url="/x")],
                     )
                 ],
             )

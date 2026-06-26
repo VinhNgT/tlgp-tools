@@ -14,15 +14,14 @@ from mcp.server.fastmcp import Context, FastMCP
 from tlgp_contracts import DocGenResult
 from tlgp_logger import get_logger
 
-from mcp_server.client import ImageExportResult, WorkspaceClient
+from mcp_server.client import WorkspaceClient
 from mcp_server.manager import DaemonManager
 from mcp_server.prompts import (
     get_classification_guide,
     get_example_analysis,
-    get_schema_reference,
     get_spec_workflow,
-    get_strict_guidelines,
 )
+from mcp_server.scaffold import PrepareAnalysisResult, scaffold_and_save
 from mcp_server.services import SpecGeneratorService
 
 logger = get_logger(__name__)
@@ -98,11 +97,9 @@ mcp = FastMCP(
     instructions=(
         "TLGP Tools MCP server. Provides tools for annotating screenshots "
         "and compiling .docx specification documents.\n\n"
-        "SYSTEM DIRECTIVES & BOUNDARIES:\n"
-        f"{get_strict_guidelines()}\n\n"
         "WORKFLOW:\n"
         "You MUST read the resource 'tlgp://spec/workflow' before starting any work. "
-        "It contains the complete step-by-step instructions."
+        "It contains the complete step-by-step instructions and rules."
     ),
 )
 
@@ -126,12 +123,6 @@ async def get_workspace_state_resource() -> str:
 def get_spec_workflow_resource() -> str:
     """End-to-end workflow guide for creating specification documents."""
     return get_spec_workflow()
-
-
-@mcp.resource("tlgp://spec/schema")
-def get_spec_schema_resource() -> str:
-    """Field-level reference for the analysis.json structure."""
-    return get_schema_reference()
 
 
 @mcp.resource("tlgp://spec/classification-guide")
@@ -180,19 +171,45 @@ async def launch_annotator(
 
 
 @mcp.tool()
-async def export_images(
+async def prepare_analysis(
     ctx: Context,
     output_path: str,
-) -> ImageExportResult:
-    """Export cropped component images (both raw and annotated) from the workspace screenshot to a directory.
+    section_prefix: str = "1.1",
+) -> PrepareAnalysisResult:
+    """Export images and scaffold analysis.json in one step.
+
+    Call this after the user finishes annotating. It:
+    1. Exports cropped component images (both annotated and raw) from the workspace
+    2. Reads the workspace state and mapping.json to auto-generate the structural
+       skeleton of analysis.json (component hierarchy, DFS ordering, image paths,
+       isLeaf flags, cross-references)
+    3. Saves analysis.json to the output directory with TODO placeholders for
+       semantic fields (Vietnamese labels, descriptions, interactions, APIs)
 
     Args:
-        output_path: Absolute path to the destination directory.
+        output_path: Absolute path to the destination directory for exported images and analysis.json.
+        section_prefix: Section number prefix for component headings in the generated document (default "1.1").
 
     Returns:
-        dict with output_path, segment/image counts, and root_images (list of filenames of the exported root segments).
+        dict with analysis_path, component count, screen name, and image export summary.
     """
-    return await _get_client(ctx).export_images(output_path, mode="both")
+    client = _get_client(ctx)
+
+    # Step 1: Export images
+    export_result = await client.export_images(output_path, mode="both")
+
+    # Step 2: Scaffold analysis.json from workspace state + exported mapping
+    state = await client.get_workspace_state()
+    scaffold_result = scaffold_and_save(state, export_result.output_path, section_prefix)
+
+    return PrepareAnalysisResult(
+        analysis_path=scaffold_result.analysis_path,
+        export_path=export_result.output_path,
+        components=scaffold_result.components,
+        screen_name=scaffold_result.screen_name,
+        annotated_images=export_result.annotated_images,
+        raw_images=export_result.raw_images,
+    )
 
 
 @mcp.tool()
@@ -207,7 +224,7 @@ async def generate_spec_doc(
     CRITICAL REQUIREMENTS:
     1. Vietnamese Translation: All component labels, descriptions, and outputs inside the analysis payload must be written in Vietnamese.
     2. Strict Validation Workflow: Always run `generate_spec_doc(validate_only=True)` first to validate the payload structure and component images. Address any warnings or errors before proceeding to document generation with `validate_only=False`.
-    3. Guidelines: Read resources `tlgp://spec/classification-guide` and `tlgp://spec/schema` before preparing the payload.
+    3. Guidelines: Read the resource `tlgp://spec/workflow` for the complete workflow instructions.
     4. Output Location: When generating the document (validate_only=False), the analysis JSON payload is always saved as `analysis.json` in the same directory as the generated `.docx` file.
 
     Args:

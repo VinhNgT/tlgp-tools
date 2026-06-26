@@ -16,19 +16,9 @@ def _read(filename: str) -> str:
     return (_PROMPT_DIR / filename).read_text(encoding="utf-8").strip()
 
 
-def get_strict_guidelines() -> str:
-    """Strict behavioral rules for the AI agent (embedded in server instructions)."""
-    return _read("strict_guidelines.md")
-
-
 def get_spec_workflow() -> str:
     """Step-by-step workflow for creating specification documents."""
     return _read("spec_workflow.md")
-
-
-def get_schema_reference() -> str:
-    """Field-level reference for the analysis.json structure."""
-    return _read("schema_reference.md")
 
 
 def get_classification_guide() -> str:
