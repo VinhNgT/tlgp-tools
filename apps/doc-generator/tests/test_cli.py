@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 from doc_generator.cli import main
+from PIL import Image
 
 
 class TestCliHelp:
@@ -58,7 +59,6 @@ class TestCliValidation:
 
 class TestCliDryRun:
     def test_dry_run_prints_summary(self, tmp_path, capsys):
-        from PIL import Image
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
@@ -85,7 +85,6 @@ class TestCliDryRun:
 
 class TestCliGeneration:
     def test_generates_docx(self, tmp_path):
-        from PIL import Image
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
@@ -109,7 +108,6 @@ class TestCliGeneration:
         assert output_path.stat().st_size > 0
 
     def test_default_output_name(self, tmp_path):
-        from PIL import Image
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
@@ -131,7 +129,6 @@ class TestCliGeneration:
         assert expected.exists()
 
     def test_permission_error_standard_mode(self, tmp_path):
-        from PIL import Image
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
@@ -155,7 +152,6 @@ class TestCliGeneration:
                 assert exc.value.code == 1
 
     def test_permission_error_json_mode(self, tmp_path, capsys):
-        from PIL import Image
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
@@ -199,7 +195,6 @@ class TestCliImageWarnings:
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
 
         with patch("sys.argv", ["doc-gen", str(json_path)]):
-            import pytest
             with pytest.raises(SystemExit) as exc_info:
                 main()
             assert exc_info.value.code == 1

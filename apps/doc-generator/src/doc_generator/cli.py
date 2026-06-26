@@ -10,12 +10,12 @@ import sys
 from pathlib import Path
 
 from pydantic import ValidationError
+from tlgp_contracts import DocGenResult
 from tlgp_logger import get_logger, setup_logging
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import AnalysisData
 from doc_generator.validation import validate_analysis
-from tlgp_contracts import DocGenResult
 
 logger = get_logger(__name__)
 

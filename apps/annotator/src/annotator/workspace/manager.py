@@ -683,7 +683,7 @@ class WorkspaceManager:
                     img_w = state_snapshot.image.width
                     img_h = state_snapshot.image.height
                     cuts = sorted(state_snapshot.cutLines)
-                    boundaries = [0] + cuts + [img_h]
+                    boundaries = [0, *cuts, img_h]
                     segments = [
                         (boundaries[i], boundaries[i + 1])
                         for i in range(len(boundaries) - 1)

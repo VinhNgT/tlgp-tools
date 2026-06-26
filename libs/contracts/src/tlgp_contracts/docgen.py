@@ -1,5 +1,6 @@
 from pydantic import BaseModel, Field
 
+
 class DocGenResult(BaseModel):
     """The structured JSON output emitted by the doc-gen CLI and consumed by the MCP Server."""
 

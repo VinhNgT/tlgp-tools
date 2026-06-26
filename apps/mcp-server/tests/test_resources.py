@@ -8,11 +8,11 @@ from uuid import uuid4
 import pytest
 from mcp_server.client import WorkspaceClient
 from mcp_server.server import (
+    _lifespan_state,
     get_spec_classification_guide_resource,
     get_spec_example_analysis_resource,
     get_spec_schema_resource,
     get_workspace_state_resource,
-    _lifespan_state,
 )
 from tlgp_contracts import WorkspaceState
 

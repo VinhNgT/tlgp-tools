@@ -12,6 +12,7 @@ import inspect
 
 from doc_generator import models as docgen_models
 from mcp_server.prompts import get_schema_reference
+from pydantic import BaseModel
 
 # Models to check and their expected section headers in the markdown
 _MODEL_SECTION_MAP: dict[type, str] = {
@@ -37,7 +38,8 @@ def test_all_model_classes_have_schema_sections():
     model_classes = [
         cls
         for _, cls in inspect.getmembers(docgen_models, inspect.isclass)
-        if issubclass(cls, docgen_models.AnalysisData.__class__.__bases__[0])
+        if issubclass(cls, BaseModel)
+        and cls is not BaseModel
         and cls.__module__ == docgen_models.__name__
     ]
 

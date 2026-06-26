@@ -6,6 +6,7 @@ from doc_generator.models import (
     Api,
     ChildElement,
     Discrepancy,
+    Interaction,
     Screen,
 )
 from doc_generator.validation import validate_analysis
@@ -85,8 +86,8 @@ class TestValidateAnalysis:
             tmp_path,
             components=[
                 AnalysisComponent(
-                    id=1, 
-                    label="Comp 1", 
+                    id=1,
+                    label="Comp 1",
                     description="",
                     imageFile="comp.png",
                     children=[ChildElement(stt=1, label="B", controlType="B")]
@@ -105,8 +106,8 @@ class TestValidateAnalysis:
             tmp_path,
             components=[
                 AnalysisComponent(
-                    id=1, 
-                    label="Comp 1", 
+                    id=1,
+                    label="Comp 1",
                     description="desc",
                     imageFile="comp.png",
                     children=[]
@@ -224,9 +225,9 @@ class TestValidateAnalysis:
             tmp_path,
             components=[
                 AnalysisComponent(
-                    id=1, 
-                    label="Comp 1", 
-                    description="desc", 
+                    id=1,
+                    label="Comp 1",
+                    description="desc",
                     imageFile=None,
                     children=[ChildElement(stt=1, label="B", controlType="B")]
                 )
@@ -241,7 +242,6 @@ class TestValidateAnalysis:
         (tmp_path / "screen.png").touch()
         analysis = _minimal_analysis(tmp_path)
         # Add 1 screen interaction and 1 screen child
-        from doc_generator.models import Interaction, ChildElement
         analysis.screen.interactions.append(Interaction(
             action="click",
             reaction="navigate"

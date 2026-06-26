@@ -4,13 +4,11 @@ from __future__ import annotations
 
 import asyncio
 import json
-import shutil
 import sys
 from pathlib import Path
 from typing import TYPE_CHECKING
 
 from tlgp_contracts import DocGenResult
-
 from tlgp_logger import get_logger
 
 from mcp_server.client import WorkspaceClient

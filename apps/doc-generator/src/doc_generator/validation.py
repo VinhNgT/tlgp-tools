@@ -8,8 +8,6 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from tlgp_contracts import DocGenResult
-
 from .models import AnalysisData
 
 
