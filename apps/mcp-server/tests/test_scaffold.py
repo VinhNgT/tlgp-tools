@@ -316,3 +316,29 @@ class TestScaffoldAndSave:
         state = _make_workspace()
         with pytest.raises(FileNotFoundError, match="does not exist"):
             scaffold_and_save(state, "/nonexistent/path")
+
+    def test_saved_file_includes_unit_limit_defaults(self, tmp_path):
+        """The saved analysis.json includes unitLimit with default constants."""
+        comp = _make_component()
+        state = _make_workspace(
+            components=[comp],
+            root_ids=[comp.id],
+            screen_name="Test",
+        )
+        _make_annotated_dir(tmp_path)
+        _write_mapping(tmp_path, {
+            "annotated": {
+                "root": [],
+                "components": {str(comp.id): f"annotated/1_Comp_{str(comp.id)[:8]}.png"},
+            },
+            "raw": {"root": [], "components": {}},
+        })
+
+        result = scaffold_and_save(state, str(tmp_path))
+        saved = json.loads(Path(result.analysis_path).read_text(encoding="utf-8"))
+
+        assert "unitLimit" in saved
+        assert saved["unitLimit"]["annotationCost"] == 1
+        assert saved["unitLimit"]["apiCost"] == 3
+        assert saved["unitLimit"]["maxUnits"] == 15
+

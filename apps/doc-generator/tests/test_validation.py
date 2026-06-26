@@ -11,6 +11,7 @@ from doc_generator.models import (
     Interaction,
     Screen,
     SubDto,
+    UnitLimitConfig,
 )
 from doc_generator.validation import validate_analysis
 from pydantic import ValidationError
@@ -656,3 +657,190 @@ class TestValidateAnalysis:
         result = validate_analysis(analysis)
         assert result.valid is True
         assert any("references non-existent component" in w for w in result.warnings)
+
+
+class TestUnitLimitValidation:
+    """Tests for the unit limit complexity budget validation."""
+
+    def _make_children(self, count: int) -> list[ChildElement]:
+        return [ChildElement(stt=i, label=f"Child {i}", controlType="Button") for i in range(1, count + 1)]
+
+    def _make_apis(self, count: int, start_number: int = 1) -> list[Api]:
+        return [
+            Api(number=start_number + i, method="GET", title=f"API {i}", url=f"/api/{i}")
+            for i in range(count)
+        ]
+
+    def test_screen_at_exactly_15_units_is_valid(self, tmp_path):
+        """15 children × 1 = 15 units, exactly at limit."""
+        (tmp_path / "screen.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            screen=Screen(
+                name="Test",
+                description="desc desc desc",
+                imageFiles=["screen.png"],
+                topLevelChildren=self._make_children(15),
+            ),
+        )
+        result = validate_analysis(analysis)
+        assert not any("unit limit" in e for e in result.errors)
+
+    def test_screen_exceeds_unit_limit(self, tmp_path):
+        """13 children + 1 API = 13 + 3 = 16 units, over the limit."""
+        (tmp_path / "screen.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            screen=Screen(
+                name="Test",
+                description="desc desc desc",
+                imageFiles=["screen.png"],
+                topLevelChildren=self._make_children(13),
+                apis=self._make_apis(1),
+            ),
+        )
+        result = validate_analysis(analysis)
+        assert result.valid is False
+        assert any("Screen 'Test' exceeds the unit limit: 16/15" in e for e in result.errors)
+
+    def test_component_at_exactly_15_units_is_valid(self, tmp_path):
+        """12 children + 1 API = 12 + 3 = 15 units, exactly at limit."""
+        (tmp_path / "screen.png").touch()
+        (tmp_path / "comp.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            components=[
+                AnalysisComponent(
+                    id=1,
+                    label="Big Component",
+                    description="desc desc desc",
+                    imageFile="comp.png",
+                    children=self._make_children(12),
+                    interactions=[Interaction(action="Click", reaction="React")],
+                    apis=self._make_apis(1, start_number=2),
+                ),
+            ],
+        )
+        result = validate_analysis(analysis)
+        assert not any("unit limit" in e for e in result.errors)
+
+    def test_component_exceeds_unit_limit(self, tmp_path):
+        """4 children + 4 APIs = 4 + 12 = 16 units, over the limit."""
+        (tmp_path / "screen.png").touch()
+        (tmp_path / "comp.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            components=[
+                AnalysisComponent(
+                    id=1,
+                    label="Heavy Component",
+                    description="desc desc desc",
+                    imageFile="comp.png",
+                    children=self._make_children(4),
+                    interactions=[Interaction(action="Click", reaction="React")],
+                    apis=self._make_apis(4, start_number=2),
+                ),
+            ],
+        )
+        result = validate_analysis(analysis)
+        assert result.valid is False
+        assert any("Component 'Heavy Component' (id=1) exceeds the unit limit: 16/15" in e for e in result.errors)
+
+    def test_only_offending_component_flagged(self, tmp_path):
+        """When multiple components exist, only the one over the limit is flagged."""
+        (tmp_path / "screen.png").touch()
+        (tmp_path / "comp_a.png").touch()
+        (tmp_path / "comp_b.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            screen=Screen(
+                name="Test",
+                description="desc desc desc",
+                imageFiles=["screen.png"],
+                topLevelChildren=[
+                    ChildElement(stt=1, label="OK Component", controlType="Component"),
+                    ChildElement(stt=2, label="Over Component", controlType="Component"),
+                ],
+            ),
+            components=[
+                AnalysisComponent(
+                    id=1,
+                    label="OK Component",
+                    description="desc desc desc",
+                    imageFile="comp_a.png",
+                    children=self._make_children(2),
+                    interactions=[Interaction(action="A", reaction="B")],
+                ),
+                AnalysisComponent(
+                    id=2,
+                    label="Over Component",
+                    description="desc desc desc",
+                    imageFile="comp_b.png",
+                    children=self._make_children(4),
+                    interactions=[Interaction(action="A", reaction="B")],
+                    apis=self._make_apis(4, start_number=2),
+                ),
+            ],
+        )
+        result = validate_analysis(analysis)
+        unit_limit_errors = [e for e in result.errors if "unit limit" in e]
+        assert len(unit_limit_errors) == 1
+        assert "Over Component" in unit_limit_errors[0]
+        assert "OK Component" not in unit_limit_errors[0]
+
+    def test_leaf_components_never_flagged(self, tmp_path):
+        """Leaf components have no children or APIs — unit check is skipped."""
+        (tmp_path / "screen.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            components=[
+                AnalysisComponent(id=1, label="Leaf", isLeaf=True),
+            ],
+        )
+        result = validate_analysis(analysis)
+        assert not any("unit limit" in e for e in result.errors)
+
+    def test_custom_unit_limit_config_allows_higher_budget(self, tmp_path):
+        """Custom maxUnits=20 allows a component that would fail with defaults."""
+        (tmp_path / "screen.png").touch()
+        (tmp_path / "comp.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            components=[
+                AnalysisComponent(
+                    id=1,
+                    label="Big Component",
+                    description="desc desc desc",
+                    imageFile="comp.png",
+                    children=self._make_children(6),
+                    interactions=[Interaction(action="A", reaction="B")],
+                    apis=self._make_apis(4, start_number=2),
+                ),
+            ],
+        )
+        # 6 children + 4 APIs = 6 + 12 = 18 units (would fail with default 15)
+        analysis.unitLimit = UnitLimitConfig(maxUnits=20)
+        result = validate_analysis(analysis)
+        assert not any("unit limit" in e for e in result.errors)
+
+    def test_error_message_contains_breakdown(self, tmp_path):
+        """Error message includes annotation count, API count, and total."""
+        (tmp_path / "screen.png").touch()
+        analysis = _minimal_analysis(
+            tmp_path,
+            screen=Screen(
+                name="Test",
+                description="desc desc desc",
+                imageFiles=["screen.png"],
+                topLevelChildren=self._make_children(10),
+                apis=self._make_apis(2),
+            ),
+        )
+        # 10 children + 2 APIs = 10 + 6 = 16 units
+        result = validate_analysis(analysis)
+        assert result.valid is False
+        err = [e for e in result.errors if "unit limit" in e][0]
+        assert "16/15" in err
+        assert "10 annotations" in err
+        assert "2 APIs" in err
+

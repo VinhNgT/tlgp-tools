@@ -257,13 +257,38 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
                             f"but it is never referenced by any request, response, or other SubDto."
                         )
 
+    # --- Unit limit checks ---
+    cfg = data.unitLimit
+
+    def _check_unit_limit(annotations: int, apis: int, owner: str) -> None:
+        units = annotations * cfg.annotationCost + apis * cfg.apiCost
+        if units > cfg.maxUnits:
+            result.errors.append(
+                f"{owner} exceeds the unit limit: {units}/{cfg.maxUnits} units "
+                f"({annotations} annotations × {cfg.annotationCost} + "
+                f"{apis} APIs × {cfg.apiCost} = {units})"
+            )
+
+    _check_unit_limit(
+        len(data.screen.topLevelChildren),
+        len(data.screen.apis),
+        f"Screen '{data.screen.name}'",
+    )
+
+    for comp in non_leaf:
+        _check_unit_limit(
+            len(comp.children),
+            len(comp.apis),
+            f"Component '{comp.label}' (id={comp.id})",
+        )
+
     # --- Discrepancy warnings ---
     for disc in data.discrepancies:
         result.warnings.append(
             f"Discrepancy at '{disc.location}': "
             f"Image shows: {disc.imageObservation} | "
             f"Code shows: {disc.codeObservation}"
-            + (f" | Resolution: {disc.resolution}" if disc.resolution else "")
+            + (f" | Expected: {disc.expectedBehavior}" if disc.expectedBehavior else "")
         )
 
     # --- Final validity ---

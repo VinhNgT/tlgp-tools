@@ -11,6 +11,7 @@ Follow these steps **in order**. Do not skip steps.
 4. **Validation Before Generation:** Always run `generate_spec_doc(validate_only=True)` and resolve all errors before calling with `validate_only=False`.
 5. **API Placement:** Document each API under the non-leaf component that **uses** its response data to render/update UI. If an API is used by multiple children, place it on the closest common ancestor. No duplicate APIs allowed.
 6. **Vision-Derived Naming:** Component labels and screen names from the workspace are rough suggestions only. Always derive accurate, descriptive Vietnamese labels from the visual content of the cropped images.
+7. **Unit Limit:** Each component and the screen have a complexity budget (default: 15 units; 1 unit per annotation, 3 per API). Validation will reject any scope that exceeds its limit. You MUST NOT attempt to resolve this yourself (e.g. by restructuring the analysis, removing children, or moving APIs). Instead, stop and ask the user to re-annotate the image in the Annotation Tool — for example, by grouping child elements under a new parent component to reduce the count at the offending level. After the user re-annotates, re-run `prepare_analysis` to regenerate the scaffold. The limits are configurable via the `unitLimit` field in analysis.json.
 
 ## Required References
 
@@ -47,17 +48,19 @@ Call `prepare_analysis(output_path="<directory>")`. This single call:
 
 ### Step 3: Fill Semantic Fields
 
-**Goal:** Replace TODO placeholders with real content using vision analysis.
+**Goal:** Replace TODO placeholders with real content by cross-referencing **both** the cropped images **and** the source code in parallel.
 
 Open the scaffolded `analysis.json` file and fill in:
 
-1. **Screen name and description** — derive from the full screenshot
-2. **Component labels and descriptions** — inspect the **raw** cropped images (no overlays) and assign descriptive Vietnamese labels based on actual visual content
+1. **Screen name and description** — derive from the full screenshot and the corresponding screen/page in the source code
+2. **Component labels and descriptions** — inspect the **raw** cropped images (no overlays) **and** the matching source code widgets/components simultaneously. Assign descriptive Vietnamese labels based on the combined understanding.
 3. **`topLevelChildren` labels** — must match the labels of the corresponding components in the `components[]` array
-4. **`children[]`** for each non-leaf component — categorize visible UI elements using `tlgp://spec/classification-guide`
-5. **`interactions[]`** — document user actions and system reactions for non-leaf components
+4. **`children[]`** for each non-leaf component — identify visible UI elements from the images and verify against the source code. Categorize using `tlgp://spec/classification-guide`.
+5. **`interactions[]`** — derive user actions and system reactions from both the visual behavior shown in images and the event handlers/logic in the source code
 6. **`apis[]`** *(optional, if source code is available)* — document API endpoints, placing each under the component that uses its data
 7. **Leaf components** (`isLeaf: true`) — analyze them for context but they have no section in the document. Their `imageFile` is `null`, `children`/`interactions`/`apis` are empty arrays.
+
+**Discrepancy Handling:** If you find conflicts between what the images show and what the source code shows (e.g., a button visible in the screenshot but absent in the code, or a field present in code but hidden in the UI), you MUST stop and ask the user to clarify. The user will either: (a) explain the correct behavior — update the analysis accordingly, or (b) confirm it is a genuine discrepancy — record it in the `discrepancies[]` array with both observations.
 
 ### Step 4: Validate & Generate
 
