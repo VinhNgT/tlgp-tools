@@ -110,11 +110,33 @@ Validates analysis data from a JSON file, generates a formatted `.docx` specific
 
 The server exposes read-only data and reference guides to assist with generating valid analysis JSON structures.
 
+- **`tlgp://spec/workflow`**: End-to-end workflow guide for creating specification documents. **Agents must read this first.**
 - **`tlgp://workspace/state`**: The active annotation hierarchy state in a flattened JSON structure.
-- **`tlgp://spec/workflow`**: End-to-end workflow guide for creating specification documents.
 - **`tlgp://spec/schema`**: JSON Schema reference for the analysis JSON structure.
 - **`tlgp://spec/classification-guide`**: UI Control Type Classification Guide detailing what UI elements fall under which categories.
 - **`tlgp://spec/example-analysis`**: Complete example analysis JSON structure for reference.
+
+## Workflow
+
+The intended end-to-end workflow for an AI agent:
+
+```text
+User: "Open the annotation tool"
+  → Agent calls launch_annotator() or connect_to_annotator()
+
+User annotates components in the GUI...
+
+User: "Done annotating"
+  → Agent reads tlgp://workspace/state
+  → Agent calls export_images()
+  → Agent analyzes images and builds analysis JSON
+  → Agent saves analysis.json to disk
+  → Agent calls generate_spec_doc(validate_only=True), fixes errors
+  → Agent calls generate_spec_doc(validate_only=False)
+  → .docx document is generated
+```
+
+The detailed step-by-step instructions are embedded in the `tlgp://spec/workflow` resource, which the server instructs agents to read before starting any work.
 
 ## Architecture
 

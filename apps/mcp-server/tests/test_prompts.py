@@ -58,9 +58,10 @@ class TestSpecWorkflowContent:
         assert "Step 2" in SPEC_WORKFLOW_CONTENT
         assert "Step 3" in SPEC_WORKFLOW_CONTENT
         assert "Step 4" in SPEC_WORKFLOW_CONTENT
+        assert "Step 5" in SPEC_WORKFLOW_CONTENT
 
-    def test_no_more_than_4_steps(self):
-        assert "Step 5" not in SPEC_WORKFLOW_CONTENT
+    def test_no_more_than_5_steps(self):
+        assert "Step 6" not in SPEC_WORKFLOW_CONTENT
 
     def test_includes_resource_references(self):
         resources = [

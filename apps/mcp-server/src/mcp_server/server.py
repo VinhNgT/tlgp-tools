@@ -75,16 +75,23 @@ mcp = FastMCP(
     "tlgp-tools",
     lifespan=app_lifespan,
     instructions=(
-        "TLGP Tools MCP server. Provides tools for annotating screenshots and compiling .docx specification documents.\n\n"
+        "TLGP Tools MCP server. Provides tools for annotating screenshots "
+        "and compiling .docx specification documents.\n\n"
+        "AVAILABLE TOOLS:\n"
+        "  - launch_annotator: Start a new annotator GUI instance\n"
+        "  - connect_to_annotator: Connect to an already-running annotator\n"
+        "  - export_images: Export cropped component images from the workspace\n"
+        "  - generate_spec_doc: Validate and generate the .docx specification document\n\n"
         "SYSTEM DIRECTIVES & BOUNDARIES:\n"
         f"{get_strict_guidelines_content()}\n\n"
-        "REQUIRED REFERENCE GUIDES & DATA:\n"
-        "Prior to performing any analysis or constructing parameters, read the resource guides:\n"
-        "   - 'tlgp://spec/workflow' (End-to-end spec creation workflow)\n"
-        "   - 'tlgp://spec/schema' (JSON Schema structure)\n"
-        "   - 'tlgp://spec/classification-guide' (UI Control type rules)\n"
-        "   - 'tlgp://spec/example-analysis' (Complete example analysis data structure)\n"
-        "   - 'tlgp://workspace/state' (Active annotation hierarchy state)"
+        "WORKFLOW:\n"
+        "You MUST read the resource 'tlgp://spec/workflow' before starting any work. "
+        "It contains the complete step-by-step instructions.\n\n"
+        "REFERENCE GUIDES:\n"
+        "  - 'tlgp://spec/schema' (JSON Schema structure)\n"
+        "  - 'tlgp://spec/classification-guide' (UI Control type rules)\n"
+        "  - 'tlgp://spec/example-analysis' (Complete example analysis data)\n"
+        "  - 'tlgp://workspace/state' (Active annotation hierarchy state)"
     ),
 )
 
