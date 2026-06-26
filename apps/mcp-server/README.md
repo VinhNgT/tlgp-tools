@@ -30,7 +30,7 @@ uv sync
   "mcpServers": {
     "tlgp-tools": {
       "command": "uv",
-      "args": ["run", "--directory", "/Volumes/Lexar2TB/Dev/tlgp-tools", "tlgp-mcp"]
+      "args": ["run", "--directory", "<absolute_path_to_cloned_repo>", "tlgp-mcp"]
     }
   }
 }
@@ -50,7 +50,7 @@ uv sync
   "mcpServers": {
     "tlgp-tools": {
       "command": "uv",
-      "args": ["run", "--directory", "/Volumes/Lexar2TB/Dev/tlgp-tools", "tlgp-mcp"]
+      "args": ["run", "--directory", "<absolute_path_to_cloned_repo>", "tlgp-mcp"]
     }
   }
 }
@@ -59,12 +59,12 @@ uv sync
 4. Use Gemini's **Agent Mode** to access the tools.
 
 > [!NOTE]
-> Replace `/Volumes/Lexar2TB/Dev/tlgp-tools` with the actual absolute path to the monorepo on your machine.
+> Replace `<absolute_path_to_cloned_repo>` with the actual absolute path to the monorepo on your machine (e.g. `C:/Users/username/tlgp-tools` or `/Users/username/tlgp-tools`).
 
 ### Testing with MCP Inspector
 
 ```bash
-cd /Volumes/Lexar2TB/Dev/tlgp-tools
+cd <absolute_path_to_cloned_repo>
 npx -y @modelcontextprotocol/inspector uv run tlgp-mcp
 ```
 
