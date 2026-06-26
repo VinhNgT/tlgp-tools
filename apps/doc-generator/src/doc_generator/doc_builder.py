@@ -189,10 +189,17 @@ def _add_screen_section(
     )
 
 
-def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int):
+def _add_api_section(
+    doc: Document, api: Api, style: StyleConfig, api_index: int
+):
     """Build a single API documentation block."""
     # API title: bold normal text
-    _add_bold_text(doc, f"{api_index}. {api.method} {api.title}", style)
+    para = doc.add_paragraph()
+    run = para.add_run(f"{api_index}. {api.method} {api.title}")
+    _set_run_font(run, style)
+    run.font.size = style.FONT_SIZE_DEFAULT
+    run.font.bold = True
+    para.paragraph_format.space_before = Pt(style.API_SECTION_SPACE_BEFORE_PT)
 
     # API URL: plain normal text
     _add_normal_text(doc, f"URL: {api.url}", style)

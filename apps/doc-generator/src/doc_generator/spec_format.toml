@@ -30,6 +30,7 @@ h4_space_before_pt = 14
 h4_space_after_pt = 6
 normal_space_before_pt = 6
 normal_space_after_pt = 4
+api_section_space_before_pt = 12
 
 [cell]
 padding_top_pt = 5

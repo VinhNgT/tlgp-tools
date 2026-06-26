@@ -130,6 +130,60 @@ class TestCliGeneration:
         expected = tmp_path / "Product_Detail.docx"
         assert expected.exists()
 
+    def test_permission_error_standard_mode(self, tmp_path):
+        from PIL import Image
+        Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
+        analysis = {
+            "sectionPrefix": "1.1",
+            "imageDir": str(tmp_path),
+            "screen": {
+                "name": "My Screen",
+                "description": "D",
+                "imageFiles": ["test.png"],
+                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+            },
+            "components": [],
+        }
+        json_path = tmp_path / "analysis.json"
+        json_path.write_text(json.dumps(analysis), encoding="utf-8")
+        output_path = tmp_path / "output.docx"
+
+        with patch("sys.argv", ["doc-gen", str(json_path), "-o", str(output_path)]):
+            with patch("docx.document.Document.save", side_effect=PermissionError("Locked file")):
+                with pytest.raises(SystemExit) as exc:
+                    main()
+                assert exc.value.code == 1
+
+    def test_permission_error_json_mode(self, tmp_path, capsys):
+        from PIL import Image
+        Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
+        analysis = {
+            "sectionPrefix": "1.1",
+            "imageDir": str(tmp_path),
+            "screen": {
+                "name": "My Screen",
+                "description": "D",
+                "imageFiles": ["test.png"],
+                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+            },
+            "components": [],
+        }
+        json_path = tmp_path / "analysis.json"
+        json_path.write_text(json.dumps(analysis), encoding="utf-8")
+        output_path = tmp_path / "output.docx"
+
+        with patch("sys.argv", ["doc-gen", str(json_path), "-o", str(output_path), "--json"]):
+            with patch("docx.document.Document.save", side_effect=PermissionError("Locked file")):
+                with pytest.raises(SystemExit) as exc:
+                    main()
+                assert exc.value.code == 1
+
+        captured = capsys.readouterr()
+        result = json.loads(captured.out)
+        assert result["valid"] is False
+        assert any("Permission denied" in err for err in result["errors"])
+
+
 
 class TestCliImageWarnings:
     def test_validation_enforced_in_human_readable_mode(self, tmp_path, capsys):

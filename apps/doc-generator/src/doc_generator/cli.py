@@ -192,7 +192,16 @@ def _run_json_mode(
     out = _resolve_output_path(data, analysis_path, output_path)
 
     out.parent.mkdir(parents=True, exist_ok=True)
-    doc.save(str(out))
+    try:
+        doc.save(str(out))
+    except PermissionError as e:
+        result = DocGenResult.from_validation(vr)
+        result.valid = False
+        result.errors.append(
+            f"Permission denied: Could not save to {out}. Please ensure the file is closed and not locked by another application (e.g. Microsoft Word). Detail: {e}"
+        )
+        sys.stdout.write(result.model_dump_json())
+        return 1
 
     # Save analysis JSON alongside the docx
     analysis_json_dest = out.parent / "analysis.json"
@@ -282,8 +291,15 @@ def main():
     # Determine output path
     output_path = _resolve_output_path(analysis, analysis_path, args.output)
     output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    doc.save(str(output_path))
+    try:
+        doc.save(str(output_path))
+    except PermissionError as e:
+        logger.error(
+            "Permission denied: Could not save to %s. Please ensure the file is closed and not locked by another application (e.g. Microsoft Word).",
+            output_path,
+            error=str(e),
+        )
+        sys.exit(1)
 
     # Copy analysis.json alongside the .docx for record-keeping
     analysis_dest = output_path.parent / "analysis.json"
