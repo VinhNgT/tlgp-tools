@@ -14,7 +14,7 @@ uv run doc-gen analysis.json [-o output.docx] [--dry-run] [--validate-only] [--j
 
 ## Input
 
-The script reads an `analysis.json` file containing the structured screen analysis. See `tlgp://schema/analysis-json` (via the MCP server) for the full field reference.
+The script reads an `analysis.json` file containing the structured screen analysis. See the Pydantic model definitions in [`models.py`](src/doc_generator/models.py) for the canonical schema.
 
 ## Output
 

@@ -71,6 +71,14 @@ Every field maps to a specific location in the generated .docx document.
 | `responseDescription` | `str` | Additional response notes |
 | `subDtos` | `list[SubDto]` | Nested DTOs referenced by the API |
 
+### SubDto Fields
+
+| Field | Type | Description |
+|---|---|---|
+| `name` | `str` | Name of the nested DTO class |
+| `fieldRef` | `str` | Name of the parent field that references this DTO |
+| `fields` | `list[ApiParam]` | Fields of the nested DTO (same structure as ApiParam) |
+
 ### ApiParam Fields
 
 | Field | Type | Description |

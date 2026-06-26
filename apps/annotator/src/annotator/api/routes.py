@@ -21,7 +21,7 @@ from fastapi import (
 )
 from fastapi.responses import StreamingResponse
 
-from annotator.models.core import WorkspaceState
+from annotator.models import WorkspaceState
 from annotator.workspace import WorkspaceManager
 from annotator.workspace.errors import (
     InvalidStateError,

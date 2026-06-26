@@ -176,12 +176,12 @@ class WorkspaceClient:
                     result["raw_images"] = len(manifest.raw.components)
                     result["annotated_segments"] = len(manifest.annotated.root)
                     result["raw_segments"] = len(manifest.raw.root)
-                    result["root_images"] = [os.path.basename(p) for p in manifest.annotated.root]
+                    result["root_images"] = list(manifest.annotated.root)
                 else:
                     manifest = ImageExportManifest.model_validate(mapping)
                     result["images"] = len(manifest.components)
                     result["segments"] = len(manifest.root)
-                    result["root_images"] = [os.path.basename(p) for p in manifest.root]
+                    result["root_images"] = list(manifest.root)
             except Exception:
                 logger.warning(
                     "Failed to parse mapping.json in exported images at %s",

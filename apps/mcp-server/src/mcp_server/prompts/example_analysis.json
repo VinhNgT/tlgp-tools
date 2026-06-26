@@ -130,7 +130,30 @@
           }
         ],
         "responseDescription": "",
-        "subDtos": []
+        "subDtos": [
+          {
+            "name": "CategoryDto",
+            "fieldRef": "category",
+            "fields": [
+              {
+                "name": "id",
+                "meaning": "ID danh mục",
+                "required": "Có",
+                "dataType": "int",
+                "limit": "",
+                "defaultValue": ""
+              },
+              {
+                "name": "name",
+                "meaning": "Tên danh mục",
+                "required": "Có",
+                "dataType": "String",
+                "limit": "",
+                "defaultValue": ""
+              }
+            ]
+          }
+        ]
       }
     ]
   },
