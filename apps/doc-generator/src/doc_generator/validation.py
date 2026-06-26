@@ -137,7 +137,7 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
     # --- Discrepancy warnings ---
     for disc in data.discrepancies:
         result.warnings.append(
-            f"⚠️ Discrepancy at '{disc.location}': "
+            f"Discrepancy at '{disc.location}': "
             f"Image shows: {disc.imageObservation} | "
             f"Code shows: {disc.codeObservation}"
             + (f" | Resolution: {disc.resolution}" if disc.resolution else "")

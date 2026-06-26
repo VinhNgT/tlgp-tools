@@ -123,11 +123,11 @@ def _print_summary(analysis: AnalysisData):
 
     logger.info("  Images:             %d referenced", image_count)
     if missing_images:
-        logger.info("  ⚠️  Missing images:  %d", len(missing_images))
+        logger.info("  [WARN] Missing images:  %d", len(missing_images))
         for m in missing_images:
             logger.info("     - %s", m)
     else:
-        logger.info("  ✅ All images found")
+        logger.info("  [OK] All images found")
 
     # Estimate tables
     table_count = 0
@@ -280,7 +280,7 @@ def main():
     if analysis_path.resolve() != analysis_dest.resolve():
         shutil.copy2(analysis_path, analysis_dest)
 
-    print(f"✅ Saved to: {output_path}")
+    print(f"[OK] Saved to: {output_path}")
 
 
 if __name__ == "__main__":
