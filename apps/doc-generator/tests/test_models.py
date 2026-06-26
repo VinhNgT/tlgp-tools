@@ -17,6 +17,11 @@ from doc_generator.models import (
     UnitLimitConfig,
 )
 from pydantic import ValidationError
+from tlgp_contracts import (
+    DEFAULT_UNIT_COST_ANNOTATION,
+    DEFAULT_UNIT_COST_API,
+    DEFAULT_UNIT_LIMIT,
+)
 
 # ── ChildElement ──────────────────────────────────────────────────────
 
@@ -358,12 +363,6 @@ class TestJsonRoundTrip:
 
 class TestUnitLimitConfig:
     def test_defaults_match_contracts(self):
-        from tlgp_contracts import (
-            DEFAULT_UNIT_COST_ANNOTATION,
-            DEFAULT_UNIT_COST_API,
-            DEFAULT_UNIT_LIMIT,
-        )
-
         cfg = UnitLimitConfig()
         assert cfg.annotationCost == DEFAULT_UNIT_COST_ANNOTATION
         assert cfg.apiCost == DEFAULT_UNIT_COST_API

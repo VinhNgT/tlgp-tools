@@ -76,7 +76,7 @@ class TestWalkPostOrderDfs:
         """Post-order DFS: children should appear before their parent."""
         child = _make_component()
         parent = _make_component(children_ids=[child.id])
-        child = Component(**{**child.model_dump(), "parentId": parent.id})
+        child = child.model_copy(update={"parentId": parent.id})
 
         state = _make_workspace(
             components=[parent, child],
@@ -89,9 +89,9 @@ class TestWalkPostOrderDfs:
         """3-level deep: grandchild → child → parent."""
         grandchild = _make_component()
         child = _make_component(children_ids=[grandchild.id])
-        grandchild = Component(**{**grandchild.model_dump(), "parentId": child.id})
+        grandchild = grandchild.model_copy(update={"parentId": child.id})
         parent = _make_component(children_ids=[child.id])
-        child = Component(**{**child.model_dump(), "parentId": parent.id})
+        child = child.model_copy(update={"parentId": parent.id})
 
         state = _make_workspace(
             components=[parent, child, grandchild],
@@ -153,7 +153,7 @@ class TestBuildScaffold:
         """Non-leaf components get imageFile from mapping."""
         child = _make_component()
         parent = _make_component(children_ids=[child.id])
-        child = Component(**{**child.model_dump(), "parentId": parent.id})
+        child = child.model_copy(update={"parentId": parent.id})
 
         state = _make_workspace(
             components=[parent, child],
@@ -191,7 +191,7 @@ class TestBuildScaffold:
         # Add a fake child so comp is non-leaf
         child_id = comp.childrenIds[0]
         child = _make_component(component_id=child_id)
-        child = Component(**{**child.model_dump(), "parentId": comp.id})
+        child = child.model_copy(update={"parentId": comp.id})
 
         state = _make_workspace(
             components=[comp, child],
@@ -264,7 +264,7 @@ class TestBuildScaffold:
         """Non-leaf root components get controlType 'Component', leaf ones get 'Image'."""
         child = _make_component()
         non_leaf_root = _make_component(children_ids=[child.id])
-        child = Component(**{**child.model_dump(), "parentId": non_leaf_root.id})
+        child = child.model_copy(update={"parentId": non_leaf_root.id})
         leaf_root = _make_component()
 
         state = _make_workspace(

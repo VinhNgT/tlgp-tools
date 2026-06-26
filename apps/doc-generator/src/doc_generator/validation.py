@@ -10,7 +10,7 @@ from pathlib import Path
 
 from pydantic import BaseModel, Field
 
-from .models import AnalysisData
+from .models import AnalysisData, Api
 
 
 class ValidationResult(BaseModel):
@@ -203,15 +203,18 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
 
         # Check for undocumented request bodies and missing DTOs
         for api in data.all_apis:
-            def check_dto_reference(type_str: str, source: str):
-                if not type_str: return
+            def check_dto_reference(api: Api, type_str: str, source: str):
+                if not type_str:
+                    return
                 if "Dto" in type_str or "DTO" in type_str:
                     has_sub_dto = any(dto.name in type_str for dto in api.subDtos)
                     if not has_sub_dto:
-                        result.warnings.append(f"API {api.number} '{api.title}' references custom type '{type_str}' in {source} but it is not defined in subDtos")
+                        result.warnings.append(
+                            f"API {api.number} '{api.title}' references custom type '{type_str}' in {source} but it is not defined in subDtos"
+                        )
 
-            check_dto_reference(api.requestBodyType, "requestBodyType")
-            check_dto_reference(api.responseType, "responseType")
+            check_dto_reference(api, api.requestBodyType, "requestBodyType")
+            check_dto_reference(api, api.responseType, "responseType")
 
             all_params = api.requestParams + api.responseFields
             for dto in api.subDtos:
@@ -220,7 +223,7 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
             for param in all_params:
                 if not param.name.strip() or not param.meaning.strip():
                     result.warnings.append(f"API {api.number} '{api.title}' has an ApiParam with empty name or meaning")
-                check_dto_reference(param.dataType, f"parameter '{param.name}'")
+                check_dto_reference(api, param.dataType, f"parameter '{param.name}'")
 
             if api.requestBodyType and not api.requestParams:
                 # Check if there is a subDto documenting this body type

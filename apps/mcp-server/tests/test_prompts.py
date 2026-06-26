@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
-from mcp_server.prompts import get_spec_workflow
+from doc_generator.models import AnalysisData
+from doc_generator.validation import validate_analysis
+from mcp_server.prompts import _read, get_spec_workflow
 
 SPEC_WORKFLOW_CONTENT = ""
 
@@ -114,18 +118,13 @@ class TestSpecWorkflowContent:
 
 class TestExampleAnalysisValidation:
     def test_example_analysis_passes_validation(self, tmp_path):
-        import json
-        from mcp_server.prompts import _read
-        from doc_generator.models import AnalysisData
-        from doc_generator.validation import validate_analysis
-
         # Read the raw JSON
         raw_json = _read("example_analysis.json")
         data_dict = json.loads(raw_json)
 
         # Override imageDir and create files
         data_dict["imageDir"] = str(tmp_path)
-        
+
         annotated_dir = tmp_path / "annotated"
         annotated_dir.mkdir()
         (annotated_dir / "root_screenshot.png").touch()
