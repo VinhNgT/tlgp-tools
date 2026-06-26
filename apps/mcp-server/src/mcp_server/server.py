@@ -13,14 +13,14 @@ from typing import TypedDict
 from mcp.server.fastmcp import Context, FastMCP
 from tlgp_logger import get_logger
 
-from mcp_server.client import WorkspaceClient
+from mcp_server.client import ImageExportResult, WorkspaceClient
 from mcp_server.manager import DaemonManager
 from mcp_server.prompts import (
     get_prompt_section,
     get_spec_workflow_content,
     get_strict_guidelines_content,
 )
-from mcp_server.services import SpecGeneratorService
+from mcp_server.services import DocGenResult, SpecGeneratorService
 
 logger = get_logger(__name__)
 
@@ -162,7 +162,7 @@ async def launch_annotator(
 async def export_images(
     ctx: Context,
     output_path: str,
-) -> dict:
+) -> ImageExportResult:
     """Export cropped component images (both raw and annotated) from the workspace screenshot to a directory.
 
     Args:
@@ -177,7 +177,7 @@ async def generate_spec_doc(
     analysis_path: str,
     output_path: str | None = None,
     validate_only: bool = False,
-) -> dict:
+) -> DocGenResult:
     """Generate a TLGP specification document (.docx).
 
     CRITICAL REQUIREMENTS:

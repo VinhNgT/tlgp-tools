@@ -156,7 +156,7 @@ class WorkspaceClient:
         with zipfile.ZipFile(zip_buf, "r") as zf:
             zf.extractall(out_path)
 
-        result: dict = {"output_path": out_path}
+        result: ImageExportResult = {"output_path": out_path}
 
         # Parse mapping.json using typed contract models
         mapping_path = os.path.join(out_path, "mapping.json")

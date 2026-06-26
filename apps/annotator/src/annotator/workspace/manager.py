@@ -609,6 +609,7 @@ class WorkspaceManager:
     ) -> bool:
         if node["is_leaf"]:
             return False
+        assert state_snapshot.image is not None
         cropped_ann = img.crop(node["bounds"])
         if node["children"]:
             cropped_ann = paint_annotations(

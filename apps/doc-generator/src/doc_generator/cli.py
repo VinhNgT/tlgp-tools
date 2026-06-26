@@ -19,7 +19,7 @@ from doc_generator.validation import DocGenResult, validate_analysis
 logger = get_logger(__name__)
 
 
-def _load_analysis_raw(path: Path) -> dict:
+def _load_analysis_raw(path: Path) -> dict | None:
     """Load raw JSON dict from the analysis file path.
 
     Returns the parsed dict on success. On failure, returns None after

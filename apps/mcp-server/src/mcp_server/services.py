@@ -111,7 +111,7 @@ class SpecGeneratorService:
 
         # Parse the JSON result from stdout
         try:
-            result: dict = json.loads(stdout_text)
+            result: DocGenResult = json.loads(stdout_text)
         except json.JSONDecodeError:
             logger.error(
                 "doc-gen produced non-JSON stdout (exit code %d): %s",
@@ -132,7 +132,7 @@ class SpecGeneratorService:
             not validate_only
             and result.get("valid")
             and self._client is not None
-            and "output_path" in result
+            and result.get("output_path") is not None
         ):
             docx_path = Path(result["output_path"])
             workspace_zip_path = docx_path.parent / "workspace.zip"
