@@ -82,13 +82,13 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
     result = ValidationResult(
         components=len(data.components),
         non_leaf=len(non_leaf),
-        ui_elements=sum(len(c.children) for c in non_leaf),
-        interactions=sum(len(c.interactions) for c in non_leaf),
+        ui_elements=sum(len(c.children) for c in non_leaf) + len(data.screen.topLevelChildren),
+        interactions=sum(len(c.interactions) for c in non_leaf) + len(data.screen.interactions),
         apis=len(data.all_apis),
         discrepancies=len(data.discrepancies),
     )
 
-    # --- Image existence checks ---
+    # --- Image and structure checks ---
     for comp in non_leaf:
         if comp.imageFile:
             img = data.resolve_image(comp.imageFile)
@@ -97,10 +97,27 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
                     f"Component '{comp.label}' (id={comp.id}): image not found: {img}"
                 )
         else:
-            result.warnings.append(
+            result.errors.append(
                 f"Component '{comp.label}' (id={comp.id}): "
-                f"no imageFile specified (non-leaf should have one)"
+                f"no imageFile specified (non-leaf must have one)"
             )
+
+        if not comp.children:
+            result.errors.append(
+                f"Component '{comp.label}' (id={comp.id}): "
+                f"no children specified (non-leaf must have at least one child)"
+            )
+
+        if not comp.description:
+            result.errors.append(
+                f"Component '{comp.label}' (id={comp.id}): empty description"
+            )
+
+    if not data.screen.description:
+        result.errors.append("Screen description is empty")
+
+    if not data.screen.topLevelChildren:
+        result.errors.append("Screen has no top-level children")
 
     for img_file in data.screen.imageFiles:
         img = data.resolve_image(img_file)
@@ -108,7 +125,7 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
             result.errors.append(f"Screen image not found: {img}")
 
     if not data.screen.imageFiles:
-        result.warnings.append("No screen-level images specified")
+        result.errors.append("No screen-level images specified")
 
     # --- Image count ---
     result.images = len(data.screen.imageFiles) + sum(
@@ -116,12 +133,6 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
     )
 
     # --- Content completeness warnings ---
-    empty_descriptions = [c.label for c in non_leaf if not c.description]
-    if empty_descriptions:
-        result.warnings.append(
-            f"{len(empty_descriptions)} component(s) have empty descriptions: "
-            + ", ".join(empty_descriptions[:5])
-        )
 
     empty_controls = sum(
         1 for comp in non_leaf for child in comp.children if not child.controlType

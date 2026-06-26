@@ -130,7 +130,7 @@ class TestBuildDocumentWithComponents:
         # Should have at least: info table + UI table + interaction table
         assert len(doc.tables) >= 3
 
-    def test_no_children_skips_ui_table(self, tmp_path):
+    def test_empty_children_still_shows_heading(self, tmp_path):
         analysis = _minimal_analysis(
             tmp_path,
             components=[
@@ -138,10 +138,8 @@ class TestBuildDocumentWithComponents:
             ],
         )
         doc = build_document(analysis)
-        # Only info table for the component + screen tables
-        # No UI elements table for the component
         text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Mô tả chi tiết các thành phần" not in text.split("Màn hình")[0]
+        assert "Mô tả chi tiết các thành phần trên màn hình" in text
 
 
 class TestBuildDocumentWithApis:
@@ -330,6 +328,21 @@ class TestBuildDocumentWithImages:
         inline_shapes = doc.inline_shapes
         assert len(inline_shapes) >= 1
 
+    def test_no_images_still_shows_heading(self, tmp_path):
+        analysis = _minimal_analysis(tmp_path)
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Màn hình chức năng" in text
+
+    def test_subsection_numbering_sequential(self, tmp_path):
+        analysis = _minimal_analysis(tmp_path)
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "1.1 Thông tin chung" in text
+        assert "1.2 Màn hình chức năng" in text
+        assert "1.3 Mô tả chi tiết các thành phần" in text
+        # Since interactions are optional and empty, 1.4 shouldn't exist
+        assert "1.4 Xử lý luồng sự kiện" not in text
 
 class TestBuildDocumentSectionNumbering:
     def test_section_prefix_used(self, tmp_path):

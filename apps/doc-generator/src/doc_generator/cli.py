@@ -261,6 +261,16 @@ def main():
     # Human-readable mode
     analysis = _load_analysis(analysis_path)
 
+    # Enforce validation (was previously skipped in this code path)
+    vr = validate_analysis(analysis)
+    if vr.warnings:
+        for w in vr.warnings:
+            logger.warning(w)
+    if not vr.valid:
+        for err in vr.errors:
+            logger.error(err)
+        sys.exit(1)
+
     if args.dry_run:
         _print_summary(analysis)
         return

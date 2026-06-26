@@ -58,10 +58,17 @@ class TestCliValidation:
 
 class TestCliDryRun:
     def test_dry_run_prints_summary(self, tmp_path, capsys):
+        from PIL import Image
+        Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {"name": "Test"},
+            "screen": {
+                "name": "Test",
+                "description": "desc",
+                "imageFiles": ["test.png"],
+                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+            },
             "components": [],
         }
         json_path = tmp_path / "analysis.json"
@@ -78,10 +85,17 @@ class TestCliDryRun:
 
 class TestCliGeneration:
     def test_generates_docx(self, tmp_path):
+        from PIL import Image
+        Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {"name": "My Screen", "description": "D"},
+            "screen": {
+                "name": "My Screen",
+                "description": "D",
+                "imageFiles": ["test.png"],
+                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+            },
             "components": [],
         }
         json_path = tmp_path / "analysis.json"
@@ -95,10 +109,17 @@ class TestCliGeneration:
         assert output_path.stat().st_size > 0
 
     def test_default_output_name(self, tmp_path):
+        from PIL import Image
+        Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {"name": "Product Detail"},
+            "screen": {
+                "name": "Product Detail",
+                "description": "desc",
+                "imageFiles": ["test.png"],
+                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+            },
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
@@ -111,7 +132,7 @@ class TestCliGeneration:
 
 
 class TestCliImageWarnings:
-    def test_dry_run_shows_missing_images(self, tmp_path, capsys):
+    def test_validation_enforced_in_human_readable_mode(self, tmp_path, capsys):
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
@@ -123,8 +144,11 @@ class TestCliImageWarnings:
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
 
-        with patch("sys.argv", ["doc-gen", str(json_path), "--dry-run"]):
-            main()
+        with patch("sys.argv", ["doc-gen", str(json_path)]):
+            import pytest
+            with pytest.raises(SystemExit) as exc_info:
+                main()
+            assert exc_info.value.code == 1
 
         captured = capsys.readouterr()
-        assert "Missing images" in captured.err
+        assert "image not found" in captured.err

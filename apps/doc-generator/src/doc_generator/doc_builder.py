@@ -100,35 +100,41 @@ def _add_content_section(
     # H3: Title
     _add_h3(doc, f"{section_number}. {title}", style)
 
+    sub = 1
+
     # H4: 1. General info
-    _add_h4(doc, f"{section_number}.1 Thông tin chung về chức năng", style)
+    _add_h4(doc, f"{section_number}.{sub} Thông tin chung về chức năng", style)
     build_generic_info_table(doc, info_label, info_value, info_description, style)
+    sub += 1
 
     # H4: 2. Screen image
-    _add_h4(doc, f"{section_number}.2 Màn hình chức năng", style)
+    _add_h4(doc, f"{section_number}.{sub} Màn hình chức năng", style)
     for img_file in image_files:
         if img_file:
             image_path = analysis.resolve_image(img_file)
             insert_image(doc, image_path, full_width=True)
+    sub += 1
 
     # H4: 3. UI elements
+    _add_h4(
+        doc,
+        f"{section_number}.{sub} Mô tả chi tiết các thành phần trên màn hình",
+        style,
+    )
     if children:
-        _add_h4(
-            doc,
-            f"{section_number}.3 Mô tả chi tiết các thành phần trên màn hình",
-            style,
-        )
         build_ui_elements_table(doc, children, style)
+    sub += 1
 
     # H4: 4. Interaction events
     if interactions:
         step_count = len(interactions)
         _add_h4(
             doc,
-            f"{section_number}.4 Xử lý luồng sự kiện tương tác ({step_count} bước)",
+            f"{section_number}.{sub} Xử lý luồng sự kiện tương tác ({step_count} bước)",
             style,
         )
         build_interaction_table(doc, interactions, style)
+        sub += 1
 
     # Render APIs at the end of the section
     for idx, api in enumerate(apis):
