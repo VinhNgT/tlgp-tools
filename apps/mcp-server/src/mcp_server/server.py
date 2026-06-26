@@ -167,6 +167,9 @@ async def export_images(
 
     Args:
         output_path: Absolute path to the destination directory.
+
+    Returns:
+        dict with output_path, segment/image counts, and root_images (list of filenames of the exported root segments).
     """
     return await _get_client(ctx).export_images(output_path, mode="both")
 

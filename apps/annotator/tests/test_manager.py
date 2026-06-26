@@ -437,6 +437,92 @@ class TestExportImages:
                 name.startswith("raw/") and "Child_Box" in name for name in names
             )
 
+    def test_export_images_with_single_cut_line_splits_root(self):
+        ws = _workspace_with_image(800, 600)
+        upper_id = uuid.uuid4()
+        lower_id = uuid.uuid4()
+        ws.add_component(upper_id, "Upper", Bounds(x=10, y=10, w=100, h=100))
+        ws.add_component(lower_id, "Lower", Bounds(x=10, y=350, w=100, h=100))
+        ws.update_cut_lines([300])
+
+        zip_bytes = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            segment_files = [n for n in names if "segment_" in n]
+            assert len(segment_files) == 2
+            assert any("segment_1" in n for n in segment_files)
+            assert any("segment_2" in n for n in segment_files)
+            # No unsplit root file
+            assert not any("root_" in n and "segment_" not in n for n in names)
+
+    def test_export_images_with_multiple_cut_lines(self):
+        ws = _workspace_with_image(800, 600)
+        comp1 = uuid.uuid4()
+        comp2 = uuid.uuid4()
+        comp3 = uuid.uuid4()
+        ws.add_component(comp1, "Top", Bounds(x=10, y=10, w=100, h=80))
+        ws.add_component(comp2, "Mid", Bounds(x=10, y=210, w=100, h=80))
+        ws.add_component(comp3, "Bot", Bounds(x=10, y=450, w=100, h=80))
+        ws.update_cut_lines([200, 400])
+
+        zip_bytes = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            segment_files = [n for n in names if "segment_" in n]
+            assert len(segment_files) == 3
+
+    def test_export_images_no_cut_lines_single_root(self):
+        ws = _workspace_with_image(800, 600)
+        comp_id = uuid.uuid4()
+        ws.add_component(comp_id, "Box", Bounds(x=10, y=10, w=100, h=100))
+
+        zip_bytes = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            root_files = [n for n in names if n.startswith("root_")]
+            assert len(root_files) == 1
+            assert "segment_" not in root_files[0]
+
+    def test_export_mapping_root_is_list(self):
+        ws = _workspace_with_image(800, 600)
+        comp_id = uuid.uuid4()
+        ws.add_component(comp_id, "Box", Bounds(x=10, y=10, w=100, h=100))
+
+        zip_bytes = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            mapping = json.loads(zf.read("mapping.json"))
+            assert isinstance(mapping["root"], list)
+            assert len(mapping["root"]) == 1
+
+    def test_export_mapping_root_list_with_cuts(self):
+        ws = _workspace_with_image(800, 600)
+        comp_id = uuid.uuid4()
+        ws.add_component(comp_id, "Box", Bounds(x=10, y=10, w=100, h=100))
+        ws.update_cut_lines([300])
+
+        zip_bytes = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            mapping = json.loads(zf.read("mapping.json"))
+            assert isinstance(mapping["root"], list)
+            assert len(mapping["root"]) == 2
+
+    def test_export_annotated_includes_empty_segments(self):
+        """Root segments are screen crops and should always be exported, even if empty."""
+        ws = _workspace_with_image(800, 600)
+        comp_id = uuid.uuid4()
+        ws.add_component(comp_id, "Upper", Bounds(x=10, y=10, w=100, h=100))
+        ws.update_cut_lines([300])
+
+        zip_bytes = ws.export_images("annotated")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+            names = zf.namelist()
+            # Both segment_1 (with component) and segment_2 (empty) should be exported
+            segment_files = [n for n in names if "segment_" in n]
+            assert len(segment_files) == 2
+            assert "root_screenshot_segment_1.png" in segment_files
+            assert "root_screenshot_segment_2.png" in segment_files
+            assert "segment_1" in segment_files[0]
+
 
 # ── Subscriber Notifications ──────────────────────────────────────────
 

@@ -594,7 +594,7 @@ class WorkspaceManager:
     ):
         target_map = mapping[submode] if mode == "both" else mapping
         if comp_id is None:
-            target_map["root"] = archive_path
+            target_map["root"].append(archive_path)
         else:
             target_map["components"][str(comp_id)] = archive_path
 
@@ -670,26 +670,49 @@ class WorkspaceManager:
             with Image.open(io.BytesIO(image_bytes)) as img:
 
                 def get_export_nodes() -> Generator[ExportNode]:
-                    # Yield root node
+                    # Yield root node(s) — split by cut lines into segments
                     root_children = TreeUtils.get_children(state_snapshot, None)
                     root_base = (
                         state_snapshot.image.filename.rsplit(".", 1)[0]
                         if state_snapshot.image.filename
                         else "root"
                     )
-                    yield {
-                        "is_leaf": len(root_children) == 0,
-                        "bounds": (
-                            0,
-                            0,
-                            state_snapshot.image.width,
-                            state_snapshot.image.height,
-                        ),
-                        "children": root_children,
-                        "parent_comp": None,
-                        "filename": f"root_{sanitize_filename(root_base)}.png",
-                        "comp_id": None,
-                    }
+                    img_w = state_snapshot.image.width
+                    img_h = state_snapshot.image.height
+                    cuts = sorted(state_snapshot.cutLines)
+                    boundaries = [0] + cuts + [img_h]
+                    segments = [
+                        (boundaries[i], boundaries[i + 1])
+                        for i in range(len(boundaries) - 1)
+                    ]
+
+                    if len(segments) <= 1:
+                        # No cuts: single root node (original behavior)
+                        yield {
+                            "is_leaf": False,  # Root is a screen crop, always export
+                            "bounds": (0, 0, img_w, img_h),
+                            "children": root_children,
+                            "parent_comp": None,
+                            "filename": f"root_{sanitize_filename(root_base)}.png",
+                            "comp_id": None,
+                        }
+                    else:
+                        # Yield one root segment per cut-delimited strip
+                        for seg_idx, (seg_start, seg_end) in enumerate(segments):
+                            seg_children = [
+                                c
+                                for c in root_children
+                                if c.bounds.top >= seg_start
+                                and c.bounds.bottom <= seg_end
+                            ]
+                            yield {
+                                "is_leaf": False,  # Root segment is a screen crop, always export
+                                "bounds": (0, seg_start, img_w, seg_end),
+                                "children": seg_children,
+                                "parent_comp": None,
+                                "filename": f"root_{sanitize_filename(root_base)}_segment_{seg_idx + 1}.png",
+                                "comp_id": None,
+                            }
 
                     # Yield component nodes
                     for comp_id, comp in state_snapshot.components.items():
@@ -717,10 +740,10 @@ class WorkspaceManager:
 
                 mapping: dict[str, Any] = {}
                 if mode == "both":
-                    mapping["annotated"] = {"root": None, "components": {}}
-                    mapping["raw"] = {"root": None, "components": {}}
+                    mapping["annotated"] = {"root": [], "components": {}}
+                    mapping["raw"] = {"root": [], "components": {}}
                 else:
-                    mapping["root"] = None
+                    mapping["root"] = []
                     mapping["components"] = {}
 
                 exported_count = 0

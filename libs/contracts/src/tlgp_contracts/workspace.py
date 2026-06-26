@@ -85,7 +85,7 @@ class ImageExportManifest(BaseModel):
         components: dict mapping component UUID string → archive path
     """
 
-    root: str | None = None
+    root: list[str] = Field(default_factory=list)
     components: dict[str, str] = Field(default_factory=dict)
 
 
