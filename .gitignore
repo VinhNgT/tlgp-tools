@@ -33,5 +33,4 @@ htmlcov/
 
 # uv
 uv.lock
-*.docx
 *.~lock.*
