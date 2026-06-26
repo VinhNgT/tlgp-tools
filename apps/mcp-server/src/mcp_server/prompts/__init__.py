@@ -1,7 +1,8 @@
 """MCP prompt content loaders.
 
-Loads markdown-based reference guides and workflow instructions from files
-co-located in this package directory.
+Each public function loads a single markdown or JSON reference file
+co-located in this package directory. There is exactly one loader per
+content file — no indirection maps or template substitution.
 """
 
 from __future__ import annotations
@@ -11,34 +12,31 @@ from pathlib import Path
 _PROMPT_DIR = Path(__file__).parent
 
 
-def get_strict_guidelines_content() -> str:
-    """Read the consolidated strict guidelines from markdown."""
-    return (_PROMPT_DIR / "strict_guidelines.md").read_text(encoding="utf-8").strip()
+def _read(filename: str) -> str:
+    return (_PROMPT_DIR / filename).read_text(encoding="utf-8").strip()
 
 
-def get_spec_workflow_content() -> str:
-    """Load the spec workflow instructions for agent reference."""
-    workflow = (_PROMPT_DIR / "spec_workflow.md").read_text(encoding="utf-8")
-    guidelines = get_strict_guidelines_content()
-    return workflow.replace("{strict_guidelines}", guidelines).strip()
+def get_strict_guidelines() -> str:
+    """Strict behavioral rules for the AI agent (embedded in server instructions)."""
+    return _read("strict_guidelines.md")
 
 
-_PROMPT_MAP = {
-    "analysis.json Schema Reference": "schema_reference.md",
-    "UI Control Type Classification Guide": "classification_guide.md",
-    "Example: Complete Analysis Dict": "example_analysis.json",
-}
+def get_spec_workflow() -> str:
+    """Step-by-step workflow for creating specification documents."""
+    return _read("spec_workflow.md")
 
 
-def get_prompt_section(section_title: str) -> str:
-    """Load the standalone files corresponding to each prompt section."""
-    filename = _PROMPT_MAP.get(section_title)
-    if not filename:
-        return ""
+def get_schema_reference() -> str:
+    """Field-level reference for the analysis.json structure."""
+    return _read("schema_reference.md")
 
-    content = (_PROMPT_DIR / filename).read_text(encoding="utf-8").strip()
 
-    if section_title == "Example: Complete Analysis Dict":
-        return f"## Example: Complete Analysis Dict\n\n```json\n{content}\n```"
+def get_classification_guide() -> str:
+    """Rules for categorizing UI elements into control types."""
+    return _read("classification_guide.md")
 
-    return content
+
+def get_example_analysis() -> str:
+    """A complete example analysis.json, wrapped in a markdown code fence."""
+    raw = _read("example_analysis.json")
+    return f"## Example: Complete Analysis JSON\n\n```json\n{raw}\n```"

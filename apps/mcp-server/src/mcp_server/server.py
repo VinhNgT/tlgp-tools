@@ -17,9 +17,11 @@ from tlgp_logger import get_logger
 from mcp_server.client import ImageExportResult, WorkspaceClient
 from mcp_server.manager import DaemonManager
 from mcp_server.prompts import (
-    get_prompt_section,
-    get_spec_workflow_content,
-    get_strict_guidelines_content,
+    get_classification_guide,
+    get_example_analysis,
+    get_schema_reference,
+    get_spec_workflow,
+    get_strict_guidelines,
 )
 from mcp_server.services import SpecGeneratorService
 
@@ -96,21 +98,11 @@ mcp = FastMCP(
     instructions=(
         "TLGP Tools MCP server. Provides tools for annotating screenshots "
         "and compiling .docx specification documents.\n\n"
-        "AVAILABLE TOOLS:\n"
-        "  - launch_annotator: Start a new annotator GUI instance\n"
-        "  - connect_to_annotator: Connect to an already-running annotator\n"
-        "  - export_images: Export cropped component images from the workspace\n"
-        "  - generate_spec_doc: Validate and generate the .docx specification document\n\n"
         "SYSTEM DIRECTIVES & BOUNDARIES:\n"
-        f"{get_strict_guidelines_content()}\n\n"
+        f"{get_strict_guidelines()}\n\n"
         "WORKFLOW:\n"
         "You MUST read the resource 'tlgp://spec/workflow' before starting any work. "
-        "It contains the complete step-by-step instructions.\n\n"
-        "REFERENCE GUIDES:\n"
-        "  - 'tlgp://spec/schema' (JSON Schema structure)\n"
-        "  - 'tlgp://spec/classification-guide' (UI Control type rules)\n"
-        "  - 'tlgp://spec/example-analysis' (Complete example analysis data)\n"
-        "  - 'tlgp://workspace/state' (Active annotation hierarchy state)"
+        "It contains the complete step-by-step instructions."
     ),
 )
 
@@ -133,25 +125,25 @@ async def get_workspace_state_resource() -> str:
 @mcp.resource("tlgp://spec/workflow")
 def get_spec_workflow_resource() -> str:
     """End-to-end workflow guide for creating specification documents."""
-    return get_spec_workflow_content()
+    return get_spec_workflow()
 
 
 @mcp.resource("tlgp://spec/schema")
 def get_spec_schema_resource() -> str:
-    """Read-only access to the analysis.json Schema Reference."""
-    return get_prompt_section("analysis.json Schema Reference")
+    """Field-level reference for the analysis.json structure."""
+    return get_schema_reference()
 
 
 @mcp.resource("tlgp://spec/classification-guide")
 def get_spec_classification_guide_resource() -> str:
-    """Read-only access to the UI Control Type Classification Guide."""
-    return get_prompt_section("UI Control Type Classification Guide")
+    """Rules for categorizing UI elements into control types."""
+    return get_classification_guide()
 
 
 @mcp.resource("tlgp://spec/example-analysis")
 def get_spec_example_analysis_resource() -> str:
-    """Read-only access to a complete example analysis.json structure."""
-    return get_prompt_section("Example: Complete Analysis Dict")
+    """A complete example analysis.json for reference."""
+    return get_example_analysis()
 
 
 # ============================================================

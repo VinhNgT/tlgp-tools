@@ -4,33 +4,33 @@
   "components": [
     {
       "id": 1,
-      "label": "Header",
-      "description": "Thanh tiêu đề phía trên cùng của màn hình",
+      "label": "Thanh tiêu đề",
+      "description": "Thanh tiêu đề phía trên cùng của màn hình, chứa nút quay lại và tên sản phẩm",
       "isLeaf": false,
-      "imageFile": "a1b2c3d4-e5f6-7890-1234-56789abcdef0.png",
+      "imageFile": "annotated/1_Thanh_tiêu_đề_a1b2c3d4.png",
       "children": [
         {
           "stt": 1,
-          "label": "Back Button",
+          "label": "Nút quay lại",
           "controlType": "Icon",
           "required": "",
           "maxLength": "",
           "editable": "",
-          "description": "Nút quay lại màn hình trước"
+          "description": "Biểu tượng mũi tên quay lại màn hình trước"
         },
         {
           "stt": 2,
-          "label": "Title",
+          "label": "Tiêu đề sản phẩm",
           "controlType": "Text",
           "required": "",
           "maxLength": "",
           "editable": "",
-          "description": "Tiêu đề màn hình hiển thị tên sản phẩm"
+          "description": "Hiển thị tên của sản phẩm đang xem chi tiết"
         }
       ],
       "interactions": [
         {
-          "action": "Click vào nút Back",
+          "action": "Nhấn vào nút quay lại",
           "reaction": "Hệ thống quay về màn hình trước đó"
         }
       ],
@@ -61,22 +61,23 @@
     },
     {
       "id": 2,
-      "label": "Banner",
-      "description": "",
+      "label": "Ảnh banner quảng cáo",
+      "description": "Hình ảnh banner quảng cáo sản phẩm ở đầu màn hình",
       "isLeaf": true,
       "imageFile": null,
       "children": [],
-      "interactions": []
+      "interactions": [],
+      "apis": []
     }
   ],
   "screen": {
     "name": "Chi tiết sản phẩm",
-    "description": "Màn hình hiển thị thông tin chi tiết của sản phẩm",
-    "imageFiles": ["raw.png"],
+    "description": "Màn hình hiển thị thông tin chi tiết của sản phẩm bao gồm ảnh, mô tả và giá",
+    "imageFiles": ["annotated/root_screenshot.png"],
     "topLevelChildren": [
       {
         "stt": 1,
-        "label": "Header",
+        "label": "Thanh tiêu đề",
         "controlType": "Component",
         "required": "",
         "maxLength": "",
@@ -85,12 +86,12 @@
       },
       {
         "stt": 2,
-        "label": "Banner",
+        "label": "Ảnh banner quảng cáo",
         "controlType": "Image",
         "required": "",
         "maxLength": "",
         "editable": "",
-        "description": "Ảnh banner quảng cáo sản phẩm"
+        "description": "Hình ảnh banner quảng cáo sản phẩm"
       }
     ],
     "interactions": [

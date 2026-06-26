@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import pytest
-from mcp_server.prompts import get_spec_workflow_content, get_strict_guidelines_content
+from mcp_server.prompts import get_spec_workflow, get_strict_guidelines
 
 SPEC_WORKFLOW_CONTENT = ""
 
@@ -11,7 +11,7 @@ SPEC_WORKFLOW_CONTENT = ""
 @pytest.fixture(autouse=True, scope="module")
 def setup_spec_workflow_content():
     global SPEC_WORKFLOW_CONTENT
-    SPEC_WORKFLOW_CONTENT = get_spec_workflow_content()
+    SPEC_WORKFLOW_CONTENT = get_spec_workflow()
 
 
 class TestSpecWorkflowContent:
@@ -48,7 +48,7 @@ class TestSpecWorkflowContent:
             )
 
     def test_no_unsubstituted_template_variables(self):
-        # All template variables should be resolved
+        assert "{strict_guidelines}" not in SPEC_WORKFLOW_CONTENT
         assert "{section_prefix}" not in SPEC_WORKFLOW_CONTENT
         assert "{annotation_json_example}" not in SPEC_WORKFLOW_CONTENT
 
@@ -75,7 +75,6 @@ class TestSpecWorkflowContent:
 
     def test_vietnamese_language_rule(self):
         assert "Vietnamese" in SPEC_WORKFLOW_CONTENT
-        assert "must be in Vietnamese" in SPEC_WORKFLOW_CONTENT
 
     def test_validate_only_documented(self):
         assert "validate_only" in SPEC_WORKFLOW_CONTENT
@@ -86,19 +85,11 @@ class TestSpecWorkflowContent:
         assert "raw/" in SPEC_WORKFLOW_CONTENT
         assert "annotated/" in SPEC_WORKFLOW_CONTENT
 
-    def test_dfs_ordering_documented(self):
-        assert "dfs" in SPEC_WORKFLOW_CONTENT.lower()
-        assert "depth-first search" in SPEC_WORKFLOW_CONTENT.lower()
-
-    def test_non_leaf_completeness_documented(self):
-        assert "non-leaf box" in SPEC_WORKFLOW_CONTENT.lower()
-        assert "isleaf" in SPEC_WORKFLOW_CONTENT.lower()
-        assert "false" in SPEC_WORKFLOW_CONTENT.lower()
-
-    def test_leaf_components_analysis_documented(self):
-        assert "leaf component" in SPEC_WORKFLOW_CONTENT.lower()
-        assert "isleaf" in SPEC_WORKFLOW_CONTENT.lower()
-        assert "true" in SPEC_WORKFLOW_CONTENT.lower()
+    def test_guidelines_not_duplicated_in_workflow(self):
+        """Guidelines are delivered via MCP server instructions, not duplicated here."""
+        assert "Vietnamese Translation Rule" not in SPEC_WORKFLOW_CONTENT
+        assert "Strict Read-Only Mode" not in SPEC_WORKFLOW_CONTENT
+        assert "DFS Document Ordering" not in SPEC_WORKFLOW_CONTENT
 
     def test_no_external_service_references(self):
         assert "createDocument" not in SPEC_WORKFLOW_CONTENT
@@ -109,10 +100,22 @@ class TestSpecWorkflowContent:
         assert "show_root_children" not in SPEC_WORKFLOW_CONTENT
         assert "show_component_children" not in SPEC_WORKFLOW_CONTENT
 
+    def test_vision_derived_naming_referenced(self):
+        """Step 4 references Guideline 12 for vision-derived naming."""
+        assert "Guideline 12" in SPEC_WORKFLOW_CONTENT
+        assert "bounding box" in SPEC_WORKFLOW_CONTENT.lower()
+
+    def test_explicit_mapping_instructions(self):
+        """Workflow must explain UUID-to-integer mapping and mapping.json for cheap agents."""
+        assert "mapping.json" in SPEC_WORKFLOW_CONTENT
+        assert "sequential integer" in SPEC_WORKFLOW_CONTENT.lower()
+        assert "imageDir" in SPEC_WORKFLOW_CONTENT
+        assert "topLevelChildren" in SPEC_WORKFLOW_CONTENT
+
 
 class TestStrictGuidelines:
-    def test_get_strict_guidelines_content(self):
-        content = get_strict_guidelines_content()
+    def test_content_is_nonempty(self):
+        content = get_strict_guidelines()
         assert isinstance(content, str)
         assert len(content) > 100
         assert "Vietnamese Translation Rule" in content
@@ -122,6 +125,12 @@ class TestStrictGuidelines:
         assert "Leaf Components" in content
 
     def test_no_stale_download_parameters(self):
-        content = get_strict_guidelines_content()
+        content = get_strict_guidelines()
         assert "show_root_children" not in content
         assert "show_component_children" not in content
+
+    def test_vision_derived_naming_guideline(self):
+        content = get_strict_guidelines()
+        assert "Vision-Derived Naming" in content
+        assert "suggestions only" in content.lower()
+        assert "bounding box" in content.lower()

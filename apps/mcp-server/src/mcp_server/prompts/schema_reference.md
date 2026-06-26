@@ -17,9 +17,9 @@ Every field maps to a specific location in the generated .docx document.
 | Field | Type | Description |
 |---|---|---|
 | `id` | `int` | Sequential annotation box ID |
-| `label` | `str` | Component name (from annotation label) |
+| `label` | `str` | Descriptive Vietnamese component name |
 | `description` | `str` | Vietnamese description of the component's purpose |
-| `isLeaf` | `bool` | True if component has no children. Every single non-leaf box in the workspace state must have an entry in components with isLeaf set to false |
+| `isLeaf` | `bool` | True if component has no children |
 | `imageFile` | `str?` | Filename of the component annotated image (e.g. `<uuid>.png`) |
 | `children` | `list[ChildElement]` | UI elements inside this component |
 | `interactions` | `list[Interaction]` | User action / system reaction pairs |
@@ -30,7 +30,7 @@ Every field maps to a specific location in the generated .docx document.
 | Field | Type | Description |
 |---|---|---|
 | `stt` | `int` | Sequential number |
-| `label` | `str` | Element name (from annotation label) |
+| `label` | `str` | Descriptive Vietnamese element name |
 | `controlType` | `str` | UI control type (Button, Text, Icon, etc.) |
 | `required` | `str` | Whether the field is required |
 | `maxLength` | `str` | Maximum input length |
