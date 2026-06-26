@@ -7,9 +7,10 @@ import json
 import os
 import threading
 import zipfile
-from typing import Literal, TypedDict
+from typing import Literal
 
 import httpx
+from pydantic import BaseModel, Field
 from tlgp_contracts import ImageExportManifest, ImageExportManifestBoth, WorkspaceState
 from tlgp_logger import get_logger
 
@@ -18,15 +19,16 @@ from mcp_server.exceptions import ApiClientError
 logger = get_logger(__name__)
 
 
-class ImageExportResult(TypedDict, total=False):
+class ImageExportResult(BaseModel):
+    """Structured result from an image export operation."""
     output_path: str
-    annotated_images: int
-    raw_images: int
-    images: int
-    segments: int
-    annotated_segments: int
-    raw_segments: int
-    root_images: list[str]
+    annotated_images: int = 0
+    raw_images: int = 0
+    images: int = 0
+    segments: int = 0
+    annotated_segments: int = 0
+    raw_segments: int = 0
+    root_images: list[str] = Field(default_factory=list)
 
 
 class WorkspaceClient:
@@ -160,7 +162,7 @@ class WorkspaceClient:
         with zipfile.ZipFile(zip_buf, "r") as zf:
             zf.extractall(out_path)
 
-        result: ImageExportResult = {"output_path": out_path}
+        result: dict = {"output_path": out_path}
 
         # Parse mapping.json using typed contract models
         mapping_path = os.path.join(out_path, "mapping.json")
@@ -187,4 +189,4 @@ class WorkspaceClient:
                     exc_info=True,
                 )
 
-        return result
+        return ImageExportResult(**result)

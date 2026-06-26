@@ -182,7 +182,7 @@ class TestWorkspaceApi:
         client = WorkspaceClient()
         res = await client.export_images(str(out_dir))
 
-        assert res["output_path"] == str(out_dir.resolve())
+        assert res.output_path == str(out_dir.resolve())
         assert (out_dir / "mapping.json").exists()
         assert (out_dir / "comp1.png").exists()
 
@@ -207,8 +207,8 @@ class TestWorkspaceApi:
         client = WorkspaceClient()
         res = await client.export_images(str(out_dir))
 
-        assert res["output_path"] == str(out_dir.resolve())
+        assert res.output_path == str(out_dir.resolve())
         assert (out_dir / "mapping.json").exists()
         assert (out_dir / "comp1.png").exists()
-        assert "images" not in res
-        assert "annotated_images" not in res
+        assert res.images == 0
+        assert res.annotated_images == 0

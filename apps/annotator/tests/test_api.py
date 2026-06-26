@@ -94,7 +94,7 @@ class TestImportExportRoutes:
         assert resp.headers["content-type"] == "application/zip"
         assert (
             resp.headers["content-disposition"]
-            == "attachment; filename=screenshot_annotated.zip"
+            == "attachment; filename*=utf-8''screenshot_annotated.zip"
         )
 
         with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:
@@ -117,7 +117,7 @@ class TestImportExportRoutes:
         assert resp.headers["content-type"] == "application/zip"
         assert (
             resp.headers["content-disposition"]
-            == "attachment; filename=screenshot_raw.zip"
+            == "attachment; filename*=utf-8''screenshot_raw.zip"
         )
 
         with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:
@@ -140,7 +140,7 @@ class TestImportExportRoutes:
         assert resp.headers["content-type"] == "application/zip"
         assert (
             resp.headers["content-disposition"]
-            == "attachment; filename=screenshot_both.zip"
+            == "attachment; filename*=utf-8''screenshot_both.zip"
         )
 
         with zipfile.ZipFile(io.BytesIO(resp.content), "r") as zf:

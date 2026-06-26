@@ -14,7 +14,8 @@ from tlgp_logger import get_logger, setup_logging
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import AnalysisData
-from doc_generator.validation import DocGenResult, validate_analysis
+from doc_generator.validation import validate_analysis
+from tlgp_contracts import DocGenResult
 
 logger = get_logger(__name__)
 
@@ -159,6 +160,7 @@ def _run_json_mode(
 
     Returns the process exit code (0 for success, 1 for failure).
     """
+    sys.stdout.reconfigure(encoding="utf-8")
     raw = _load_analysis_raw(analysis_path)
     if raw is None:
         result = DocGenResult(valid=False, errors=[f"Failed to read {analysis_path}"])
@@ -177,12 +179,12 @@ def _run_json_mode(
     vr = validate_analysis(data)
 
     if not vr.valid:
-        result = DocGenResult.from_validation(vr)
+        result = DocGenResult(**vr.model_dump())
         sys.stdout.write(result.model_dump_json())
         return 1
 
     if validate_only:
-        result = DocGenResult.from_validation(vr)
+        result = DocGenResult(**vr.model_dump())
         sys.stdout.write(result.model_dump_json())
         return 0
 
@@ -195,7 +197,7 @@ def _run_json_mode(
     try:
         doc.save(str(out))
     except PermissionError as e:
-        result = DocGenResult.from_validation(vr)
+        result = DocGenResult(**vr.model_dump())
         result.valid = False
         result.errors.append(
             f"Permission denied: Could not save to {out}. Please ensure the file is closed and not locked by another application (e.g. Microsoft Word). Detail: {e}"
@@ -208,8 +210,8 @@ def _run_json_mode(
     if analysis_path.resolve() != analysis_json_dest.resolve():
         shutil.copy2(analysis_path, analysis_json_dest)
 
-    result = DocGenResult.from_validation(
-        vr, output_path=str(out), tables=len(doc.tables)
+    result = DocGenResult(
+        **vr.model_dump(), output_path=str(out), tables=len(doc.tables)
     )
     sys.stdout.write(result.model_dump_json())
     return 0

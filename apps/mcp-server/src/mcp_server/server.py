@@ -11,6 +11,7 @@ from contextlib import asynccontextmanager
 from typing import TypedDict
 
 from mcp.server.fastmcp import Context, FastMCP
+from tlgp_contracts import DocGenResult
 from tlgp_logger import get_logger
 
 from mcp_server.client import ImageExportResult, WorkspaceClient
@@ -20,9 +21,25 @@ from mcp_server.prompts import (
     get_spec_workflow_content,
     get_strict_guidelines_content,
 )
-from mcp_server.services import DocGenResult, SpecGeneratorService
+from mcp_server.services import SpecGeneratorService
 
 logger = get_logger(__name__)
+
+
+class _LifespanState:
+    """Module-level state populated by the server lifespan.
+
+    FastMCP resource handlers do not receive Context injection
+    (functions with parameters are registered as resource templates).
+    Resources that need access to lifespan-scoped services read from
+    this state holder instead.
+
+    Tools continue using Context-based DI via _get_client() etc.
+    """
+    client: WorkspaceClient | None = None
+
+
+_lifespan_state = _LifespanState()
 
 
 # ============================================================
@@ -41,6 +58,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Initialize and tear down shared services for the server's lifetime."""
     client = WorkspaceClient()
     daemon_manager = DaemonManager()
+    _lifespan_state.client = client
     try:
         yield {
             "client": client,
@@ -48,6 +66,7 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
             "spec_service": SpecGeneratorService(client=client),
         }
     finally:
+        _lifespan_state.client = None
         daemon_manager.cleanup()
         await client.close()
 
@@ -102,9 +121,12 @@ mcp = FastMCP(
 
 
 @mcp.resource("tlgp://workspace/state")
-async def get_workspace_state_resource(ctx: Context) -> str:
+async def get_workspace_state_resource() -> str:
     """Read-only access to the latest flat-map JSON WorkspaceState."""
-    state = await _get_client(ctx).get_workspace_state()
+    client = _lifespan_state.client
+    if not client:
+        raise RuntimeError("Workspace client not initialized")
+    state = await client.get_workspace_state()
     return json.dumps(state.model_dump(mode="json"), indent=2, ensure_ascii=False)
 
 

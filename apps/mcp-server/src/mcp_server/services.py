@@ -5,8 +5,11 @@ from __future__ import annotations
 import asyncio
 import json
 import shutil
+import sys
 from pathlib import Path
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING
+
+from tlgp_contracts import DocGenResult
 
 from tlgp_logger import get_logger
 
@@ -18,21 +21,6 @@ if TYPE_CHECKING:
 logger = get_logger(__name__)
 
 
-class DocGenResult(TypedDict, total=False):
-    """The structured JSON output from the doc-gen CLI."""
-
-    valid: bool
-    errors: list[str]
-    warnings: list[str]
-    components: int
-    non_leaf: int
-    ui_elements: int
-    interactions: int
-    apis: int
-    images: int
-    discrepancies: int
-    output_path: str | None
-    tables: int | None
 
 
 class SpecGeneratorService:
@@ -42,13 +30,8 @@ class SpecGeneratorService:
     Communication happens via a structured JSON contract over stdout.
     """
 
-    def __init__(
-        self,
-        client: WorkspaceClient | None = None,
-        doc_gen_bin: str | None = None,
-    ):
+    def __init__(self, client: WorkspaceClient | None = None):
         self._client = client
-        self._doc_gen_bin = doc_gen_bin or shutil.which("doc-gen")
 
     async def generate(
         self,
@@ -61,23 +44,13 @@ class SpecGeneratorService:
 
         Delegates to the ``doc-gen`` CLI with ``--json`` for structured output.
         """
-        if not self._doc_gen_bin:
-            return {
-                "valid": False,
-                "errors": [
-                    "doc-gen binary not found on PATH. "
-                    "Ensure the doc-generator package is installed."
-                ],
-                "warnings": [],
-            }
-
         if ctx:
             await ctx.report_progress(
                 10, 100, "Loading and validating analysis data..."
             )
 
         # Build CLI command
-        cmd = [self._doc_gen_bin, analysis_path, "--json"]
+        cmd = [sys.executable, "-m", "doc_generator", analysis_path, "--json"]
         if validate_only:
             cmd.append("--validate-only")
         if output_path:
@@ -97,11 +70,10 @@ class SpecGeneratorService:
             stdout_bytes, stderr_bytes = await proc.communicate()
         except Exception as e:
             logger.error("Failed to invoke doc-gen subprocess: %s", e)
-            return {
-                "valid": False,
-                "errors": [f"Failed to invoke doc-gen: {e}"],
-                "warnings": [],
-            }
+            return DocGenResult(
+                valid=False,
+                errors=[f"Failed to invoke doc-gen: {e}"],
+            )
 
         stdout_text = stdout_bytes.decode("utf-8", errors="replace").strip()
         stderr_text = stderr_bytes.decode("utf-8", errors="replace").strip()
@@ -109,32 +81,30 @@ class SpecGeneratorService:
         if stderr_text:
             logger.debug("doc-gen stderr: %s", stderr_text)
 
-        # Parse the JSON result from stdout
         try:
-            result: DocGenResult = json.loads(stdout_text)
-        except json.JSONDecodeError:
+            result = DocGenResult.model_validate(json.loads(stdout_text))
+        except Exception:
             logger.error(
                 "doc-gen produced non-JSON stdout (exit code %d): %s",
                 proc.returncode,
                 stdout_text[:500],
             )
-            return {
-                "valid": False,
-                "errors": [
+            return DocGenResult(
+                valid=False,
+                errors=[
                     f"doc-gen exited with code {proc.returncode}. "
                     f"stderr: {stderr_text[:500]}"
                 ],
-                "warnings": [],
-            }
+            )
 
         # On successful generation, export workspace.zip alongside the docx
         if (
             not validate_only
-            and result.get("valid")
+            and result.valid
             and self._client is not None
-            and result.get("output_path") is not None
+            and result.output_path is not None
         ):
-            docx_path = Path(result["output_path"])
+            docx_path = Path(result.output_path)
             workspace_zip_path = docx_path.parent / "workspace.zip"
             if ctx:
                 await ctx.log(

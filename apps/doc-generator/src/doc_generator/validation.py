@@ -8,7 +8,9 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
-from doc_generator.models import AnalysisData
+from tlgp_contracts import DocGenResult
+
+from .models import AnalysisData
 
 
 class ValidationResult(BaseModel):
@@ -28,46 +30,7 @@ class ValidationResult(BaseModel):
     discrepancies: int = 0
 
 
-class DocGenResult(BaseModel):
-    """The complete structured JSON output emitted by the doc-gen CLI."""
 
-    valid: bool = True
-    errors: list[str] = Field(default_factory=list)
-    warnings: list[str] = Field(default_factory=list)
-
-    components: int = 0
-    non_leaf: int = 0
-    ui_elements: int = 0
-    interactions: int = 0
-    apis: int = 0
-    images: int = 0
-    discrepancies: int = 0
-
-    output_path: str | None = None
-    tables: int | None = None
-
-    @classmethod
-    def from_validation(
-        cls,
-        vr: ValidationResult,
-        output_path: str | None = None,
-        tables: int | None = None,
-    ) -> DocGenResult:
-        """Construct from a ValidationResult and generation artifacts."""
-        return cls(
-            valid=vr.valid,
-            errors=vr.errors,
-            warnings=vr.warnings,
-            components=vr.components,
-            non_leaf=vr.non_leaf,
-            ui_elements=vr.ui_elements,
-            interactions=vr.interactions,
-            apis=vr.apis,
-            images=vr.images,
-            discrepancies=vr.discrepancies,
-            output_path=output_path,
-            tables=tables,
-        )
 
 
 def validate_analysis(data: AnalysisData) -> ValidationResult:

@@ -552,9 +552,12 @@ class WorkspaceManager:
 
         buf = io.BytesIO()
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+            # Strip folder paths to just get the file name (handle both \ and /)
+            base_filename = state_snapshot.image.filename.replace('\\', '/').split('/')[-1]
+            state_snapshot.image.filename = base_filename
             state_json = state_snapshot.model_dump_json(indent=2)
             zf.writestr("workspace.json", state_json)
-            zf.writestr(state_snapshot.image.filename, image_bytes)
+            zf.writestr(base_filename, image_bytes)
 
         return buf.getvalue()
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import urllib.parse
 from typing import Literal
 
 from fastapi import (
@@ -37,6 +38,12 @@ def get_workspace(request: Request) -> WorkspaceManager:
     return request.app.state.workspace
 
 
+def _content_disposition(filename: str) -> dict[str, str]:
+    """Build a Content-Disposition header with RFC 5987 encoding for non-ASCII filenames."""
+    encoded = urllib.parse.quote(filename)
+    return {"Content-Disposition": f"attachment; filename*=utf-8''{encoded}"}
+
+
 # ── Status Routes ──────────────────────────────────────────────────────
 
 
@@ -55,13 +62,14 @@ async def get_state(workspace: WorkspaceManager = Depends(get_workspace)):
     return workspace.state
 
 
+
 @router.get("/workspace/export", tags=["Export"])
 async def export_workspace(workspace: WorkspaceManager = Depends(get_workspace)):
     zip_bytes = await asyncio.to_thread(workspace.export_zip)
     return StreamingResponse(
         io.BytesIO(zip_bytes),
         media_type="application/zip",
-        headers={"Content-Disposition": "attachment; filename=annotation_export.zip"},
+        headers=_content_disposition("annotation_export.zip"),
     )
 
 
@@ -77,5 +85,5 @@ async def export_images(
     return StreamingResponse(
         io.BytesIO(zip_bytes),
         media_type="application/zip",
-        headers={"Content-Disposition": f"attachment; filename={export_name}.zip"},
+        headers=_content_disposition(f"{export_name}.zip"),
     )

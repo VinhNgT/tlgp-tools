@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import io
 import json
+import sys
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -41,15 +42,15 @@ class TestSpecGeneratorService:
         with patch(
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec:
-            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            service = SpecGeneratorService()
             result = await service.generate(analysis_path=str(analysis_file))
 
-        assert result["valid"] is True
-        assert result["output_path"] == str(tmp_path / "out.docx")
+        assert result.valid is True
+        assert result.output_path == str(tmp_path / "out.docx")
 
         # Verify CLI was called with --json
         call_args = mock_exec.call_args[0]
-        assert call_args[0] == "/usr/bin/doc-gen"
+        assert call_args[0] == sys.executable
         assert str(analysis_file) in call_args
         assert "--json" in call_args
 
@@ -68,13 +69,13 @@ class TestSpecGeneratorService:
         with patch(
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec:
-            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            service = SpecGeneratorService()
             result = await service.generate(
                 analysis_path=str(analysis_file),
                 validate_only=True,
             )
 
-        assert result["valid"] is True
+        assert result.valid is True
         call_args = mock_exec.call_args[0]
         assert "--validate-only" in call_args
 
@@ -93,7 +94,7 @@ class TestSpecGeneratorService:
         with patch(
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec:
-            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            service = SpecGeneratorService()
             await service.generate(
                 analysis_path=str(analysis_file),
                 output_path="/out/spec.docx",
@@ -115,23 +116,13 @@ class TestSpecGeneratorService:
         with patch(
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ):
-            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
-            result = await service.generate(analysis_path=str(analysis_file))
-
-        assert result["valid"] is False
-        assert len(result["errors"]) > 0
-
-    @pytest.mark.anyio
-    async def test_generate_missing_binary(self, tmp_path):
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text("{}", encoding="utf-8")
-
-        with patch("mcp_server.services.shutil.which", return_value=None):
             service = SpecGeneratorService()
             result = await service.generate(analysis_path=str(analysis_file))
 
-        assert result["valid"] is False
-        assert "doc-gen binary not found" in result["errors"][0]
+        assert result.valid is False
+        assert len(result.errors) > 0
+
+
 
     @pytest.mark.anyio
     async def test_generate_exports_workspace_zip_on_success(self, tmp_path):
@@ -159,11 +150,10 @@ class TestSpecGeneratorService:
         ):
             service = SpecGeneratorService(
                 client=mock_client,
-                doc_gen_bin="/usr/bin/doc-gen",
             )
             result = await service.generate(analysis_path=str(analysis_file))
 
-        assert result["valid"] is True
+        assert result.valid is True
         mock_client.export_workspace.assert_awaited_once_with(
             str(tmp_path / "workspace.zip")
         )
@@ -187,7 +177,7 @@ class TestSpecGeneratorService:
         with patch(
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ):
-            service = SpecGeneratorService(doc_gen_bin="/usr/bin/doc-gen")
+            service = SpecGeneratorService()
             await service.generate(analysis_path=str(analysis_file), ctx=ctx)
 
         ctx.report_progress.assert_any_call(
