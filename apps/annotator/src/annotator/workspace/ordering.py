@@ -143,6 +143,9 @@ def recalculate_tree(state: WorkspaceState, changed_id: UUID | object | None = N
 
         check_recursive(changed_id)
 
+    if not getattr(state, "autoNumbering", True):
+        return
+
     # 1. Row-major visual sorting step
     if changed_id is ROOTS_CHANGED:
         valid_roots = [

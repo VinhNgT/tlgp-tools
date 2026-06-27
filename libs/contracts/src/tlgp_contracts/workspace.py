@@ -8,7 +8,7 @@ contract between the annotator and any consumer (e.g. the MCP server).
 from typing import Literal
 from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 PillCorner = Literal["top_left", "top_right", "bottom_left", "bottom_right"]
 
@@ -50,6 +50,13 @@ class Component(BaseModel):
     bounds: Bounds
     style: Style = Field(default_factory=Style)
 
+    @field_validator("number")
+    @classmethod
+    def validate_number(cls, v: str) -> str:
+        if v != "" and not v.isdigit():
+            raise ValueError("Component number must contain only digits")
+        return v
+
 
 class ScreenInfo(BaseModel):
     name: str = ""
@@ -72,6 +79,7 @@ class WorkspaceState(BaseModel):
     cutLines: list[int] = Field(default_factory=list)
     rootComponents: list[UUID] = Field(default_factory=list)
     components: dict[UUID, Component] = Field(default_factory=dict)
+    autoNumbering: bool = True
 
 
 # ── Export Manifest ────────────────────────────────────────────

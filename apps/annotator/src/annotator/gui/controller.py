@@ -77,6 +77,9 @@ class AppController:
         self.view.callbacks.on_enter_pressed = self._on_enter_pressed
         self.view.callbacks.on_escape_pressed = self._on_escape_pressed
         self.view.callbacks.on_arrow_key_pressed = self._on_arrow_key_pressed
+        self.view.callbacks.on_toggle_auto_numbering_request = (
+            self._on_toggle_auto_numbering_request
+        )
 
         # Canvas callbacks
         self.view.canvas.callbacks.on_import_zip = self.io_handler.handle_import_zip
@@ -147,6 +150,11 @@ class AppController:
 
         # Sync visual navigation controls
         self._sync_breadcrumbs()
+
+        if hasattr(self.view, "chk_auto_number"):
+            self.view.chk_auto_number.blockSignals(True)
+            self.view.chk_auto_number.setChecked(getattr(state, "autoNumbering", True))
+            self.view.chk_auto_number.blockSignals(False)
 
     def _sync_workspace_reset(self, current_workspace_id: str | None):
         if (
@@ -229,6 +237,11 @@ class AppController:
             self.store.state.workspace_state,
             self.store.state.active_interaction,
         )
+        state = self.store.state.workspace_state
+        if state and hasattr(self.view, "chk_auto_number"):
+            self.view.chk_auto_number.blockSignals(True)
+            self.view.chk_auto_number.setChecked(getattr(state, "autoNumbering", True))
+            self.view.chk_auto_number.blockSignals(False)
 
     def _build_tree_nodes(self) -> list[dict]:
         state = self.store.state.workspace_state
@@ -324,9 +337,13 @@ class AppController:
                     w=bounds.w,
                     h=bounds.h,
                     pill_corner=comp.style.pillCorner,
+                    number=comp.number,
+                    auto_numbering=getattr(state, "autoNumbering", True),
                 )
                 if box_changed or not self.view.properties.is_field_focused("name"):
                     self.view.properties.update_field_value("name", comp.label)
+                if box_changed or not self.view.properties.is_field_focused("number"):
+                    self.view.properties.update_field_value("number", comp.number)
                 for key in ["x", "y", "w", "h"]:
                     if box_changed or not self.view.properties.is_field_focused(key):
                         val = getattr(bounds, key)
@@ -620,6 +637,8 @@ class AppController:
         update_kwargs = {}
         if "label" in kwargs:
             update_kwargs["label"] = kwargs["label"]
+        if "number" in kwargs:
+            update_kwargs["number"] = kwargs["number"]
         if "pillCorner" in kwargs:
             style = comp.style.model_copy() if comp.style else Style()
             style.pillCorner = kwargs["pillCorner"]
@@ -652,6 +671,9 @@ class AppController:
             update_kwargs["bounds"] = bounds
 
         self.workspace.update_component(UUID(comp_id), **update_kwargs)
+
+    def _on_toggle_auto_numbering_request(self, checked: bool):
+        self.workspace.set_auto_numbering(checked)
 
     def _on_properties_focus_changed(self, focused: bool):
         self.store.update_state("viewport", text_focused=focused)

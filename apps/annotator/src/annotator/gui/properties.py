@@ -1,7 +1,7 @@
 """Property inspector panel for editing component metadata and API tables."""
 
 from PySide6.QtCore import QEvent, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtGui import QColor, QIntValidator, QPainter, QPen
 from PySide6.QtWidgets import (
     QGridLayout,
     QHBoxLayout,
@@ -149,6 +149,7 @@ class ComponentPropertiesView(QWidget):
         self._selected_box_id = None
         self._current_label = ""
         self._current_pill_corner: str | None = "top_left"
+        self._current_number = ""
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
@@ -174,6 +175,20 @@ class ComponentPropertiesView(QWidget):
         self.entry_name.editingFinished.connect(self._save_name)
         name_row.addWidget(self.entry_name)
         layout.addLayout(name_row)
+
+        # Number field
+        number_row = QHBoxLayout()
+        lbl_number = QLabel("Number")
+        lbl_number.setFixedWidth(50)
+        lbl_number.setStyleSheet("color: #C5C5C5;")
+        number_row.addWidget(lbl_number)
+
+        self.entry_number = QLineEdit()
+        self.entry_number.setValidator(QIntValidator(1, 999999, self))
+        self.entry_number.returnPressed.connect(self._save_number)
+        self.entry_number.editingFinished.connect(self._save_number)
+        number_row.addWidget(self.entry_number)
+        layout.addLayout(number_row)
 
         # Coordinate fields
         coords_grid = QGridLayout()
@@ -229,6 +244,7 @@ class ComponentPropertiesView(QWidget):
 
         # Track focus changes
         self.entry_name.installEventFilter(self)
+        self.entry_number.installEventFilter(self)
         for entry in self.prop_entries.values():
             entry.installEventFilter(self)
 
@@ -258,15 +274,26 @@ class ComponentPropertiesView(QWidget):
         w: int,
         h: int,
         pill_corner: str,
+        number: str,
+        auto_numbering: bool,
     ):
         if self._selected_box_id and self._selected_box_id != box_id:
             self._save_name()
+            self._save_number()
 
         self._selected_box_id = box_id
         self._current_label = label
         self._current_pill_corner = pill_corner
+        self._current_number = number
 
         self.entry_name.setEnabled(True)
+        self.entry_number.setEnabled(True)
+        self.entry_number.setReadOnly(auto_numbering)
+        if auto_numbering:
+            self.entry_number.setStyleSheet("color: #8C8C8C; background-color: #2D2D30;")
+        else:
+            self.entry_number.setStyleSheet("color: #FFFFFF; background-color: #1E1E1E;")
+
         for entry in self.prop_entries.values():
             entry.setEnabled(True)
             entry.setReadOnly(True)
@@ -279,6 +306,8 @@ class ComponentPropertiesView(QWidget):
         focused = self.focusWidget()
         if field_name == "name":
             return focused == self.entry_name
+        elif field_name == "number":
+            return focused == self.entry_number
         elif field_name in self.prop_entries:
             return focused == self.prop_entries[field_name]
         return False
@@ -288,6 +317,9 @@ class ComponentPropertiesView(QWidget):
         if field_name == "name":
             if self.entry_name.isEnabled():
                 self.entry_name.setText(value)
+        elif field_name == "number":
+            if self.entry_number.isEnabled():
+                self.entry_number.setText(value)
         elif field_name in self.prop_entries:
             entry = self.prop_entries[field_name]
             if entry.isEnabled():
@@ -298,11 +330,16 @@ class ComponentPropertiesView(QWidget):
     def disable_properties_fields(self):
         if self._selected_box_id:
             self._save_name()
+            self._save_number()
         self._selected_box_id = None
         self._current_label = ""
         self._current_pill_corner = None
+        self._current_number = ""
         self.entry_name.setEnabled(False)
         self.entry_name.clear()
+        self.entry_number.setEnabled(False)
+        self.entry_number.clear()
+        self.entry_number.setStyleSheet("")
         for entry in self.prop_entries.values():
             entry.setEnabled(False)
             entry.clear()
@@ -336,6 +373,13 @@ class ComponentPropertiesView(QWidget):
             if val and val != self._current_label:
                 self._current_label = val
                 self.on_property_changed(self._selected_box_id, label=val)
+
+    def _save_number(self):
+        if self._selected_box_id and self.on_property_changed:
+            val = self.entry_number.text().strip()
+            if val != self._current_number:
+                self._current_number = val
+                self.on_property_changed(self._selected_box_id, number=val)
 
     def _save_corner(self, corner: str):
         if self._selected_box_id and self.on_property_changed:

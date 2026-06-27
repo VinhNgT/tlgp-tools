@@ -52,6 +52,38 @@ def test_component_uuid_relationships():
     assert comp.style.pillCorner == "top_left"
 
 
+def test_component_number_digit_validation():
+    # Valid numeric numbers and empty string are allowed
+    Component(
+        id=uuid.uuid4(),
+        number="123",
+        label="Test",
+        bounds=Bounds(x=0, y=0, w=10, h=10),
+    )
+    Component(
+        id=uuid.uuid4(),
+        number="",
+        label="Test",
+        bounds=Bounds(x=0, y=0, w=10, h=10),
+    )
+
+    # Invalid non-digit characters should raise ValidationError
+    with pytest.raises(ValidationError, match="Component number must contain only digits"):
+        Component(
+            id=uuid.uuid4(),
+            number="abc",
+            label="Test",
+            bounds=Bounds(x=0, y=0, w=10, h=10),
+        )
+    with pytest.raises(ValidationError, match="Component number must contain only digits"):
+        Component(
+            id=uuid.uuid4(),
+            number="1.2",
+            label="Test",
+            bounds=Bounds(x=0, y=0, w=10, h=10),
+        )
+
+
 def test_workspace_state_defaults_and_serialization():
     ws_id = uuid.uuid4()
     state = WorkspaceState(workspaceId=ws_id)

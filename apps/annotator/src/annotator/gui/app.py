@@ -403,6 +403,14 @@ class MainAppWindow(QMainWindow):
         self.chk_show_labels.toggled.connect(self._on_show_labels_toggled)
         tb.addWidget(self.chk_show_labels)
 
+        # Auto Numbering checkbox
+        self.chk_auto_number = QCheckBox("Auto Numbering")
+        self.chk_auto_number.setToolTip("Toggle Auto Numbering")
+        self.chk_auto_number.setChecked(True)
+        self.chk_auto_number.setEnabled(False)
+        self.chk_auto_number.toggled.connect(self._on_auto_numbering_toggled)
+        tb.addWidget(self.chk_auto_number)
+
         tb.addSeparator()
 
         # Cut Lines button
@@ -485,6 +493,7 @@ class MainAppWindow(QMainWindow):
         # Data-driven widget enable/disable
         self.btn_cut_lines.setEnabled(has_img)
         self.chk_show_labels.setEnabled(has_img)
+        self.chk_auto_number.setEnabled(has_img)
         self.btn_screen_info.setEnabled(has_img)
         self.btn_export_images.setEnabled(has_img)
         self.btn_fit.setEnabled(has_img)
@@ -753,6 +762,10 @@ class MainAppWindow(QMainWindow):
     def _on_show_labels_toggled(self, checked: bool):
         if self.canvas.show_labels != checked:
             self.canvas.toggle_labels_visibility()
+
+    def _on_auto_numbering_toggled(self, checked: bool):
+        if self.callbacks.on_toggle_auto_numbering_request:
+            self.callbacks.on_toggle_auto_numbering_request(checked)
 
     def _toggle_labels_action(self):
         self.canvas.toggle_labels_visibility()

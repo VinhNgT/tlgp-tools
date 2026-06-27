@@ -138,7 +138,7 @@ class TestFontSizingLevels:
 
         tiny_parent = Component(
             id=uuid.uuid4(),
-            number="1.1.1.1",
+            number="1111",
             label="Deep",
             bounds=Bounds(x=0, y=0, w=20, h=20),
         )
