@@ -11,6 +11,11 @@ from pathlib import Path
 from pydantic import BaseModel, Field
 
 from .models import AnalysisData, Api
+from tlgp_contracts import (
+    DEFAULT_UNIT_COST_ANNOTATION,
+    DEFAULT_UNIT_COST_API,
+    DEFAULT_UNIT_LIMIT,
+)
 
 
 class ValidationResult(BaseModel):
@@ -261,15 +266,13 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
                         )
 
     # --- Unit limit checks ---
-    cfg = data.unitLimit
-
     def _check_unit_limit(annotations: int, apis: int, owner: str) -> None:
-        units = annotations * cfg.annotationCost + apis * cfg.apiCost
-        if units > cfg.maxUnits:
+        units = annotations * DEFAULT_UNIT_COST_ANNOTATION + apis * DEFAULT_UNIT_COST_API
+        if units > DEFAULT_UNIT_LIMIT:
             result.errors.append(
-                f"{owner} exceeds the unit limit: {units}/{cfg.maxUnits} units "
-                f"({annotations} annotations × {cfg.annotationCost} + "
-                f"{apis} APIs × {cfg.apiCost} = {units})"
+                f"{owner} exceeds the unit limit: {units}/{DEFAULT_UNIT_LIMIT} units "
+                f"({annotations} annotations × {DEFAULT_UNIT_COST_ANNOTATION} + "
+                f"{apis} APIs × {DEFAULT_UNIT_COST_API} = {units})"
             )
 
     _check_unit_limit(

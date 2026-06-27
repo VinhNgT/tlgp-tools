@@ -14,9 +14,6 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from tlgp_contracts import (
-    DEFAULT_UNIT_COST_ANNOTATION,
-    DEFAULT_UNIT_COST_API,
-    DEFAULT_UNIT_LIMIT,
     TreeUtils,
     WorkspaceState,
 )
@@ -178,11 +175,6 @@ def build_scaffold(
     scaffold: dict = {
         "sectionPrefix": section_prefix,
         "imageDir": image_dir,
-        "unitLimit": {
-            "annotationCost": DEFAULT_UNIT_COST_ANNOTATION,
-            "apiCost": DEFAULT_UNIT_COST_API,
-            "maxUnits": DEFAULT_UNIT_LIMIT,
-        },
         "screen": {
             "name": screen_name,
             "description": screen_desc,

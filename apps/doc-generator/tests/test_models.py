@@ -14,14 +14,8 @@ from doc_generator.models import (
     Interaction,
     Screen,
     SubDto,
-    UnitLimitConfig,
 )
 from pydantic import ValidationError
-from tlgp_contracts import (
-    DEFAULT_UNIT_COST_ANNOTATION,
-    DEFAULT_UNIT_COST_API,
-    DEFAULT_UNIT_LIMIT,
-)
 
 # ── ChildElement ──────────────────────────────────────────────────────
 
@@ -358,51 +352,4 @@ class TestJsonRoundTrip:
         assert len(restored.all_apis) == 1
 
 
-# ── UnitLimitConfig ──────────────────────────────────────────────────
-
-
-class TestUnitLimitConfig:
-    def test_defaults_match_contracts(self):
-        cfg = UnitLimitConfig()
-        assert cfg.annotationCost == DEFAULT_UNIT_COST_ANNOTATION
-        assert cfg.apiCost == DEFAULT_UNIT_COST_API
-        assert cfg.maxUnits == DEFAULT_UNIT_LIMIT
-
-    def test_custom_values(self):
-        cfg = UnitLimitConfig(annotationCost=2, apiCost=5, maxUnits=20)
-        assert cfg.annotationCost == 2
-        assert cfg.apiCost == 5
-        assert cfg.maxUnits == 20
-
-    def test_analysis_data_defaults_when_omitted(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        data = AnalysisData(
-            imageDir=str(tmp_path),
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="A", controlType="B")],
-            ),
-        )
-        assert data.unitLimit.annotationCost == 1
-        assert data.unitLimit.apiCost == 3
-        assert data.unitLimit.maxUnits == 15
-
-    def test_analysis_data_custom_unit_limit_from_json(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        raw = {
-            "imageDir": str(tmp_path),
-            "unitLimit": {"annotationCost": 2, "apiCost": 4, "maxUnits": 25},
-            "screen": {
-                "name": "Test",
-                "description": "desc",
-                "imageFiles": ["screen.png"],
-                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "B"}],
-            },
-        }
-        data = AnalysisData.model_validate(raw)
-        assert data.unitLimit.annotationCost == 2
-        assert data.unitLimit.apiCost == 4
-        assert data.unitLimit.maxUnits == 25
 

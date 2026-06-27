@@ -1,11 +1,6 @@
 {
   "sectionPrefix": "1.1",
   "imageDir": "./workspace_xyz",
-  "unitLimit": {
-    "annotationCost": 1,
-    "apiCost": 3,
-    "maxUnits": 15
-  },
   "components": [
     {
       "id": 1,

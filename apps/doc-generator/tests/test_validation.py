@@ -11,7 +11,6 @@ from doc_generator.models import (
     Interaction,
     Screen,
     SubDto,
-    UnitLimitConfig,
 )
 from doc_generator.validation import validate_analysis
 from pydantic import ValidationError
@@ -800,28 +799,6 @@ class TestUnitLimitValidation:
         result = validate_analysis(analysis)
         assert not any("unit limit" in e for e in result.errors)
 
-    def test_custom_unit_limit_config_allows_higher_budget(self, tmp_path):
-        """Custom maxUnits=20 allows a component that would fail with defaults."""
-        (tmp_path / "screen.png").touch()
-        (tmp_path / "comp.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1,
-                    label="Big Component",
-                    description="desc desc desc",
-                    imageFile="comp.png",
-                    children=self._make_children(6),
-                    interactions=[Interaction(action="A", reaction="B")],
-                    apis=self._make_apis(4, start_number=2),
-                ),
-            ],
-        )
-        # 6 children + 4 APIs = 6 + 12 = 18 units (would fail with default 15)
-        analysis.unitLimit = UnitLimitConfig(maxUnits=20)
-        result = validate_analysis(analysis)
-        assert not any("unit limit" in e for e in result.errors)
 
     def test_error_message_contains_breakdown(self, tmp_path):
         """Error message includes annotation count, API count, and total."""

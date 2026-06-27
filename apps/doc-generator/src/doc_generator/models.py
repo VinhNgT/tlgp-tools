@@ -5,24 +5,6 @@ from __future__ import annotations
 from pathlib import Path
 
 from pydantic import BaseModel, Field, field_validator, model_validator
-from tlgp_contracts import (
-    DEFAULT_UNIT_COST_ANNOTATION,
-    DEFAULT_UNIT_COST_API,
-    DEFAULT_UNIT_LIMIT,
-)
-
-
-class UnitLimitConfig(BaseModel):
-    """Configurable unit cost parameters for complexity validation.
-
-    Each component and screen has a complexity budget measured in units.
-    Annotations (child elements) and APIs each consume a configurable
-    number of units, and the total per scope must not exceed maxUnits.
-    """
-
-    annotationCost: int = DEFAULT_UNIT_COST_ANNOTATION
-    apiCost: int = DEFAULT_UNIT_COST_API
-    maxUnits: int = DEFAULT_UNIT_LIMIT
 
 
 class ChildElement(BaseModel):
@@ -154,7 +136,6 @@ class AnalysisData(BaseModel):
 
     sectionPrefix: str = "1.1"
     imageDir: str
-    unitLimit: UnitLimitConfig = Field(default_factory=UnitLimitConfig)
     components: list[AnalysisComponent] = []
     screen: Screen
     discrepancies: list[Discrepancy] = []

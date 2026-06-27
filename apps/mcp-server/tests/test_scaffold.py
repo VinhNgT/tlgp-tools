@@ -326,8 +326,8 @@ class TestScaffoldAndSave:
         with pytest.raises(FileNotFoundError, match="does not exist"):
             scaffold_and_save(state, "/nonexistent/path")
 
-    def test_saved_file_includes_unit_limit_defaults(self, tmp_path):
-        """The saved analysis.json includes unitLimit with default constants."""
+    def test_saved_file_does_not_include_unit_limit(self, tmp_path):
+        """The saved analysis.json does not include unitLimit config."""
         comp = _make_component()
         state = _make_workspace(
             components=[comp],
@@ -346,8 +346,5 @@ class TestScaffoldAndSave:
         result = scaffold_and_save(state, str(tmp_path))
         saved = json.loads(Path(result.analysis_path).read_text(encoding="utf-8"))
 
-        assert "unitLimit" in saved
-        assert saved["unitLimit"]["annotationCost"] == 1
-        assert saved["unitLimit"]["apiCost"] == 3
-        assert saved["unitLimit"]["maxUnits"] == 15
+        assert "unitLimit" not in saved
 
