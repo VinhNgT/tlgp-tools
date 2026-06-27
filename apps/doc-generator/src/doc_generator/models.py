@@ -1,11 +1,11 @@
-"""Pydantic models for analysis.json — the contract between agent and script."""
+"""Pydantic models for spec.json — the contract between agent and script."""
 
 from __future__ import annotations
 
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, model_validator, field_validator
 
 # ChildElement was removed in favor of the unified NodeSpec
 
@@ -21,17 +21,30 @@ class ApiParam(BaseModel):
     """A single field in a request/response API table."""
 
     name: str = Field(min_length=1)
-    meaning: str = ""
-    required: str = ""
-    dataType: str = ""
-    limit: str = ""
-    defaultValue: str = ""
+    meaning: str | None = None
+    required: bool | None = None
+    dataType: str | None = None
+    limit: str | None = None
+    defaultValue: str | None = None
+
+    @field_validator("required", mode="before")
+    @classmethod
+    def _parse_bool(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            val = v.strip().upper()
+            if val in ("Y", "YES", "TRUE", "1", "CÓ", "CO"):
+                return True
+            if val in ("N", "NO", "FALSE", "0", "KHÔNG", "KHONG", "K"):
+                return False
+        return bool(v)
 
 
 class ApiPayload(BaseModel):
     """The structure of an API request or response payload schema."""
 
-    type: str = ""
+    type: str | None = None
     parentType: str | None = None
     fields: list[ApiParam] = []
 
@@ -50,15 +63,35 @@ class NodeSpec(BaseModel):
 
     id: str  # Globally unique ID (can be UUID string or number string)
     label: str
-    controlType: str = ""  # Strictly informational (e.g. "Button", "Text", "Icon"). Omitted for components.
-    required: str = ""
-    maxLength: str = ""
-    editable: str = ""
-    description: str = ""
+    controlType: str | None = None
+    required: bool | None = None
+    maxLength: int | None = None
+    editable: bool | None = None
+    description: str | None = None
     imageFiles: list[str] = Field(default_factory=list)  # Present for Screens and Components
     childrenIds: list[str] = Field(default_factory=list)  # Sibling order is preserved here
     interactions: list[Interaction] = Field(default_factory=list)
     apis: list[Api] = Field(default_factory=list)
+
+    @field_validator("required", "editable", mode="before")
+    @classmethod
+    def _parse_bool(cls, v):
+        if v is None or v == "":
+            return None
+        if isinstance(v, str):
+            val = v.strip().upper()
+            if val in ("Y", "YES", "TRUE", "1", "CÓ", "CO"):
+                return True
+            if val in ("N", "NO", "FALSE", "0", "KHÔNG", "KHONG", "K"):
+                return False
+        return bool(v)
+
+    @field_validator("maxLength", mode="before")
+    @classmethod
+    def _parse_int(cls, v):
+        if v is None or v == "":
+            return None
+        return int(v)
 
 
 class ScreenSpec(BaseModel):

@@ -126,7 +126,7 @@ def _set_cell_width(cell, twips: int):
 
 def _style_cell_text(
     cell,
-    text: str,
+    text: str | None,
     style: StyleConfig,
     bold: bool = False,
     font_size: Pt | None = None,
@@ -137,6 +137,8 @@ def _style_cell_text(
     Uses cell.text to produce a single clean run, then applies formatting
     to that run.
     """
+    if text is None:
+        text = ""
     cell.text = text
     para = cell.paragraphs[0]
     if alignment:
@@ -318,9 +320,9 @@ def build_ui_elements_table(
             label = child.label
             description = child.description
             control_type = child.controlType
-            required = child.required
-            max_length = child.maxLength
-            editable = child.editable
+            required = "" if child.required is None else ("Có" if child.required else "Không")
+            max_length = "" if child.maxLength is None else str(child.maxLength)
+            editable = "" if child.editable is None else ("Có" if child.editable else "Không")
 
             # If the node has children, it is structurally a Component, so output "Component" as its control type in the table.
             if len(child.childrenIds) > 0:
@@ -385,7 +387,7 @@ def build_api_table(doc: Document, params: list[ApiParam], style: StyleConfig) -
         row_data = [
             param.name,
             param.meaning,
-            param.required,
+            "Có" if param.required else "Không",
             param.dataType,
             param.limit,
             param.defaultValue,

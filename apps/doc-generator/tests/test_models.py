@@ -18,10 +18,10 @@ class TestNodeSpec:
         assert c.id == "1"
         assert c.label == "Submit"
         assert c.controlType == "Button"
-        assert c.required == ""
-        assert c.maxLength == ""
-        assert c.editable == ""
-        assert c.description == ""
+        assert c.required is None
+        assert c.maxLength is None
+        assert c.editable is None
+        assert c.description is None
         assert c.childrenIds == []
         assert c.interactions == []
         assert c.apis == []
@@ -38,9 +38,9 @@ class TestApiParam:
     def test_required_fields(self):
         p = ApiParam(name="id")
         assert p.name == "id"
-        assert p.meaning == ""
-        assert p.dataType == ""
-        assert p.required == ""
+        assert p.meaning is None
+        assert p.dataType is None
+        assert p.required is None
 
 
 class TestApiPayload:

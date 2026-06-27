@@ -8,6 +8,8 @@
       "label": "Màn hình chi tiết sản phẩm",
       "description": "Màn hình hiển thị toàn bộ thông tin chi tiết của sản phẩm bao gồm hình ảnh, giá cả, thông tin nhà bán hàng, các thuộc tính lựa chọn và các hành động mua hàng.",
       "imageFiles": ["dummy_screen.png"],
+      "required": null,
+      "editable": null,
       "childrenIds": ["1", "2"],
       "interactions": [
         {
@@ -27,18 +29,18 @@
                 {
                   "name": "id",
                   "meaning": "Mã định danh sản phẩm",
-                  "required": "Y",
+                  "required": true,
                   "dataType": "String",
                   "limit": "36 ký tự",
-                  "defaultValue": ""
+                  "defaultValue": null
                 },
                 {
                   "name": "name",
                   "meaning": "Tên sản phẩm",
-                  "required": "Y",
+                  "required": true,
                   "dataType": "String",
                   "limit": "255 ký tự",
-                  "defaultValue": ""
+                  "defaultValue": null
                 }
               ]
             }
@@ -51,6 +53,8 @@
       "label": "Thanh tiêu đề điều hướng (Header)",
       "description": "Thanh công cụ nằm ở đầu màn hình, chứa tiêu đề của màn hình hiện tại và các nút điều hướng nhanh.",
       "imageFiles": ["dummy_header.png"],
+      "required": null,
+      "editable": null,
       "childrenIds": ["3", "6"],
       "interactions": [],
       "apis": []
@@ -59,9 +63,9 @@
       "id": "2",
       "label": "Ảnh banner quảng cáo",
       "controlType": "Image",
-      "required": "N",
-      "maxLength": "",
-      "editable": "N",
+      "required": false,
+      "maxLength": null,
+      "editable": false,
       "description": "Hình ảnh hoặc slider hiển thị các chương trình khuyến mãi liên quan đến sản phẩm."
     },
     {
@@ -69,6 +73,8 @@
       "label": "Khối điều khiển nút chức năng quay lại",
       "description": "Nút bấm chứa biểu tượng mũi tên quay lại màn hình trước đó, xử lý lưu trạng thái tạm thời nếu có.",
       "imageFiles": ["dummy_back_button.png"],
+      "required": null,
+      "editable": null,
       "childrenIds": ["4", "5"],
       "interactions": [
         {
@@ -82,27 +88,27 @@
       "id": "4",
       "label": "Biểu tượng mũi tên quay lại",
       "controlType": "Icon",
-      "required": "Y",
-      "maxLength": "",
-      "editable": "N",
+      "required": true,
+      "maxLength": null,
+      "editable": false,
       "description": "Biểu tượng trực quan hỗ trợ nhận diện hành động quay lại."
     },
     {
       "id": "5",
       "label": "Nhãn văn bản gợi ý",
       "controlType": "Text",
-      "required": "N",
-      "maxLength": "10",
-      "editable": "N",
+      "required": false,
+      "maxLength": 10,
+      "editable": false,
       "description": "Văn bản hiển thị bên cạnh mũi tên (ví dụ: 'Quay lại' hoặc 'Back')."
     },
     {
       "id": "6",
       "label": "Tiêu đề màn hình",
       "controlType": "Text",
-      "required": "Y",
-      "maxLength": "50",
-      "editable": "N",
+      "required": true,
+      "maxLength": 50,
+      "editable": false,
       "description": "Hiển thị tên ngắn gọn của màn hình đang xem."
     }
   ]

@@ -134,6 +134,9 @@ class TestUiElementsTable:
                     label="Share",
                     controlType="Icon",
                     description="Share product",
+                    required=True,
+                    editable=False,
+                    maxLength=20,
                 ),
             ]
         )
@@ -141,6 +144,9 @@ class TestUiElementsTable:
         assert table.cell(1, 0).text == "1"
         assert table.cell(1, 1).text == "Share"
         assert table.cell(1, 2).text == "Icon"
+        assert table.cell(1, 3).text == "Có"
+        assert table.cell(1, 4).text == "20"
+        assert table.cell(1, 5).text == "Không"
         assert table.cell(1, 6).text == "Share product"
 
     def test_empty_children_produces_header_only(self):

@@ -194,7 +194,8 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
     for node_id in reachable:
         node = nodes_dict.get(node_id)
         if node and node_id != data.rootId and len(node.childrenIds) == 0:
-            if not node.controlType.strip():
+            control_type = node.controlType or ""
+            if not control_type.strip():
                 empty_controls += 1
     if empty_controls:
         result.warnings.append(
@@ -214,9 +215,10 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                 )
             if not comp.label.strip():
                 result.warnings.append(f"Component (id={comp.id}) has an empty label")
-            if len(comp.childrenIds) > 0 and comp.controlType.strip():
+            control_type = comp.controlType or ""
+            if len(comp.childrenIds) > 0 and control_type.strip():
                 result.warnings.append(
-                    f"Component '{comp.label}' (id={comp.id}) has children but also specifies a controlType ('{comp.controlType}'). controlType should only be used on leaf elements."
+                    f"Component '{comp.label}' (id={comp.id}) has children but also specifies a controlType ('{control_type}'). controlType should only be used on leaf elements."
                 )
 
     # Check for empty interaction actions/reactions
@@ -252,7 +254,9 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
             all_params.extend(payload.fields)
 
         for param in all_params:
-            if not param.name.strip() or not param.meaning.strip():
+            param_name = param.name or ""
+            param_meaning = param.meaning or ""
+            if not param_name.strip() or not param_meaning.strip():
                 result.warnings.append(
                     f"API '{api.api}' has an ApiParam with empty name or meaning"
                 )

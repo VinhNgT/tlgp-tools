@@ -29,6 +29,8 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
                 imageFiles=["screen.png"],
                 childrenIds=["1"],
                 apis=[Api(api="GET Test", url="/test")],
+                required=False,
+                editable=False,
             )
         )
         nodes.append(
@@ -36,6 +38,8 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
                 id="1",
                 label="Test Child",
                 controlType="Button",
+                required=False,
+                editable=False,
             )
         )
     else:
@@ -802,4 +806,6 @@ class TestUnitLimitValidation:
         result = validate_spec(spec)
         assert result.valid is True
         assert any("Interaction at index 0 with empty action" in w for w in result.warnings)
+
+
 
