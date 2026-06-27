@@ -297,7 +297,6 @@ class WorkspaceManager:
         bounds: Bounds | None = None,
         parent_id: uuid.UUID | None = None,
         style: Style | None = None,
-        number: str | None = None,
     ):
         if not self.state.image:
             raise InvalidStateError("No screenshot/image loaded in workspace")
@@ -316,8 +315,7 @@ class WorkspaceManager:
                 comp.bounds = bounds
             if style is not None:
                 comp.style = style
-            if number is not None:
-                comp.number = number
+
 
             if parent_id is not None and parent_id != comp.parentId:
                 if comp.parentId:
@@ -432,13 +430,7 @@ class WorkspaceManager:
             self.raw_image_bytes = b""
         self.mutate(mutation, force=force)
 
-    def set_auto_numbering(self, enabled: bool):
-        def mutation(state: WorkspaceState):
-            state.autoNumbering = enabled
-            if enabled:
-                # Force a full recalculation when enabling
-                recalculate_tree(state)
-        self.mutate(mutation)
+
 
     def undo(self, force: bool = False) -> bool:
         with self._lock:

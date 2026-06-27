@@ -184,9 +184,7 @@ class ComponentPropertiesView(QWidget):
         number_row.addWidget(lbl_number)
 
         self.entry_number = QLineEdit()
-        self.entry_number.setValidator(QIntValidator(1, 999999, self))
-        self.entry_number.returnPressed.connect(self._save_number)
-        self.entry_number.editingFinished.connect(self._save_number)
+        self.entry_number.setReadOnly(True)
         number_row.addWidget(self.entry_number)
         layout.addLayout(number_row)
 
@@ -275,11 +273,9 @@ class ComponentPropertiesView(QWidget):
         h: int,
         pill_corner: str,
         number: str,
-        auto_numbering: bool,
     ):
         if self._selected_box_id and self._selected_box_id != box_id:
             self._save_name()
-            self._save_number()
 
         self._selected_box_id = box_id
         self._current_label = label
@@ -288,11 +284,8 @@ class ComponentPropertiesView(QWidget):
 
         self.entry_name.setEnabled(True)
         self.entry_number.setEnabled(True)
-        self.entry_number.setReadOnly(auto_numbering)
-        if auto_numbering:
-            self.entry_number.setStyleSheet("color: #8C8C8C; background-color: #2D2D30;")
-        else:
-            self.entry_number.setStyleSheet("color: #FFFFFF; background-color: #1E1E1E;")
+        self.entry_number.setReadOnly(True)
+        self.entry_number.setStyleSheet("color: #8C8C8C; background-color: #2D2D30;")
 
         for entry in self.prop_entries.values():
             entry.setEnabled(True)
@@ -330,7 +323,6 @@ class ComponentPropertiesView(QWidget):
     def disable_properties_fields(self):
         if self._selected_box_id:
             self._save_name()
-            self._save_number()
         self._selected_box_id = None
         self._current_label = ""
         self._current_pill_corner = None
@@ -374,12 +366,7 @@ class ComponentPropertiesView(QWidget):
                 self._current_label = val
                 self.on_property_changed(self._selected_box_id, label=val)
 
-    def _save_number(self):
-        if self._selected_box_id and self.on_property_changed:
-            val = self.entry_number.text().strip()
-            if val != self._current_number:
-                self._current_number = val
-                self.on_property_changed(self._selected_box_id, number=val)
+
 
     def _save_corner(self, corner: str):
         if self._selected_box_id and self.on_property_changed:

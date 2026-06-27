@@ -93,7 +93,7 @@ def test_show_labels_checkbox(qapp):
     assert view.chk_show_labels.isChecked() is False
 
 
-def test_auto_numbering_checkbox(qapp):
+def test_auto_numbering_always_enabled(qapp):
     # Setup workspace
     ws = WorkspaceManager()
     ws.import_image(create_test_image())
@@ -109,44 +109,13 @@ def test_auto_numbering_checkbox(qapp):
     view = MainAppWindow()
     controller = AppController(ws, store, view, dialog_service)
 
-    # Initial state should be: autoNumbering is enabled, chk_auto_number checked and enabled
-    assert ws.state.autoNumbering is True
-    assert view.chk_auto_number.isChecked()
-    assert view.chk_auto_number.isEnabled()
+    # Initial state should be: chk_auto_number does not exist
+    assert not hasattr(view, "chk_auto_number")
 
     # Select the component so properties are loaded
     store.update_state("selection", selected_component_ids=[comp_id])
     assert view.properties.entry_number.text() == "1"
     assert view.properties.entry_number.isReadOnly() is True
-    from PySide6.QtGui import QIntValidator
-    assert isinstance(view.properties.entry_number.validator(), QIntValidator)
-
-    # Simulate user toggling the checkbox off
-    view.chk_auto_number.setChecked(False)
-    controller._apply_state_sync()
-
-    # Verify state autoNumbering is False, checkbox is unchecked, and entry is editable
-    assert ws.state.autoNumbering is False
-    assert not view.chk_auto_number.isChecked()
-    assert view.properties.entry_number.isReadOnly() is False
-
-    # Simulate user manually changing the number
-    view.properties.entry_number.setText("42")
-    view.properties._save_number()  # Trigger manual save slot
-    controller._apply_state_sync()
-
-    # Verify updated number
-    assert ws.state.components[comp_id].number == "42"
-
-    # Simulate toggling checkbox back on
-    view.chk_auto_number.setChecked(True)
-    controller._apply_state_sync()
-
-    # Verify auto numbering re-enabled and recalculated
-    assert ws.state.autoNumbering is True
-    assert view.chk_auto_number.isChecked()
-    assert view.properties.entry_number.isReadOnly() is True
-    assert ws.state.components[comp_id].number == "1"
 
 
 def test_export_images_button(qapp):

@@ -79,7 +79,6 @@ class WorkspaceState(BaseModel):
     cutLines: list[int] = Field(default_factory=list)
     rootComponents: list[UUID] = Field(default_factory=list)
     components: dict[UUID, Component] = Field(default_factory=dict)
-    autoNumbering: bool = True
 
 
 # ── Export Manifest ────────────────────────────────────────────

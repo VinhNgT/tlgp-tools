@@ -142,6 +142,8 @@ class TestAddComponent:
         assert ws.state.components[id2].number == "2"
 
 
+
+
 # ── Move Component ────────────────────────────────────────────────────
 
 

@@ -51,4 +51,3 @@ class AppCallbacks:
         self.on_arrow_key_pressed: Callable[[int, int], None] | None = None
         self.on_sidebar_context_menu: Callable[[UUID, int, int], None] | None = None
         self.on_sidebar_rename_request: Callable[[UUID, str], None] | None = None
-        self.on_toggle_auto_numbering_request: Callable[[bool], None] | None = None
