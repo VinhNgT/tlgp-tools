@@ -398,7 +398,7 @@ class MainAppWindow(QMainWindow):
         # Show Labels checkbox
         self.chk_show_labels = QCheckBox("Show Labels")
         self.chk_show_labels.setToolTip("Toggle Labels (T)")
-        self.chk_show_labels.setChecked(True)
+        self.chk_show_labels.setChecked(False)
         self.chk_show_labels.setEnabled(False)
         self.chk_show_labels.toggled.connect(self._on_show_labels_toggled)
         tb.addWidget(self.chk_show_labels)

@@ -123,7 +123,7 @@ class AnnotationCanvasView(QWidget):
         self.current_mode: str = "select"
         self.active_interaction: dict[UUID, Any] | None = None
         self.space_pan_active: bool = False
-        self.show_labels: bool = True
+        self.show_labels: bool = False
         self._needs_fit: bool = False
 
         # ── Callbacks (set by controller) ─────────────────────────

@@ -70,17 +70,17 @@ def test_show_labels_checkbox(qapp):
     view = MainAppWindow()
     AppController(ws, store, view, dialog_service)
 
-    # Initial state should be: labels shown, chk_show_labels checked and enabled
-    assert view.canvas.show_labels
-    assert view.chk_show_labels.isChecked()
+    # Initial state should be: labels not shown, chk_show_labels unchecked and enabled
+    assert not view.canvas.show_labels
+    assert not view.chk_show_labels.isChecked()
     assert view.chk_show_labels.isEnabled()
 
     # Simulate user toggling the checkbox
-    view.chk_show_labels.setChecked(False)
+    view.chk_show_labels.setChecked(True)
 
-    # Verify canvas show_labels is False and checkbox is unchecked
-    assert not view.canvas.show_labels
-    assert not view.chk_show_labels.isChecked()
+    # Verify canvas show_labels is True and checkbox is checked
+    assert view.canvas.show_labels
+    assert view.chk_show_labels.isChecked()
 
     # Simulate keyboard shortcut 'T'
     press_event = QKeyEvent(
@@ -88,9 +88,9 @@ def test_show_labels_checkbox(qapp):
     )
     QApplication.sendEvent(view, press_event)
 
-    # Verify canvas show_labels is True and checkbox is checked again
-    assert view.canvas.show_labels is True
-    assert view.chk_show_labels.isChecked() is True
+    # Verify canvas show_labels is False and checkbox is unchecked again
+    assert view.canvas.show_labels is False
+    assert view.chk_show_labels.isChecked() is False
 
 
 def test_auto_numbering_checkbox(qapp):
