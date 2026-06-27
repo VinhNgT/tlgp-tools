@@ -1,5 +1,6 @@
 """Figma-inspired UI theme for Annotator."""
 
+import sys
 from PySide6.QtGui import QFontDatabase
 
 FIGMA_THEME = """
@@ -240,7 +241,16 @@ def get_theme() -> str:
             font_family = f'"{font}"'
             break
 
-    return FIGMA_THEME.replace(
+    theme_stylesheet = FIGMA_THEME.replace(
         'font-family: "Inter", "Segoe UI", sans-serif;',
         f"font-family: {font_family}, sans-serif;",
     )
+
+    # Scale font size up on macOS to match standard system UI appearance
+    font_size = "11pt" if sys.platform == "darwin" else "8pt"
+    theme_stylesheet = theme_stylesheet.replace(
+        "font-size: 8pt;",
+        f"font-size: {font_size};",
+    )
+
+    return theme_stylesheet

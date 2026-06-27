@@ -31,3 +31,17 @@ def test_theme_includes_primary_button(qapp):
     assert "background-color: #18A0FB;" in theme_stylesheet
     assert "QRadioButton {" in theme_stylesheet
     assert "QRadioButton::indicator {" in theme_stylesheet
+
+
+def test_theme_font_size_platform_dependent(qapp, monkeypatch):
+    """Verify that get_theme() returns the correct font size based on the platform."""
+    # Test macOS behavior
+    monkeypatch.setattr("sys.platform", "darwin")
+    theme_mac = get_theme()
+    assert "font-size: 11pt;" in theme_mac
+
+    # Test other platforms behavior
+    monkeypatch.setattr("sys.platform", "win32")
+    theme_other = get_theme()
+    assert "font-size: 8pt;" in theme_other
+
