@@ -168,7 +168,7 @@ def build_scaffold(
     # Use workspace screen name/description if provided, otherwise placeholder
     screen_name_val = state.screen.name.strip()
     screen_name = f"[TODO: Vietnamese screen name. Suggestion: {screen_name_val}]" if screen_name_val else _TODO_SCREEN_NAME
-    
+
     screen_desc_val = state.screen.description.strip()
     screen_desc = f"[TODO: Vietnamese screen description (high-level summary) - NOT a list/restatement of UI elements. Suggestion: {screen_desc_val}]" if screen_desc_val else _TODO_SCREEN_DESC
 

@@ -1,6 +1,7 @@
 """Figma-inspired UI theme for Annotator."""
 
 import sys
+
 from PySide6.QtGui import QFontDatabase
 
 FIGMA_THEME = """

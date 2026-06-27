@@ -1,4 +1,5 @@
 import io
+import uuid
 
 from annotator.gui.app import MainAppWindow
 from annotator.gui.controller import AppController
@@ -99,7 +100,6 @@ def test_auto_numbering_always_enabled(qapp):
     ws.import_image(create_test_image())
 
     # Add a component so we have something to select/number
-    import uuid
     comp_id = uuid.uuid4()
     ws.add_component(comp_id, "Test Button", {"x": 10, "y": 10, "w": 100, "h": 50})
 
@@ -107,7 +107,7 @@ def test_auto_numbering_always_enabled(qapp):
     store = UIStateStore()
     dialog_service = QtDialogService()
     view = MainAppWindow()
-    controller = AppController(ws, store, view, dialog_service)
+    AppController(ws, store, view, dialog_service)
 
     # Initial state should be: chk_auto_number does not exist
     assert not hasattr(view, "chk_auto_number")

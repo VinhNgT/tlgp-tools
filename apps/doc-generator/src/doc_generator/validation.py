@@ -9,13 +9,13 @@ from __future__ import annotations
 from pathlib import Path
 
 from pydantic import BaseModel, Field
-
-from .models import AnalysisData, Api
 from tlgp_contracts import (
     DEFAULT_UNIT_COST_ANNOTATION,
     DEFAULT_UNIT_COST_API,
     DEFAULT_UNIT_LIMIT,
 )
+
+from .models import AnalysisData, Api
 
 
 class ValidationResult(BaseModel):

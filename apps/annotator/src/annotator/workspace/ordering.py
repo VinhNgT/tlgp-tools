@@ -1,5 +1,6 @@
 """Heuristics and algorithms for determining logical reading order of UI components."""
 
+from functools import cmp_to_key
 from typing import Final
 from uuid import UUID
 
@@ -15,7 +16,7 @@ ROOTS_CHANGED: Final = object()
 
 def sort_components_reading_order(components: list[Component]) -> list[Component]:
     """Sort components into natural reading order (row-major) using Binary Recursive XY-Cut.
-    
+
     Finds the single visually widest gap (gutter) on either the X or Y axis at each step,
     splits the layout along that cut line, and recurses. This matches visual hierarchy
     perfectly, resolving both column and row structures without interleaving.
@@ -46,7 +47,7 @@ def sort_components_reading_order(components: list[Component]) -> list[Component
             else:
                 prev_start, prev_end, prev_objs = merged[-1]
                 if start <= prev_end:
-                    merged[-1] = (prev_start, max(prev_end, end), prev_objs + [obj])
+                    merged[-1] = (prev_start, max(prev_end, end), [*prev_objs, obj])
                 else:
                     merged.append((start, end, [obj]))
 
@@ -69,15 +70,14 @@ def sort_components_reading_order(components: list[Component]) -> list[Component
             return objs
 
         # Find widest gap on X and Y
-        x_intervals, x_gap_info = get_intervals_and_max_gap(objs, 'x')
-        y_intervals, y_gap_info = get_intervals_and_max_gap(objs, 'y')
+        _x_intervals, x_gap_info = get_intervals_and_max_gap(objs, 'x')
+        _y_intervals, y_gap_info = get_intervals_and_max_gap(objs, 'y')
 
         x_width = x_gap_info[0] if x_gap_info else -1
         y_width = y_gap_info[0] if y_gap_info else -1
 
         # If no gaps on either axis, fallback to sorting
         if x_width <= 0 and y_width <= 0:
-            from functools import cmp_to_key
 
             def compare_components(a: Component, b: Component) -> int:
                 a_bounds = a.bounds

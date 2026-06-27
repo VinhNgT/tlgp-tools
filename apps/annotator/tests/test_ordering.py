@@ -67,7 +67,7 @@ class TestSortReadingOrder:
         # Both are siblings (not parent-child). The outer box should sort first.
         outer = _make_comp(153, 435, 281, 282, "outer")
         inner = _make_comp(281, 459, 128, 95, "inner")
-        
+
         # Outer has lower top/left but center Y is lower.
         # Without containment check, inner would sort first because of higher center-Y.
         result1 = sort_components_reading_order([inner, outer])

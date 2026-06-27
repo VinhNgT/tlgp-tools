@@ -7,6 +7,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
+from doc_generator.models import AnalysisData
 from mcp_server.scaffold import (
     ScaffoldResult,
     _walk_post_order_dfs,
@@ -285,7 +286,6 @@ class TestBuildScaffold:
         assert top_children_raw[1]["componentId"] is not None
 
         # Parse into AnalysisData to resolve controlType references
-        from doc_generator.models import AnalysisData
         analysis = AnalysisData.model_validate(scaffold)
         top_children = analysis.screen.topLevelChildren
         assert len(top_children) == 2

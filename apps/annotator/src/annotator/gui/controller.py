@@ -231,7 +231,6 @@ class AppController:
             self.store.state.workspace_state,
             self.store.state.active_interaction,
         )
-        state = self.store.state.workspace_state
 
 
     def _build_tree_nodes(self) -> list[dict]:
