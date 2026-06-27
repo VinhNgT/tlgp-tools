@@ -6,8 +6,6 @@ import pytest
 from annotator.models import Bounds, Component, WorkspaceState
 from annotator.workspace.errors import BoundaryViolationError
 from annotator.workspace.ordering import (
-    _build_row_groups,
-    _compute_overlap_ratio,
     recalculate_tree,
     sort_components_reading_order,
 )
@@ -21,54 +19,6 @@ def _make_comp(x: int, y: int, w: int = 50, h: int = 50, label: str = "") -> Com
         label=label,
         bounds=Bounds(x=x, y=y, w=w, h=h),
     )
-
-
-# ── Overlap Ratio ──────────────────────────────────────────────────────
-
-
-class TestOverlapRatio:
-    def test_no_overlap(self):
-        a = _make_comp(0, 0, 50, 50)
-        b = _make_comp(0, 100, 50, 50)
-        assert _compute_overlap_ratio(a, b) == 0.0
-
-    def test_full_overlap(self):
-        a = _make_comp(0, 0, 50, 50)
-        b = _make_comp(100, 0, 50, 50)
-        assert _compute_overlap_ratio(a, b) == 1.0
-
-    def test_partial_overlap(self):
-        a = _make_comp(0, 0, 50, 100)
-        b = _make_comp(0, 50, 50, 100)
-        ratio = _compute_overlap_ratio(a, b)
-        assert 0.0 < ratio < 1.0
-
-
-# ── Row Groups ─────────────────────────────────────────────────────────
-
-
-class TestRowGroups:
-    def test_empty_list(self):
-        assert _build_row_groups([]) == []
-
-    def test_single_component(self):
-        comp = _make_comp(0, 0)
-        groups = _build_row_groups([comp])
-        assert len(groups) == 1
-        assert groups[0] == [comp]
-
-    def test_same_row_grouped(self):
-        a = _make_comp(0, 0, 50, 50)
-        b = _make_comp(100, 0, 50, 50)
-        groups = _build_row_groups([a, b])
-        assert len(groups) == 1
-        assert len(groups[0]) == 2
-
-    def test_different_rows_separated(self):
-        a = _make_comp(0, 0, 50, 50)
-        b = _make_comp(0, 200, 50, 50)
-        groups = _build_row_groups([a, b])
-        assert len(groups) == 2
 
 
 # ── Reading Order Sort ─────────────────────────────────────────────────
@@ -96,6 +46,37 @@ class TestSortReadingOrder:
         result = sort_components_reading_order([bottom, top])
         assert result[0].label == "top"
         assert result[1].label == "bottom"
+
+    def test_tall_image_does_not_collapse_rows(self):
+        checkbox = _make_comp(20, 130, 20, 20, "checkbox")
+        image = _make_comp(60, 100, 180, 150, "image")
+        title = _make_comp(250, 100, 700, 30, "title")
+        dropdown = _make_comp(250, 140, 700, 40, "dropdown")
+        price = _make_comp(250, 190, 100, 40, "price")
+        qty = _make_comp(360, 190, 100, 40, "qty")
+
+        components = [qty, price, dropdown, title, image, checkbox]
+        sorted_comps = sort_components_reading_order(components)
+
+        expected = ["checkbox", "image", "title", "dropdown", "price", "qty"]
+        actual = [c.label for c in sorted_comps]
+        assert actual == expected
+
+    def test_containing_component_sorted_before_contained(self):
+        # A large outer box completely contains a smaller inner box.
+        # Both are siblings (not parent-child). The outer box should sort first.
+        outer = _make_comp(153, 435, 281, 282, "outer")
+        inner = _make_comp(281, 459, 128, 95, "inner")
+        
+        # Outer has lower top/left but center Y is lower.
+        # Without containment check, inner would sort first because of higher center-Y.
+        result1 = sort_components_reading_order([inner, outer])
+        assert result1[0].label == "outer"
+        assert result1[1].label == "inner"
+
+        result2 = sort_components_reading_order([outer, inner])
+        assert result2[0].label == "outer"
+        assert result2[1].label == "inner"
 
 
 # ── recalculate_tree ───────────────────────────────────────────────────

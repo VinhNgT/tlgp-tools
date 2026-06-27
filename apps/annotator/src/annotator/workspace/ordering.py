@@ -10,98 +10,137 @@ from .errors import BoundaryViolationError
 # Sentinel indicating that root-level sibling ordering should be recalculated.
 ROOTS_CHANGED: Final = object()
 
-ROW_OVERLAP_THRESHOLD = 0.5
 
-
-def _compute_overlap_ratio(a: Component, b: Component) -> float:
-    """Compute the vertical overlap between two components as a ratio.
-
-    Returns the overlap distance divided by the smaller component's height.
-    Returns 0.0 if there is no overlap or either component has zero height.
-    """
-    overlap = min(a.bounds.bottom, b.bounds.bottom) - max(a.bounds.top, b.bounds.top)
-    if overlap <= 0:
-        return 0.0
-
-    min_height = min(a.bounds.h, b.bounds.h)
-    if min_height <= 0:
-        return 0.0
-
-    return overlap / min_height
-
-
-class _UnionFind:
-    """Lightweight union-find (disjoint set) data structure."""
-
-    def __init__(self, n: int):
-        self.parent = list(range(n))
-        self.rank = [0] * n
-
-    def find(self, x: int) -> int:
-        while self.parent[x] != x:
-            self.parent[x] = self.parent[self.parent[x]]
-            x = self.parent[x]
-        return x
-
-    def union(self, x: int, y: int):
-        rx, ry = self.find(x), self.find(y)
-        if rx == ry:
-            return
-        if self.rank[rx] < self.rank[ry]:
-            rx, ry = ry, rx
-        self.parent[ry] = rx
-        if self.rank[rx] == self.rank[ry]:
-            self.rank[rx] += 1
-
-
-def _build_row_groups(components: list[Component]) -> list[list[Component]]:
-    """Group components into rows using vertical overlap and connected components."""
-    n = len(components)
-    if n == 0:
-        return []
-    if n == 1:
-        return [list(components)]
-
-    uf = _UnionFind(n)
-    for i in range(n):
-        for j in range(i + 1, n):
-            ratio = _compute_overlap_ratio(components[i], components[j])
-            if ratio >= ROW_OVERLAP_THRESHOLD:
-                uf.union(i, j)
-
-    groups = {}
-    for i in range(n):
-        root = uf.find(i)
-        if root not in groups:
-            groups[root] = []
-        groups[root].append(i)
-
-    row_groups = []
-    for indices in groups.values():
-        row = [components[i] for i in indices]
-        row.sort(key=lambda c: c.bounds.left)
-        row_groups.append(row)
-
-    def row_median_center(row: list[Component]) -> float:
-        centers = sorted((c.bounds.top + c.bounds.bottom) / 2 for c in row)
-        mid = len(centers) // 2
-        if len(centers) % 2 == 0:
-            return (centers[mid - 1] + centers[mid]) / 2
-        return centers[mid]
-
-    row_groups.sort(key=row_median_center)
-    return row_groups
 
 
 def sort_components_reading_order(components: list[Component]) -> list[Component]:
-    """Sort components into natural reading order (row-major)."""
+    """Sort components into natural reading order (row-major) using Binary Recursive XY-Cut.
+    
+    Finds the single visually widest gap (gutter) on either the X or Y axis at each step,
+    splits the layout along that cut line, and recurses. This matches visual hierarchy
+    perfectly, resolving both column and row structures without interleaving.
+    """
     if len(components) <= 1:
         return list(components)
-    row_groups = _build_row_groups(components)
-    result = []
-    for row in row_groups:
-        result.extend(row)
-    return result
+
+    def get_intervals_and_max_gap(objs: list[Component], axis: str) -> tuple[list[tuple[int, int, Component]], tuple[int, float] | None]:
+        # Get shrunk intervals for elements
+        intervals = []
+        for o in objs:
+            if axis == 'x':
+                left, right = o.bounds.left, o.bounds.right
+                h_tol = min(2, (right - left) // 4)
+                intervals.append((left + h_tol, right - h_tol, o))
+            else:
+                top, bottom = o.bounds.top, o.bounds.bottom
+                v_tol = min(2, (bottom - top) // 4)
+                intervals.append((top + v_tol, bottom - v_tol, o))
+
+        intervals.sort(key=lambda x: x[0])
+
+        # Merge intervals to find gaps
+        merged = []
+        for start, end, obj in intervals:
+            if not merged:
+                merged.append((start, end, [obj]))
+            else:
+                prev_start, prev_end, prev_objs = merged[-1]
+                if start <= prev_end:
+                    merged[-1] = (prev_start, max(prev_end, end), prev_objs + [obj])
+                else:
+                    merged.append((start, end, [obj]))
+
+        if len(merged) <= 1:
+            return intervals, None
+
+        # Find the widest gap between merged intervals
+        max_gap_width = -1
+        cut_coord = 0.0
+        for i in range(len(merged) - 1):
+            gap_width = merged[i+1][0] - merged[i][1]
+            if gap_width > max_gap_width:
+                max_gap_width = gap_width
+                cut_coord = (merged[i][1] + merged[i+1][0]) / 2.0
+
+        return intervals, (max_gap_width, cut_coord)
+
+    def recurse(objs: list[Component]) -> list[Component]:
+        if len(objs) <= 1:
+            return objs
+
+        # Find widest gap on X and Y
+        x_intervals, x_gap_info = get_intervals_and_max_gap(objs, 'x')
+        y_intervals, y_gap_info = get_intervals_and_max_gap(objs, 'y')
+
+        x_width = x_gap_info[0] if x_gap_info else -1
+        y_width = y_gap_info[0] if y_gap_info else -1
+
+        # If no gaps on either axis, fallback to sorting
+        if x_width <= 0 and y_width <= 0:
+            from functools import cmp_to_key
+
+            def compare_components(a: Component, b: Component) -> int:
+                a_bounds = a.bounds
+                b_bounds = b.bounds
+
+                # Does A contain B?
+                a_contains_b = (
+                    a_bounds.left <= b_bounds.left
+                    and a_bounds.right >= b_bounds.right
+                    and a_bounds.top <= b_bounds.top
+                    and a_bounds.bottom >= b_bounds.bottom
+                )
+                # Does B contain A?
+                b_contains_a = (
+                    b_bounds.left <= a_bounds.left
+                    and b_bounds.right >= a_bounds.right
+                    and b_bounds.top <= a_bounds.top
+                    and b_bounds.bottom >= a_bounds.bottom
+                )
+
+                if a_contains_b and not b_contains_a:
+                    return -1  # A contains B, so A comes first
+                if b_contains_a and not a_contains_b:
+                    return 1   # B contains A, so B comes first
+
+                # Standard row-major center sorting
+                cy_a = (a_bounds.top + a_bounds.bottom) / 2.0
+                cy_b = (b_bounds.top + b_bounds.bottom) / 2.0
+
+                h_limit = min(10, a_bounds.h / 4, b_bounds.h / 4)
+                if abs(cy_a - cy_b) < h_limit:
+                    cx_a = (a_bounds.left + a_bounds.right) / 2.0
+                    cx_b = (b_bounds.left + b_bounds.right) / 2.0
+                    if cx_a < cx_b:
+                        return -1
+                    elif cx_a > cx_b:
+                        return 1
+                    return 0
+                else:
+                    if cy_a < cy_b:
+                        return -1
+                    elif cy_a > cy_b:
+                        return 1
+                    return 0
+
+            sorted_objs = list(objs)
+            sorted_objs.sort(key=cmp_to_key(compare_components))
+            return sorted_objs
+
+        # Split at the widest gap
+        # Tie-breaker: prefer Y (horizontal split) to keep rows together
+        if x_width > y_width:
+            cut_x = x_gap_info[1]
+            left_group = [o for o in objs if (o.bounds.left + o.bounds.right) / 2.0 < cut_x]
+            right_group = [o for o in objs if (o.bounds.left + o.bounds.right) / 2.0 >= cut_x]
+            return recurse(left_group) + recurse(right_group)
+        else:
+            cut_y = y_gap_info[1]
+            top_group = [o for o in objs if (o.bounds.top + o.bounds.bottom) / 2.0 < cut_y]
+            bottom_group = [o for o in objs if (o.bounds.top + o.bounds.bottom) / 2.0 >= cut_y]
+            return recurse(top_group) + recurse(bottom_group)
+
+    return recurse(components)
 
 
 def recalculate_tree(state: WorkspaceState, changed_id: UUID | object | None = None):
