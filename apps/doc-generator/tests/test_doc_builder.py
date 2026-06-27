@@ -9,7 +9,7 @@ from doc_generator.models import (
     Interaction,
     PrimitiveElement,
     Screen,
-    SubDto,
+    ApiSchema,
 )
 from PIL import Image
 
@@ -27,8 +27,8 @@ def _minimal_analysis(tmp_path, **overrides) -> AnalysisData:
 
     if "components" in overrides and isinstance(overrides["components"], list):
         overrides["components"] = {c.id: c for c in overrides["components"]}
-    if "subDtos" in overrides and isinstance(overrides["subDtos"], list):
-        overrides["subDtos"] = {d.name: d for d in overrides["subDtos"]}
+    if "schemas" in overrides and isinstance(overrides["schemas"], list):
+        overrides["schemas"] = {d.name: d for d in overrides["schemas"]}
     defaults.update(overrides)
 
     return AnalysisData(**defaults)
@@ -183,8 +183,8 @@ class TestBuildDocumentWithApis:
                     responseFields=[
                         ApiParam(name="id", dataType="String"),
                     ],
-                    subDtos={
-                        "PriceDTO": SubDto(
+                    schemas={
+                        "PriceDTO": ApiSchema(
                             name="PriceDTO",
                             fieldRef="prices",
                             fields=[ApiParam(name="amount", dataType="double")],

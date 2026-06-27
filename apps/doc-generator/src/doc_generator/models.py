@@ -57,8 +57,8 @@ class ApiParam(BaseModel):
     defaultValue: str = ""
 
 
-class SubDto(BaseModel):
-    """A nested DTO table within an API response."""
+class ApiSchema(BaseModel):
+    """A nested schema table within an API request or response."""
 
     name: str = Field(min_length=1)
     fieldRef: str = ""
@@ -90,7 +90,7 @@ class Api(BaseModel):
     responseType: str = ""
     responseFields: list[ApiParam] = []
     responseDescription: str = ""
-    subDtos: dict[str, SubDto] = Field(default_factory=dict)
+    schemas: dict[str, ApiSchema] = Field(default_factory=dict)
 
 
 class AnalysisComponent(BaseModel):

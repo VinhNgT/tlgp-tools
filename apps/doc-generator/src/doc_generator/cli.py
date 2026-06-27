@@ -145,7 +145,7 @@ def _print_summary(analysis: AnalysisData):
             table_count += 1
         if api.responseFields:
             table_count += 1
-        table_count += sum(1 for s in api.subDtos if s.fields)
+        table_count += sum(1 for s in api.schemas.values() if s.fields)
 
     logger.info("  Tables:             %d total", table_count)
     logger.info("=" * 50)

@@ -10,7 +10,7 @@ from doc_generator.models import (
     Interaction,
     PrimitiveElement,
     Screen,
-    SubDto,
+    ApiSchema,
 )
 from pydantic import ValidationError
 
@@ -53,9 +53,9 @@ class TestApiParam:
         assert p.required == ""
 
 
-class TestSubDto:
+class TestApiSchema:
     def test_minimal(self):
-        s = SubDto(name="UserDTO")
+        s = ApiSchema(name="UserDTO")
         assert s.name == "UserDTO"
         assert s.fieldRef == ""
         assert s.fields == []
@@ -68,15 +68,15 @@ class TestApi:
         assert a.title == "List"
         assert a.url == "/api/list"
         assert a.requestParams == []
-        assert a.subDtos == {}
+        assert a.schemas == {}
 
     def test_with_sub_dtos(self):
         a = Api(
             method="GET",
             title="Detail",
             url="/api/detail",
-            subDtos={
-                "PriceTiersDTO": SubDto(
+            schemas={
+                "PriceTiersDTO": ApiSchema(
                     name="PriceTiersDTO",
                     fieldRef="price_tiers",
                     fields=[
@@ -85,8 +85,8 @@ class TestApi:
                 )
             },
         )
-        assert len(a.subDtos) == 1
-        assert "PriceTiersDTO" in a.subDtos
+        assert len(a.schemas) == 1
+        assert "PriceTiersDTO" in a.schemas
 
 
 class TestAnalysisComponent:

@@ -54,7 +54,7 @@
             }
           ],
           "responseDescription": "Số lượng thông báo chưa đọc của người dùng",
-          "subDtos": {
+          "schemas": {
             "UnreadCountDto": {
               "name": "UnreadCountDto",
               "fieldRef": "",
@@ -143,7 +143,7 @@
             }
           ],
           "responseDescription": "Thông tin tóm tắt giỏ hàng sau khi thêm",
-          "subDtos": {
+          "schemas": {
             "AddToCartRequestDto": {
               "name": "AddToCartRequestDto",
               "fieldRef": "",
@@ -288,7 +288,7 @@
           }
         ],
         "responseDescription": "Thông tin chi tiết của sản phẩm",
-        "subDtos": {
+        "schemas": {
           "ProductDetailResponseDto": {
             "name": "ProductDetailResponseDto",
             "fieldRef": "",

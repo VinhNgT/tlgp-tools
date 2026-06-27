@@ -225,14 +225,14 @@ def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int
         if api.responseDescription:
             _add_normal_text(doc, api.responseDescription, style)
 
-    # Sub-DTO tables
-    for sub in api.subDtos.values():
-        title = f"{sub.name} fields"
-        if sub.fieldRef:
-            title += f" ({sub.fieldRef})"
+    # Schema tables
+    for schema in api.schemas.values():
+        title = f"{schema.name} fields"
+        if schema.fieldRef:
+            title += f" ({schema.fieldRef})"
         _add_normal_text(doc, title, style)
-        if sub.fields:
-            build_api_table(doc, sub.fields, style)
+        if schema.fields:
+            build_api_table(doc, schema.fields, style)
 
 
 # ============================================================

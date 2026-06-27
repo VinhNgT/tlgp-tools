@@ -153,70 +153,33 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
                 f"Child element in Screen '{data.screen.name}' has an empty label"
             )
 
-    # Check for undocumented request bodies and missing DTOs
+    # Check for structural errors in API parameters and unused schemas
     for api in data.all_apis:
-
-        def check_dto_reference(api: Api, type_str: str, source: str):
-            if not type_str:
-                return
-            if "Dto" in type_str or "DTO" in type_str:
-                has_sub_dto = any(dto.name in type_str for dto in api.subDtos.values())
-                if not has_sub_dto:
-                    result.warnings.append(
-                        f"API '{api.title}' references custom type '{type_str}' in {source} but it is not defined in subDtos"
-                    )
-
-        check_dto_reference(api, api.requestBodyType, "requestBodyType")
-        check_dto_reference(api, api.responseType, "responseType")
-
         all_params = api.requestParams + api.responseFields
-        for dto in api.subDtos.values():
-            all_params.extend(dto.fields)
+        for schema in api.schemas.values():
+            all_params.extend(schema.fields)
 
         for param in all_params:
             if not param.name.strip() or not param.meaning.strip():
                 result.warnings.append(
                     f"API '{api.title}' has an ApiParam with empty name or meaning"
                 )
-            check_dto_reference(api, param.dataType, f"parameter '{param.name}'")
 
-        if api.requestBodyType and not api.requestParams:
-            # Check if there is a subDto documenting this body type
-            has_sub_dto = any(
-                dto.name == api.requestBodyType for dto in api.subDtos.values()
-            )
-            if not has_sub_dto:
-                result.warnings.append(
-                    f"API '{api.title}' declares requestBodyType '{api.requestBodyType}' "
-                    f"but has no request parameters or subDtos documenting its fields."
-                )
-
-        if api.responseType and not api.responseFields:
-            # Check if there is a subDto documenting this response type
-            has_sub_dto = any(
-                dto.name == api.responseType for dto in api.subDtos.values()
-            )
-            if not has_sub_dto:
-                result.warnings.append(
-                    f"API '{api.title}' declares responseType '{api.responseType}' "
-                    f"but has no response fields or subDtos documenting its fields."
-                )
-
-        if api.subDtos:
+        if api.schemas:
             referenced_types = {api.requestBodyType, api.responseType}
             for param in api.requestParams:
                 referenced_types.add(param.dataType)
             for param in api.responseFields:
                 referenced_types.add(param.dataType)
-            for dto in api.subDtos.values():
-                for param in dto.fields:
+            for schema in api.schemas.values():
+                for param in schema.fields:
                     referenced_types.add(param.dataType)
 
-            for dto in api.subDtos.values():
-                if not any(dto.name in str(t) for t in referenced_types if t):
+            for schema in api.schemas.values():
+                if not any(schema.name in str(t) for t in referenced_types if t):
                     result.warnings.append(
-                        f"API '{api.title}' declares SubDto '{dto.name}', "
-                        f"but it is never referenced by any request, response, or other SubDto."
+                        f"API '{api.title}' declares schema '{schema.name}', "
+                        f"but it is never referenced by any request, response, or other schema."
                     )
 
     # --- Unit limit checks ---
