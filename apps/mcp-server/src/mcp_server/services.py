@@ -33,7 +33,7 @@ class SpecGeneratorService:
 
     async def generate(
         self,
-        analysis_path: str,
+        spec_path: str,
         ctx: Context | None = None,
         output_path: str | None = None,
         validate_only: bool = False,
@@ -44,11 +44,11 @@ class SpecGeneratorService:
         """
         if ctx:
             await ctx.report_progress(
-                10, 100, "Loading and validating analysis data..."
+                10, 100, "Loading and validating spec data..."
             )
 
         # Build CLI command
-        cmd = [sys.executable, "-m", "doc_generator", analysis_path, "--json"]
+        cmd = [sys.executable, "-m", "doc_generator", spec_path, "--json"]
         if validate_only:
             cmd.append("--validate-only")
         if output_path:

@@ -99,22 +99,22 @@ Connect the MCP server to a running annotator instance at the specified URL.
 
 ### `generate_spec_doc`
 
-Validates analysis data from a JSON file, generates a formatted `.docx` specification document, and saves the final analysis JSON data alongside it as `analysis.json` for record-keeping. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
+Validates spec data from a JSON file, generates a formatted `.docx` specification document, and saves the final spec JSON data alongside it as `spec.json` for record-keeping. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
 
 **Args:**
-- `analysis_path` — path to the `analysis.json` file on disk.
-- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `imageDir`). The analysis JSON data will also be saved next to it.
+- `spec_path` — path to the `spec.json` file on disk.
+- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `imageDir`). The spec JSON data will also be saved next to it.
 - `validate_only` — if `True`, validate without generating (useful for catching errors early)
 
 ## Resources
 
-The server exposes read-only data and reference guides to assist with generating valid analysis JSON structures.
+The server exposes read-only data and reference guides to assist with generating valid spec JSON structures.
 
 - **`tlgp://spec/workflow`**: End-to-end workflow guide for creating specification documents. **Agents must read this first.**
 - **`tlgp://workspace/state`**: The active annotation hierarchy state in a flattened JSON structure.
-- **`tlgp://spec/schema`**: JSON Schema reference for the analysis JSON structure.
+- **`tlgp://spec/schema`**: JSON Schema reference for the spec JSON structure.
 - **`tlgp://spec/classification-guide`**: UI Control Type Classification Guide detailing what UI elements fall under which categories.
-- **`tlgp://spec/example-analysis`**: Complete example analysis JSON structure for reference.
+- **`tlgp://spec/example-analysis`**: Complete example spec JSON structure for reference.
 
 ## Workflow
 
@@ -129,8 +129,8 @@ User annotates components in the GUI...
 User: "Done annotating"
   → Agent reads tlgp://workspace/state
   → Agent calls export_images()
-  → Agent analyzes images and builds analysis JSON
-  → Agent saves analysis.json to disk
+  → Agent analyzes images and builds spec JSON
+  → Agent saves spec.json to disk
   → Agent calls generate_spec_doc(validate_only=True), fixes errors
   → Agent calls generate_spec_doc(validate_only=False)
   → .docx document is generated

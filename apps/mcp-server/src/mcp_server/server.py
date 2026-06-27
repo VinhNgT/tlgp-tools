@@ -189,34 +189,33 @@ async def prepare_analysis(
     output_path: str,
     section_prefix: str = "1.1",
 ) -> PrepareAnalysisResult:
-    """Export images and scaffold analysis.json in one step.
+    """Export images and scaffold spec.json in one step.
 
     Call this after the user finishes annotating. It:
     1. Exports cropped component images (both annotated and raw) from the workspace
     2. Reads the workspace state and mapping.json to auto-generate the structural
-       skeleton of analysis.json (component hierarchy, DFS ordering, image paths,
-       isLeaf flags, cross-references)
-    3. Saves analysis.json to the output directory with TODO placeholders for
+       skeleton of spec.json (component hierarchy, image paths, cross-references)
+    3. Saves spec.json to the output directory with TODO placeholders for
        semantic fields (Vietnamese labels, descriptions, interactions, APIs)
 
     Args:
-        output_path: Absolute path to the destination directory for exported images and analysis.json.
+        output_path: Absolute path to the destination directory for exported images and spec.json.
         section_prefix: Section number prefix for component headings in the generated document (default "1.1").
 
     Returns:
-        dict with analysis_path, component count, screen name, and image export summary.
+        dict with spec_path, component count, screen name, and image export summary.
     """
     client = _get_client(ctx)
 
     # Step 1: Export images
     export_result = await client.export_images(output_path, mode="both")
 
-    # Step 2: Scaffold analysis.json from workspace state + exported mapping
+    # Step 2: Scaffold spec.json from workspace state + exported mapping
     state = await client.get_workspace_state()
     scaffold_result = scaffold_and_save(state, export_result.output_path, section_prefix)
 
     return PrepareAnalysisResult(
-        analysis_path=scaffold_result.analysis_path,
+        spec_path=scaffold_result.spec_path,
         export_path=export_result.output_path,
         components=scaffold_result.components,
         screen_name=scaffold_result.screen_name,
@@ -228,28 +227,28 @@ async def prepare_analysis(
 @mcp.tool()
 async def generate_spec_doc(
     ctx: Context,
-    analysis_path: str,
+    spec_path: str,
     output_path: str | None = None,
     validate_only: bool = False,
 ) -> DocGenResult:
     """Generate a TLGP specification document (.docx).
 
     CRITICAL REQUIREMENTS:
-    1. Vietnamese Translation: All component labels, descriptions, and outputs inside the analysis payload must be written in Vietnamese.
+    1. Vietnamese Translation: All component labels, descriptions, and outputs inside the spec payload must be written in Vietnamese.
     2. Strict Validation Workflow: Always run `generate_spec_doc(validate_only=True)` first to validate the payload structure and component images. Address any warnings or errors before proceeding to document generation with `validate_only=False`.
     3. Guidelines: Read the resource `tlgp://spec/workflow` for the complete workflow instructions.
-    4. Output Location: When generating the document (validate_only=False), the analysis JSON payload is always saved as `analysis.json` in the same directory as the generated `.docx` file.
+    4. Output Location: When generating the document (validate_only=False), the spec JSON payload is always saved as `spec.json` in the same directory as the generated `.docx` file.
 
     Args:
-        analysis_path: Path to the saved analysis.json file on disk.
-        output_path: Where to save the .docx. Defaults to <screen_name>.docx in imageDir. The analysis.json file will be written to the same directory.
+        spec_path: Path to the saved spec.json file on disk.
+        output_path: Where to save the .docx. Defaults to <screen_name>.docx in imageDir. The spec.json file will be written to the same directory.
         validate_only: If True, validates structure and checks files without compiling.
 
     Returns:
         dict with valid, output_path, tables, images, warnings, errors.
     """
     return await _get_spec_service(ctx).generate(
-        analysis_path=analysis_path,
+        spec_path=spec_path,
         ctx=ctx,
         output_path=output_path,
         validate_only=validate_only,

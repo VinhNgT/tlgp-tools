@@ -20,8 +20,8 @@ class TestSpecGeneratorService:
     @pytest.mark.anyio
     async def test_generate_invokes_cli_and_parses_result(self, tmp_path):
         """Mocked subprocess returns valid JSON → service returns parsed result."""
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text('{"dummy": true}', encoding="utf-8")
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text('{"dummy": true}', encoding="utf-8")
 
         expected_result = {
             "valid": True,
@@ -43,7 +43,7 @@ class TestSpecGeneratorService:
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec:
             service = SpecGeneratorService()
-            result = await service.generate(analysis_path=str(analysis_file))
+            result = await service.generate(spec_path=str(spec_file))
 
         assert result.valid is True
         assert result.output_path == str(tmp_path / "out.docx")
@@ -51,13 +51,13 @@ class TestSpecGeneratorService:
         # Verify CLI was called with --json
         call_args = mock_exec.call_args[0]
         assert call_args[0] == sys.executable
-        assert str(analysis_file) in call_args
+        assert str(spec_file) in call_args
         assert "--json" in call_args
 
     @pytest.mark.anyio
     async def test_generate_validate_only_passes_flag(self, tmp_path):
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text("{}", encoding="utf-8")
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (
@@ -71,7 +71,7 @@ class TestSpecGeneratorService:
         ) as mock_exec:
             service = SpecGeneratorService()
             result = await service.generate(
-                analysis_path=str(analysis_file),
+                spec_path=str(spec_file),
                 validate_only=True,
             )
 
@@ -81,8 +81,8 @@ class TestSpecGeneratorService:
 
     @pytest.mark.anyio
     async def test_generate_output_path_passes_flag(self, tmp_path):
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text("{}", encoding="utf-8")
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (
@@ -96,7 +96,7 @@ class TestSpecGeneratorService:
         ) as mock_exec:
             service = SpecGeneratorService()
             await service.generate(
-                analysis_path=str(analysis_file),
+                spec_path=str(spec_file),
                 output_path="/out/spec.docx",
             )
 
@@ -106,8 +106,8 @@ class TestSpecGeneratorService:
 
     @pytest.mark.anyio
     async def test_generate_invalid_json_stdout(self, tmp_path):
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text("{}", encoding="utf-8")
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (b"not json", b"some error")
@@ -117,7 +117,7 @@ class TestSpecGeneratorService:
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ):
             service = SpecGeneratorService()
-            result = await service.generate(analysis_path=str(analysis_file))
+            result = await service.generate(spec_path=str(spec_file))
 
         assert result.valid is False
         assert len(result.errors) > 0
@@ -126,8 +126,8 @@ class TestSpecGeneratorService:
 
     @pytest.mark.anyio
     async def test_generate_exports_workspace_zip_on_success(self, tmp_path):
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text("{}", encoding="utf-8")
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text("{}", encoding="utf-8")
 
         docx_path = tmp_path / "out.docx"
         expected_result = {
@@ -151,7 +151,7 @@ class TestSpecGeneratorService:
             service = SpecGeneratorService(
                 client=mock_client,
             )
-            result = await service.generate(analysis_path=str(analysis_file))
+            result = await service.generate(spec_path=str(spec_file))
 
         assert result.valid is True
         mock_client.export_workspace.assert_awaited_once_with(
@@ -160,8 +160,8 @@ class TestSpecGeneratorService:
 
     @pytest.mark.anyio
     async def test_generate_with_progress_reporting(self, tmp_path):
-        analysis_file = tmp_path / "analysis.json"
-        analysis_file.write_text("{}", encoding="utf-8")
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text("{}", encoding="utf-8")
 
         mock_proc = AsyncMock()
         mock_proc.communicate.return_value = (
@@ -178,10 +178,10 @@ class TestSpecGeneratorService:
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ):
             service = SpecGeneratorService()
-            await service.generate(analysis_path=str(analysis_file), ctx=ctx)
+            await service.generate(spec_path=str(spec_file), ctx=ctx)
 
         ctx.report_progress.assert_any_call(
-            10, 100, "Loading and validating analysis data..."
+            10, 100, "Loading and validating spec data..."
         )
         ctx.report_progress.assert_any_call(60, 100, "Running document generation...")
         ctx.report_progress.assert_any_call(100, 100, "Spec generation complete.")

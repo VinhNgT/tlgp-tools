@@ -25,7 +25,7 @@ logger = get_logger(__name__)
 class ScaffoldResult(BaseModel):
     """Structured result from a scaffold operation."""
 
-    analysis_path: str
+    spec_path: str
     components: int = 0
     screen_name: str = ""
 
@@ -33,7 +33,7 @@ class ScaffoldResult(BaseModel):
 class PrepareAnalysisResult(BaseModel):
     """Structured result from a prepare_analysis operation (export + scaffold)."""
 
-    analysis_path: str
+    spec_path: str
     export_path: str = ""
     components: int = 0
     screen_name: str = ""
@@ -179,7 +179,7 @@ def scaffold_and_save(
     export_dir: str,
     section_prefix: str = "1.1",
 ) -> ScaffoldResult:
-    """Build a scaffold and save it as analysis.json in the export directory.
+    """Build a scaffold and save it as spec.json in the export directory.
 
     Args:
         state: The annotator's workspace state.
@@ -195,7 +195,7 @@ def scaffold_and_save(
 
     scaffold = build_scaffold(state, export_path, section_prefix)
 
-    output_path = export_path / "analysis.json"
+    output_path = export_path / "spec.json"
     output_path.write_text(
         json.dumps(scaffold, indent=2, ensure_ascii=False),
         encoding="utf-8",
@@ -204,7 +204,7 @@ def scaffold_and_save(
     components_count = len(scaffold["nodes"]) - 1  # excluding screen
 
     logger.info(
-        "Saved analysis scaffold to %s (%d components)",
+        "Saved spec scaffold to %s (%d components)",
         output_path,
         components_count,
     )
@@ -213,7 +213,7 @@ def scaffold_and_save(
     screen_node = next(n for n in scaffold["nodes"] if n["id"] == scaffold["rootId"])
 
     return ScaffoldResult(
-        analysis_path=str(output_path),
+        spec_path=str(output_path),
         components=components_count,
         screen_name=screen_node["label"],
     )

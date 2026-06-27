@@ -315,7 +315,7 @@ class TestScaffoldAndSave:
         assert "Trang chủ" in result.screen_name
 
         # Verify file was written
-        saved = json.loads(Path(result.analysis_path).read_text(encoding="utf-8"))
+        saved = json.loads(Path(result.spec_path).read_text(encoding="utf-8"))
         assert saved["sectionPrefix"] == "1.1"
         assert len(saved["nodes"]) == 2
 
