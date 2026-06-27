@@ -6,6 +6,8 @@ by the high-level API (borders, cell padding, shading).
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from docx.document import Document
 from docx.enum.table import WD_TABLE_ALIGNMENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
@@ -282,7 +284,7 @@ def build_generic_info_table(
 
 def build_ui_elements_table(
     doc: Document,
-    children: list[ChildElement],
+    children: Sequence[ChildElement],
     style: StyleConfig,
 ) -> Table:
     """Build a 7-column UI Elements Table."""
@@ -301,12 +303,12 @@ def build_ui_elements_table(
     # Data
     for r, child in enumerate(children):
         row_data = [
-            str(child.stt),
+            str(r + 1),
             child.label,
             child.controlType,
-            child.required,
-            child.maxLength,
-            child.editable,
+            getattr(child, "required", ""),
+            getattr(child, "maxLength", ""),
+            getattr(child, "editable", ""),
             child.description,
         ]
         for c, text in enumerate(row_data):

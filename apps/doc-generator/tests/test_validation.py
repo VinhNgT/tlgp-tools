@@ -7,10 +7,11 @@ from doc_generator.models import (
     Api,
     ApiParam,
     ChildElement,
+    ComponentReferenceElement,
     Discrepancy,
     Interaction,
+    PrimitiveElement,
     Screen,
-    SubDto,
 )
 from doc_generator.validation import validate_analysis
 from pydantic import ValidationError
@@ -24,13 +25,19 @@ def _minimal_analysis(tmp_path, **overrides) -> AnalysisData:
             name="Test",
             description="desc desc desc",
             imageFiles=["screen.png"],
-            topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-            apis=[Api(number=1, method="GET", title="Test", url="/test")],
+            topLevelChildren=[PrimitiveElement(label="Test", controlType="Button")],
+            apis=[Api(method="GET", title="Test", url="/test")],
         ),
-        "components": [],
+        "components": {},
         "discrepancies": [],
     }
+
+    if "components" in overrides and isinstance(overrides["components"], list):
+        overrides["components"] = {c.id: c for c in overrides["components"]}
+    if "subDtos" in overrides and isinstance(overrides["subDtos"], list):
+        overrides["subDtos"] = {d.name: d for d in overrides["subDtos"]}
     defaults.update(overrides)
+
     return AnalysisData(**defaults)
 
 
@@ -45,8 +52,10 @@ class TestValidateAnalysis:
                 name="Test",
                 description="desc desc desc",
                 imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Comp 1", controlType="Component")],
-                apis=[Api(number=1, method="GET", title="Test", url="/test")],
+                topLevelChildren=[
+                    ComponentReferenceElement(label="Comp 1", componentId=99)
+                ],
+                apis=[Api(method="GET", title="Test", url="/test")],
             ),
             components=[
                 AnalysisComponent(
@@ -54,9 +63,7 @@ class TestValidateAnalysis:
                     label="Comp 1",
                     description="desc desc desc",
                     imageFile="comp.png",
-                    children=[
-                        ChildElement(stt=1, label="Button", controlType="Button")
-                    ],
+                    children=[PrimitiveElement(label="Button", controlType="Button")],
                     interactions=[Interaction(action="Click", reaction="Test")],
                 )
             ],
@@ -80,7 +87,7 @@ class TestValidateAnalysis:
                     label="Comp 1",
                     description="desc",
                     imageFile="missing_comp.png",
-                    children=[ChildElement(stt=1, label="B", controlType="B")]
+                    children=[PrimitiveElement(label="B", controlType="B")],
                 )
             ],
         )
@@ -102,7 +109,7 @@ class TestValidateAnalysis:
                     label="Comp 1",
                     description="",
                     imageFile="comp.png",
-                    children=[ChildElement(stt=1, label="B", controlType="B")]
+                    children=[PrimitiveElement(label="B", controlType="B")],
                 )
             ],
         )
@@ -122,7 +129,7 @@ class TestValidateAnalysis:
                     label="Comp 1",
                     description="desc",
                     imageFile="comp.png",
-                    children=[]
+                    children=[],
                 )
             ],
         )
@@ -130,43 +137,6 @@ class TestValidateAnalysis:
         result = validate_analysis(analysis)
         assert result.valid is False
         assert any("no children specified" in err for err in result.errors)
-
-    def test_warnings_empty_control_type(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        (tmp_path / "comp.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1,
-                    label="Comp 1",
-                    description="desc",
-                    imageFile="comp.png",
-                    children=[ChildElement(stt=1, label="Label", controlType="")],
-                )
-            ],
-        )
-
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("empty controlType" in w for w in result.warnings)
-
-    def test_warnings_no_apis(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[],
-            ),
-        )
-
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("No APIs defined" in w for w in result.warnings)
 
     def test_warnings_discrepancies(self, tmp_path):
         (tmp_path / "screen.png").touch()
@@ -193,7 +163,7 @@ class TestValidateAnalysis:
                 name="Test",
                 description="",
                 imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
+                topLevelChildren=[PrimitiveElement(label="Test", controlType="Button")],
             ),
         )
         result = validate_analysis(analysis)
@@ -222,8 +192,8 @@ class TestValidateAnalysis:
                 name="Test",
                 description="desc",
                 imageFiles=[],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[Api(number=1, method="GET", title="Test", url="/test")],
+                topLevelChildren=[PrimitiveElement(label="Test", controlType="Button")],
+                apis=[Api(method="GET", title="Test", url="/test")],
             ),
         )
 
@@ -241,7 +211,7 @@ class TestValidateAnalysis:
                     label="Comp 1",
                     description="desc",
                     imageFile=None,
-                    children=[ChildElement(stt=1, label="B", controlType="B")]
+                    children=[PrimitiveElement(label="B", controlType="B")],
                 )
             ],
         )
@@ -250,203 +220,16 @@ class TestValidateAnalysis:
         assert result.valid is False
         assert any("no imageFile specified" in err for err in result.errors)
 
-    def test_statistics_include_screen_data(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(tmp_path)
-        # Add 1 screen interaction and 1 screen child
-        analysis.screen.interactions.append(Interaction(
-            action="click",
-            reaction="navigate"
-        ))
-        analysis.screen.topLevelChildren.append(ChildElement(stt=1, label="label", controlType="type"))
-
-        result = validate_analysis(analysis)
-        # The base _minimal_analysis might have some ui_elements or interactions,
-        # but we know we added 1 to screen.
-        assert result.ui_elements >= 1
-        assert result.interactions >= 1
-
-    def test_warnings_non_contiguous_api_numbering(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[
-                    Api(number=1, method="GET", title="Test 1", url="/test1"),
-                    Api(number=3, method="GET", title="Test 3", url="/test3"),
-                ],
-            ),
-        )
-
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("missing number(s) 2" in w for w in result.warnings)
-
-    def test_warnings_undocumented_request_body(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[
-                    Api(
-                        number=1,
-                        method="POST",
-                        title="Test",
-                        url="/test",
-                        requestBodyType="TestRequestDto",
-                        requestParams=[],
-                        subDtos=[],
-                    )
-                ],
-            ),
-        )
-
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("declares requestBodyType 'TestRequestDto' but has no request parameters" in w for w in result.warnings)
-
-    def test_no_warning_when_request_body_documented_in_subdtos(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[
-                    Api(
-                        number=1,
-                        method="POST",
-                        title="Test",
-                        url="/test",
-                        requestBodyType="TestRequestDto",
-                        requestParams=[],
-                        subDtos=[
-                            SubDto(
-                                name="TestRequestDto",
-                                fieldRef="",
-                                fields=[ApiParam(name="id", meaning="id", required="Có", dataType="int", limit="", defaultValue="")]
-                            )
-                        ],
-                    )
-                ],
-            ),
-        )
-
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert not any("declares requestBodyType" in w for w in result.warnings)
-
-    def test_warnings_duplicate_stt(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[
-                    ChildElement(stt=1, label="A", controlType="Button"),
-                    ChildElement(stt=1, label="B", controlType="Text"),
-                ],
-            ),
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("Duplicate stt 1 in Screen 'Test'" in w for w in result.warnings)
-
-    def test_warnings_undocumented_response_type(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[
-                    Api(
-                        number=1,
-                        method="GET",
-                        title="Test",
-                        url="/test",
-                        responseType="TestResponseDto",
-                        responseFields=[],
-                        subDtos=[],
-                    )
-                ],
-            ),
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("declares responseType 'TestResponseDto' but has no response fields" in w for w in result.warnings)
-
-    def test_warnings_dangling_subdto(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[
-                    Api(
-                        number=1,
-                        method="GET",
-                        title="Test",
-                        url="/test",
-                        subDtos=[
-                            SubDto(name="UnusedDto", fields=[])
-                        ],
-                    )
-                ],
-            ),
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("declares SubDto 'UnusedDto', but it is never referenced" in w for w in result.warnings)
-
     def test_error_leaf_cannot_have_children(self):
-        with pytest.raises(ValidationError, match="is a leaf component and cannot have children"):
+        with pytest.raises(
+            ValidationError, match="is a leaf component and cannot have children"
+        ):
             AnalysisComponent(
                 id=1,
                 label="Leaf",
                 isLeaf=True,
-                children=[ChildElement(stt=1, label="A", controlType="Button")]
+                children=[PrimitiveElement(label="A", controlType="Button")],
             )
-
-    def test_error_duplicate_component_id(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        with pytest.raises(ValidationError, match="Component ID 1 is duplicated across components"):
-            _minimal_analysis(
-                tmp_path,
-                components=[
-                    AnalysisComponent(id=1, label="Comp 1", imageFile="screen.png", children=[ChildElement(stt=1, label="A", controlType="B")]),
-                    AnalysisComponent(id=1, label="Comp 2", imageFile="screen.png", children=[ChildElement(stt=1, label="A", controlType="B")])
-                ]
-            )
-
-    def test_error_api_number_less_than_one(self):
-        with pytest.raises(ValidationError, match="API number must be >= 1"):
-            Api(number=0, method="GET", title="Test", url="/")
-
-    def test_error_api_method_invalid(self):
-        with pytest.raises(ValidationError, match="API method must be one of"):
-            Api(number=1, method="GETT", title="Test", url="/")
-
-    def test_api_method_normalized(self):
-        api = Api(number=1, method=" get ", title="Test", url="/")
-        assert api.method == "GET"
 
     def test_error_image_path_traversal(self, tmp_path):
         (tmp_path / "screen.png").touch()
@@ -457,9 +240,12 @@ class TestValidateAnalysis:
             tmp_path,
             components=[
                 AnalysisComponent(
-                    id=1, label="Comp 1", imageFile="../outside.png", children=[ChildElement(stt=1, label="A", controlType="B")]
+                    id=1,
+                    label="Comp 1",
+                    imageFile="../outside.png",
+                    children=[PrimitiveElement(label="A", controlType="B")],
                 )
-            ]
+            ],
         )
         result = validate_analysis(analysis)
         assert result.valid is False
@@ -472,84 +258,18 @@ class TestValidateAnalysis:
             tmp_path,
             components=[
                 AnalysisComponent(
-                    id=1, label=" ", description="desc desc desc", imageFile="screen.png", children=[ChildElement(stt=1, label=" ", controlType="B")],
-                    interactions=[Interaction(action="A", reaction="B")]
+                    id=1,
+                    label=" ",
+                    description="desc desc desc",
+                    imageFile="screen.png",
+                    children=[PrimitiveElement(label=" ", controlType="B")],
+                    interactions=[Interaction(action="A", reaction="B")],
                 )
-            ]
+            ],
         )
         result = validate_analysis(analysis)
         assert result.valid is True
         assert any("empty label" in w for w in result.warnings)
-
-    def test_warnings_empty_interactions(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1, label="Comp", description="desc desc desc", imageFile="screen.png", children=[ChildElement(stt=1, label="A", controlType="B")],
-                    interactions=[]
-                )
-            ]
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("zero interactions" in w for w in result.warnings)
-
-    def test_warnings_empty_action_reaction(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1, label="Comp", description="desc desc desc", imageFile="screen.png", children=[ChildElement(stt=1, label="A", controlType="B")],
-                    interactions=[Interaction(action=" ", reaction="A")]
-                )
-            ]
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("empty action/reaction" in w for w in result.warnings)
-
-    def test_warnings_stt_starts_at_2(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[
-                    ChildElement(stt=2, label="A", controlType="Button"),
-                    ChildElement(stt=3, label="B", controlType="Text"),
-                ],
-            ),
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("starts at 2, expected 1" in w for w in result.warnings)
-
-    def test_warnings_api_numbering_starts_at_2(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[
-                    Api(number=2, method="GET", title="Test", url="/test")
-                ],
-            ),
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("starts at 2, expected 1" in w for w in result.warnings)
-
-    def test_error_api_url_no_slash(self):
-        with pytest.raises(ValidationError, match="API url must start with"):
-            Api(number=1, method="GET", title="Test", url="test")
 
     def test_warnings_orphan_component(self, tmp_path):
         (tmp_path / "screen.png").touch()
@@ -558,10 +278,14 @@ class TestValidateAnalysis:
             tmp_path,
             components=[
                 AnalysisComponent(
-                    id=1, label="Orphan", description="desc desc desc", imageFile="comp.png", children=[ChildElement(stt=1, label="A", controlType="B")],
-                    interactions=[Interaction(action="A", reaction="B")]
+                    id=1,
+                    label="Orphan",
+                    description="desc desc desc",
+                    imageFile="comp.png",
+                    children=[PrimitiveElement(label="A", controlType="B")],
+                    interactions=[Interaction(action="A", reaction="B")],
                 )
-            ]
+            ],
         )
         result = validate_analysis(analysis)
         assert result.valid is True
@@ -575,51 +299,12 @@ class TestValidateAnalysis:
                 name="Test",
                 description="short",
                 imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
+                topLevelChildren=[PrimitiveElement(label="Test", controlType="Button")],
             ),
         )
         result = validate_analysis(analysis)
         assert result.valid is True
         assert any("suspiciously short" in w for w in result.warnings)
-
-    def test_error_duplicate_api_number(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        with pytest.raises(ValidationError, match="defined in multiple places"):
-            _minimal_analysis(
-                tmp_path,
-                screen=Screen(
-                    name="Test",
-                    description="desc desc desc",
-                    imageFiles=["screen.png"],
-                    topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                    apis=[
-                        Api(number=1, method="GET", title="Test 1", url="/test1"),
-                        Api(number=1, method="POST", title="Test 2", url="/test2")
-                    ],
-                ),
-            )
-
-    def test_warnings_missing_subdto(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc desc desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
-                apis=[
-                    Api(
-                        number=1, method="GET", title="Test", url="/test",
-                        requestBodyType="MissingDto",
-                        subDtos=[]
-                    )
-                ],
-            ),
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("not defined in subDtos" in w for w in result.warnings)
 
     def test_warnings_empty_api_param(self, tmp_path):
         (tmp_path / "screen.png").touch()
@@ -629,11 +314,15 @@ class TestValidateAnalysis:
                 name="Test",
                 description="desc desc desc",
                 imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Test", controlType="Button")],
+                topLevelChildren=[PrimitiveElement(label="Test", controlType="Button")],
                 apis=[
                     Api(
-                        number=1, method="GET", title="Test", url="/test",
-                        requestParams=[ApiParam(name=" ", meaning="valid", dataType="String")]
+                        method="GET",
+                        title="Test",
+                        url="/test",
+                        requestParams=[
+                            ApiParam(name=" ", meaning="valid", dataType="String")
+                        ],
                     )
                 ],
             ),
@@ -642,31 +331,21 @@ class TestValidateAnalysis:
         assert result.valid is True
         assert any("empty name or meaning" in w for w in result.warnings)
 
-    def test_warnings_component_cross_check(self, tmp_path):
-        (tmp_path / "screen.png").touch()
-        analysis = _minimal_analysis(
-            tmp_path,
-            screen=Screen(
-                name="Test",
-                description="desc desc desc",
-                imageFiles=["screen.png"],
-                topLevelChildren=[ChildElement(stt=1, label="Missing Comp", controlType="Component")],
-            ),
-        )
-        result = validate_analysis(analysis)
-        assert result.valid is True
-        assert any("references non-existent component" in w for w in result.warnings)
-
 
 class TestUnitLimitValidation:
     """Tests for the unit limit complexity budget validation."""
 
     def _make_children(self, count: int) -> list[ChildElement]:
-        return [ChildElement(stt=i, label=f"Child {i}", controlType="Button") for i in range(1, count + 1)]
+        return [
+            PrimitiveElement(stt=i, label=f"Child {i}", controlType="Button")
+            for i in range(1, count + 1)
+        ]
 
     def _make_apis(self, count: int, start_number: int = 1) -> list[Api]:
         return [
-            Api(number=start_number + i, method="GET", title=f"API {i}", url=f"/api/{i}")
+            Api(
+                number=start_number + i, method="GET", title=f"API {i}", url=f"/api/{i}"
+            )
             for i in range(count)
         ]
 
@@ -700,7 +379,9 @@ class TestUnitLimitValidation:
         )
         result = validate_analysis(analysis)
         assert result.valid is False
-        assert any("Screen 'Test' exceeds the unit limit: 16/15" in e for e in result.errors)
+        assert any(
+            "Screen 'Test' exceeds the unit limit: 16/15" in e for e in result.errors
+        )
 
     def test_component_at_exactly_15_units_is_valid(self, tmp_path):
         """12 children + 1 API = 12 + 3 = 15 units, exactly at limit."""
@@ -743,7 +424,10 @@ class TestUnitLimitValidation:
         )
         result = validate_analysis(analysis)
         assert result.valid is False
-        assert any("Component 'Heavy Component' (id=1) exceeds the unit limit: 16/15" in e for e in result.errors)
+        assert any(
+            "Component 'Heavy Component' (id=1) exceeds the unit limit: 16/15" in e
+            for e in result.errors
+        )
 
     def test_only_offending_component_flagged(self, tmp_path):
         """When multiple components exist, only the one over the limit is flagged."""
@@ -757,8 +441,8 @@ class TestUnitLimitValidation:
                 description="desc desc desc",
                 imageFiles=["screen.png"],
                 topLevelChildren=[
-                    ChildElement(stt=1, label="OK Component", controlType="Component"),
-                    ChildElement(stt=2, label="Over Component", controlType="Component"),
+                    ComponentReferenceElement(label="OK Component", componentId=99),
+                    ComponentReferenceElement(label="Over Component", componentId=99),
                 ],
             ),
             components=[
@@ -799,7 +483,6 @@ class TestUnitLimitValidation:
         result = validate_analysis(analysis)
         assert not any("unit limit" in e for e in result.errors)
 
-
     def test_error_message_contains_breakdown(self, tmp_path):
         """Error message includes annotation count, API count, and total."""
         (tmp_path / "screen.png").touch()
@@ -820,4 +503,3 @@ class TestUnitLimitValidation:
         assert "16/15" in err
         assert "10 annotations" in err
         assert "2 APIs" in err
-

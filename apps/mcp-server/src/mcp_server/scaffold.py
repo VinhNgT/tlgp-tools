@@ -110,8 +110,8 @@ def build_scaffold(
     # Walk in post-order DFS to get the component ordering
     ordered_uuids = _walk_post_order_dfs(state)
 
-    # Build the components array with sequential IDs
-    components: list[dict] = []
+    # Build the components dict with sequential IDs
+    components: dict[int, dict] = {}
     uuid_to_seq_id: dict[UUID, int] = {}
     seq_id = 1
 
@@ -129,10 +129,10 @@ def build_scaffold(
 
         # Build children array referencing annotated children
         component_children = []
-        for child_idx, child_uuid in enumerate(comp.childrenIds, start=1):
+        for child_uuid in comp.childrenIds:
             if child_uuid in uuid_to_seq_id:
                 component_children.append({
-                    "stt": child_idx,
+                    "type": "component",
                     "componentId": uuid_to_seq_id[child_uuid]
                 })
 
@@ -149,16 +149,16 @@ def build_scaffold(
             "interactions": [],
             "apis": [],
         }
-        components.append(component_entry)
+        components[seq_id] = component_entry
         seq_id += 1
 
     # Build screen.topLevelChildren from rootComponents using componentId
     top_level_children: list[dict] = []
-    for stt_idx, root_uuid in enumerate(state.rootComponents, start=1):
+    for root_uuid in state.rootComponents:
         if root_uuid not in uuid_to_seq_id:
             continue
         top_level_children.append({
-            "stt": stt_idx,
+            "type": "component",
             "componentId": uuid_to_seq_id[root_uuid]
         })
 

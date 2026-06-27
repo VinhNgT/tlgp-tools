@@ -3,8 +3,8 @@
 import pytest
 from doc_generator.models import (
     ApiParam,
-    ChildElement,
     Interaction,
+    PrimitiveElement,
 )
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
@@ -99,8 +99,8 @@ class TestUiElementsTable:
     def test_correct_dimensions(self):
         doc = Document()
         children = [
-            ChildElement(stt=1, label="Back", controlType="Icon"),
-            ChildElement(stt=2, label="Title", controlType="Text"),
+            PrimitiveElement(label="Back", controlType="Icon"),
+            PrimitiveElement(label="Title", controlType="Text"),
         ]
         table = build_ui_elements_table(doc, children, style)
         assert len(table.rows) == 3  # 1 header + 2 data
@@ -108,7 +108,7 @@ class TestUiElementsTable:
 
     def test_header_labels(self):
         doc = Document()
-        children = [ChildElement(stt=1, label="A", controlType="B")]
+        children = [PrimitiveElement(label="A", controlType="B")]
         table = build_ui_elements_table(doc, children, style)
         headers = [table.cell(0, c).text for c in range(7)]
         assert headers[0] == "STT"
@@ -118,8 +118,7 @@ class TestUiElementsTable:
     def test_data_populated(self):
         doc = Document()
         children = [
-            ChildElement(
-                stt=1,
+            PrimitiveElement(
                 label="Share",
                 controlType="Icon",
                 description="Share product",

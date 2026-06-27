@@ -126,9 +126,13 @@ class TestExampleAnalysisValidation:
 
         annotated_dir = tmp_path / "annotated"
         annotated_dir.mkdir()
-        (annotated_dir / "root_screenshot.png").touch()
         (annotated_dir / "1_Thanh_tiêu_đề_a1b2c3d4.png").touch()
         (annotated_dir / "3_Khối_chọn_thuộc_tính_c5d6e7f8.png").touch()
+
+        root_dir = tmp_path / "root"
+        root_dir.mkdir()
+        (root_dir / "Chi_tiết_sản_phẩm_1.png").touch()
+        (root_dir / "Chi_tiết_sản_phẩm_2.png").touch()
 
         analysis_data = AnalysisData(**data_dict)
         result = validate_analysis(analysis_data)

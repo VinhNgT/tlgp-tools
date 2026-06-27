@@ -1,8 +1,8 @@
 {
   "sectionPrefix": "1.1",
   "imageDir": "./workspace_xyz",
-  "components": [
-    {
+  "components": {
+    "1": {
       "id": 1,
       "label": "Thanh tiêu đề",
       "description": "Thanh tiêu đề phía trên cùng của màn hình, chứa nút quay lại và tên sản phẩm",
@@ -10,7 +10,7 @@
       "imageFile": "annotated/1_Thanh_tiêu_đề_a1b2c3d4.png",
       "children": [
         {
-          "stt": 1,
+          "type": "primitive",
           "label": "Nút quay lại",
           "controlType": "Icon",
           "required": "",
@@ -19,7 +19,7 @@
           "description": "Biểu tượng mũi tên quay lại màn hình trước"
         },
         {
-          "stt": 2,
+          "type": "primitive",
           "label": "Tiêu đề sản phẩm",
           "controlType": "Text",
           "required": "",
@@ -36,7 +36,6 @@
       ],
       "apis": [
         {
-          "number": 2,
           "method": "GET",
           "title": "Lấy thông báo chưa đọc",
           "url": "/api/v1/notifications/unread",
@@ -55,8 +54,8 @@
             }
           ],
           "responseDescription": "Số lượng thông báo chưa đọc của người dùng",
-          "subDtos": [
-            {
+          "subDtos": {
+            "UnreadCountDto": {
               "name": "UnreadCountDto",
               "fieldRef": "",
               "fields": [
@@ -70,11 +69,11 @@
                 }
               ]
             }
-          ]
+          }
         }
       ]
     },
-    {
+    "2": {
       "id": 2,
       "label": "Ảnh banner quảng cáo",
       "description": "Hình ảnh banner quảng cáo sản phẩm ở đầu màn hình",
@@ -84,7 +83,7 @@
       "interactions": [],
       "apis": []
     },
-    {
+    "3": {
       "id": 3,
       "label": "Khối chọn thuộc tính sản phẩm",
       "description": "Khu vực cho phép người dùng lựa chọn màu sắc và kích thước sản phẩm trước khi mua hàng.",
@@ -92,7 +91,7 @@
       "imageFile": "annotated/3_Khối_chọn_thuộc_tính_c5d6e7f8.png",
       "children": [
         {
-          "stt": 1,
+          "type": "primitive",
           "label": "Danh sách màu sắc",
           "controlType": "Tabbar",
           "required": "Có",
@@ -101,7 +100,7 @@
           "description": "Các tùy chọn màu sắc hiển thị dưới dạng danh sách nhãn tròn"
         },
         {
-          "stt": 2,
+          "type": "primitive",
           "label": "Danh sách kích thước",
           "controlType": "Tabbar",
           "required": "Có",
@@ -118,14 +117,13 @@
       ],
       "apis": [
         {
-          "number": 3,
           "method": "POST",
           "title": "Thêm sản phẩm vào giỏ hàng",
           "url": "/api/v1/cart/add",
           "requestParams": [],
           "requestBodyType": "AddToCartRequestDto",
           "requestDescription": "Thông tin sản phẩm và thuộc tính lựa chọn để thêm vào giỏ",
-          "responseType": "CartSummaryDto",
+          "responseType": "",
           "responseFields": [
             {
               "name": "total_items",
@@ -145,219 +143,192 @@
             }
           ],
           "responseDescription": "Thông tin tóm tắt giỏ hàng sau khi thêm",
-          "subDtos": [
-            {
+          "subDtos": {
+            "AddToCartRequestDto": {
               "name": "AddToCartRequestDto",
               "fieldRef": "",
               "fields": [
                 {
                   "name": "product_id",
-                  "meaning": "ID của sản phẩm cần thêm",
+                  "meaning": "ID của sản phẩm",
                   "required": "Có",
-                  "dataType": "int",
+                  "dataType": "string",
                   "limit": "",
                   "defaultValue": ""
                 },
                 {
                   "name": "quantity",
-                  "meaning": "Số lượng cần thêm vào giỏ",
+                  "meaning": "Số lượng muốn mua",
                   "required": "Có",
                   "dataType": "int",
-                  "limit": "",
+                  "limit": ">= 1",
                   "defaultValue": "1"
-                }
-              ]
-            },
-            {
-              "name": "CartSummaryDto",
-              "fieldRef": "",
-              "fields": [
-                {
-                  "name": "total_items",
-                  "meaning": "Tổng số lượng vật phẩm trong giỏ hàng",
-                  "required": "Có",
-                  "dataType": "int",
-                  "limit": "",
-                  "defaultValue": "0"
                 },
                 {
-                  "name": "total_price",
-                  "meaning": "Tổng giá trị giỏ hàng",
-                  "required": "Có",
-                  "dataType": "double",
-                  "limit": "",
-                  "defaultValue": "0.0"
-                },
-                {
-                  "name": "items",
-                  "meaning": "Danh sách vật phẩm chi tiết trong giỏ hàng",
-                  "required": "Có",
-                  "dataType": "List<CartItemDto>",
+                  "name": "options",
+                  "meaning": "Các tùy chọn thuộc tính",
+                  "required": "Không",
+                  "dataType": "ProductOptionDto",
                   "limit": "",
                   "defaultValue": ""
                 }
               ]
             },
-            {
-              "name": "CartItemDto",
-              "fieldRef": "items",
+            "ProductOptionDto": {
+              "name": "ProductOptionDto",
+              "fieldRef": "options",
               "fields": [
                 {
-                  "name": "sku",
-                  "meaning": "Mã SKU định danh sản phẩm chi tiết",
+                  "name": "color_id",
+                  "meaning": "ID của màu sắc",
                   "required": "Có",
-                  "dataType": "String",
+                  "dataType": "string",
                   "limit": "",
                   "defaultValue": ""
                 },
                 {
-                  "name": "name",
-                  "meaning": "Tên sản phẩm chi tiết",
+                  "name": "size_id",
+                  "meaning": "ID của kích thước",
                   "required": "Có",
-                  "dataType": "String",
-                  "limit": "",
-                  "defaultValue": ""
-                },
-                {
-                  "name": "price",
-                  "meaning": "Đơn giá của sản phẩm",
-                  "required": "Có",
-                  "dataType": "double",
+                  "dataType": "string",
                   "limit": "",
                   "defaultValue": ""
                 }
               ]
             }
-          ]
+          }
         }
       ]
     }
-  ],
+  },
   "screen": {
     "name": "Chi tiết sản phẩm",
-    "description": "Màn hình hiển thị thông tin chi tiết của sản phẩm bao gồm ảnh, mô tả và giá",
+    "description": "Màn hình hiển thị chi tiết thông tin của một sản phẩm, cho phép người dùng xem thông tin, chọn thuộc tính và thêm vào giỏ hàng.",
     "imageFiles": [
-      "annotated/root_screenshot.png"
+      "root/Chi_tiết_sản_phẩm_1.png",
+      "root/Chi_tiết_sản_phẩm_2.png"
     ],
     "topLevelChildren": [
       {
-        "stt": 1,
+        "type": "component",
+        "componentId": 1,
         "label": "Thanh tiêu đề",
-        "controlType": "Component",
-        "required": "",
-        "maxLength": "",
-        "editable": "",
-        "description": "Thanh tiêu đề chứa nút quay lại và tên sản phẩm"
+        "description": "Thanh tiêu đề chứa nút quay lại"
       },
       {
-        "stt": 2,
+        "type": "component",
+        "componentId": 2,
         "label": "Ảnh banner quảng cáo",
-        "controlType": "Image",
-        "required": "",
-        "maxLength": "",
-        "editable": "",
-        "description": "Hình ảnh banner quảng cáo sản phẩm"
+        "description": "Hình ảnh quảng cáo sản phẩm"
       },
       {
-        "stt": 3,
+        "type": "component",
+        "componentId": 3,
         "label": "Khối chọn thuộc tính sản phẩm",
-        "controlType": "Component",
+        "description": "Khu vực chọn màu sắc và kích thước"
+      },
+      {
+        "type": "primitive",
+        "label": "Nút chat với người bán",
+        "controlType": "Button",
         "required": "",
         "maxLength": "",
         "editable": "",
-        "description": "Khối hiển thị tùy chọn và xử lý chọn thuộc tính sản phẩm"
+        "description": "Nút mở màn hình chat với cửa hàng"
       }
     ],
     "interactions": [
       {
-        "action": "Mở màn hình",
-        "reaction": "Hệ thống gọi API lấy chi tiết sản phẩm và hiển thị"
+        "action": "Vuốt màn hình lên/xuống",
+        "reaction": "Cuộn xem các thông tin chi tiết khác của sản phẩm."
       }
     ],
     "apis": [
       {
-        "number": 1,
         "method": "GET",
-        "title": "Lấy chi tiết sản phẩm",
+        "title": "Lấy thông tin chi tiết sản phẩm",
         "url": "/api/v1/products/{id}",
         "requestParams": [
           {
             "name": "id",
-            "meaning": "ID sản phẩm",
+            "meaning": "ID của sản phẩm cần lấy chi tiết",
             "required": "Có",
-            "dataType": "int",
+            "dataType": "string",
             "limit": "",
             "defaultValue": ""
           }
         ],
         "requestBodyType": "",
         "requestDescription": "",
-        "responseType": "ProductDetailDto",
+        "responseType": "ProductDetailResponseDto",
         "responseFields": [
           {
             "name": "name",
             "meaning": "Tên sản phẩm",
             "required": "Có",
-            "dataType": "String",
+            "dataType": "string",
+            "limit": "",
+            "defaultValue": ""
+          },
+          {
+            "name": "price",
+            "meaning": "Giá sản phẩm",
+            "required": "Có",
+            "dataType": "double",
+            "limit": "",
+            "defaultValue": "0.0"
+          },
+          {
+            "name": "description",
+            "meaning": "Mô tả chi tiết sản phẩm",
+            "required": "Không",
+            "dataType": "string",
             "limit": "",
             "defaultValue": ""
           }
         ],
         "responseDescription": "Thông tin chi tiết của sản phẩm",
-        "subDtos": [
-          {
-            "name": "ProductDetailDto",
+        "subDtos": {
+          "ProductDetailResponseDto": {
+            "name": "ProductDetailResponseDto",
             "fieldRef": "",
             "fields": [
               {
                 "name": "name",
                 "meaning": "Tên sản phẩm",
                 "required": "Có",
-                "dataType": "String",
+                "dataType": "string",
                 "limit": "",
                 "defaultValue": ""
               },
               {
-                "name": "category",
-                "meaning": "Danh mục sản phẩm",
+                "name": "price",
+                "meaning": "Giá sản phẩm",
                 "required": "Có",
-                "dataType": "CategoryDto",
+                "dataType": "double",
                 "limit": "",
-                "defaultValue": ""
-              }
-            ]
-          },
-          {
-            "name": "CategoryDto",
-            "fieldRef": "category",
-            "fields": [
-              {
-                "name": "id",
-                "meaning": "ID danh mục",
-                "required": "Có",
-                "dataType": "int",
-                "limit": "",
-                "defaultValue": ""
+                "defaultValue": "0.0"
               },
               {
-                "name": "name",
-                "meaning": "Tên danh mục",
-                "required": "Có",
-                "dataType": "String",
+                "name": "description",
+                "meaning": "Mô tả chi tiết sản phẩm",
+                "required": "Không",
+                "dataType": "string",
                 "limit": "",
                 "defaultValue": ""
               }
             ]
           }
-        ]
+        }
       }
     ]
   },
   "discrepancies": [
     {
-      "location": "Thanh tiêu đề",
-      "imageObservation": "Tiêu đề sản phẩm hiển thị căn giữa màn hình",
-      "codeObservation": "Trong mã nguồn Flutter, tiêu đề hiển thị căn lề trái (mặc định của Android)"
+      "location": "Khối chọn thuộc tính sản phẩm > Danh sách kích thước",
+      "imageObservation": "Có hiển thị nút chọn size XL",
+      "codeObservation": "Dữ liệu size trả về từ API không có size XL",
+      "expectedBehavior": "Ẩn nút chọn size XL nếu hết hàng hoặc không hỗ trợ"
     }
   ]
 }

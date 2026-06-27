@@ -189,13 +189,11 @@ def _add_screen_section(
     )
 
 
-def _add_api_section(
-    doc: Document, api: Api, style: StyleConfig, api_index: int
-):
+def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int):
     """Build a single API documentation block."""
     # API title: bold normal text
     para = doc.add_paragraph()
-    run = para.add_run(f"{api_index}. {api.method} {api.title}")
+    run = para.add_run(f"{api_index}. {api.method.value} {api.title}")
     _set_run_font(run, style)
     run.font.size = style.FONT_SIZE_DEFAULT
     run.font.bold = True
@@ -228,7 +226,7 @@ def _add_api_section(
             _add_normal_text(doc, api.responseDescription, style)
 
     # Sub-DTO tables
-    for sub in api.subDtos:
+    for sub in api.subDtos.values():
         title = f"{sub.name} fields"
         if sub.fieldRef:
             title += f" ({sub.fieldRef})"
@@ -294,7 +292,7 @@ def build_document(analysis: AnalysisData) -> Document:
         section.right_margin = Inches(1)
 
     # Collect non-leaf components for section numbering
-    non_leaf_components = [c for c in analysis.components if not c.isLeaf]
+    non_leaf_components = [c for c in analysis.components.values() if not c.isLeaf]
 
     # Component sections
     for i, component in enumerate(non_leaf_components):

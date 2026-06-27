@@ -260,7 +260,9 @@ def main():
     args = parser.parse_args()
 
     if args.schema:
-        print(json.dumps(AnalysisData.model_json_schema(), indent=2, ensure_ascii=False))
+        print(
+            json.dumps(AnalysisData.model_json_schema(), indent=2, ensure_ascii=False)
+        )
         sys.exit(0)
 
     if args.analysis_json is None:

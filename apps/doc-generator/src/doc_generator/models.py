@@ -2,22 +2,41 @@
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
+from typing import Annotated, Literal
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 
-class ChildElement(BaseModel):
-    """A leaf UI element inside a component or at the screen level."""
+class PrimitiveElement(BaseModel):
+    """A leaf UI element that is a primitive control (e.g., Button, Text)."""
 
-    stt: int
-    componentId: int | None = None
-    label: str = ""
-    controlType: str = ""
+    type: Literal["primitive"] = "primitive"
+    label: str
+    controlType: str
     required: str = ""
     maxLength: str = ""
     editable: str = ""
     description: str = ""
+
+
+class ComponentReferenceElement(BaseModel):
+    """A leaf UI element that references another component."""
+
+    type: Literal["component"] = "component"
+    componentId: int
+    label: str = ""
+    description: str = ""
+
+    @property
+    def controlType(self) -> str:
+        return "Component"
+
+
+ChildElement = Annotated[
+    PrimitiveElement | ComponentReferenceElement, Field(discriminator="type")
+]
 
 
 class Interaction(BaseModel):
@@ -30,7 +49,7 @@ class Interaction(BaseModel):
 class ApiParam(BaseModel):
     """A single field in a request/response API table."""
 
-    name: str
+    name: str = Field(min_length=1)
     meaning: str = ""
     required: str = ""
     dataType: str = ""
@@ -41,48 +60,37 @@ class ApiParam(BaseModel):
 class SubDto(BaseModel):
     """A nested DTO table within an API response."""
 
-    name: str
+    name: str = Field(min_length=1)
     fieldRef: str = ""
     fields: list[ApiParam] = []
+
+
+class ApiMethod(StrEnum):
+    GET = "GET"
+    POST = "POST"
+    PUT = "PUT"
+    DELETE = "DELETE"
+    PATCH = "PATCH"
+    HEAD = "HEAD"
+    OPTIONS = "OPTIONS"
+    WS = "WS"
+    GRPC = "GRPC"
+    SSE = "SSE"
 
 
 class Api(BaseModel):
     """A single API endpoint's documentation."""
 
-    number: int
-    method: str
-    title: str
-    url: str
+    method: ApiMethod
+    title: str = Field(min_length=1)
+    url: str = Field(min_length=1)
     requestParams: list[ApiParam] = []
     requestBodyType: str = ""
     requestDescription: str = ""
     responseType: str = ""
     responseFields: list[ApiParam] = []
     responseDescription: str = ""
-    subDtos: list[SubDto] = []
-
-    @field_validator("number")
-    @classmethod
-    def validate_number(cls, v: int) -> int:
-        if v < 1:
-            raise ValueError(f"API number must be >= 1, got {v}")
-        return v
-
-    @field_validator("method")
-    @classmethod
-    def validate_method(cls, v: str) -> str:
-        v = v.strip().upper()
-        allowed = {"GET", "POST", "PUT", "DELETE", "PATCH"}
-        if v not in allowed:
-            raise ValueError(f"API method must be one of {allowed}, got '{v}'")
-        return v
-
-    @field_validator("url")
-    @classmethod
-    def validate_url(cls, v: str) -> str:
-        if not v.startswith("/"):
-            raise ValueError(f"API url must start with '/', got '{v}'")
-        return v
+    subDtos: dict[str, SubDto] = Field(default_factory=dict)
 
 
 class AnalysisComponent(BaseModel):
@@ -114,7 +122,7 @@ class AnalysisComponent(BaseModel):
 class Screen(BaseModel):
     """Screen-level metadata and top-level children."""
 
-    name: str
+    name: str = Field(min_length=1)
     description: str = ""
     imageFiles: list[str] = []
     topLevelChildren: list[ChildElement] = []
@@ -136,7 +144,7 @@ class AnalysisData(BaseModel):
 
     sectionPrefix: str = "1.1"
     imageDir: str
-    components: list[AnalysisComponent] = []
+    components: dict[int, AnalysisComponent] = Field(default_factory=dict)
     screen: Screen
     discrepancies: list[Discrepancy] = []
 
@@ -144,88 +152,9 @@ class AnalysisData(BaseModel):
     def all_apis(self) -> list[Api]:
         """Combine APIs from the screen and all components in order."""
         res = list(self.screen.apis)
-        for c in self.components:
+        for c in self.components.values():
             res.extend(c.apis)
         return res
-
-    @model_validator(mode="after")
-    def resolve_component_references(self) -> AnalysisData:
-        comp_dict = {c.id: c for c in self.components}
-
-        def _resolve_children(children: list[ChildElement], owner_name: str):
-            for child in children:
-                if child.componentId is not None:
-                    if child.componentId in comp_dict:
-                        comp = comp_dict[child.componentId]
-                        if not child.label:
-                            child.label = comp.label
-                        if not child.description:
-                            child.description = comp.description
-                        if not child.controlType:
-                            child.controlType = "Component"
-                    else:
-                        raise ValueError(
-                            f"Child element in {owner_name} references non-existent componentId: {child.componentId}"
-                        )
-
-        _resolve_children(self.screen.topLevelChildren, f"Screen '{self.screen.name}'")
-        for comp in self.components:
-            _resolve_children(comp.children, f"Component '{comp.label}' (id={comp.id})")
-
-        return self
-
-    @model_validator(mode="after")
-    def validate_uniqueness_constraints(self) -> AnalysisData:
-        api_numbers: dict[int, list[str]] = {}
-        api_endpoints: dict[tuple[str, str], list[str]] = {}
-        component_ids: dict[int, list[str]] = {}
-
-        def add_api(api: Api, owner: str):
-            api_numbers.setdefault(api.number, []).append(owner)
-            method_url = (api.method.upper().strip(), api.url.strip())
-            api_endpoints.setdefault(method_url, []).append(owner)
-
-        # Screen APIs
-        for api in self.screen.apis:
-            add_api(api, f"Screen '{self.screen.name}'")
-
-        # Component APIs and IDs
-        for comp in self.components:
-            component_ids.setdefault(comp.id, []).append(comp.label)
-            for api in comp.apis:
-                add_api(api, f"Component '{comp.label}' (id={comp.id})")
-
-        errors = []
-        for comp_id, labels in component_ids.items():
-            if len(labels) > 1:
-                errors.append(
-                    f"Component ID {comp_id} is duplicated across components: {', '.join(labels)}"
-                )
-
-        for num, owners in api_numbers.items():
-            if len(owners) > 1:
-                errors.append(
-                    f"API number {num} is defined in multiple places: {', '.join(owners)}"
-                )
-
-        for (method, url), owners in api_endpoints.items():
-            if len(owners) > 1:
-                errors.append(
-                    f"API {method} {url} is defined in multiple places: {', '.join(owners)}"
-                )
-
-        if errors:
-            raise ValueError("; ".join(errors))
-
-        return self
-
-    @field_validator("imageDir")
-    @classmethod
-    def validate_image_dir(cls, v: str) -> str:
-        path = Path(v)
-        if not path.is_dir():
-            raise ValueError(f"imageDir does not exist: {v}")
-        return v
 
     def resolve_image(self, relative_path: str) -> Path:
         """Resolve an image filename relative to imageDir."""

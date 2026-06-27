@@ -140,7 +140,7 @@ class TestBuildScaffold:
         assert len(scaffold["components"]) == 1
 
         # Leaf component: imageFile is None
-        comp_entry = scaffold["components"][0]
+        comp_entry = scaffold["components"][1]
         assert comp_entry["id"] == 1
         assert comp_entry["isLeaf"] is True
         assert comp_entry["imageFile"] is None
@@ -177,8 +177,8 @@ class TestBuildScaffold:
 
         assert len(scaffold["components"]) == 2
         # Post-order: child (id=1) then parent (id=2)
-        child_entry = scaffold["components"][0]
-        parent_entry = scaffold["components"][1]
+        child_entry = scaffold["components"][1]
+        parent_entry = scaffold["components"][2]
 
         assert child_entry["isLeaf"] is True
         assert child_entry["imageFile"] is None
@@ -216,7 +216,7 @@ class TestBuildScaffold:
         assert scaffold["screen"]["imageFiles"] == ["annotated/root_screen.png"]
 
         # Non-leaf component imageFile should have the prefix
-        parent_entry = scaffold["components"][1]  # post-order: child first
+        parent_entry = scaffold["components"][2]  # post-order: child first
         assert parent_entry["imageFile"] == "annotated/1_Header_abc12345.png"
 
     def test_placeholder_screen_name_when_empty(self, tmp_path):

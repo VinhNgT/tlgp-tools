@@ -6,8 +6,8 @@ from doc_generator.models import (
     AnalysisData,
     Api,
     ApiParam,
-    ChildElement,
     Interaction,
+    PrimitiveElement,
     Screen,
     SubDto,
 )
@@ -24,7 +24,13 @@ def _minimal_analysis(tmp_path, **overrides) -> AnalysisData:
         "imageDir": str(tmp_path),
         "screen": Screen(name=screen_name, description=screen_desc, apis=screen_apis),
     }
+
+    if "components" in overrides and isinstance(overrides["components"], list):
+        overrides["components"] = {c.id: c for c in overrides["components"]}
+    if "subDtos" in overrides and isinstance(overrides["subDtos"], list):
+        overrides["subDtos"] = {d.name: d for d in overrides["subDtos"]}
     defaults.update(overrides)
+
     return AnalysisData(**defaults)
 
 
@@ -78,7 +84,7 @@ class TestBuildDocumentWithComponents:
                     label="Header",
                     description="Header component",
                     children=[
-                        ChildElement(stt=1, label="Back", controlType="Icon"),
+                        PrimitiveElement(label="Back", controlType="Icon"),
                     ],
                     interactions=[
                         Interaction(action="Click", reaction="Go back"),
@@ -118,7 +124,7 @@ class TestBuildDocumentWithComponents:
                     label="Nav",
                     description="Nav bar",
                     children=[
-                        ChildElement(stt=1, label="Back", controlType="Icon"),
+                        PrimitiveElement(label="Back", controlType="Icon"),
                     ],
                     interactions=[
                         Interaction(action="Click", reaction="Go back"),
@@ -177,13 +183,13 @@ class TestBuildDocumentWithApis:
                     responseFields=[
                         ApiParam(name="id", dataType="String"),
                     ],
-                    subDtos=[
-                        SubDto(
+                    subDtos={
+                        "PriceDTO": SubDto(
                             name="PriceDTO",
                             fieldRef="prices",
                             fields=[ApiParam(name="amount", dataType="double")],
                         ),
-                    ],
+                    },
                 ),
             ],
         )
@@ -196,8 +202,8 @@ class TestBuildDocumentWithApis:
         analysis = _minimal_analysis(
             tmp_path,
             apis=[
-                Api(number=1, method="GET", title="List", url="/api/list"),
-                Api(number=2, method="POST", title="Create", url="/api/create"),
+                Api(method="GET", title="List", url="/api/list"),
+                Api(method="POST", title="Create", url="/api/create"),
             ],
         )
         doc = build_document(analysis)
@@ -343,6 +349,7 @@ class TestBuildDocumentWithImages:
         assert "1.3 Mô tả chi tiết các thành phần" in text
         # Since interactions are optional and empty, 1.4 shouldn't exist
         assert "1.4 Xử lý luồng sự kiện" not in text
+
 
 class TestBuildDocumentSectionNumbering:
     def test_section_prefix_used(self, tmp_path):

@@ -67,7 +67,9 @@ class StyleConfig:
             self.H4_SPACE_AFTER_PT: float = spacing["h4_space_after_pt"]
             self.NORMAL_SPACE_BEFORE_PT: float = spacing["normal_space_before_pt"]
             self.NORMAL_SPACE_AFTER_PT: float = spacing["normal_space_after_pt"]
-            self.API_SECTION_SPACE_BEFORE_PT: float = spacing["api_section_space_before_pt"]
+            self.API_SECTION_SPACE_BEFORE_PT: float = spacing[
+                "api_section_space_before_pt"
+            ]
         except KeyError as e:
             raise ValueError(f"Missing required styling configuration key: {e}") from e
 

@@ -67,9 +67,11 @@ class TestCliDryRun:
                 "name": "Test",
                 "description": "desc",
                 "imageFiles": ["test.png"],
-                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+                "topLevelChildren": [
+                    {"type": "primitive", "label": "A", "controlType": "T"}
+                ],
             },
-            "components": [],
+            "components": {},
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
@@ -93,9 +95,11 @@ class TestCliGeneration:
                 "name": "My Screen",
                 "description": "D",
                 "imageFiles": ["test.png"],
-                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+                "topLevelChildren": [
+                    {"type": "primitive", "label": "A", "controlType": "T"}
+                ],
             },
-            "components": [],
+            "components": {},
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
@@ -116,7 +120,9 @@ class TestCliGeneration:
                 "name": "Product Detail",
                 "description": "desc",
                 "imageFiles": ["test.png"],
-                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+                "topLevelChildren": [
+                    {"type": "primitive", "label": "A", "controlType": "T"}
+                ],
             },
         }
         json_path = tmp_path / "analysis.json"
@@ -137,16 +143,21 @@ class TestCliGeneration:
                 "name": "My Screen",
                 "description": "D",
                 "imageFiles": ["test.png"],
-                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+                "topLevelChildren": [
+                    {"type": "primitive", "label": "A", "controlType": "T"}
+                ],
             },
-            "components": [],
+            "components": {},
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
         output_path = tmp_path / "output.docx"
 
         with patch("sys.argv", ["doc-gen", str(json_path), "-o", str(output_path)]):
-            with patch("docx.document.Document.save", side_effect=PermissionError("Locked file")):
+            with patch(
+                "docx.document.Document.save",
+                side_effect=PermissionError("Locked file"),
+            ):
                 with pytest.raises(SystemExit) as exc:
                     main()
                 assert exc.value.code == 1
@@ -160,16 +171,23 @@ class TestCliGeneration:
                 "name": "My Screen",
                 "description": "D",
                 "imageFiles": ["test.png"],
-                "topLevelChildren": [{"stt": 1, "label": "A", "controlType": "T"}]
+                "topLevelChildren": [
+                    {"type": "primitive", "label": "A", "controlType": "T"}
+                ],
             },
-            "components": [],
+            "components": {},
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
         output_path = tmp_path / "output.docx"
 
-        with patch("sys.argv", ["doc-gen", str(json_path), "-o", str(output_path), "--json"]):
-            with patch("docx.document.Document.save", side_effect=PermissionError("Locked file")):
+        with patch(
+            "sys.argv", ["doc-gen", str(json_path), "-o", str(output_path), "--json"]
+        ):
+            with patch(
+                "docx.document.Document.save",
+                side_effect=PermissionError("Locked file"),
+            ):
                 with pytest.raises(SystemExit) as exc:
                     main()
                 assert exc.value.code == 1
@@ -180,16 +198,15 @@ class TestCliGeneration:
         assert any("Permission denied" in err for err in result["errors"])
 
 
-
 class TestCliImageWarnings:
     def test_validation_enforced_in_human_readable_mode(self, tmp_path, capsys):
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
             "screen": {"name": "T", "imageFiles": ["missing.png"]},
-            "components": [
-                {"id": 1, "label": "A", "imageFile": "also_missing.png"},
-            ],
+            "components": {
+                "1": {"id": 1, "label": "A", "imageFile": "also_missing.png"}
+            },
         }
         json_path = tmp_path / "analysis.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
