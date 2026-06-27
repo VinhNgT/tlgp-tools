@@ -97,8 +97,7 @@ def build_scaffold(
     """
     mapping = _load_mapping(export_dir)
 
-    annotated_dir = export_dir / "annotated"
-    image_dir = str(annotated_dir)
+    image_dir = str(export_dir.resolve())
 
     # Build UUID → annotated image filename lookup
     annotated_mapping: dict[str, str] = {}
@@ -110,13 +109,6 @@ def build_scaffold(
         # single-mode export (annotated only)
         annotated_mapping = mapping.get("components", {})
         root_images = mapping.get("root", [])
-
-    # Strip the "annotated/" prefix from paths since imageDir already points there
-    def _strip_annotated_prefix(path: str) -> str:
-        prefix = "annotated/"
-        if path.startswith(prefix):
-            return path[len(prefix):]
-        return path
 
     # Walk in post-order DFS to get the component ordering
     ordered_uuids = _walk_post_order_dfs(state)
@@ -136,47 +128,52 @@ def build_scaffold(
         uuid_str = str(uuid)
         image_file = annotated_mapping.get(uuid_str)
 
-        if image_file is not None:
-            image_file = _strip_annotated_prefix(image_file)
-
         uuid_to_seq_id[uuid] = seq_id
+
+        # Build children array referencing annotated children
+        component_children = []
+        for child_idx, child_uuid in enumerate(comp.childrenIds, start=1):
+            if child_uuid in uuid_to_seq_id:
+                component_children.append({
+                    "stt": child_idx,
+                    "componentId": uuid_to_seq_id[child_uuid]
+                })
+
+        comp_label = comp.label.strip()
+        label = f"[TODO: Descriptive Vietnamese label from vision analysis. Suggestion: {comp_label}]" if comp_label else _TODO_LABEL
 
         component_entry: dict = {
             "id": seq_id,
-            "label": _TODO_LABEL,
+            "label": label,
             "description": _TODO_DESCRIPTION,
             "isLeaf": is_leaf,
             "imageFile": image_file if not is_leaf else None,
-            "children": [],
+            "children": component_children,
             "interactions": [],
             "apis": [],
         }
         components.append(component_entry)
         seq_id += 1
 
-    # Build screen.topLevelChildren from rootComponents
+    # Build screen.topLevelChildren from rootComponents using componentId
     top_level_children: list[dict] = []
     for stt_idx, root_uuid in enumerate(state.rootComponents, start=1):
-        comp = state.components.get(root_uuid)
-        if comp is None:
+        if root_uuid not in uuid_to_seq_id:
             continue
-        is_leaf = len(comp.childrenIds) == 0
         top_level_children.append({
             "stt": stt_idx,
-            "label": _TODO_LABEL,
-            "controlType": "Component" if not is_leaf else "Image",
-            "required": "",
-            "maxLength": "",
-            "editable": "",
-            "description": _TODO_DESCRIPTION,
+            "componentId": uuid_to_seq_id[root_uuid]
         })
 
-    # Build screen.imageFiles from root images (strip prefix)
-    screen_image_files = [_strip_annotated_prefix(img) for img in root_images]
+    # Screen images (retain prefix)
+    screen_image_files = list(root_images)
 
     # Use workspace screen name/description if provided, otherwise placeholder
-    screen_name = state.screen.name.strip() if state.screen.name.strip() else _TODO_SCREEN_NAME
-    screen_desc = state.screen.description.strip() if state.screen.description.strip() else _TODO_SCREEN_DESC
+    screen_name_val = state.screen.name.strip()
+    screen_name = f"[TODO: Vietnamese screen name. Suggestion: {screen_name_val}]" if screen_name_val else _TODO_SCREEN_NAME
+    
+    screen_desc_val = state.screen.description.strip()
+    screen_desc = f"[TODO: Vietnamese screen description. Suggestion: {screen_desc_val}]" if screen_desc_val else _TODO_SCREEN_DESC
 
     scaffold: dict = {
         "sectionPrefix": section_prefix,

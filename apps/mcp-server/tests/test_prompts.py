@@ -77,7 +77,6 @@ class TestSpecWorkflowContent:
 
     def test_does_not_reference_deleted_resources(self):
         deleted = [
-            "tlgp://spec/schema",
             "tlgp://workspace/state",
         ]
         for res in deleted:

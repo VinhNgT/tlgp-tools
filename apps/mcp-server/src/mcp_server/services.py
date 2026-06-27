@@ -122,3 +122,21 @@ class SpecGeneratorService:
             await ctx.report_progress(100, 100, "Spec generation complete.")
 
         return result
+
+    async def get_schema(self) -> str:
+        """Get the JSON schema of AnalysisData from the doc-gen CLI."""
+        cmd = [sys.executable, "-m", "doc_generator", "--schema"]
+        try:
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            stdout_bytes, _ = await proc.communicate()
+            if proc.returncode != 0:
+                logger.error("doc-gen --schema failed with code %d", proc.returncode)
+                return "{}"
+            return stdout_bytes.decode("utf-8", errors="replace").strip()
+        except Exception as e:
+            logger.error("Failed to invoke doc-gen --schema: %s", e)
+            return "{}"

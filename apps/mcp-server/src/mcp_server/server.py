@@ -38,6 +38,7 @@ class _LifespanState:
     Tools continue using Context-based DI via _get_client() etc.
     """
     client: WorkspaceClient | None = None
+    spec_service: SpecGeneratorService | None = None
 
 
 _lifespan_state = _LifespanState()
@@ -59,15 +60,18 @@ async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
     """Initialize and tear down shared services for the server's lifetime."""
     client = WorkspaceClient()
     daemon_manager = DaemonManager()
+    spec_service = SpecGeneratorService(client=client)
     _lifespan_state.client = client
+    _lifespan_state.spec_service = spec_service
     try:
         yield {
             "client": client,
             "daemon_manager": daemon_manager,
-            "spec_service": SpecGeneratorService(client=client),
+            "spec_service": spec_service,
         }
     finally:
         _lifespan_state.client = None
+        _lifespan_state.spec_service = None
         daemon_manager.cleanup()
         await client.close()
 
@@ -135,6 +139,15 @@ def get_spec_classification_guide_resource() -> str:
 def get_spec_example_analysis_resource() -> str:
     """A complete example analysis.json for reference."""
     return get_example_analysis()
+
+
+@mcp.resource("tlgp://spec/schema")
+async def get_spec_schema_resource() -> str:
+    """JSON schema of AnalysisData for analysis.json validation."""
+    spec_service = _lifespan_state.spec_service
+    if not spec_service:
+        raise RuntimeError("Spec generator service not initialized")
+    return await spec_service.get_schema()
 
 
 # ============================================================

@@ -251,8 +251,17 @@ def main():
         action="store_true",
         help="Validate analysis data without generating the .docx (implies --json)",
     )
+    parser.add_argument(
+        "--schema",
+        action="store_true",
+        help="Print the JSON schema of AnalysisData to stdout and exit immediately",
+    )
 
     args = parser.parse_args()
+
+    if args.schema:
+        print(json.dumps(AnalysisData.model_json_schema(), indent=2, ensure_ascii=False))
+        sys.exit(0)
 
     if args.analysis_json is None:
         parser.print_help()

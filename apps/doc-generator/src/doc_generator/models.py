@@ -29,8 +29,9 @@ class ChildElement(BaseModel):
     """A leaf UI element inside a component or at the screen level."""
 
     stt: int
-    label: str
-    controlType: str
+    componentId: int | None = None
+    label: str = ""
+    controlType: str = ""
     required: str = ""
     maxLength: str = ""
     editable: str = ""
@@ -165,6 +166,32 @@ class AnalysisData(BaseModel):
         for c in self.components:
             res.extend(c.apis)
         return res
+
+    @model_validator(mode="after")
+    def resolve_component_references(self) -> AnalysisData:
+        comp_dict = {c.id: c for c in self.components}
+
+        def _resolve_children(children: list[ChildElement], owner_name: str):
+            for child in children:
+                if child.componentId is not None:
+                    if child.componentId in comp_dict:
+                        comp = comp_dict[child.componentId]
+                        if not child.label:
+                            child.label = comp.label
+                        if not child.description:
+                            child.description = comp.description
+                        if not child.controlType:
+                            child.controlType = "Component"
+                    else:
+                        raise ValueError(
+                            f"Child element in {owner_name} references non-existent componentId: {child.componentId}"
+                        )
+
+        _resolve_children(self.screen.topLevelChildren, f"Screen '{self.screen.name}'")
+        for comp in self.components:
+            _resolve_children(comp.children, f"Component '{comp.label}' (id={comp.id})")
+
+        return self
 
     @model_validator(mode="after")
     def validate_uniqueness_constraints(self) -> AnalysisData:
