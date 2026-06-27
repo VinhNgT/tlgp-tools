@@ -211,21 +211,15 @@
     "topLevelChildren": [
       {
         "type": "component",
-        "componentId": 1,
-        "label": "Thanh tiêu đề",
-        "description": "Thanh tiêu đề chứa nút quay lại"
+        "componentId": 1
       },
       {
         "type": "component",
-        "componentId": 2,
-        "label": "Ảnh banner quảng cáo",
-        "description": "Hình ảnh quảng cáo sản phẩm"
+        "componentId": 2
       },
       {
         "type": "component",
-        "componentId": 3,
-        "label": "Khối chọn thuộc tính sản phẩm",
-        "description": "Khu vực chọn màu sắc và kích thước"
+        "componentId": 3
       },
       {
         "type": "primitive",

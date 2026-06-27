@@ -17,6 +17,7 @@ from docx.shared import Pt
 from docx.table import Table
 
 from doc_generator.models import (
+    AnalysisData,
     ApiParam,
     ChildElement,
     Interaction,
@@ -286,6 +287,7 @@ def build_ui_elements_table(
     doc: Document,
     children: Sequence[ChildElement],
     style: StyleConfig,
+    analysis: AnalysisData | None = None,
 ) -> Table:
     """Build a 7-column UI Elements Table."""
     table = doc.add_table(rows=1 + len(children), cols=7)
@@ -302,14 +304,23 @@ def build_ui_elements_table(
 
     # Data
     for r, child in enumerate(children):
+        label = child.label
+        description = child.description
+
+        if child.type == "component" and analysis is not None:
+            target = analysis.components.get(child.componentId)
+            if target:
+                label = label or target.label
+                description = description or target.description
+
         row_data = [
             str(r + 1),
-            child.label,
+            label,
             child.controlType,
             getattr(child, "required", ""),
             getattr(child, "maxLength", ""),
             getattr(child, "editable", ""),
-            child.description,
+            description,
         ]
         for c, text in enumerate(row_data):
             _style_cell_text(table.cell(r + 1, c), text, style)

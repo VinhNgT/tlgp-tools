@@ -53,7 +53,7 @@ class TestValidateAnalysis:
                 description="desc desc desc",
                 imageFiles=["screen.png"],
                 topLevelChildren=[
-                    ComponentReferenceElement(label="Comp 1", componentId=99)
+                    ComponentReferenceElement(label="Comp 1", componentId=1)
                 ],
                 apis=[Api(method="GET", title="Test", url="/test")],
             ),

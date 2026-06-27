@@ -122,7 +122,7 @@ def _add_content_section(
         style,
     )
     if children:
-        build_ui_elements_table(doc, children, style)
+        build_ui_elements_table(doc, children, style, analysis=analysis)
     sub += 1
 
     # H4: 4. Interaction events

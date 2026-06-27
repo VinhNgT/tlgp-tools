@@ -125,10 +125,25 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
             f"Screen description is suspiciously short (< 10 chars): '{data.screen.description}'"
         )
 
-    all_child_labels = {c.label for c in data.screen.topLevelChildren}
+    def get_child_label(child) -> str:
+        if child.label.strip():
+            return child.label.strip()
+        if child.type == "component":
+            target = data.components.get(child.componentId)
+            if target:
+                return target.label.strip()
+        return ""
+
+    referenced_component_ids = set()
+    for child in data.screen.topLevelChildren:
+        if child.type == "component":
+            referenced_component_ids.add(child.componentId)
 
     for comp in data.components.values():
-        all_child_labels.update(c.label for c in comp.children)
+        for child in comp.children:
+            if child.type == "component":
+                referenced_component_ids.add(child.componentId)
+
         if comp.description and len(comp.description) < 10:
             result.warnings.append(
                 f"Component '{comp.label}' (id={comp.id}) description is suspiciously short (< 10 chars)"
@@ -136,19 +151,19 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
         if not comp.label.strip():
             result.warnings.append(f"Component (id={comp.id}) has an empty label")
         for i, child in enumerate(comp.children):
-            if not child.label.strip():
+            if not get_child_label(child):
                 result.warnings.append(
                     f"Child element {i + 1} in Component '{comp.label}' has an empty label"
                 )
 
     for comp in data.components.values():
-        if comp.label not in all_child_labels:
+        if comp.id not in referenced_component_ids:
             result.warnings.append(
                 f"Component '{comp.label}' (id={comp.id}) is defined but never referenced as a child"
             )
 
     for child in data.screen.topLevelChildren:
-        if not child.label.strip():
+        if not get_child_label(child):
             result.warnings.append(
                 f"Child element in Screen '{data.screen.name}' has an empty label"
             )
