@@ -6,7 +6,7 @@ Exposes tools for screenshot annotation and .docx specification document generat
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import TypedDict
 
@@ -56,7 +56,7 @@ class AppContext(TypedDict):
 
 
 @asynccontextmanager
-async def app_lifespan(server: FastMCP) -> AsyncIterator[AppContext]:
+async def app_lifespan(server: FastMCP) -> AsyncGenerator[AppContext]:
     """Initialize and tear down shared services for the server's lifetime."""
     client = WorkspaceClient()
     daemon_manager = DaemonManager()
