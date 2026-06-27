@@ -46,9 +46,9 @@ class PrepareAnalysisResult(BaseModel):
 
 # Placeholder constants for fields the AI must fill via vision analysis
 _TODO_LABEL = "[TODO: Descriptive Vietnamese label from vision analysis]"
-_TODO_DESCRIPTION = "[TODO: Vietnamese description from vision analysis]"
+_TODO_DESCRIPTION = "[TODO: Vietnamese description (high-level summary) from vision analysis - NOT a list/restatement of UI elements]"
 _TODO_SCREEN_NAME = "[TODO: Vietnamese screen name]"
-_TODO_SCREEN_DESC = "[TODO: Vietnamese screen description]"
+_TODO_SCREEN_DESC = "[TODO: Vietnamese screen description (high-level summary) - NOT a list/restatement of UI elements]"
 
 
 def _load_mapping(export_dir: Path) -> dict:
@@ -173,7 +173,7 @@ def build_scaffold(
     screen_name = f"[TODO: Vietnamese screen name. Suggestion: {screen_name_val}]" if screen_name_val else _TODO_SCREEN_NAME
     
     screen_desc_val = state.screen.description.strip()
-    screen_desc = f"[TODO: Vietnamese screen description. Suggestion: {screen_desc_val}]" if screen_desc_val else _TODO_SCREEN_DESC
+    screen_desc = f"[TODO: Vietnamese screen description (high-level summary) - NOT a list/restatement of UI elements. Suggestion: {screen_desc_val}]" if screen_desc_val else _TODO_SCREEN_DESC
 
     scaffold: dict = {
         "sectionPrefix": section_prefix,
