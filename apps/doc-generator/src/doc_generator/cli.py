@@ -218,6 +218,11 @@ def _run_json_mode(
 
 
 def main():
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
+
     env = os.environ.get("TLGP_ENV", "dev")
     setup_logging(json_format=(env == "prod"))
 

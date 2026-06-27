@@ -10,9 +10,10 @@ from mcp_server.server import mcp
 
 def main():
     """Run the TLGP MCP server with stdio transport."""
-    reconfigure = getattr(sys.stdout, "reconfigure", None)
-    if reconfigure:
-        reconfigure(line_buffering=True)
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8", line_buffering=True)
+    if hasattr(sys.stderr, "reconfigure"):
+        sys.stderr.reconfigure(encoding="utf-8")
 
     env = os.environ.get("TLGP_ENV", "dev")
     setup_logging(json_format=(env == "prod"))
