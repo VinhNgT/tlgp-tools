@@ -19,26 +19,28 @@
       ],
       "apis": [
         {
-          "api": "Lấy chi tiết sản phẩm",
+          "name": "Lấy chi tiết sản phẩm",
           "url": "GET /api/v1/products/{id}",
+          "requestRootType": null,
           "request": [],
+          "responseRootType": "ProductDetailResponse",
           "response": [
             {
               "type": "ProductDetailResponse",
               "fields": [
                 {
                   "name": "id",
-                  "meaning": "Mã định danh sản phẩm",
+                  "description": "Mã định danh sản phẩm",
                   "required": true,
-                  "dataType": "String",
+                  "type": "String",
                   "limit": "36 ký tự",
                   "defaultValue": null
                 },
                 {
                   "name": "name",
-                  "meaning": "Tên sản phẩm",
+                  "description": "Tên sản phẩm",
                   "required": true,
-                  "dataType": "String",
+                  "type": "String",
                   "limit": "255 ký tự",
                   "defaultValue": null
                 }

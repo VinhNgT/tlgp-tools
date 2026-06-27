@@ -21,9 +21,9 @@ class ApiParam(BaseModel):
     """A single field in a request/response API table."""
 
     name: str = Field(min_length=1)
-    meaning: str | None = None
+    description: str | None = None
     required: bool | None = None
-    dataType: str | None = None
+    type: str | None = None
     limit: str | None = None
     defaultValue: str | None = None
 
@@ -42,19 +42,20 @@ class ApiParam(BaseModel):
 
 
 class ApiPayload(BaseModel):
-    """The structure of an API request or response payload schema."""
+    """A single flat DTO payload schema."""
 
-    type: str | None = None
-    parentType: str | None = None
-    fields: list[ApiParam] = []
+    type: str = Field(min_length=1)  # Unique name/type of the DTO (e.g. "AddToCartRequestDto")
+    fields: list[ApiParam] = Field(default_factory=list)
 
 
 class Api(BaseModel):
     """A single API endpoint's documentation."""
 
-    api: str = Field(min_length=1)
+    name: str = Field(min_length=1)
     url: str = Field(min_length=1)
+    requestRootType: str | None = None
     request: list[ApiPayload] = Field(default_factory=list)
+    responseRootType: str | None = None
     response: list[ApiPayload] = Field(default_factory=list)
 
 

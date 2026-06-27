@@ -191,23 +191,50 @@ def _add_screen_section(
 
 def _add_payload_section(
     doc: Document,
+    root_type: str | None,
     payloads: list[ApiPayload],
     is_response: bool,
     style: StyleConfig,
 ):
-    """Render request or response payloads list."""
-    for payload in payloads:
-        # Determine if it's root (parentType is None or empty)
-        is_root = not payload.parentType
+    """Render request or response payloads list starting from the root type."""
+    if not root_type:
+        return
+
+    dto_map = {p.type.strip().lower(): p for p in payloads}
+    visited_lower = set()
+    ordered_payloads: list[ApiPayload] = []
+
+    def dfs(dto_id: str):
+        lower_id = dto_id.strip().lower()
+        if lower_id in visited_lower:
+            return
+        visited_lower.add(lower_id)
+        
+        payload = dto_map.get(lower_id)
+        if not payload:
+            return
+        
+        ordered_payloads.append(payload)
+        
+        for field in payload.fields:
+            if field.type:
+                field_lower_type = field.type.strip().lower()
+                if field_lower_type in dto_map:
+                    dfs(field.type)
+
+    dfs(root_type)
+
+    for idx, payload in enumerate(ordered_payloads):
+        is_root = (idx == 0)
 
         if is_root:
             if is_response:
-                heading = f"Response (data = {payload.type})" if payload.type else "Response"
+                heading = f"Response (data = {payload.type})"
             else:
-                heading = f"Request Body ({payload.type})" if payload.type else "Request"
+                heading = f"Request Body ({payload.type})"
             _add_bold_text(doc, heading, style)
         else:
-            # Child schema: simple text heading
+            # Child DTO heading
             _add_normal_text(doc, payload.type, style)
 
         if payload.fields:
@@ -218,7 +245,7 @@ def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int
     """Build a single API documentation block."""
     # API title: bold normal text
     para = doc.add_paragraph()
-    run = para.add_run(f"{api_index}. {api.api}")
+    run = para.add_run(f"{api_index}. {api.name}")
     _set_run_font(run, style)
     run.font.size = style.FONT_SIZE_DEFAULT
     run.font.bold = True
@@ -228,10 +255,10 @@ def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int
     _add_normal_text(doc, f"URL: {api.url}", style)
 
     # 1. Request Payload
-    _add_payload_section(doc, api.request, is_response=False, style=style)
+    _add_payload_section(doc, api.requestRootType, api.request, is_response=False, style=style)
 
     # 2. Response Payload
-    _add_payload_section(doc, api.response, is_response=True, style=style)
+    _add_payload_section(doc, api.responseRootType, api.response, is_response=True, style=style)
 
 
 # ============================================================

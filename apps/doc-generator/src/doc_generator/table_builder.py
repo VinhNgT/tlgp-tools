@@ -386,9 +386,9 @@ def build_api_table(doc: Document, params: list[ApiParam], style: StyleConfig) -
     for r, param in enumerate(params):
         row_data = [
             param.name,
-            param.meaning,
+            param.description,
             "Có" if param.required else "Không",
-            param.dataType,
+            param.type,
             param.limit,
             param.defaultValue,
         ]

@@ -174,13 +174,14 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    api="GET Products",
+                    name="GET Products",
                     url="/api/products",
+                    requestRootType="ProductsRequest",
                     request=[
                         ApiPayload(
                             type="ProductsRequest",
                             fields=[
-                                ApiParam(name="page", dataType="int"),
+                                ApiParam(name="page", type="int"),
                             ],
                         )
                     ],
@@ -198,20 +199,20 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    api="GET Detail",
+                    name="GET Detail",
                     url="/api/detail",
+                    responseRootType="ProductDTO",
                     response=[
                         ApiPayload(
                             type="ProductDTO",
-                            parentType=None,
                             fields=[
-                                ApiParam(name="id", dataType="String"),
+                                ApiParam(name="id", type="String"),
+                                ApiParam(name="price", type="PriceDTO"),
                             ],
                         ),
                         ApiPayload(
                             type="PriceDTO",
-                            parentType="ProductDTO",
-                            fields=[ApiParam(name="amount", dataType="double")],
+                            fields=[ApiParam(name="amount", type="double")],
                         ),
                     ],
                 ),
@@ -226,8 +227,8 @@ class TestBuildDocumentWithApis:
         analysis = _minimal_spec(
             tmp_path,
             apis=[
-                Api(api="GET List", url="/api/list"),
-                Api(api="POST Create", url="/api/create"),
+                Api(name="GET List", url="/api/list"),
+                Api(name="POST Create", url="/api/create"),
             ],
         )
         doc = build_document(analysis)
@@ -240,13 +241,14 @@ class TestBuildDocumentWithApis:
             tmp_path,
             apis=[
                 Api(
-                    api="POST Favorite",
+                    name="POST Favorite",
                     url="/api/fav",
+                    requestRootType="FavoriteProductRequestDTO",
                     request=[
                         ApiPayload(
                             type="FavoriteProductRequestDTO",
                             fields=[
-                                ApiParam(name="product_id", dataType="String"),
+                                ApiParam(name="product_id", type="String"),
                             ],
                         )
                     ],
@@ -274,7 +276,7 @@ class TestBuildDocumentWithApis:
                     childrenIds=["2"],
                     apis=[
                         Api(
-                            api="GET Get Header Data",
+                            name="GET Get Header Data",
                             url="/api/header",
                         ),
                     ],

@@ -38,8 +38,8 @@ class TestApiParam:
     def test_required_fields(self):
         p = ApiParam(name="id")
         assert p.name == "id"
-        assert p.meaning is None
-        assert p.dataType is None
+        assert p.description is None
+        assert p.type is None
         assert p.required is None
 
 
@@ -47,35 +47,33 @@ class TestApiPayload:
     def test_minimal(self):
         s = ApiPayload(type="UserDTO")
         assert s.type == "UserDTO"
-        assert s.parentType is None
         assert s.fields == []
 
 
 class TestApi:
     def test_minimal(self):
-        a = Api(api="GET List", url="/api/list")
-        assert a.api == "GET List"
+        a = Api(name="GET List", url="/api/list")
+        assert a.name == "GET List"
         assert a.url == "/api/list"
         assert a.request == []
         assert a.response == []
 
     def test_with_sub_dtos(self):
         a = Api(
-            api="GET Detail",
+            name="GET Detail",
             url="/api/detail",
+            requestRootType="PriceTiersDTO",
             request=[
                 ApiPayload(
                     type="PriceTiersDTO",
-                    parentType="RootDto",
                     fields=[
-                        ApiParam(name="min_qty", dataType="int"),
+                        ApiParam(name="min_qty", type="int"),
                     ],
                 )
             ],
         )
         assert len(a.request) == 1
         assert a.request[0].type == "PriceTiersDTO"
-        assert a.request[0].parentType == "RootDto"
 
 
 class TestScreenSpec:
@@ -121,7 +119,7 @@ class TestJsonRoundTrip:
                     label="Cart",
                     childrenIds=["1"],
                     apis=[
-                        Api(api="POST Add to cart", url="/api/cart"),
+                        Api(name="POST Add to cart", url="/api/cart"),
                     ],
                 ),
             ],
@@ -145,10 +143,8 @@ class TestSampleSpecFixture:
         raw = json.loads(fixture_path.read_text(encoding="utf-8"))
         data = ScreenSpec.model_validate(raw)
         assert len(data.all_apis) == 3
-        # Assert type/parentType on Cart Add
-        cart_add_api = [a for a in data.all_apis if "Thêm sản phẩm" in a.api][0]
+        # Assert type and layout on Cart Add
+        cart_add_api = [a for a in data.all_apis if "Thêm sản phẩm" in a.name][0]
         assert len(cart_add_api.request) == 2
         assert cart_add_api.request[0].type == "AddToCartRequestDto"
-        assert cart_add_api.request[0].parentType is None
         assert cart_add_api.request[1].type == "ProductOptionDto"
-        assert cart_add_api.request[1].parentType == "AddToCartRequestDto"

@@ -247,6 +247,83 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
 
     # Check for structural errors in API parameters
     for api in data.all_apis:
+        def _validate_dto_list(dtos: list[ApiPayload], root_type: str | None, side: str, api_name: str) -> None:
+            if not dtos:
+                if root_type:
+                    result.errors.append(
+                        f"API '{api_name}' {side}RootType '{root_type}' is specified but {side} list is empty"
+                    )
+                return
+
+            seen_ids = set()
+            dto_map = {}
+            for payload in dtos:
+                obj_type = (payload.type or "").strip()
+                if not obj_type:
+                    result.errors.append(
+                        f"API '{api_name}' has a DTO with an empty type in {side}"
+                    )
+                    continue
+
+                lower_id = obj_type.lower()
+                if lower_id in seen_ids:
+                    result.errors.append(
+                        f"API '{api_name}' has duplicate DTO type '{payload.type}' in {side}"
+                    )
+                seen_ids.add(lower_id)
+                dto_map[lower_id] = payload
+
+            if not root_type:
+                result.warnings.append(
+                    f"API '{api_name}' has DTOs defined in {side} but no {side}RootType is specified"
+                )
+                return
+
+            lower_root = root_type.strip().lower()
+            if lower_root not in dto_map:
+                result.errors.append(
+                    f"API '{api_name}' {side}RootType '{root_type}' not found in {side} DTOs"
+                )
+                return
+
+            visited = set()
+            rec_stack = set()
+
+            def dfs(dto_id: str):
+                lower_id = dto_id.strip().lower()
+                if lower_id in rec_stack:
+                    result.errors.append(
+                        f"API '{api_name}' {side} DTO cycle detected at '{dto_id}'"
+                    )
+                    return
+                if lower_id in visited:
+                    return
+                
+                visited.add(lower_id)
+                rec_stack.add(lower_id)
+                
+                payload = dto_map.get(lower_id)
+                if payload:
+                    for field in payload.fields:
+                        if field.type:
+                            field_lower_type = field.type.strip().lower()
+                            if field_lower_type in dto_map:
+                                dfs(field.type)
+                
+                rec_stack.remove(lower_id)
+
+            dfs(root_type)
+
+            # Warn about unreachable DTOs
+            for lower_id, payload in dto_map.items():
+                if lower_id not in visited:
+                    result.warnings.append(
+                        f"API '{api_name}' {side} DTO '{payload.type}' is defined but unreachable from root '{root_type}'"
+                    )
+
+        _validate_dto_list(api.request, api.requestRootType, "request", api.name)
+        _validate_dto_list(api.response, api.responseRootType, "response", api.name)
+
         all_params = []
         for payload in api.request:
             all_params.extend(payload.fields)
@@ -255,10 +332,10 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
 
         for param in all_params:
             param_name = param.name or ""
-            param_meaning = param.meaning or ""
-            if not param_name.strip() or not param_meaning.strip():
+            param_desc = param.description or ""
+            if not param_name.strip() or not param_desc.strip():
                 result.warnings.append(
-                    f"API '{api.api}' has an ApiParam with empty name or meaning"
+                    f"API '{api.name}' has an ApiParam with empty name or description"
                 )
 
     # --- Unit limit complexity checks ---

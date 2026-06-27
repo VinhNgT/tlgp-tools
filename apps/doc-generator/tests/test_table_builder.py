@@ -192,9 +192,10 @@ class TestApiTable:
     def test_correct_dimensions(self):
         doc = Document()
         params = [
-            ApiParam(name="id", meaning="ID", dataType="String"),
+            ApiParam(name="id", description="ID", type="String"),
         ]
         table = build_api_table(doc, params, style)
+        assert table.cell(1, 0).text == "id"
         assert len(table.rows) == 2
         assert len(table.columns) == 6
 
@@ -211,9 +212,9 @@ class TestApiTable:
         params = [
             ApiParam(
                 name="merchant_id",
-                meaning="Mã đối tác",
+                description="Mã đối tác",
                 required="Có",
-                dataType="String",
+                type="String",
             ),
         ]
         table = build_api_table(doc, params, style)

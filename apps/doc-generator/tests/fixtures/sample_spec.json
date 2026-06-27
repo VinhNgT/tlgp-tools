@@ -22,50 +22,36 @@
       ],
       "apis": [
         {
-          "api": "GET Lấy thông tin chi tiết sản phẩm",
+          "name": "GET Lấy thông tin chi tiết sản phẩm",
           "url": "/api/v1/products/{id}",
-          "request": [
-            {
-              "type": null,
-              "parentType": null,
-              "fields": [
-                {
-                  "name": "id",
-                  "meaning": "ID của sản phẩm cần lấy chi tiết",
-                  "required": true,
-                  "dataType": "string",
-                  "limit": null,
-                  "defaultValue": null
-                }
-              ]
-            }
-          ],
+          "requestRootType": null,
+          "request": [],
+          "responseRootType": "ProductDetailResponseDto",
           "response": [
             {
               "type": "ProductDetailResponseDto",
-              "parentType": null,
               "fields": [
                 {
                   "name": "name",
-                  "meaning": "Tên sản phẩm",
+                  "description": "Tên sản phẩm",
                   "required": true,
-                  "dataType": "string",
+                  "type": "string",
                   "limit": null,
                   "defaultValue": null
                 },
                 {
                   "name": "price",
-                  "meaning": "Giá sản phẩm",
+                  "description": "Giá sản phẩm",
                   "required": true,
-                  "dataType": "double",
+                  "type": "double",
                   "limit": null,
                   "defaultValue": "0.0"
                 },
                 {
                   "name": "description",
-                  "meaning": "Mô tả chi tiết sản phẩm",
+                  "description": "Mô tả chi tiết sản phẩm",
                   "required": false,
-                  "dataType": "string",
+                  "type": "string",
                   "limit": null,
                   "defaultValue": null
                 }
@@ -93,19 +79,20 @@
       ],
       "apis": [
         {
-          "api": "GET Lấy thông báo chưa đọc",
+          "name": "GET Lấy thông báo chưa đọc",
           "url": "/api/v1/notifications/unread",
+          "requestRootType": null,
           "request": [],
+          "responseRootType": "UnreadCountDto",
           "response": [
             {
               "type": "UnreadCountDto",
-              "parentType": null,
               "fields": [
                 {
                   "name": "count",
-                  "meaning": "Số lượng thông báo",
+                  "description": "Số lượng thông báo",
                   "required": true,
-                  "dataType": "int",
+                  "type": "int",
                   "limit": null,
                   "defaultValue": "0"
                 }
@@ -142,34 +129,34 @@
       ],
       "apis": [
         {
-          "api": "POST Thêm sản phẩm vào giỏ hàng",
+          "name": "POST Thêm sản phẩm vào giỏ hàng",
           "url": "/api/v1/cart/add",
+          "requestRootType": "AddToCartRequestDto",
           "request": [
             {
               "type": "AddToCartRequestDto",
-              "parentType": null,
               "fields": [
                 {
                   "name": "product_id",
-                  "meaning": "ID của sản phẩm",
+                  "description": "ID của sản phẩm",
                   "required": true,
-                  "dataType": "string",
+                  "type": "string",
                   "limit": null,
                   "defaultValue": null
                 },
                 {
                   "name": "quantity",
-                  "meaning": "Số lượng muốn mua",
+                  "description": "Số lượng muốn mua",
                   "required": true,
-                  "dataType": "int",
+                  "type": "int",
                   "limit": ">= 1",
                   "defaultValue": "1"
                 },
                 {
                   "name": "options",
-                  "meaning": "Các tùy chọn thuộc tính",
+                  "description": "Các tùy chọn thuộc tính",
                   "required": false,
-                  "dataType": "ProductOptionDto",
+                  "type": "ProductOptionDto",
                   "limit": null,
                   "defaultValue": null
                 }
@@ -177,45 +164,44 @@
             },
             {
               "type": "ProductOptionDto",
-              "parentType": "AddToCartRequestDto",
               "fields": [
                 {
                   "name": "color_id",
-                  "meaning": "ID của màu sắc",
+                  "description": "ID của màu sắc",
                   "required": true,
-                  "dataType": "string",
+                  "type": "string",
                   "limit": null,
                   "defaultValue": null
                 },
                 {
                   "name": "size_id",
-                  "meaning": "ID của kích thước",
+                  "description": "ID của kích thước",
                   "required": true,
-                  "dataType": "string",
+                  "type": "string",
                   "limit": null,
                   "defaultValue": null
                 }
               ]
             }
           ],
+          "responseRootType": "CartSummaryDto",
           "response": [
             {
               "type": "CartSummaryDto",
-              "parentType": null,
               "fields": [
                 {
                   "name": "total_items",
-                  "meaning": "Tổng số lượng vật phẩm trong giỏ hàng",
+                  "description": "Tổng số lượng vật phẩm trong giỏ hàng",
                   "required": true,
-                  "dataType": "int",
+                  "type": "int",
                   "limit": null,
                   "defaultValue": "0"
                 },
                 {
                   "name": "total_price",
-                  "meaning": "Tổng giá trị giỏ hàng",
+                  "description": "Tổng giá trị giỏ hàng",
                   "required": true,
-                  "dataType": "double",
+                  "type": "double",
                   "limit": null,
                   "defaultValue": "0.0"
                 }

@@ -73,7 +73,7 @@ class TestValidateSpec:
                     description="desc desc desc",
                     imageFiles=["screen.png"],
                     childrenIds=["1", "2"],
-                    apis=[Api(api="GET Test", url="/test")],
+                    apis=[Api(name="GET Test", url="/test")],
                 ),
                 NodeSpec(
                     id="1",
@@ -250,7 +250,7 @@ class TestValidateSpec:
                     description="desc",
                     imageFiles=[],
                     childrenIds=["1"],
-                    apis=[Api(api="GET Test", url="/test")],
+                    apis=[Api(name="GET Test", url="/test")],
                 ),
                 NodeSpec(
                     id="1",
@@ -432,13 +432,14 @@ class TestValidateSpec:
                     childrenIds=["1"],
                     apis=[
                         Api(
-                            api="GET Test",
+                            name="GET Test",
                             url="/test",
+                            requestRootType="TestDto",
                             request=[
                                 ApiPayload(
                                     type="TestDto",
                                     fields=[
-                                        ApiParam(name=" ", meaning="valid", dataType="String")
+                                        ApiParam(name=" ", description="valid", type="String")
                                     ]
                                 )
                             ],
@@ -454,7 +455,7 @@ class TestValidateSpec:
         )
         result = validate_spec(spec)
         assert result.valid is True
-        assert any("empty name or meaning" in w for w in result.warnings)
+        assert any("empty name or description" in w for w in result.warnings)
 
     def test_skip_image_validation(self, tmp_path):
         spec = ScreenSpec(
@@ -631,7 +632,7 @@ class TestUnitLimitValidation:
 
     def _make_apis(self, count: int) -> list[Api]:
         return [
-            Api(api=f"GET API {i}", url=f"/api/{i}")
+            Api(name=f"GET API {i}", url=f"/api/{i}")
             for i in range(count)
         ]
 
@@ -806,6 +807,104 @@ class TestUnitLimitValidation:
         result = validate_spec(spec)
         assert result.valid is True
         assert any("Interaction at index 0 with empty action" in w for w in result.warnings)
+
+    def test_api_dto_duplicate_ids(self, tmp_path):
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    apis=[
+                        Api(
+                            name="GET Test",
+                            url="/test",
+                            requestRootType="Dup",
+                            request=[
+                                ApiPayload(type="Dup"),
+                                ApiPayload(type="Dup"),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is False
+        assert any("duplicate DTO type" in e for e in result.errors)
+
+    def test_api_dto_cycle_detected(self, tmp_path):
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    apis=[
+                        Api(
+                            name="GET Test",
+                            url="/test",
+                            requestRootType="A",
+                            request=[
+                                ApiPayload(type="A", fields=[ApiParam(name="b", type="B")]),
+                                ApiPayload(type="B", fields=[ApiParam(name="a", type="A")]),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is False
+        assert any("cycle detected" in e for e in result.errors)
+
+    def test_api_dto_root_missing(self, tmp_path):
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    apis=[
+                        Api(
+                            name="GET Test",
+                            url="/test",
+                            requestRootType="Missing",
+                            request=[
+                                ApiPayload(type="A"),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is False
+        assert any("RootType 'Missing' not found" in e for e in result.errors)
+
+    def test_api_dto_unreachable_warning(self, tmp_path):
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    apis=[
+                        Api(
+                            name="GET Test",
+                            url="/test",
+                            requestRootType="A",
+                            request=[
+                                ApiPayload(type="A"),
+                                ApiPayload(type="B"),
+                            ],
+                        )
+                    ],
+                )
+            ],
+        )
+        result = validate_spec(spec, skip_image_validation=True)
+        assert any("unreachable from root" in w for w in result.warnings)
 
 
 
