@@ -11,7 +11,7 @@ from docx.oxml.ns import nsdecls, qn
 from docx.shared import Inches, Pt
 
 from doc_generator.image_handler import insert_image
-from doc_generator.models import AnalysisComponent, AnalysisData, Api, Screen
+from doc_generator.models import NodeSpec, ScreenSpec, Api, ApiPayload
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
     build_api_table,
@@ -93,7 +93,7 @@ def _add_content_section(
     children: list,
     interactions: list,
     apis: list,
-    analysis: AnalysisData,
+    analysis: ScreenSpec,
     style: StyleConfig,
 ):
     """Build a complete section with all sub-sections (used for both components and screens)."""
@@ -143,9 +143,9 @@ def _add_content_section(
 
 def _add_component_section(
     doc: Document,
-    component: AnalysisComponent,
+    component: NodeSpec,
     section_number: str,
-    analysis: AnalysisData,
+    analysis: ScreenSpec,
     style: StyleConfig,
 ):
     """Build a complete component section with all sub-sections."""
@@ -156,8 +156,8 @@ def _add_component_section(
         info_label="Tên chức năng",
         info_value=f"Component {component.label}",
         info_description=component.description,
-        image_files=[component.imageFile] if component.imageFile else [],
-        children=component.children,
+        image_files=component.imageFiles,
+        children=component.childrenIds,
         interactions=component.interactions,
         apis=component.apis,
         analysis=analysis,
@@ -167,21 +167,21 @@ def _add_component_section(
 
 def _add_screen_section(
     doc: Document,
-    screen: Screen,
+    screen: NodeSpec,
     section_number: str,
-    analysis: AnalysisData,
+    analysis: ScreenSpec,
     style: StyleConfig,
 ):
     """Build the screen overview section."""
     _add_content_section(
         doc,
-        title=f"Màn hình {screen.name}",
+        title=f"Màn hình {screen.label}",
         section_number=section_number,
         info_label="Tên màn hình",
-        info_value=f"Màn hình {screen.name}",
+        info_value=f"Màn hình {screen.label}",
         info_description=screen.description,
         image_files=screen.imageFiles,
-        children=screen.topLevelChildren,
+        children=screen.childrenIds,
         interactions=screen.interactions,
         apis=screen.apis,
         analysis=analysis,
@@ -189,11 +189,36 @@ def _add_screen_section(
     )
 
 
+def _add_payload_section(
+    doc: Document,
+    payloads: list[ApiPayload],
+    is_response: bool,
+    style: StyleConfig,
+):
+    """Render request or response payloads list."""
+    for payload in payloads:
+        # Determine if it's root (parentType is None or empty)
+        is_root = not payload.parentType
+
+        if is_root:
+            if is_response:
+                heading = f"Response (data = {payload.type})" if payload.type else "Response"
+            else:
+                heading = f"Request Body ({payload.type})" if payload.type else "Request"
+            _add_bold_text(doc, heading, style)
+        else:
+            # Child schema: simple text heading
+            _add_normal_text(doc, payload.type, style)
+
+        if payload.fields:
+            build_api_table(doc, payload.fields, style)
+
+
 def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int):
     """Build a single API documentation block."""
     # API title: bold normal text
     para = doc.add_paragraph()
-    run = para.add_run(f"{api_index}. {api.method.value} {api.title}")
+    run = para.add_run(f"{api_index}. {api.api}")
     _set_run_font(run, style)
     run.font.size = style.FONT_SIZE_DEFAULT
     run.font.bold = True
@@ -202,37 +227,11 @@ def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int
     # API URL: plain normal text
     _add_normal_text(doc, f"URL: {api.url}", style)
 
-    # Request section
-    if api.requestParams:
-        if api.requestBodyType:
-            _add_bold_text(doc, f"Request Body ({api.requestBodyType})", style)
-        else:
-            _add_bold_text(doc, "Request", style)
-        build_api_table(doc, api.requestParams, style)
-    elif api.requestDescription:
-        _add_bold_text(doc, "Request", style)
-        _add_normal_text(doc, api.requestDescription, style)
+    # 1. Request Payload
+    _add_payload_section(doc, api.request, is_response=False, style=style)
 
-    # Response section
-    if api.responseFields:
-        response_label = (
-            f"Response (data = {api.responseType})" if api.responseType else "Response"
-        )
-        _add_bold_text(doc, response_label, style)
-        build_api_table(doc, api.responseFields, style)
-    elif api.responseType:
-        _add_bold_text(doc, f"Response (data = {api.responseType})", style)
-        if api.responseDescription:
-            _add_normal_text(doc, api.responseDescription, style)
-
-    # Schema tables
-    for schema in api.schemas.values():
-        title = f"{schema.name} fields"
-        if schema.fieldRef:
-            title += f" ({schema.fieldRef})"
-        _add_normal_text(doc, title, style)
-        if schema.fields:
-            build_api_table(doc, schema.fields, style)
+    # 2. Response Payload
+    _add_payload_section(doc, api.response, is_response=True, style=style)
 
 
 # ============================================================
@@ -270,13 +269,12 @@ def _configure_document_styles(doc: Document, style: StyleConfig):
 # ============================================================
 
 
-def build_document(analysis: AnalysisData) -> Document:
-    """Build a complete .docx from analysis data.
+def build_document(analysis: ScreenSpec) -> Document:
+    """Build a complete .docx from spec data.
 
     Follows the TLGP spec structure:
-    1. Non-leaf component sections (in annotation order)
+    1. Sub-component sections (bottom-up order)
     2. Screen overview section
-    3. API documentation
     """
     doc = docx.Document()
     style_config = load_default_style()
@@ -291,16 +289,36 @@ def build_document(analysis: AnalysisData) -> Document:
         section.left_margin = Inches(1)
         section.right_margin = Inches(1)
 
-    # Collect non-leaf components for section numbering
-    non_leaf_components = [c for c in analysis.components.values() if not c.isLeaf]
+    # Find all components using post-order DFS starting from rootId
+    dfs_order: list[str] = []
+    visited: set[str] = set()
+    nodes_dict = analysis.nodes_map
+
+    def dfs(node_id: str):
+        if node_id in visited:
+            return
+        visited.add(node_id)
+        node = nodes_dict.get(node_id)
+        if not node:
+            return
+        for child_id in node.childrenIds:
+            child = nodes_dict.get(child_id)
+            # A node is a sub-component if it has children of its own
+            if child and len(child.childrenIds) > 0:
+                dfs(child_id)
+        if node_id != analysis.rootId:
+            dfs_order.append(node_id)
+
+    dfs(analysis.rootId)
+    sub_components = [nodes_dict[cid] for cid in dfs_order if cid in nodes_dict]
 
     # Component sections
-    for i, component in enumerate(non_leaf_components):
+    for i, component in enumerate(sub_components):
         section_num = f"{analysis.sectionPrefix}.{i + 1}"
         _add_component_section(doc, component, section_num, analysis, style_config)
 
-    # Screen overview section
-    screen_section_num = f"{analysis.sectionPrefix}.{len(non_leaf_components) + 1}"
+    # Screen overview section (rendered last)
+    screen_section_num = f"{analysis.sectionPrefix}.{len(sub_components) + 1}"
     _add_screen_section(
         doc, analysis.screen, screen_section_num, analysis, style_config
     )

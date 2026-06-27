@@ -1,7 +1,7 @@
-"""Validation logic for analysis data.
+"""Validation logic for spec data.
 
-Performs structural and semantic checks on a parsed AnalysisData object:
-image existence, content completeness warnings, discrepancy reporting.
+Performs structural and semantic checks on a parsed ScreenSpec object:
+image existence, content completeness warnings, bottom-up DFS traversal order.
 """
 
 from __future__ import annotations
@@ -15,11 +15,11 @@ from tlgp_contracts import (
     DEFAULT_UNIT_LIMIT,
 )
 
-from .models import AnalysisData, Api
+from .models import ScreenSpec, Api
 
 
 class ValidationResult(BaseModel):
-    """Structured outcome of analysis data validation."""
+    """Structured outcome of spec data validation."""
 
     valid: bool = True
     errors: list[str] = Field(default_factory=list)
@@ -35,169 +35,216 @@ class ValidationResult(BaseModel):
     discrepancies: int = 0
 
 
-def validate_analysis(data: AnalysisData) -> ValidationResult:
-    """Run all validation checks against parsed analysis data.
+def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> ValidationResult:
+    """Run all validation checks against parsed spec data.
 
     This is the single source of truth for validation logic, consumed by
-    both the CLI (``--validate-only`` / ``--json``) and any external caller
-    that needs to pre-check analysis data before document generation.
+    both the CLI and any external caller.
     """
-    non_leaf = [c for c in data.components.values() if not c.isLeaf]
+    # Ensure exactly one root screen node exists
+    screens = [n for n in data.nodes if n.id == data.rootId]
+    if len(screens) != 1:
+        result = ValidationResult(valid=False)
+        result.errors.append(
+            f"Screen component (id == {data.rootId}) must be defined exactly once. Found: {len(screens)}"
+        )
+        return result
+
+    # Check for duplicate IDs in the nodes list
+    seen_ids = set()
+    for n in data.nodes:
+        if n.id in seen_ids:
+            result = ValidationResult(valid=False)
+            result.errors.append(f"Duplicate node ID defined in nodes list: {n.id}")
+            return result
+        seen_ids.add(n.id)
+
+    screen = data.screen
+    non_leaf = [n for n in data.nodes if n.id != data.rootId and (len(n.childrenIds) > 0 or len(n.imageFiles) > 0)]
+    all_components = [screen] + non_leaf
 
     result = ValidationResult(
-        components=len(data.components),
+        components=len(all_components),
         non_leaf=len(non_leaf),
-        ui_elements=sum(len(c.children) for c in non_leaf)
-        + len(data.screen.topLevelChildren),
-        interactions=sum(len(c.interactions) for c in non_leaf)
-        + len(data.screen.interactions),
+        ui_elements=sum(len(c.childrenIds) for c in all_components),
+        interactions=sum(len(c.interactions) for c in all_components),
         apis=len(data.all_apis),
-        discrepancies=len(data.discrepancies),
     )
 
     base_dir = Path(data.imageDir).resolve()
 
-    # --- Image and structure checks ---
-    for comp in non_leaf:
-        if comp.imageFile:
-            img = data.resolve_image(comp.imageFile)
-            if not img.resolve().is_relative_to(base_dir):
-                result.errors.append(
-                    f"Component '{comp.label}' (id={comp.id}): image path escapes imageDir: {comp.imageFile}"
-                )
-            elif not img.exists():
-                result.errors.append(
-                    f"Component '{comp.label}' (id={comp.id}): image not found: {img}"
-                )
-        else:
-            result.errors.append(
-                f"Component '{comp.label}' (id={comp.id}): "
-                f"no imageFile specified (non-leaf must have one)"
-            )
+    # --- Structural integrity checks (Parent-child references) ---
+    nodes_dict = data.nodes_map
+    referenced_child_ids = set()
+    parent_map = {}
 
-        if not comp.children:
-            result.errors.append(
-                f"Component '{comp.label}' (id={comp.id}): "
-                f"no children specified (non-leaf must have at least one child)"
-            )
+    for parent in all_components:
+        for cid in parent.childrenIds:
+            if cid not in nodes_dict:
+                result.errors.append(
+                    f"Component '{parent.label}' (id={parent.id}) references non-existent child ID: '{cid}'"
+                )
+                continue
+            
+            # Check for multiple parents
+            if cid in parent_map:
+                result.errors.append(
+                    f"Child ID '{cid}' has multiple parents: '{parent_map[cid]}' and '{parent.id}'"
+                )
+            else:
+                parent_map[cid] = parent.id
+                
+            referenced_child_ids.add(cid)
+
+    # --- Cycle detection ---
+    visited = set()
+    path = set()
+
+    def check_cycle(node_id: str) -> bool:
+        if node_id in path:
+            return True
+        if node_id in visited:
+            return False
+        
+        path.add(node_id)
+        node = nodes_dict.get(node_id)
+        if node:
+            for cid in node.childrenIds:
+                if check_cycle(cid):
+                    return True
+        path.remove(node_id)
+        visited.add(node_id)
+        return False
+
+    if check_cycle(data.rootId):
+        result.errors.append("Cyclic reference detected in components tree hierarchy")
+
+    # --- Reachability and Orphan validation ---
+    reachable = set()
+    def traverse(node_id: str):
+        if node_id in reachable:
+            return
+        reachable.add(node_id)
+        node = nodes_dict.get(node_id)
+        if node:
+            for cid in node.childrenIds:
+                traverse(cid)
+    traverse(data.rootId)
+
+    # Warn about orphan component nodes
+    for node in data.nodes:
+        if node.id != data.rootId and len(node.childrenIds) > 0:
+            if node.id not in reachable:
+                result.warnings.append(
+                    f"Component '{node.label}' (id={node.id}) is defined but never referenced as a child"
+                )
+
+    # --- Image checks ---
+    for comp in all_components:
+        is_screen = (comp.id == data.rootId)
+        if not skip_image_validation:
+            if not comp.imageFiles:
+                if is_screen:
+                    result.errors.append("No screen-level images specified")
+                else:
+                    result.errors.append(
+                        f"Component '{comp.label}' (id={comp.id}): no imageFiles specified"
+                    )
+            for img_file in comp.imageFiles:
+                if img_file:
+                    img = data.resolve_image(img_file)
+                    if not img.resolve().is_relative_to(base_dir):
+                        err_msg = (
+                            f"Screen image path escapes imageDir: {img_file}"
+                            if is_screen
+                            else f"Component '{comp.label}' (id={comp.id}): image path escapes imageDir: {img_file}"
+                        )
+                        result.errors.append(err_msg)
+                    elif not img.exists():
+                        err_msg = (
+                            f"Screen image not found: {img}"
+                            if is_screen
+                            else f"Component '{comp.label}' (id={comp.id}): image not found: {img}"
+                        )
+                        result.errors.append(err_msg)
 
         if not comp.description:
-            result.errors.append(
-                f"Component '{comp.label}' (id={comp.id}): empty description"
-            )
+            if is_screen:
+                result.errors.append("Screen description is empty")
+            else:
+                result.errors.append(
+                    f"Component '{comp.label}' (id={comp.id}): empty description"
+                )
 
-    if not data.screen.description:
-        result.errors.append("Screen description is empty")
+        if not comp.childrenIds:
+            if is_screen:
+                result.errors.append("Screen has no children")
+            else:
+                result.errors.append(
+                    f"Component '{comp.label}' (id={comp.id}): "
+                    f"no children specified (must have at least one child)"
+                )
 
-    if not data.screen.topLevelChildren:
-        result.errors.append("Screen has no top-level children")
-
-    for img_file in data.screen.imageFiles:
-        img = data.resolve_image(img_file)
-        if not img.resolve().is_relative_to(base_dir):
-            result.errors.append(f"Screen image path escapes imageDir: {img_file}")
-        elif not img.exists():
-            result.errors.append(f"Screen image not found: {img}")
-
-    if not data.screen.imageFiles:
-        result.errors.append("No screen-level images specified")
-
-    # --- Image count ---
-    result.images = len(data.screen.imageFiles) + sum(
-        1 for c in non_leaf if c.imageFile
-    )
+    # Update summary images count
+    result.images = sum(len(c.imageFiles) for c in all_components)
 
     # --- Content completeness warnings ---
-
-    empty_controls = sum(
-        1
-        for comp in non_leaf
-        for child in comp.children
-        if getattr(child, "type", "") == "primitive" and not child.controlType
-    )
+    # Check for empty controlType in Element (leaf) nodes that are reachable
+    empty_controls = 0
+    for node_id in reachable:
+        node = nodes_dict.get(node_id)
+        if node and node_id != data.rootId and len(node.childrenIds) == 0:
+            if not node.controlType.strip():
+                empty_controls += 1
     if empty_controls:
         result.warnings.append(
             f"{empty_controls} child element(s) have empty controlType"
         )
 
-    if data.screen.description and len(data.screen.description) < 10:
+    if screen.description and len(screen.description) < 10:
         result.warnings.append(
-            f"Screen description is suspiciously short (< 10 chars): '{data.screen.description}'"
+            f"Screen description is suspiciously short (< 10 chars): '{screen.description}'"
         )
 
-    def get_child_label(child) -> str:
-        if child.label.strip():
-            return child.label.strip()
-        if child.type == "component":
-            target = data.components.get(child.componentId)
-            if target:
-                return target.label.strip()
-        return ""
-
-    referenced_component_ids = set()
-    for child in data.screen.topLevelChildren:
-        if child.type == "component":
-            referenced_component_ids.add(child.componentId)
-
-    for comp in data.components.values():
-        for child in comp.children:
-            if child.type == "component":
-                referenced_component_ids.add(child.componentId)
-
-        if comp.description and len(comp.description) < 10:
-            result.warnings.append(
-                f"Component '{comp.label}' (id={comp.id}) description is suspiciously short (< 10 chars)"
-            )
-        if not comp.label.strip():
-            result.warnings.append(f"Component (id={comp.id}) has an empty label")
-        for i, child in enumerate(comp.children):
-            if not get_child_label(child):
+    for comp in non_leaf:
+        if comp.id in reachable:
+            if comp.description and len(comp.description) < 10:
                 result.warnings.append(
-                    f"Child element {i + 1} in Component '{comp.label}' has an empty label"
+                    f"Component '{comp.label}' (id={comp.id}) description is suspiciously short (< 10 chars)"
                 )
+            if not comp.label.strip():
+                result.warnings.append(f"Component (id={comp.id}) has an empty label")
 
-    for comp in data.components.values():
-        if comp.id not in referenced_component_ids:
-            result.warnings.append(
-                f"Component '{comp.label}' (id={comp.id}) is defined but never referenced as a child"
-            )
+    # Empty labels on children checks
+    for parent in all_components:
+        if parent.id in reachable:
+            for i, cid in enumerate(parent.childrenIds):
+                child = nodes_dict.get(cid)
+                if child and not child.label.strip():
+                    if parent.id == data.rootId:
+                        result.warnings.append(
+                            f"Child element in Screen '{parent.label}' has an empty label"
+                        )
+                    else:
+                        result.warnings.append(
+                            f"Child element {i + 1} in Component '{parent.label}' has an empty label"
+                        )
 
-    for child in data.screen.topLevelChildren:
-        if not get_child_label(child):
-            result.warnings.append(
-                f"Child element in Screen '{data.screen.name}' has an empty label"
-            )
-
-    # Check for structural errors in API parameters and unused schemas
+    # Check for structural errors in API parameters
     for api in data.all_apis:
-        all_params = api.requestParams + api.responseFields
-        for schema in api.schemas.values():
-            all_params.extend(schema.fields)
+        all_params = []
+        for payload in api.request:
+            all_params.extend(payload.fields)
+        for payload in api.response:
+            all_params.extend(payload.fields)
 
         for param in all_params:
             if not param.name.strip() or not param.meaning.strip():
                 result.warnings.append(
-                    f"API '{api.title}' has an ApiParam with empty name or meaning"
+                    f"API '{api.api}' has an ApiParam with empty name or meaning"
                 )
 
-        if api.schemas:
-            referenced_types = {api.requestBodyType, api.responseType}
-            for param in api.requestParams:
-                referenced_types.add(param.dataType)
-            for param in api.responseFields:
-                referenced_types.add(param.dataType)
-            for schema in api.schemas.values():
-                for param in schema.fields:
-                    referenced_types.add(param.dataType)
-
-            for schema in api.schemas.values():
-                if not any(schema.name in str(t) for t in referenced_types if t):
-                    result.warnings.append(
-                        f"API '{api.title}' declares schema '{schema.name}', "
-                        f"but it is never referenced by any request, response, or other schema."
-                    )
-
-    # --- Unit limit checks ---
+    # --- Unit limit complexity checks ---
     def _check_unit_limit(annotations: int, apis: int, owner: str) -> None:
         units = (
             annotations * DEFAULT_UNIT_COST_ANNOTATION + apis * DEFAULT_UNIT_COST_API
@@ -209,27 +256,20 @@ def validate_analysis(data: AnalysisData) -> ValidationResult:
                 f"{apis} APIs × {DEFAULT_UNIT_COST_API} = {units})"
             )
 
-    _check_unit_limit(
-        len(data.screen.topLevelChildren),
-        len(data.screen.apis),
-        f"Screen '{data.screen.name}'",
-    )
+    if screen.id in reachable:
+        _check_unit_limit(
+            len(screen.childrenIds),
+            len(screen.apis),
+            f"Screen '{screen.label}'",
+        )
 
     for comp in non_leaf:
-        _check_unit_limit(
-            len(comp.children),
-            len(comp.apis),
-            f"Component '{comp.label}' (id={comp.id})",
-        )
-
-    # --- Discrepancy warnings ---
-    for disc in data.discrepancies:
-        result.warnings.append(
-            f"Discrepancy at '{disc.location}': "
-            f"Image shows: {disc.imageObservation} | "
-            f"Code shows: {disc.codeObservation}"
-            + (f" | Expected: {disc.expectedBehavior}" if disc.expectedBehavior else "")
-        )
+        if comp.id in reachable:
+            _check_unit_limit(
+                len(comp.childrenIds),
+                len(comp.apis),
+                f"Component '{comp.label}' (id={comp.id})",
+            )
 
     # --- Final validity ---
     if result.errors:

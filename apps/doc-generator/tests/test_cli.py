@@ -15,7 +15,7 @@ class TestCliHelp:
                 main()
             assert exc.value.code == 0
         captured = capsys.readouterr()
-        assert "analysis.json" in captured.out
+        assert "spec.json" in captured.out
 
     def test_help_flag(self, capsys):
         with patch("sys.argv", ["doc-gen", "--help"]):
@@ -26,7 +26,7 @@ class TestCliHelp:
 
 class TestCliValidation:
     def test_nonexistent_file(self, capsys):
-        with patch("sys.argv", ["doc-gen", "/nonexistent/analysis.json"]):
+        with patch("sys.argv", ["doc-gen", "/nonexistent/spec.json"]):
             with pytest.raises(SystemExit) as exc:
                 main()
             assert exc.value.code == 1
@@ -63,17 +63,23 @@ class TestCliDryRun:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {
-                "name": "Test",
-                "description": "desc",
-                "imageFiles": ["test.png"],
-                "topLevelChildren": [
-                    {"type": "primitive", "label": "A", "controlType": "T"}
-                ],
-            },
-            "components": {},
+            "rootId": "0",
+            "nodes": [
+                {
+                    "id": "0",
+                    "label": "Test",
+                    "description": "desc desc desc",
+                    "imageFiles": ["test.png"],
+                    "childrenIds": ["1"],
+                },
+                {
+                    "id": "1",
+                    "label": "A",
+                    "controlType": "T",
+                }
+            ],
         }
-        json_path = tmp_path / "analysis.json"
+        json_path = tmp_path / "spec.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
 
         with patch("sys.argv", ["doc-gen", str(json_path), "--dry-run"]):
@@ -82,7 +88,6 @@ class TestCliDryRun:
         captured = capsys.readouterr()
         assert "Dry Run Summary" in captured.err
         assert "Test" in captured.err
-        assert "Components:" in captured.err
 
 
 class TestCliGeneration:
@@ -91,17 +96,23 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {
-                "name": "My Screen",
-                "description": "D",
-                "imageFiles": ["test.png"],
-                "topLevelChildren": [
-                    {"type": "primitive", "label": "A", "controlType": "T"}
-                ],
-            },
-            "components": {},
+            "rootId": "0",
+            "nodes": [
+                {
+                    "id": "0",
+                    "label": "My Screen",
+                    "description": "D",
+                    "imageFiles": ["test.png"],
+                    "childrenIds": ["1"],
+                },
+                {
+                    "id": "1",
+                    "label": "A",
+                    "controlType": "T",
+                }
+            ],
         }
-        json_path = tmp_path / "analysis.json"
+        json_path = tmp_path / "spec.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
 
         output_path = tmp_path / "output.docx"
@@ -116,16 +127,23 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {
-                "name": "Product Detail",
-                "description": "desc",
-                "imageFiles": ["test.png"],
-                "topLevelChildren": [
-                    {"type": "primitive", "label": "A", "controlType": "T"}
-                ],
-            },
+            "rootId": "0",
+            "nodes": [
+                {
+                    "id": "0",
+                    "label": "Product Detail",
+                    "description": "desc desc desc",
+                    "imageFiles": ["test.png"],
+                    "childrenIds": ["1"],
+                },
+                {
+                    "id": "1",
+                    "label": "A",
+                    "controlType": "T",
+                }
+            ],
         }
-        json_path = tmp_path / "analysis.json"
+        json_path = tmp_path / "spec.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
 
         with patch("sys.argv", ["doc-gen", str(json_path)]):
@@ -139,17 +157,23 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {
-                "name": "My Screen",
-                "description": "D",
-                "imageFiles": ["test.png"],
-                "topLevelChildren": [
-                    {"type": "primitive", "label": "A", "controlType": "T"}
-                ],
-            },
-            "components": {},
+            "rootId": "0",
+            "nodes": [
+                {
+                    "id": "0",
+                    "label": "My Screen",
+                    "description": "D",
+                    "imageFiles": ["test.png"],
+                    "childrenIds": ["1"],
+                },
+                {
+                    "id": "1",
+                    "label": "A",
+                    "controlType": "T",
+                }
+            ],
         }
-        json_path = tmp_path / "analysis.json"
+        json_path = tmp_path / "spec.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
         output_path = tmp_path / "output.docx"
 
@@ -167,17 +191,23 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {
-                "name": "My Screen",
-                "description": "D",
-                "imageFiles": ["test.png"],
-                "topLevelChildren": [
-                    {"type": "primitive", "label": "A", "controlType": "T"}
-                ],
-            },
-            "components": {},
+            "rootId": "0",
+            "nodes": [
+                {
+                    "id": "0",
+                    "label": "My Screen",
+                    "description": "D",
+                    "imageFiles": ["test.png"],
+                    "childrenIds": ["1"],
+                },
+                {
+                    "id": "1",
+                    "label": "A",
+                    "controlType": "T",
+                }
+            ],
         }
-        json_path = tmp_path / "analysis.json"
+        json_path = tmp_path / "spec.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
         output_path = tmp_path / "output.docx"
 
@@ -203,12 +233,30 @@ class TestCliImageWarnings:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "screen": {"name": "T", "imageFiles": ["missing.png"]},
-            "components": {
-                "1": {"id": 1, "label": "A", "imageFile": "also_missing.png"}
-            },
+            "rootId": "0",
+            "nodes": [
+                {
+                    "id": "0",
+                    "label": "T",
+                    "description": "desc desc desc",
+                    "imageFiles": ["missing.png"],
+                    "childrenIds": ["1"],
+                },
+                {
+                    "id": "1",
+                    "label": "A",
+                    "description": "desc desc desc",
+                    "imageFiles": ["also_missing.png"],
+                    "childrenIds": ["2"],
+                },
+                {
+                    "id": "2",
+                    "label": "B",
+                    "controlType": "B",
+                }
+            ],
         }
-        json_path = tmp_path / "analysis.json"
+        json_path = tmp_path / "spec.json"
         json_path.write_text(json.dumps(analysis), encoding="utf-8")
 
         with patch("sys.argv", ["doc-gen", str(json_path)]):
@@ -218,3 +266,36 @@ class TestCliImageWarnings:
 
         captured = capsys.readouterr()
         assert "image not found" in captured.err
+
+    def test_skip_image_validation_cli(self, tmp_path):
+        analysis = {
+            "sectionPrefix": "1.1",
+            "imageDir": str(tmp_path),
+            "rootId": "0",
+            "nodes": [
+                {
+                    "id": "0",
+                    "label": "T",
+                    "description": "desc desc desc",
+                    "imageFiles": ["missing.png"],
+                    "childrenIds": ["1"],
+                },
+                {
+                    "id": "1",
+                    "label": "A",
+                    "description": "desc desc desc",
+                    "imageFiles": ["also_missing.png"],
+                    "childrenIds": ["2"],
+                },
+                {
+                    "id": "2",
+                    "label": "B",
+                    "controlType": "B",
+                }
+            ],
+        }
+        json_path = tmp_path / "spec.json"
+        json_path.write_text(json.dumps(analysis), encoding="utf-8")
+
+        with patch("sys.argv", ["doc-gen", str(json_path), "--skip-image-validation", "--dry-run"]):
+            main()

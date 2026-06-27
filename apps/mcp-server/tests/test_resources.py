@@ -40,4 +40,4 @@ class TestMcpResources:
     def test_get_spec_example_analysis_resource(self):
         result = get_spec_example_analysis_resource()
         assert "Example" in result
-        assert "Chi tiết sản phẩm" in result
+        assert "chi tiết sản phẩm" in result.lower()

@@ -19,6 +19,13 @@ from .workspace import (
     WorkspaceState,
 )
 
+import importlib.resources
+
+def get_example_spec_json() -> str:
+    """Retrieve the canonical example spec JSON string."""
+    ref = importlib.resources.files("tlgp_contracts") / "example_spec.json"
+    return ref.read_text(encoding="utf-8")
+
 __all__ = [
     "DEFAULT_UNIT_COST_ANNOTATION",
     "DEFAULT_UNIT_COST_API",
@@ -34,5 +41,6 @@ __all__ = [
     "Style",
     "TreeUtils",
     "WorkspaceState",
+    "get_example_spec_json",
 ]
 

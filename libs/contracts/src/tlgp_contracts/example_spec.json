@@ -1,0 +1,109 @@
+{
+  "sectionPrefix": "1.1",
+  "imageDir": "./tests/fixtures/images",
+  "rootId": "0",
+  "nodes": [
+    {
+      "id": "0",
+      "label": "Màn hình chi tiết sản phẩm",
+      "description": "Màn hình hiển thị toàn bộ thông tin chi tiết của sản phẩm bao gồm hình ảnh, giá cả, thông tin nhà bán hàng, các thuộc tính lựa chọn và các hành động mua hàng.",
+      "imageFiles": ["dummy_screen.png"],
+      "childrenIds": ["1", "2"],
+      "interactions": [
+        {
+          "action": "Người dùng vuốt màn hình lên/xuống",
+          "reaction": "Hệ thống cuộn nội dung màn hình tương ứng để hiển thị thêm thông tin."
+        }
+      ],
+      "apis": [
+        {
+          "api": "Lấy chi tiết sản phẩm",
+          "url": "GET /api/v1/products/{id}",
+          "request": [],
+          "response": [
+            {
+              "type": "ProductDetailResponse",
+              "fields": [
+                {
+                  "name": "id",
+                  "meaning": "Mã định danh sản phẩm",
+                  "required": "Y",
+                  "dataType": "String",
+                  "limit": "36 ký tự",
+                  "defaultValue": ""
+                },
+                {
+                  "name": "name",
+                  "meaning": "Tên sản phẩm",
+                  "required": "Y",
+                  "dataType": "String",
+                  "limit": "255 ký tự",
+                  "defaultValue": ""
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "1",
+      "label": "Thanh tiêu đề điều hướng (Header)",
+      "description": "Thanh công cụ nằm ở đầu màn hình, chứa tiêu đề của màn hình hiện tại và các nút điều hướng nhanh.",
+      "imageFiles": ["dummy_header.png"],
+      "childrenIds": ["3", "6"],
+      "interactions": [],
+      "apis": []
+    },
+    {
+      "id": "2",
+      "label": "Ảnh banner quảng cáo",
+      "controlType": "Image",
+      "required": "N",
+      "maxLength": "",
+      "editable": "N",
+      "description": "Hình ảnh hoặc slider hiển thị các chương trình khuyến mãi liên quan đến sản phẩm."
+    },
+    {
+      "id": "3",
+      "label": "Khối điều khiển nút chức năng quay lại",
+      "description": "Nút bấm chứa biểu tượng mũi tên quay lại màn hình trước đó, xử lý lưu trạng thái tạm thời nếu có.",
+      "imageFiles": ["dummy_back_button.png"],
+      "childrenIds": ["4", "5"],
+      "interactions": [
+        {
+          "action": "Người dùng chạm vào nút quay lại",
+          "reaction": "Hệ thống đóng màn hình hiện tại và đưa người dùng trước đó."
+        }
+      ],
+      "apis": []
+    },
+    {
+      "id": "4",
+      "label": "Biểu tượng mũi tên quay lại",
+      "controlType": "Icon",
+      "required": "Y",
+      "maxLength": "",
+      "editable": "N",
+      "description": "Biểu tượng trực quan hỗ trợ nhận diện hành động quay lại."
+    },
+    {
+      "id": "5",
+      "label": "Nhãn văn bản gợi ý",
+      "controlType": "Text",
+      "required": "N",
+      "maxLength": "10",
+      "editable": "N",
+      "description": "Văn bản hiển thị bên cạnh mũi tên (ví dụ: 'Quay lại' hoặc 'Back')."
+    },
+    {
+      "id": "6",
+      "label": "Tiêu đề màn hình",
+      "controlType": "Text",
+      "required": "Y",
+      "maxLength": "50",
+      "editable": "N",
+      "description": "Hiển thị tên ngắn gọn của màn hình đang xem."
+    }
+  ]
+}

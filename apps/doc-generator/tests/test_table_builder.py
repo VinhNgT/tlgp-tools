@@ -4,7 +4,8 @@ import pytest
 from doc_generator.models import (
     ApiParam,
     Interaction,
-    PrimitiveElement,
+    NodeSpec,
+    ScreenSpec,
 )
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
@@ -98,18 +99,26 @@ class TestGenericInfoTable:
 class TestUiElementsTable:
     def test_correct_dimensions(self):
         doc = Document()
-        children = [
-            PrimitiveElement(label="Back", controlType="Icon"),
-            PrimitiveElement(label="Title", controlType="Text"),
-        ]
-        table = build_ui_elements_table(doc, children, style)
+        analysis = ScreenSpec(
+            imageDir=".",
+            nodes=[
+                NodeSpec(id="1", label="Back", controlType="Icon"),
+                NodeSpec(id="2", label="Title", controlType="Text"),
+            ]
+        )
+        table = build_ui_elements_table(doc, ["1", "2"], style, analysis=analysis)
         assert len(table.rows) == 3  # 1 header + 2 data
         assert len(table.columns) == 7
 
     def test_header_labels(self):
         doc = Document()
-        children = [PrimitiveElement(label="A", controlType="B")]
-        table = build_ui_elements_table(doc, children, style)
+        analysis = ScreenSpec(
+            imageDir=".",
+            nodes=[
+                NodeSpec(id="1", label="A", controlType="B"),
+            ]
+        )
+        table = build_ui_elements_table(doc, ["1"], style, analysis=analysis)
         headers = [table.cell(0, c).text for c in range(7)]
         assert headers[0] == "STT"
         assert headers[1] == "Tên"
@@ -117,14 +126,18 @@ class TestUiElementsTable:
 
     def test_data_populated(self):
         doc = Document()
-        children = [
-            PrimitiveElement(
-                label="Share",
-                controlType="Icon",
-                description="Share product",
-            ),
-        ]
-        table = build_ui_elements_table(doc, children, style)
+        analysis = ScreenSpec(
+            imageDir=".",
+            nodes=[
+                NodeSpec(
+                    id="1",
+                    label="Share",
+                    controlType="Icon",
+                    description="Share product",
+                ),
+            ]
+        )
+        table = build_ui_elements_table(doc, ["1"], style, analysis=analysis)
         assert table.cell(1, 0).text == "1"
         assert table.cell(1, 1).text == "Share"
         assert table.cell(1, 2).text == "Icon"

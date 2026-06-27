@@ -17,9 +17,8 @@ from docx.shared import Pt
 from docx.table import Table
 
 from doc_generator.models import (
-    AnalysisData,
+    ScreenSpec,
     ApiParam,
-    ChildElement,
     Interaction,
 )
 from doc_generator.style_constants import StyleConfig
@@ -285,9 +284,9 @@ def build_generic_info_table(
 
 def build_ui_elements_table(
     doc: Document,
-    children: Sequence[ChildElement],
+    children: Sequence[str],
     style: StyleConfig,
-    analysis: AnalysisData | None = None,
+    analysis: ScreenSpec | None = None,
 ) -> Table:
     """Build a 7-column UI Elements Table."""
     table = doc.add_table(rows=1 + len(children), cols=7)
@@ -303,23 +302,37 @@ def build_ui_elements_table(
         )
 
     # Data
-    for r, child in enumerate(children):
-        label = child.label
-        description = child.description
+    for r, child_id in enumerate(children):
+        child = None
+        if analysis is not None:
+            child = analysis.nodes_map.get(child_id)
 
-        if child.type == "component" and analysis is not None:
-            target = analysis.components.get(child.componentId)
-            if target:
-                label = label or target.label
-                description = description or target.description
+        if child is None:
+            label = f"Node {child_id}"
+            control_type = ""
+            required = ""
+            max_length = ""
+            editable = ""
+            description = ""
+        else:
+            label = child.label
+            description = child.description
+            control_type = child.controlType
+            required = child.required
+            max_length = child.maxLength
+            editable = child.editable
+
+            # If the node has children, it is structurally a Component, so output "Component" as its control type in the table.
+            if len(child.childrenIds) > 0:
+                control_type = "Component"
 
         row_data = [
             str(r + 1),
             label,
-            child.controlType,
-            getattr(child, "required", ""),
-            getattr(child, "maxLength", ""),
-            getattr(child, "editable", ""),
+            control_type,
+            required,
+            max_length,
+            editable,
             description,
         ]
         for c, text in enumerate(row_data):

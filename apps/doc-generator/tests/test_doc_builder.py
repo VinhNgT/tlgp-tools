@@ -2,49 +2,61 @@ from typing import Any
 
 from doc_generator.doc_builder import build_document
 from doc_generator.models import (
-    AnalysisComponent,
-    AnalysisData,
+    NodeSpec,
+    ScreenSpec,
     Api,
     ApiParam,
     Interaction,
-    PrimitiveElement,
-    Screen,
-    ApiSchema,
+    ApiPayload,
 )
 from PIL import Image
+from pathlib import Path
 
 
-def _minimal_analysis(tmp_path, **overrides) -> AnalysisData:
-    """Create a minimal AnalysisData for testing."""
+def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
+    """Create a minimal ScreenSpec for testing."""
     screen_apis = overrides.pop("apis", [])
     screen_desc = overrides.pop("screen_description", "Test description")
     screen_name = overrides.pop("screen_name", "Test Screen")
+    nodes = overrides.pop("nodes", [])
+
+    # Ensure exactly one screen component (id == "0") exists
+    screen_comp = [n for n in nodes if n.id == "0"]
+    if not screen_comp:
+        nodes.append(
+            NodeSpec(
+                id="0",
+                label=screen_name,
+                description=screen_desc,
+                imageFiles=[],
+                childrenIds=["1"],
+                apis=screen_apis,
+            )
+        )
+        nodes.append(
+            NodeSpec(id="1", label="Dummy", controlType="Text")
+        )
+
     defaults = {
         "sectionPrefix": "1.1",
         "imageDir": str(tmp_path),
-        "screen": Screen(name=screen_name, description=screen_desc, apis=screen_apis),
+        "nodes": nodes,
     }
-
-    if "components" in overrides and isinstance(overrides["components"], list):
-        overrides["components"] = {c.id: c for c in overrides["components"]}
-    if "schemas" in overrides and isinstance(overrides["schemas"], list):
-        overrides["schemas"] = {d.name: d for d in overrides["schemas"]}
     defaults.update(overrides)
 
-    return AnalysisData(**defaults)
+    return ScreenSpec(**defaults)
 
 
 class TestBuildDocumentMinimal:
     def test_produces_document(self, tmp_path):
-        analysis = _minimal_analysis(tmp_path)
+        analysis = _minimal_spec(tmp_path)
         doc = build_document(analysis)
-        # Document() returns a docx.document.Document object
         assert hasattr(doc, "paragraphs")
         assert hasattr(doc, "tables")
         assert hasattr(doc, "save")
 
     def test_can_save(self, tmp_path):
-        analysis = _minimal_analysis(tmp_path)
+        analysis = _minimal_spec(tmp_path)
         doc = build_document(analysis)
         out_path = tmp_path / "output.docx"
         doc.save(str(out_path))
@@ -52,9 +64,8 @@ class TestBuildDocumentMinimal:
         assert out_path.stat().st_size > 0
 
     def test_has_screen_heading(self, tmp_path):
-        analysis = _minimal_analysis(tmp_path)
+        analysis = _minimal_spec(tmp_path)
         doc = build_document(analysis)
-        # Find paragraphs with heading style
         headings = [
             p
             for p in doc.paragraphs
@@ -63,38 +74,44 @@ class TestBuildDocumentMinimal:
             and p.style.name.startswith("Heading")
         ]
         assert len(headings) >= 1
-        # Screen heading should contain "Màn hình Test Screen"
         screen_headings = [h for h in headings if "Test Screen" in h.text]
         assert len(screen_headings) >= 1
 
     def test_default_font_is_times_new_roman(self, tmp_path):
-        analysis = _minimal_analysis(tmp_path)
+        analysis = _minimal_spec(tmp_path)
         doc = build_document(analysis)
         normal_style: Any = doc.styles["Normal"]
         assert normal_style.font.name == "Times New Roman"
 
 
 class TestBuildDocumentWithComponents:
-    def test_non_leaf_components_generate_sections(self, tmp_path):
-        analysis = _minimal_analysis(
+    def test_sub_components_generate_sections(self, tmp_path):
+        analysis = _minimal_spec(
             tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1", "2"],
+                ),
+                NodeSpec(
+                    id="1",
                     label="Header",
                     description="Header component",
-                    children=[
-                        PrimitiveElement(label="Back", controlType="Icon"),
-                    ],
+                    childrenIds=["3"],
                     interactions=[
                         Interaction(action="Click", reaction="Go back"),
                     ],
                 ),
-                AnalysisComponent(
-                    id=2,
+                NodeSpec(
+                    id="2",
                     label="Footer",
                     description="Footer component",
+                    childrenIds=["4"],
                 ),
+                NodeSpec(id="3", label="Back", controlType="Icon"),
+                NodeSpec(id="4", label="Copyright", controlType="Text"),
             ],
         )
         doc = build_document(analysis)
@@ -102,45 +119,48 @@ class TestBuildDocumentWithComponents:
         assert "Component Header" in text
         assert "Component Footer" in text
 
-    def test_leaf_components_skipped(self, tmp_path):
-        analysis = _minimal_analysis(
-            tmp_path,
-            components=[
-                AnalysisComponent(id=1, label="Visible", isLeaf=False),
-                AnalysisComponent(id=2, label="Hidden Leaf", isLeaf=True),
-            ],
-        )
-        doc = build_document(analysis)
-        text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Visible" in text
-        assert "Hidden Leaf" not in text
-
     def test_component_tables_present(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
                     label="Nav",
                     description="Nav bar",
-                    children=[
-                        PrimitiveElement(label="Back", controlType="Icon"),
-                    ],
+                    childrenIds=["2"],
                     interactions=[
                         Interaction(action="Click", reaction="Go back"),
                     ],
                 ),
+                NodeSpec(id="2", label="Back", controlType="Icon"),
             ],
         )
         doc = build_document(analysis)
-        # Should have at least: info table + UI table + interaction table
         assert len(doc.tables) >= 3
 
     def test_empty_children_still_shows_heading(self, tmp_path):
-        analysis = _minimal_analysis(
+        # Note: although validation prevents this in production, we check behavior
+        analysis = _minimal_spec(
             tmp_path,
-            components=[
-                AnalysisComponent(id=1, label="Empty", description="No children"),
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
+                    label="Empty",
+                    description="No children",
+                    childrenIds=[],
+                ),
             ],
         )
         doc = build_document(analysis)
@@ -150,16 +170,19 @@ class TestBuildDocumentWithComponents:
 
 class TestBuildDocumentWithApis:
     def test_api_section_generated(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
             apis=[
                 Api(
-                    number=1,
-                    method="GET",
-                    title="Products",
+                    api="GET Products",
                     url="/api/products",
-                    requestParams=[
-                        ApiParam(name="page", dataType="int"),
+                    request=[
+                        ApiPayload(
+                            type="ProductsRequest",
+                            fields=[
+                                ApiParam(name="page", dataType="int"),
+                            ],
+                        )
                     ],
                 ),
             ],
@@ -168,42 +191,43 @@ class TestBuildDocumentWithApis:
         text = "\n".join(p.text for p in doc.paragraphs)
         assert "1. GET Products" in text
         assert "URL: /api/products" in text
-        assert "Request" in text
+        assert "Request Body (ProductsRequest)" in text
 
     def test_api_with_response_and_sub_dtos(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
             apis=[
                 Api(
-                    number=1,
-                    method="GET",
-                    title="Detail",
+                    api="GET Detail",
                     url="/api/detail",
-                    responseType="ProductDTO",
-                    responseFields=[
-                        ApiParam(name="id", dataType="String"),
-                    ],
-                    schemas={
-                        "PriceDTO": ApiSchema(
-                            name="PriceDTO",
-                            fieldRef="prices",
+                    response=[
+                        ApiPayload(
+                            type="ProductDTO",
+                            parentType=None,
+                            fields=[
+                                ApiParam(name="id", dataType="String"),
+                            ],
+                        ),
+                        ApiPayload(
+                            type="PriceDTO",
+                            parentType="ProductDTO",
                             fields=[ApiParam(name="amount", dataType="double")],
                         ),
-                    },
+                    ],
                 ),
             ],
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
         assert "Response (data = ProductDTO)" in text
-        assert "PriceDTO fields (prices)" in text
+        assert "PriceDTO" in text
 
     def test_multiple_apis(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
             apis=[
-                Api(method="GET", title="List", url="/api/list"),
-                Api(method="POST", title="Create", url="/api/create"),
+                Api(api="GET List", url="/api/list"),
+                Api(api="POST Create", url="/api/create"),
             ],
         )
         doc = build_document(analysis)
@@ -212,17 +236,19 @@ class TestBuildDocumentWithApis:
         assert "2. POST Create" in text
 
     def test_post_api_shows_request_body_label(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
             apis=[
                 Api(
-                    number=1,
-                    method="POST",
-                    title="Favorite",
+                    api="POST Favorite",
                     url="/api/fav",
-                    requestBodyType="FavoriteProductRequestDTO",
-                    requestParams=[
-                        ApiParam(name="product_id", dataType="String"),
+                    request=[
+                        ApiPayload(
+                            type="FavoriteProductRequestDTO",
+                            fields=[
+                                ApiParam(name="product_id", dataType="String"),
+                            ],
+                        )
                     ],
                 ),
             ],
@@ -230,62 +256,30 @@ class TestBuildDocumentWithApis:
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
         assert "Request Body (FavoriteProductRequestDTO)" in text
-        assert "Request\n" not in text  # should NOT have plain "Request"
-
-    def test_free_text_request_description(self, tmp_path):
-        analysis = _minimal_analysis(
-            tmp_path,
-            apis=[
-                Api(
-                    number=1,
-                    method="GET",
-                    title="Health",
-                    url="/api/health",
-                    requestDescription="Không có tham số",
-                ),
-            ],
-        )
-        doc = build_document(analysis)
-        text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Request" in text
-        assert "Không có tham số" in text
-
-    def test_free_text_response_description(self, tmp_path):
-        analysis = _minimal_analysis(
-            tmp_path,
-            apis=[
-                Api(
-                    number=1,
-                    method="GET",
-                    title="Count",
-                    url="/api/count",
-                    responseType="int",
-                    responseDescription="Tổng số items trong giỏ hàng",
-                ),
-            ],
-        )
-        doc = build_document(analysis)
-        text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Response (data = int)" in text
-        assert "Tổng số items trong giỏ hàng" in text
 
     def test_component_apis_under_component_section(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
                     label="Header",
                     description="Header component",
+                    childrenIds=["2"],
                     apis=[
                         Api(
-                            number=1,
-                            method="GET",
-                            title="Get Header Data",
+                            api="GET Get Header Data",
                             url="/api/header",
                         ),
                     ],
-                )
+                ),
+                NodeSpec(id="2", label="Back", controlType="Icon"),
             ],
         )
         doc = build_document(analysis)
@@ -296,15 +290,23 @@ class TestBuildDocumentWithApis:
 
 class TestBuildDocumentWithImages:
     def test_missing_image_shows_placeholder(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
                     label="Nav",
                     description="Nav bar",
-                    imageFile="nonexistent.png",
+                    imageFiles=["nonexistent.png"],
+                    childrenIds=["2"],
                 ),
+                NodeSpec(id="2", label="Back", controlType="Icon"),
             ],
         )
         doc = build_document(analysis)
@@ -312,71 +314,116 @@ class TestBuildDocumentWithImages:
         assert "Image not found" in text
 
     def test_existing_image_embedded(self, tmp_path):
-        # Create a minimal 1x1 PNG
-
         img = Image.new("RGB", (100, 100), color="red")
         img_path = tmp_path / "test.png"
         img.save(str(img_path))
 
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
-            components=[
-                AnalysisComponent(
-                    id=1,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
                     label="Nav",
                     description="Nav bar",
-                    imageFile="test.png",
+                    imageFiles=["test.png"],
+                    childrenIds=["2"],
                 ),
+                NodeSpec(id="2", label="Back", controlType="Icon"),
             ],
         )
         doc = build_document(analysis)
-        # Check that an inline shape (image) was added
         inline_shapes = doc.inline_shapes
         assert len(inline_shapes) >= 1
 
     def test_no_images_still_shows_heading(self, tmp_path):
-        analysis = _minimal_analysis(tmp_path)
+        analysis = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Test description",
+                    imageFiles=[],
+                    childrenIds=["1"],
+                ),
+                NodeSpec(id="1", label="Dummy", controlType="Text"),
+            ],
+        )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
         assert "Màn hình chức năng" in text
 
     def test_subsection_numbering_sequential(self, tmp_path):
-        analysis = _minimal_analysis(tmp_path)
+        analysis = _minimal_spec(tmp_path)
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
         assert "1.1 Thông tin chung" in text
         assert "1.2 Màn hình chức năng" in text
         assert "1.3 Mô tả chi tiết các thành phần" in text
-        # Since interactions are optional and empty, 1.4 shouldn't exist
         assert "1.4 Xử lý luồng sự kiện" not in text
 
 
 class TestBuildDocumentSectionNumbering:
     def test_section_prefix_used(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
             sectionPrefix="3.2",
-            components=[
-                AnalysisComponent(id=1, label="Header", description="H"),
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
+                    label="Header",
+                    description="H",
+                    childrenIds=["2"],
+                ),
+                NodeSpec(id="2", label="Back", controlType="Icon"),
             ],
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
-        assert "3.2.1." in text  # component section
-        assert "3.2.2." in text  # screen section
+        assert "3.2.1." in text
+        assert "3.2.2." in text
 
     def test_screen_section_number_follows_components(self, tmp_path):
-        analysis = _minimal_analysis(
+        analysis = _minimal_spec(
             tmp_path,
             sectionPrefix="1.1",
-            components=[
-                AnalysisComponent(id=1, label="A", description="A"),
-                AnalysisComponent(id=2, label="B", description="B"),
-                AnalysisComponent(id=3, label="C", description="C", isLeaf=True),
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Test Screen",
+                    description="Desc",
+                    childrenIds=["1", "2"],
+                ),
+                NodeSpec(
+                    id="1",
+                    label="A",
+                    description="A",
+                    childrenIds=["3"],
+                ),
+                NodeSpec(
+                    id="2",
+                    label="B",
+                    description="B",
+                    childrenIds=["4"],
+                ),
+                NodeSpec(id="3", label="A1", controlType="Text"),
+                NodeSpec(id="4", label="B1", controlType="Text"),
             ],
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
-        # 2 non-leaf components → sections 1.1.1 and 1.1.2
-        # Screen → section 1.1.3
+        # 2 components -> sections 1.1.1 and 1.1.2
+        # Screen -> section 1.1.3
         assert "1.1.3." in text

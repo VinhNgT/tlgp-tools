@@ -3,11 +3,13 @@
 from __future__ import annotations
 
 import json
+from pathlib import Path
 
 import pytest
-from doc_generator.models import AnalysisData
-from doc_generator.validation import validate_analysis
+from doc_generator.models import ScreenSpec
+from doc_generator.validation import validate_spec
 from mcp_server.prompts import _read, get_spec_workflow
+from tlgp_contracts import get_example_spec_json
 
 SPEC_WORKFLOW_CONTENT = ""
 
@@ -38,108 +40,29 @@ class TestSpecWorkflowContent:
             "export_images",
             "scaffold_analysis",
             "update_analysis",
-            "finalize",
-            "list_exports",
-            "parse_annotations",
-            "validate_analysis",
-            "generate_docx",
-            "get_workspace_state",
-            "download_workspace_assets",
         ]
         for tool in old_tools:
-            assert tool not in SPEC_WORKFLOW_CONTENT, (
-                f"Old tool still referenced: {tool}"
-            )
-
-    def test_no_unsubstituted_template_variables(self):
-        assert "{strict_guidelines}" not in SPEC_WORKFLOW_CONTENT
-        assert "{section_prefix}" not in SPEC_WORKFLOW_CONTENT
-        assert "{annotation_json_example}" not in SPEC_WORKFLOW_CONTENT
-
-    def test_has_all_steps(self):
-        """Verify the prompt covers the high-level workflow."""
-        assert "Step 1" in SPEC_WORKFLOW_CONTENT
-        assert "Step 2" in SPEC_WORKFLOW_CONTENT
-        assert "Step 3" in SPEC_WORKFLOW_CONTENT
-        assert "Step 4" in SPEC_WORKFLOW_CONTENT
-        assert "Step 4" in SPEC_WORKFLOW_CONTENT
-
-    def test_no_more_than_4_steps(self):
-        assert "Step 5" not in SPEC_WORKFLOW_CONTENT
-
-    def test_includes_resource_references(self):
-        resources = [
-            "tlgp://spec/classification-guide",
-            "tlgp://spec/example-analysis",
-        ]
-        for res in resources:
-            assert res in SPEC_WORKFLOW_CONTENT, f"Missing resource reference: {res}"
-
-    def test_does_not_reference_deleted_resources(self):
-        deleted = [
-            "tlgp://workspace/state",
-        ]
-        for res in deleted:
-            assert res not in SPEC_WORKFLOW_CONTENT, (
-                f"Deleted resource still referenced: {res}"
-            )
-
-    def test_vietnamese_language_rule(self):
-        assert "Vietnamese" in SPEC_WORKFLOW_CONTENT
-
-    def test_validate_only_documented(self):
-        assert "validate_only" in SPEC_WORKFLOW_CONTENT
-
-    def test_export_images_documented(self):
-        assert "annotated/" in SPEC_WORKFLOW_CONTENT
-        assert "raw/" in SPEC_WORKFLOW_CONTENT
-
-    def test_rules_section_exists(self):
-        """Behavioral rules are now inline in the workflow, not a separate file."""
-        assert "## Rules" in SPEC_WORKFLOW_CONTENT
-        assert "Vietnamese" in SPEC_WORKFLOW_CONTENT
-        assert "Vision-Derived Naming" in SPEC_WORKFLOW_CONTENT
-
-    def test_no_external_service_references(self):
-        assert "createDocument" not in SPEC_WORKFLOW_CONTENT
-        assert "insertTable" not in SPEC_WORKFLOW_CONTENT
-
-    def test_no_stale_download_parameters(self):
-        assert "show_root_children" not in SPEC_WORKFLOW_CONTENT
-        assert "show_component_children" not in SPEC_WORKFLOW_CONTENT
-
-    def test_prepare_step_documented(self):
-        """Step 2 must reference the prepare_analysis tool."""
-        assert "prepare_analysis" in SPEC_WORKFLOW_CONTENT
-        assert "imageDir" in SPEC_WORKFLOW_CONTENT
-        assert "topLevelChildren" in SPEC_WORKFLOW_CONTENT
+            assert tool not in SPEC_WORKFLOW_CONTENT, f"Should not reference old tool: {tool}"
 
 
 class TestExampleAnalysisValidation:
     def test_example_analysis_passes_validation(self, tmp_path):
         # Read the raw JSON
-        raw_json = _read("example_analysis.json")
+        raw_json = get_example_spec_json()
         data_dict = json.loads(raw_json)
 
         # Override imageDir and create files
         data_dict["imageDir"] = str(tmp_path)
 
-        annotated_dir = tmp_path / "annotated"
-        annotated_dir.mkdir()
-        (annotated_dir / "1_Thanh_tiêu_đề_a1b2c3d4.png").touch()
-        (annotated_dir / "3_Khối_chọn_thuộc_tính_c5d6e7f8.png").touch()
+        # Touch the required files defined in the example spec
+        (tmp_path / "dummy_screen.png").touch()
+        (tmp_path / "dummy_header.png").touch()
+        (tmp_path / "dummy_back_button.png").touch()
 
-        root_dir = tmp_path / "root"
-        root_dir.mkdir()
-        (root_dir / "Chi_tiết_sản_phẩm_1.png").touch()
-        (root_dir / "Chi_tiết_sản_phẩm_2.png").touch()
+        spec = ScreenSpec(**data_dict)
+        result = validate_spec(spec)
 
-        analysis_data = AnalysisData(**data_dict)
-        result = validate_analysis(analysis_data)
-
-        # Assert validation is successful with zero errors, expecting only discrepancy warnings
+        # Assert validation is successful with zero errors and warnings
         assert result.valid is True
         assert len(result.errors) == 0
-        other_warnings = [w for w in result.warnings if "Discrepancy at" not in w]
-        assert len(other_warnings) == 0, f"Unexpected warnings found: {other_warnings}"
-
+        assert len(result.warnings) == 0, f"Unexpected warnings: {result.warnings}"

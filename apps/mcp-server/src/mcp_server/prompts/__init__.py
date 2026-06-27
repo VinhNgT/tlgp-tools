@@ -8,6 +8,7 @@ content file — no indirection maps or template substitution.
 from __future__ import annotations
 
 from pathlib import Path
+from tlgp_contracts import get_example_spec_json
 
 _PROMPT_DIR = Path(__file__).parent
 
@@ -28,5 +29,5 @@ def get_classification_guide() -> str:
 
 def get_example_analysis() -> str:
     """A complete example analysis.json, wrapped in a markdown code fence."""
-    raw = _read("example_analysis.json")
+    raw = get_example_spec_json().strip()
     return f"## Example: Complete Analysis JSON\n\n```json\n{raw}\n```"

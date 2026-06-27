@@ -1,7 +1,7 @@
-"""Scaffold an analysis.json skeleton from workspace state and exported images.
+"""Scaffold a spec.json skeleton from workspace state and exported images.
 
-Derives all structural fields (component hierarchy, DFS ordering, image paths,
-isLeaf flags, cross-references) automatically from the annotator's workspace
+Derives all structural fields (component hierarchy, image paths,
+cross-references) automatically from the annotator's workspace
 state and the image export mapping. The AI agent only needs to fill in semantic
 fields (Vietnamese labels, descriptions, interactions, APIs).
 """
@@ -66,7 +66,7 @@ def _walk_post_order_dfs(
     """Walk the component tree in post-order DFS (children before parents).
 
     Returns a flat list of component UUIDs in the order they should appear
-    in the analysis.json components array.
+    in the spec.json nodes array.
     """
     result: list[UUID] = []
     children = TreeUtils.get_children(state, parent_id)
@@ -81,7 +81,7 @@ def build_scaffold(
     export_dir: Path,
     section_prefix: str = "1.1",
 ) -> dict:
-    """Build a scaffold analysis.json dict from workspace state and exported images.
+    """Build a scaffold spec.json dict from workspace state and exported images.
 
     Args:
         state: The annotator's workspace state (flat-map).
@@ -89,7 +89,7 @@ def build_scaffold(
         section_prefix: Section number prefix for the generated document.
 
     Returns:
-        A dict matching the analysis.json schema, with structural fields
+        A dict matching the ScreenSpec schema, with structural fields
         pre-filled and semantic fields set to TODO placeholders.
     """
     mapping = _load_mapping(export_dir)
@@ -107,87 +107,71 @@ def build_scaffold(
         annotated_mapping = mapping.get("components", {})
         root_images = mapping.get("root", [])
 
-    # Walk in post-order DFS to get the component ordering
+    # Walk in post-order DFS to get the component ordering (for readable ordering in JSON)
     ordered_uuids = _walk_post_order_dfs(state)
 
-    # Build the components dict with sequential IDs
-    components: dict[int, dict] = {}
-    uuid_to_seq_id: dict[UUID, int] = {}
-    seq_id = 1
+    nodes = []
 
-    for uuid in ordered_uuids:
-        comp = state.components.get(uuid)
-        if comp is None:
-            logger.warning("Component UUID %s in DFS order but missing from state", uuid)
-            continue
-
-        is_leaf = len(comp.childrenIds) == 0
-        uuid_str = str(uuid)
-        image_file = annotated_mapping.get(uuid_str)
-
-        uuid_to_seq_id[uuid] = seq_id
-
-        # Build children array referencing annotated children
-        component_children = []
-        for child_uuid in comp.childrenIds:
-            if child_uuid in uuid_to_seq_id:
-                component_children.append({
-                    "type": "component",
-                    "componentId": uuid_to_seq_id[child_uuid]
-                })
-
-        comp_label = comp.label.strip()
-        label = f"[TODO: Descriptive Vietnamese label from vision analysis. Suggestion: {comp_label}]" if comp_label else _TODO_LABEL
-
-        component_entry: dict = {
-            "id": seq_id,
-            "label": label,
-            "description": _TODO_DESCRIPTION,
-            "isLeaf": is_leaf,
-            "imageFile": image_file if not is_leaf else None,
-            "children": component_children,
-            "interactions": [],
-            "apis": [],
-        }
-        components[seq_id] = component_entry
-        seq_id += 1
-
-    # Build screen.topLevelChildren from rootComponents using componentId
-    top_level_children: list[dict] = []
-    for root_uuid in state.rootComponents:
-        if root_uuid not in uuid_to_seq_id:
-            continue
-        top_level_children.append({
-            "type": "component",
-            "componentId": uuid_to_seq_id[root_uuid]
-        })
-
-    # Screen images (retain prefix)
-    screen_image_files = list(root_images)
-
-    # Use workspace screen name/description if provided, otherwise placeholder
+    # 1. Add the Screen node (always "0")
     screen_name_val = state.screen.name.strip()
     screen_name = f"[TODO: Vietnamese screen name. Suggestion: {screen_name_val}]" if screen_name_val else _TODO_SCREEN_NAME
 
     screen_desc_val = state.screen.description.strip()
     screen_desc = f"[TODO: Vietnamese screen description (high-level summary) - NOT a list/restatement of UI elements. Suggestion: {screen_desc_val}]" if screen_desc_val else _TODO_SCREEN_DESC
 
-    scaffold: dict = {
-        "sectionPrefix": section_prefix,
-        "imageDir": image_dir,
-        "screen": {
-            "name": screen_name,
-            "description": screen_desc,
-            "imageFiles": screen_image_files,
-            "topLevelChildren": top_level_children,
+    screen_children_ids = [str(rid) for rid in state.rootComponents if rid in state.components]
+
+    nodes.append({
+        "id": "0",
+        "label": screen_name,
+        "description": screen_desc,
+        "imageFiles": list(root_images),
+        "childrenIds": screen_children_ids,
+        "interactions": [],
+        "apis": [],
+    })
+
+    # 2. Add each component node
+    for uuid in ordered_uuids:
+        comp = state.components.get(uuid)
+        if comp is None:
+            logger.warning("Component UUID %s in DFS order but missing from state", uuid)
+            continue
+
+        uuid_str = str(uuid)
+        comp_label = comp.label.strip()
+        label = f"[TODO: Descriptive Vietnamese label from vision analysis. Suggestion: {comp_label}]" if comp_label else _TODO_LABEL
+
+        # If it has no children, it's a leaf node (element), so we set a TODO controlType
+        is_leaf = len(comp.childrenIds) == 0
+        control_type = ""
+        if is_leaf:
+            control_type = "[TODO: Control Type (e.g. Button, Text, Icon, Image)]"
+
+        image_file = annotated_mapping.get(uuid_str)
+        image_files = [image_file] if image_file else []
+
+        comp_node = {
+            "id": uuid_str,
+            "label": label,
+            "controlType": control_type,
+            "required": "",
+            "maxLength": "",
+            "editable": "",
+            "description": _TODO_DESCRIPTION,
+            "imageFiles": image_files,
+            "childrenIds": [str(cid) for cid in comp.childrenIds if cid in state.components],
             "interactions": [],
             "apis": [],
-        },
-        "components": components,
-        "discrepancies": [],
-    }
+        }
+        nodes.append(comp_node)
 
-    return scaffold
+    return {
+        "sectionPrefix": section_prefix,
+        "imageDir": image_dir,
+        "rootId": "0",
+        "nodes": nodes,
+    }
 
 
 def scaffold_and_save(
@@ -217,14 +201,19 @@ def scaffold_and_save(
         encoding="utf-8",
     )
 
+    components_count = len(scaffold["nodes"]) - 1  # excluding screen
+
     logger.info(
         "Saved analysis scaffold to %s (%d components)",
         output_path,
-        len(scaffold["components"]),
+        components_count,
     )
+
+    # Find screen node name
+    screen_node = next(n for n in scaffold["nodes"] if n["id"] == scaffold["rootId"])
 
     return ScaffoldResult(
         analysis_path=str(output_path),
-        components=len(scaffold["components"]),
-        screen_name=scaffold["screen"]["name"],
+        components=components_count,
+        screen_name=screen_node["label"],
     )

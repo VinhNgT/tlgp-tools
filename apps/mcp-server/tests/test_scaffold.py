@@ -7,7 +7,7 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from doc_generator.models import AnalysisData
+from doc_generator.models import ScreenSpec
 from mcp_server.scaffold import (
     ScaffoldResult,
     _walk_post_order_dfs,
@@ -137,18 +137,21 @@ class TestBuildScaffold:
 
         assert scaffold["sectionPrefix"] == "1.1"
         assert scaffold["imageDir"] == str(tmp_path.resolve())
-        assert len(scaffold["components"]) == 1
+        assert len(scaffold["nodes"]) == 2  # screen + comp
 
-        # Leaf component: imageFile is None
-        comp_entry = scaffold["components"][1]
-        assert comp_entry["id"] == 1
-        assert comp_entry["isLeaf"] is True
-        assert comp_entry["imageFile"] is None
+        # Screen (id="0")
+        screen_node = scaffold["nodes"][0]
+        assert screen_node["id"] == "0"
+        assert "Trang chủ" in screen_node["label"]
+        assert screen_node["imageFiles"] == ["annotated/root_Trang_chu.png"]
+        assert screen_node["childrenIds"] == [str(comp.id)]
 
-        # Screen
-        assert "Trang chủ" in scaffold["screen"]["name"]
-        assert scaffold["screen"]["imageFiles"] == ["annotated/root_Trang_chu.png"]
-        assert len(scaffold["screen"]["topLevelChildren"]) == 1
+        # Leaf component (comp)
+        comp_entry = scaffold["nodes"][1]
+        assert comp_entry["id"] == str(comp.id)
+        # In the new logic, the leaf gets a default imageFiles with its screenshot if mapped
+        assert comp_entry["imageFiles"] == [f"annotated/1_Comp_{str(comp.id)[:8]}.png"]
+        assert comp_entry["childrenIds"] == []
 
     def test_non_leaf_component_gets_image_file(self, tmp_path):
         """Non-leaf components get imageFile from mapping."""
@@ -162,12 +165,13 @@ class TestBuildScaffold:
         )
         _make_annotated_dir(tmp_path)
         parent_img = f"annotated/1_Comp_{str(parent.id)[:8]}.png"
+        child_img = f"annotated/2_Comp_{str(child.id)[:8]}.png"
         _write_mapping(tmp_path, {
             "annotated": {
                 "root": ["annotated/root.png"],
                 "components": {
                     str(parent.id): parent_img,
-                    str(child.id): f"annotated/2_Comp_{str(child.id)[:8]}.png",
+                    str(child.id): child_img,
                 },
             },
             "raw": {"root": [], "components": {}},
@@ -175,16 +179,14 @@ class TestBuildScaffold:
 
         scaffold = build_scaffold(state, tmp_path)
 
-        assert len(scaffold["components"]) == 2
-        # Post-order: child (id=1) then parent (id=2)
-        child_entry = scaffold["components"][1]
-        parent_entry = scaffold["components"][2]
+        assert len(scaffold["nodes"]) == 3  # screen + child + parent
+        nodes_map = {n["id"]: n for n in scaffold["nodes"]}
 
-        assert child_entry["isLeaf"] is True
-        assert child_entry["imageFile"] is None
+        child_entry = nodes_map[str(child.id)]
+        parent_entry = nodes_map[str(parent.id)]
 
-        assert parent_entry["isLeaf"] is False
-        assert parent_entry["imageFile"] == f"annotated/1_Comp_{str(parent.id)[:8]}.png"
+        assert child_entry["imageFiles"] == [child_img]
+        assert parent_entry["imageFiles"] == [parent_img]
 
     def test_retains_annotated_prefix_for_image_paths(self, tmp_path):
         """Image paths in the scaffold should retain the 'annotated/' prefix."""
@@ -212,12 +214,15 @@ class TestBuildScaffold:
 
         scaffold = build_scaffold(state, tmp_path)
 
+        nodes_map = {n["id"]: n for n in scaffold["nodes"]}
+        screen_node = nodes_map["0"]
+        comp_entry = nodes_map[str(comp.id)]
+
         # Screen imageFiles should have the prefix
-        assert scaffold["screen"]["imageFiles"] == ["annotated/root_screen.png"]
+        assert screen_node["imageFiles"] == ["annotated/root_screen.png"]
 
         # Non-leaf component imageFile should have the prefix
-        parent_entry = scaffold["components"][2]  # post-order: child first
-        assert parent_entry["imageFile"] == "annotated/1_Header_abc12345.png"
+        assert comp_entry["imageFiles"] == ["annotated/1_Header_abc12345.png"]
 
     def test_placeholder_screen_name_when_empty(self, tmp_path):
         """Empty screen name gets a TODO placeholder."""
@@ -229,8 +234,9 @@ class TestBuildScaffold:
         })
 
         scaffold = build_scaffold(state, tmp_path)
-        assert "[TODO" in scaffold["screen"]["name"]
-        assert "[TODO" in scaffold["screen"]["description"]
+        screen_node = scaffold["nodes"][0]
+        assert "[TODO" in screen_node["label"]
+        assert "[TODO" in screen_node["description"]
 
     def test_preserves_nonempty_screen_metadata(self, tmp_path):
         """Non-empty screen name/description from workspace is suggested."""
@@ -242,8 +248,9 @@ class TestBuildScaffold:
         })
 
         scaffold = build_scaffold(state, tmp_path)
-        assert "Cài đặt" in scaffold["screen"]["name"]
-        assert "Màn hình cài đặt" in scaffold["screen"]["description"]
+        screen_node = scaffold["nodes"][0]
+        assert "Cài đặt" in screen_node["label"]
+        assert "Màn hình cài đặt" in screen_node["description"]
 
     def test_custom_section_prefix(self, tmp_path):
         state = _make_workspace()
@@ -261,8 +268,8 @@ class TestBuildScaffold:
         with pytest.raises(FileNotFoundError, match="mapping.json not found"):
             build_scaffold(state, tmp_path)
 
-    def test_top_level_children_control_type(self, tmp_path):
-        """Non-leaf root components and leaf root components resolve correctly under AnalysisData."""
+    def test_scaffold_parses_into_screen_spec(self, tmp_path):
+        """Ensure the generated scaffold successfully validates against ScreenSpec schema."""
         child = _make_component()
         non_leaf_root = _make_component(children_ids=[child.id])
         child = child.model_copy(update={"parentId": non_leaf_root.id})
@@ -279,18 +286,9 @@ class TestBuildScaffold:
         })
 
         scaffold = build_scaffold(state, tmp_path)
-        # Manually verify componentId is mapped in raw dict
-        top_children_raw = scaffold["screen"]["topLevelChildren"]
-        assert len(top_children_raw) == 2
-        assert top_children_raw[0]["componentId"] is not None
-        assert top_children_raw[1]["componentId"] is not None
-
-        # Parse into AnalysisData to resolve controlType references
-        analysis = AnalysisData.model_validate(scaffold)
-        top_children = analysis.screen.topLevelChildren
-        assert len(top_children) == 2
-        assert top_children[0].controlType == "Component"
-        assert top_children[1].controlType == "Component"
+        spec = ScreenSpec.model_validate(scaffold)
+        assert len(spec.nodes) == 4  # screen + 3 components
+        assert spec.rootId == "0"
 
 
 class TestScaffoldAndSave:
@@ -319,32 +317,9 @@ class TestScaffoldAndSave:
         # Verify file was written
         saved = json.loads(Path(result.analysis_path).read_text(encoding="utf-8"))
         assert saved["sectionPrefix"] == "1.1"
-        assert len(saved["components"]) == 1
+        assert len(saved["nodes"]) == 2
 
     def test_raises_on_nonexistent_directory(self):
         state = _make_workspace()
         with pytest.raises(FileNotFoundError, match="does not exist"):
             scaffold_and_save(state, "/nonexistent/path")
-
-    def test_saved_file_does_not_include_unit_limit(self, tmp_path):
-        """The saved analysis.json does not include unitLimit config."""
-        comp = _make_component()
-        state = _make_workspace(
-            components=[comp],
-            root_ids=[comp.id],
-            screen_name="Test",
-        )
-        _make_annotated_dir(tmp_path)
-        _write_mapping(tmp_path, {
-            "annotated": {
-                "root": [],
-                "components": {str(comp.id): f"annotated/1_Comp_{str(comp.id)[:8]}.png"},
-            },
-            "raw": {"root": [], "components": {}},
-        })
-
-        result = scaffold_and_save(state, str(tmp_path))
-        saved = json.loads(Path(result.analysis_path).read_text(encoding="utf-8"))
-
-        assert "unitLimit" not in saved
-

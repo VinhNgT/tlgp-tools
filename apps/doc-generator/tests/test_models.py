@@ -2,39 +2,29 @@
 
 import pytest
 from doc_generator.models import (
-    AnalysisComponent,
-    AnalysisData,
+    NodeSpec,
+    ScreenSpec,
     Api,
     ApiParam,
-    ComponentReferenceElement,
     Interaction,
-    PrimitiveElement,
-    Screen,
-    ApiSchema,
+    ApiPayload,
 )
 from pydantic import ValidationError
 
 
-class TestPrimitiveElement:
+class TestNodeSpec:
     def test_required_fields(self):
-        c = PrimitiveElement(label="Submit", controlType="Button")
-        assert c.type == "primitive"
+        c = NodeSpec(id="1", label="Submit", controlType="Button")
+        assert c.id == "1"
         assert c.label == "Submit"
         assert c.controlType == "Button"
         assert c.required == ""
         assert c.maxLength == ""
         assert c.editable == ""
         assert c.description == ""
-
-
-class TestComponentReferenceElement:
-    def test_required_fields(self):
-        c = ComponentReferenceElement(componentId=5)
-        assert c.type == "component"
-        assert c.componentId == 5
-        assert c.label == ""
-        assert c.description == ""
-        assert c.controlType == "Component"
+        assert c.childrenIds == []
+        assert c.interactions == []
+        assert c.apis == []
 
 
 class TestInteraction:
@@ -53,98 +43,57 @@ class TestApiParam:
         assert p.required == ""
 
 
-class TestApiSchema:
+class TestApiPayload:
     def test_minimal(self):
-        s = ApiSchema(name="UserDTO")
-        assert s.name == "UserDTO"
-        assert s.fieldRef == ""
+        s = ApiPayload(type="UserDTO")
+        assert s.type == "UserDTO"
+        assert s.parentType is None
         assert s.fields == []
 
 
 class TestApi:
     def test_minimal(self):
-        a = Api(method="GET", title="List", url="/api/list")
-        assert a.method == "GET"
-        assert a.title == "List"
+        a = Api(api="GET List", url="/api/list")
+        assert a.api == "GET List"
         assert a.url == "/api/list"
-        assert a.requestParams == []
-        assert a.schemas == {}
+        assert a.request == []
+        assert a.response == []
 
     def test_with_sub_dtos(self):
         a = Api(
-            method="GET",
-            title="Detail",
+            api="GET Detail",
             url="/api/detail",
-            schemas={
-                "PriceTiersDTO": ApiSchema(
-                    name="PriceTiersDTO",
-                    fieldRef="price_tiers",
+            request=[
+                ApiPayload(
+                    type="PriceTiersDTO",
+                    parentType="RootDto",
                     fields=[
                         ApiParam(name="min_qty", dataType="int"),
                     ],
                 )
-            },
+            ],
         )
-        assert len(a.schemas) == 1
-        assert "PriceTiersDTO" in a.schemas
+        assert len(a.request) == 1
+        assert a.request[0].type == "PriceTiersDTO"
+        assert a.request[0].parentType == "RootDto"
 
 
-class TestAnalysisComponent:
-    def test_leaf_cannot_have_children(self):
-        with pytest.raises(ValidationError, match="cannot have children"):
-            AnalysisComponent(
-                id=1,
-                label="Leaf",
-                isLeaf=True,
-                children=[PrimitiveElement(label="Btn", controlType="Button")],
-            )
-
-    def test_leaf_cannot_have_apis(self):
-        with pytest.raises(ValidationError, match="cannot have API documentation"):
-            AnalysisComponent(
-                id=1,
-                label="Leaf",
-                isLeaf=True,
-                apis=[Api(method="GET", title="Test", url="/test")],
-            )
-
-    def test_with_children_and_interactions(self):
-        c = AnalysisComponent(
-            id=1,
-            label="Form",
-            isLeaf=False,
-            children=[PrimitiveElement(label="Submit", controlType="Button")],
-            interactions=[Interaction(action="Tap", reaction="Submit")],
-        )
-        assert len(c.children) == 1
-        assert len(c.interactions) == 1
-
-
-class TestScreen:
-    def test_defaults(self):
-        s = Screen(name="Home")
-        assert s.imageFiles == []
-        assert s.topLevelChildren == []
-        assert s.interactions == []
-
-
-class TestAnalysisData:
+class TestScreenSpec:
     def test_valid_with_real_dir(self, tmp_path):
-        data = AnalysisData(
+        data = ScreenSpec(
             sectionPrefix="1.1",
             imageDir=str(tmp_path),
-            screen=Screen(name="Test"),
+            nodes=[NodeSpec(id="0", label="Test")],
         )
         assert data.sectionPrefix == "1.1"
-        assert data.components == {}
+        assert len(data.nodes) == 1
         assert data.all_apis == []
-        assert data.discrepancies == []
 
     def test_resolve_image(self, tmp_path):
         (tmp_path / "test.png").touch()
-        data = AnalysisData(
+        data = ScreenSpec(
             imageDir=str(tmp_path),
-            screen=Screen(name="Test"),
+            nodes=[NodeSpec(id="0", label="Test")],
         )
         resolved = data.resolve_image("test.png")
         assert resolved == tmp_path / "test.png"
@@ -153,29 +102,53 @@ class TestAnalysisData:
 
 class TestJsonRoundTrip:
     def test_serialize_and_deserialize(self, tmp_path):
-        data = AnalysisData(
+        data = ScreenSpec(
             sectionPrefix="2.3",
             imageDir=str(tmp_path),
-            screen=Screen(
-                name="Cart",
-                apis=[
-                    Api(method="POST", title="Add to cart", url="/api/cart"),
-                ],
-            ),
-            components={
-                1: AnalysisComponent(
-                    id=1,
+            nodes=[
+                NodeSpec(
+                    id="1",
                     label="Header",
-                    children=[
-                        PrimitiveElement(label="Back", controlType="Icon"),
+                    childrenIds=["2"],
+                ),
+                NodeSpec(
+                    id="2",
+                    label="Back",
+                    controlType="Icon",
+                ),
+                NodeSpec(
+                    id="0",
+                    label="Cart",
+                    childrenIds=["1"],
+                    apis=[
+                        Api(api="POST Add to cart", url="/api/cart"),
                     ],
-                )
-            },
+                ),
+            ],
         )
         json_str = data.model_dump_json()
-        restored = AnalysisData.model_validate_json(json_str)
+        restored = ScreenSpec.model_validate_json(json_str)
         assert restored.sectionPrefix == "2.3"
-        assert restored.screen.name == "Cart"
-        assert len(restored.components) == 1
-        assert 1 in restored.components
-        assert restored.components[1].label == "Header"
+        assert restored.screen.label == "Cart"
+        assert len(restored.nodes) == 3
+        # Assert specific node details
+        nodes_dict = restored.nodes_map
+        assert nodes_dict["1"].label == "Header"
+        assert nodes_dict["2"].controlType == "Icon"
+
+
+class TestSampleSpecFixture:
+    def test_sample_spec_parses(self):
+        import json
+        from pathlib import Path
+        fixture_path = Path(__file__).parent / "fixtures" / "sample_spec.json"
+        raw = json.loads(fixture_path.read_text(encoding="utf-8"))
+        data = ScreenSpec.model_validate(raw)
+        assert len(data.all_apis) == 3
+        # Assert type/parentType on Cart Add
+        cart_add_api = [a for a in data.all_apis if "Thêm sản phẩm" in a.api][0]
+        assert len(cart_add_api.request) == 2
+        assert cart_add_api.request[0].type == "AddToCartRequestDto"
+        assert cart_add_api.request[0].parentType is None
+        assert cart_add_api.request[1].type == "ProductOptionDto"
+        assert cart_add_api.request[1].parentType == "AddToCartRequestDto"
