@@ -131,13 +131,13 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                 traverse(cid)
     traverse(data.rootId)
 
-    # Warn about orphan component nodes
+    # Warn about unreachable orphan nodes
     for node in data.nodes:
-        if node.id != data.rootId and len(node.childrenIds) > 0:
-            if node.id not in reachable:
-                result.warnings.append(
-                    f"Component '{node.label}' (id={node.id}) is defined but never referenced as a child"
-                )
+        if node.id != data.rootId and node.id not in reachable:
+            node_type = "Component" if (len(node.childrenIds) > 0 or len(node.imageFiles) > 0) else "Element"
+            result.warnings.append(
+                f"{node_type} '{node.label}' (id={node.id}) is defined in nodes list but never referenced in the tree hierarchy"
+            )
 
     # --- Image checks ---
     for comp in all_components:
@@ -214,6 +214,19 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                 )
             if not comp.label.strip():
                 result.warnings.append(f"Component (id={comp.id}) has an empty label")
+            if len(comp.childrenIds) > 0 and comp.controlType.strip():
+                result.warnings.append(
+                    f"Component '{comp.label}' (id={comp.id}) has children but also specifies a controlType ('{comp.controlType}'). controlType should only be used on leaf elements."
+                )
+
+    # Check for empty interaction actions/reactions
+    for node in data.nodes:
+        if node.id in reachable:
+            for i, inter in enumerate(node.interactions):
+                if not inter.action.strip() or not inter.reaction.strip():
+                    result.warnings.append(
+                        f"Node '{node.label}' (id={node.id}) has an Interaction at index {i} with empty action or reaction"
+                    )
 
     # Empty labels on children checks
     for parent in all_components:

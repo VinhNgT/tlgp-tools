@@ -390,7 +390,7 @@ class TestValidateSpec:
         )
         result = validate_spec(spec)
         assert result.valid is True
-        assert any("never referenced as a child" in w for w in result.warnings)
+        assert any("never referenced in the tree hierarchy" in w for w in result.warnings)
 
     def test_warnings_short_description(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
@@ -734,3 +734,72 @@ class TestUnitLimitValidation:
             "Component 'Heavy Component' (id=1) exceeds the unit limit: 16/15" in e
             for e in result.errors
         )
+
+    def test_warnings_unreachable_orphan_nodes(self, tmp_path):
+        (Path(tmp_path) / "screen.png").touch()
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    description="desc desc desc",
+                    imageFiles=["screen.png"],
+                    childrenIds=["1"],
+                ),
+                NodeSpec(id="1", label="Button", controlType="Button"),
+                NodeSpec(id="2", label="Orphan Element", controlType="Text"),
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is True
+        assert any("never referenced in the tree hierarchy" in w for w in result.warnings)
+
+    def test_warnings_component_with_control_type(self, tmp_path):
+        (Path(tmp_path) / "screen.png").touch()
+        (Path(tmp_path) / "comp.png").touch()
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    description="desc desc desc",
+                    imageFiles=["screen.png"],
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
+                    label="Component with ControlType",
+                    controlType="Button",
+                    description="desc desc desc",
+                    imageFiles=["comp.png"],
+                    childrenIds=["2"],
+                ),
+                NodeSpec(id="2", label="Child", controlType="Text"),
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is True
+        assert any("specifies a controlType" in w for w in result.warnings)
+
+    def test_warnings_empty_interactions(self, tmp_path):
+        (Path(tmp_path) / "screen.png").touch()
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    description="desc desc desc",
+                    imageFiles=["screen.png"],
+                    childrenIds=["1"],
+                    interactions=[Interaction(action=" ", reaction="Reaction")],
+                ),
+                NodeSpec(id="1", label="Button", controlType="Button"),
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is True
+        assert any("Interaction at index 0 with empty action" in w for w in result.warnings)
+
