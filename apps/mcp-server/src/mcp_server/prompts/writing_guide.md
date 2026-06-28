@@ -31,7 +31,8 @@ This guide defines the semantic rules, content guidelines, and UI classification
 - Do NOT attempt to bypass the MCP server layer (e.g., using raw curl or HTTP requests) to interact with the Annotator REST API directly.
 
 ### Rule 7: Programmatic Editing Only
-- Do not modify `spec.json` directly using text replacement or file writing tools. Always update node properties (labels, descriptions, control types, interactions, APIs) using the `update_spec_node` tool.
+- Do not modify `spec.json` directly using text replacement or file writing tools. Always update node properties (labels, descriptions, control types, interactions, APIs) using the `update_spec_node` or `update_spec_nodes` (for batch updates) tools.
+
 
 ---
 
@@ -74,3 +75,19 @@ This guide defines the semantic rules, content guidelines, and UI classification
 | `TextField` | Show keyboard, filter results, validate input |
 | `Tabbar` | Switch displayed content category |
 | `Checkbox` / `Switch` | Toggle boolean state, update preferences |
+
+---
+
+## 3. Screen Hierarchy & API Modeling Concepts
+
+### Visual Containment Hierarchy (The Tree)
+- **Hierarchy Philosophy:** Nodes in the spec are nested to reflect visual containment on the screen. The screen root contains major layout sections, which in turn contain smaller cards or groups, which contain the leaf elements (buttons, images, texts).
+- **Logical Groups:** Group related visual elements into container components (e.g., grouping a product image, title text, and buy button under a single "Product Card" component). This keeps the screen layout structured and ensures individual component headings in the compiled document contain their respective child elements.
+
+### API Document Modeling
+- **DTO Schema Mapping:** Document the API structures using separate DTO definitions. If an API payload references a nested sub-DTO (e.g., `HotProductDto` includes a `price` of type `PriceDto`), define both DTOs as separate payloads. The compiler will render the root DTO first, followed by all other defined DTOs in order.
+- **Request vs. Response Namespace:** The request payloads and response payloads are compiled as two completely independent lists/trees. If a shared DTO (e.g., a common entity like `UserDto` or `ImageDto`) is used in both the request parameters and response data, it must be defined separately in both the `request` and `response` lists.
+- **Rendering Trigger:** For the document compiler to generate parameter tables, you must declare the entry-point DTO names (`requestRootType` and `responseRootType`). If they are omitted or null, the generator assumes no structured data exists and skips compiling the tables.
+
+
+

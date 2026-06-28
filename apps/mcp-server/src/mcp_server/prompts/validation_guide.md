@@ -66,3 +66,8 @@ This guide maps 1-to-1 to the programmatic checks performed by the `doc-generato
   - API `name` and `url`.
   - API Request/Response DTO payload field names and descriptions.
 - **Failure:** Validator fails if the substring `"TODO"` is found in any of these properties.
+
+### 15. Missing API Root Type Warnings
+- **Rule:** If an API defines a list of payload fields in its `request` or `response` lists, it **must** specify the corresponding entry-point type in `requestRootType` or `responseRootType`.
+- **Warning:** Validator emits a warning if payloads are defined but their root types are missing (meaning those tables will be omitted from the final `.docx` document).
+
