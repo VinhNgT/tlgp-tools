@@ -12,21 +12,25 @@
         "h": 812
       },
       "label": "Màn hình chi tiết sản phẩm",
-      "description": "Màn hình hiển thị toàn bộ thông tin chi tiết của sản phẩm bao gồm hình ảnh, giá cả, thông tin nhà bán hàng, các thuộc tính lựa chọn và các hành động mua hàng.",
+      "controlType": "Screen",
+      "required": false,
+      "editable": false,
+      "description": "Màn hình hiển thị thông tin chi tiết của sản phẩm, bao gồm tên, giá, mô tả, đánh giá từ khách hàng, và thông tin nhà cung cấp.",
       "rawImage": "dummy_screen.png",
       "annotatedImages": [
         "dummy_screen.png"
       ],
-      "required": false,
-      "editable": false,
       "childrenIds": [
         1,
-        2
+        2,
+        3,
+        4,
+        15
       ],
       "interactions": [
         {
           "action": "Người dùng vuốt màn hình lên/xuống",
-          "reaction": "Hệ thống cuộn nội dung màn hình tương ứng để hiển thị thêm thông tin."
+          "reaction": "Hệ thống cuộn nội dung màn hình tương ứng để hiển thị thêm thông tin chi tiết."
         }
       ],
       "apis": [
@@ -42,7 +46,7 @@
               "fields": [
                 {
                   "name": "id",
-                  "description": "Mã định danh sản phẩm",
+                  "description": "Mã định danh duy nhất của sản phẩm",
                   "required": true,
                   "type": "String",
                   "limit": "36 ký tự",
@@ -50,18 +54,78 @@
                 },
                 {
                   "name": "name",
-                  "description": "Tên sản phẩm",
+                  "description": "Tên đầy đủ của sản phẩm",
                   "required": true,
                   "type": "String",
                   "limit": "255 ký tự",
                   "defaultValue": null
+                },
+                {
+                  "name": "price",
+                  "description": "Giá bán hiện tại của sản phẩm",
+                  "required": true,
+                  "type": "Double",
+                  "limit": ">= 0.0",
+                  "defaultValue": null
+                },
+                {
+                  "name": "description",
+                  "description": "Mô tả chi tiết về sản phẩm và công dụng",
+                  "required": false,
+                  "type": "String",
+                  "limit": "1000 ký tự",
+                  "defaultValue": null
+                },
+                {
+                  "name": "images",
+                  "description": "Danh sách các URL hình ảnh sản phẩm",
+                  "required": true,
+                  "type": "List<String>",
+                  "limit": null,
+                  "defaultValue": null
+                },
+                {
+                  "name": "seller",
+                  "description": "Thông tin chi tiết về nhà bán hàng",
+                  "required": true,
+                  "type": "SellerInfo",
+                  "limit": null,
+                  "defaultValue": null
+                }
+              ]
+            },
+            {
+              "type": "SellerInfo",
+              "fields": [
+                {
+                  "name": "sellerId",
+                  "description": "Mã định danh duy nhất của nhà bán hàng",
+                  "required": true,
+                  "type": "String",
+                  "limit": "36 ký tự",
+                  "defaultValue": null
+                },
+                {
+                  "name": "shopName",
+                  "description": "Tên cửa hàng hiển thị",
+                  "required": true,
+                  "type": "String",
+                  "limit": "100 ký tự",
+                  "defaultValue": null
+                },
+                {
+                  "name": "rating",
+                  "description": "Điểm đánh giá trung bình của cửa hàng",
+                  "required": true,
+                  "type": "Double",
+                  "limit": "0.0 - 5.0",
+                  "defaultValue": "5.0"
                 }
               ]
             }
           ]
         }
-      ],
-      "controlType": "Screen"
+      ]
     },
     {
       "id": 1,
@@ -72,20 +136,66 @@
         "h": 56
       },
       "label": "Thanh tiêu đề điều hướng (Header)",
-      "description": "Thanh công cụ nằm ở đầu màn hình, chứa tiêu đề của màn hình hiện tại và các nút điều hướng nhanh.",
+      "controlType": "Component",
+      "required": false,
+      "editable": false,
+      "description": "Thanh công cụ nằm ở đầu màn hình, chứa nút quay lại, tiêu đề màn hình và nút chia sẻ.",
       "rawImage": "dummy_header.png",
       "annotatedImages": [
         "dummy_header.png"
       ],
-      "required": false,
-      "editable": false,
       "childrenIds": [
-        3,
-        6
+        5,
+        6,
+        7
       ],
       "interactions": [],
-      "apis": [],
-      "controlType": "Component"
+      "apis": [
+        {
+          "name": "Lấy thông tin đếm ngược khuyến mãi",
+          "url": "GET /api/v1/promotions/live",
+          "requestRootType": "PromoCountdownRequest",
+          "request": [
+            {
+              "type": "PromoCountdownRequest",
+              "fields": [
+                {
+                  "name": "productId",
+                  "description": "Mã định danh sản phẩm cần lấy khuyến mãi",
+                  "required": true,
+                  "type": "String",
+                  "limit": null,
+                  "defaultValue": null
+                }
+              ]
+            }
+          ],
+          "responseRootType": "PromoCountdownResponse",
+          "response": [
+            {
+              "type": "PromoCountdownResponse",
+              "fields": [
+                {
+                  "name": "secondsRemaining",
+                  "description": "Số giây còn lại của chương trình flash sale",
+                  "required": true,
+                  "type": "Int",
+                  "limit": ">= 0",
+                  "defaultValue": "0"
+                },
+                {
+                  "name": "isFlashSale",
+                  "description": "Xác định sản phẩm có đang trong khung giờ flash sale không",
+                  "required": true,
+                  "type": "Boolean",
+                  "limit": null,
+                  "defaultValue": "false"
+                }
+              ]
+            }
+          ]
+        }
+      ]
     },
     {
       "id": 2,
@@ -93,75 +203,92 @@
         "x": 0,
         "y": 56,
         "w": 375,
-        "h": 200
+        "h": 250
       },
-      "label": "Ảnh banner quảng cáo",
-      "controlType": "Image",
+      "label": "Khu vực hình ảnh sản phẩm",
+      "controlType": "Component",
       "required": false,
-      "maxLength": null,
       "editable": false,
-      "description": "Hình ảnh hoặc slider hiển thị các chương trình khuyến mãi liên quan đến sản phẩm.",
-      "rawImage": "dummy_screen.png"
+      "description": "Vùng hiển thị slider hình ảnh lớn của sản phẩm kèm theo chỉ số trang hiện tại.",
+      "rawImage": "dummy_screen.png",
+      "annotatedImages": [
+        "dummy_screen.png"
+      ],
+      "childrenIds": [
+        8,
+        9
+      ],
+      "interactions": [
+        {
+          "action": "Người dùng vuốt ngang trên slider ảnh",
+          "reaction": "Slider chuyển sang ảnh tiếp theo hoặc trước đó và cập nhật chỉ số trang tương ứng."
+        }
+      ],
+      "apis": []
     },
     {
       "id": 3,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 306,
+        "w": 375,
+        "h": 180
+      },
+      "label": "Khối thông tin chi tiết",
+      "controlType": "Component",
+      "required": false,
+      "editable": false,
+      "description": "Khối chứa thông tin văn bản chính của sản phẩm bao gồm tên, giá bán và mô tả tóm tắt.",
+      "rawImage": "dummy_screen.png",
+      "annotatedImages": [
+        "dummy_screen.png"
+      ],
+      "childrenIds": [
+        10,
+        11,
+        12
+      ],
+      "interactions": [],
+      "apis": []
+    },
+    {
+      "id": 4,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 486,
+        "w": 375,
+        "h": 120
+      },
+      "label": "Khối chọn cấu hình",
+      "controlType": "Component",
+      "required": false,
+      "editable": false,
+      "description": "Khu vực cho phép chọn màu sắc và kích cỡ sản phẩm mong muốn.",
+      "rawImage": "dummy_screen.png",
+      "annotatedImages": [
+        "dummy_screen.png"
+      ],
+      "childrenIds": [
+        13,
+        14
+      ],
+      "interactions": [],
+      "apis": []
+    },
+    {
+      "id": 5,
       "absoluteBounds": {
         "x": 10,
         "y": 10,
         "w": 36,
         "h": 36
       },
-      "label": "Khối điều khiển nút chức năng quay lại",
-      "description": "Nút bấm chứa biểu tượng mũi tên quay lại màn hình trước đó, xử lý lưu trạng thái tạm thời nếu có.",
-      "rawImage": "dummy_back_button.png",
-      "annotatedImages": [
-        "dummy_back_button.png"
-      ],
-      "required": false,
-      "editable": false,
-      "childrenIds": [
-        4,
-        5
-      ],
-      "interactions": [
-        {
-          "action": "Người dùng chạm vào nút quay lại",
-          "reaction": "Hệ thống đóng màn hình hiện tại và đưa người dùng trước đó."
-        }
-      ],
-      "apis": [],
-      "controlType": "Component"
-    },
-    {
-      "id": 4,
-      "absoluteBounds": {
-        "x": 12,
-        "y": 12,
-        "w": 20,
-        "h": 20
-      },
-      "label": "Biểu tượng mũi tên quay lại",
+      "label": "Nút quay lại",
       "controlType": "Icon",
       "required": true,
       "maxLength": null,
       "editable": false,
-      "description": "Biểu tượng trực quan hỗ trợ nhận diện hành động quay lại.",
-      "rawImage": "dummy_screen.png"
-    },
-    {
-      "id": 5,
-      "absoluteBounds": {
-        "x": 38,
-        "y": 12,
-        "w": 60,
-        "h": 20
-      },
-      "label": "Nhãn văn bản gợi ý",
-      "controlType": "Text",
-      "required": false,
-      "maxLength": 10,
-      "editable": false,
-      "description": "Văn bản hiển thị bên cạnh mũi tên (ví dụ: 'Quay lại' hoặc 'Back').",
+      "description": "Biểu tượng nút bấm điều hướng để quay lại màn hình trước đó.",
       "rawImage": "dummy_screen.png"
     },
     {
@@ -177,8 +304,286 @@
       "required": true,
       "maxLength": 50,
       "editable": false,
-      "description": "Hiển thị tên ngắn gọn của màn hình đang xem.",
+      "description": "Nhãn chữ hiển thị tiêu đề tiêu chuẩn của màn hình.",
       "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 7,
+      "absoluteBounds": {
+        "x": 329,
+        "y": 10,
+        "w": 36,
+        "h": 36
+      },
+      "label": "Nút chia sẻ sản phẩm",
+      "controlType": "Icon",
+      "required": false,
+      "maxLength": null,
+      "editable": false,
+      "description": "Nút bấm chia sẻ liên kết sản phẩm lên các mạng xã hội.",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 8,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 56,
+        "w": 375,
+        "h": 250
+      },
+      "label": "Banner ảnh sản phẩm",
+      "controlType": "Image",
+      "required": true,
+      "maxLength": null,
+      "editable": false,
+      "description": "Thành phần hiển thị hình ảnh sản phẩm thực tế.",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 9,
+      "absoluteBounds": {
+        "x": 320,
+        "y": 270,
+        "w": 45,
+        "h": 20
+      },
+      "label": "Chỉ báo trang slide",
+      "controlType": "Text",
+      "required": false,
+      "maxLength": 10,
+      "editable": false,
+      "description": "Nhãn hiển thị chỉ số trang ảnh hiện tại trên tổng số ảnh (ví dụ: '1/5').",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 10,
+      "absoluteBounds": {
+        "x": 15,
+        "y": 320,
+        "w": 345,
+        "h": 40
+      },
+      "label": "Tên sản phẩm",
+      "controlType": "Text",
+      "required": true,
+      "maxLength": 100,
+      "editable": false,
+      "description": "Nhãn chữ hiển thị tên đầy đủ của mặt hàng.",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 11,
+      "absoluteBounds": {
+        "x": 15,
+        "y": 370,
+        "w": 345,
+        "h": 30
+      },
+      "label": "Giá sản phẩm",
+      "controlType": "Text",
+      "required": true,
+      "maxLength": 20,
+      "editable": false,
+      "description": "Nhãn chữ hiển thị thông tin giá bán định dạng tiền tệ.",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 12,
+      "absoluteBounds": {
+        "x": 15,
+        "y": 410,
+        "w": 345,
+        "h": 70
+      },
+      "label": "Mô tả chi tiết",
+      "controlType": "Text",
+      "required": false,
+      "maxLength": 500,
+      "editable": false,
+      "description": "Nhãn văn bản hiển thị phần mô tả tóm tắt nội dung sản phẩm.",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 13,
+      "absoluteBounds": {
+        "x": 15,
+        "y": 500,
+        "w": 345,
+        "h": 40
+      },
+      "label": "Tab chọn màu sắc",
+      "controlType": "Tabbar",
+      "required": true,
+      "maxLength": null,
+      "editable": true,
+      "description": "Thành phần dạng tab hiển thị các lựa chọn màu sắc có sẵn.",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 14,
+      "absoluteBounds": {
+        "x": 15,
+        "y": 550,
+        "w": 345,
+        "h": 40
+      },
+      "label": "Tab chọn kích thước",
+      "controlType": "Tabbar",
+      "required": true,
+      "maxLength": null,
+      "editable": true,
+      "description": "Thành phần dạng tab hiển thị các lựa chọn kích thước (size) có sẵn.",
+      "rawImage": "dummy_screen.png"
+    },
+    {
+      "id": 15,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 756,
+        "w": 375,
+        "h": 56
+      },
+      "label": "Thanh công cụ mua hàng (Bottom Bar)",
+      "controlType": "Component",
+      "required": false,
+      "editable": false,
+      "description": "Thanh công cụ nằm cuối màn hình chứa nút Chat với người bán và nút Mua ngay.",
+      "rawImage": "dummy_back_button.png",
+      "annotatedImages": [
+        "dummy_back_button.png"
+      ],
+      "childrenIds": [
+        16,
+        17
+      ],
+      "interactions": [],
+      "apis": [
+        {
+          "name": "Thêm vào giỏ hàng",
+          "url": "POST /api/v1/cart/items",
+          "requestRootType": "AddToCartRequest",
+          "request": [
+            {
+              "type": "AddToCartRequest",
+              "fields": [
+                {
+                  "name": "productId",
+                  "description": "Mã định danh của sản phẩm",
+                  "required": true,
+                  "type": "String",
+                  "limit": null,
+                  "defaultValue": null
+                },
+                {
+                  "name": "quantity",
+                  "description": "Số lượng sản phẩm muốn thêm",
+                  "required": true,
+                  "type": "Int",
+                  "limit": ">= 1",
+                  "defaultValue": "1"
+                },
+                {
+                  "name": "options",
+                  "description": "Các thuộc tính tùy chọn kèm theo",
+                  "required": false,
+                  "type": "ProductOption",
+                  "limit": null,
+                  "defaultValue": null
+                }
+              ]
+            },
+            {
+              "type": "ProductOption",
+              "fields": [
+                {
+                  "name": "colorId",
+                  "description": "Mã màu sắc sản phẩm",
+                  "required": true,
+                  "type": "String",
+                  "limit": null,
+                  "defaultValue": null
+                },
+                {
+                  "name": "sizeId",
+                  "description": "Mã kích thước sản phẩm",
+                  "required": true,
+                  "type": "String",
+                  "limit": null,
+                  "defaultValue": null
+                }
+              ]
+            }
+          ],
+          "responseRootType": "AddToCartResponse",
+          "response": [
+            {
+              "type": "AddToCartResponse",
+              "fields": [
+                {
+                  "name": "cartTotalItems",
+                  "description": "Tổng số lượng sản phẩm trong giỏ hàng hiện tại",
+                  "required": true,
+                  "type": "Int",
+                  "limit": null,
+                  "defaultValue": "0"
+                },
+                {
+                  "name": "cartTotalPrice",
+                  "description": "Tổng giá trị tiền tệ giỏ hàng hiện tại",
+                  "required": true,
+                  "type": "Double",
+                  "limit": null,
+                  "defaultValue": "0.0"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": 16,
+      "absoluteBounds": {
+        "x": 15,
+        "y": 764,
+        "w": 100,
+        "h": 40
+      },
+      "label": "Nút chat",
+      "controlType": "Button",
+      "required": false,
+      "maxLength": null,
+      "editable": false,
+      "description": "Nút nhấn kích hoạt khung trò chuyện trực tiếp với nhà bán hàng.",
+      "rawImage": "dummy_screen.png",
+      "interactions": [
+        {
+          "action": "Người dùng nhấn nút chat",
+          "reaction": "Hệ thống mở giao diện chat tương ứng với cửa hàng bán sản phẩm này."
+        }
+      ]
+    },
+    {
+      "id": 17,
+      "absoluteBounds": {
+        "x": 130,
+        "y": 764,
+        "w": 230,
+        "h": 40
+      },
+      "label": "Nút mua ngay",
+      "controlType": "Button",
+      "required": true,
+      "maxLength": null,
+      "editable": false,
+      "description": "Nút bấm chuyển nhanh đến màn hình thanh toán đơn hàng sản phẩm hiện tại.",
+      "rawImage": "dummy_screen.png",
+      "interactions": [
+        {
+          "action": "Người dùng nhấn nút mua ngay",
+          "reaction": "Hệ thống kiểm tra tồn kho và điều hướng người dùng đến trang đặt hàng."
+        }
+      ]
     }
   ]
 }

@@ -24,7 +24,8 @@
         1,
         2,
         3,
-        4
+        4,
+        9
       ],
       "interactions": [
         {
@@ -113,10 +114,10 @@
               "fields": [
                 {
                   "name": "count",
-                  "description": "Số lượng thông báo",
+                  "description": "Số lượng thông báo chưa đọc",
                   "required": true,
                   "type": "int",
-                  "limit": null,
+                  "limit": ">= 0",
                   "defaultValue": "0"
                 }
               ]
@@ -331,6 +332,62 @@
       "maxLength": null,
       "editable": false,
       "description": "Các tùy chọn kích thước hiển thị dưới dạng danh sách nhãn chữ",
+      "rawImage": "raw/Chi_tiết_sản_phẩm.png"
+    },
+    {
+      "id": 9,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 762,
+        "w": 375,
+        "h": 50
+      },
+      "label": "Thanh công cụ hành động dưới cùng",
+      "description": "Thanh công cụ chứa các nút mua ngay và nút thêm vào giỏ hàng nhanh.",
+      "rawImage": "raw/Chi_tiết_sản_phẩm.png",
+      "annotatedImages": [
+        "Chi_tiết_sản_phẩm_1.png"
+      ],
+      "required": false,
+      "editable": false,
+      "childrenIds": [
+        10,
+        11
+      ],
+      "interactions": [],
+      "apis": [],
+      "controlType": "Component"
+    },
+    {
+      "id": 10,
+      "absoluteBounds": {
+        "x": 20,
+        "y": 767,
+        "w": 150,
+        "h": 40
+      },
+      "label": "Nút mua ngay trực tiếp",
+      "controlType": "Button",
+      "required": false,
+      "maxLength": null,
+      "editable": false,
+      "description": "Nút mua ngay trực tiếp không qua giỏ hàng",
+      "rawImage": "raw/Chi_tiết_sản_phẩm.png"
+    },
+    {
+      "id": 11,
+      "absoluteBounds": {
+        "x": 190,
+        "y": 767,
+        "w": 150,
+        "h": 40
+      },
+      "label": "Nút thêm vào giỏ hàng nhanh",
+      "controlType": "Button",
+      "required": false,
+      "maxLength": null,
+      "editable": false,
+      "description": "Nút bấm nhanh để đưa sản phẩm vào giỏ hàng hiện tại",
       "rawImage": "raw/Chi_tiết_sản_phẩm.png"
     }
   ]
