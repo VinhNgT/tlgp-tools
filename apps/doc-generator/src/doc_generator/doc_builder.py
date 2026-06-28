@@ -198,42 +198,20 @@ def _add_payload_section(
 ):
     """Render request or response payloads list starting from the root type."""
     if not root_type:
+        heading = "Response" if is_response else "Request Body"
+        _add_bold_text(doc, heading, style)
+        text = "Không có dữ liệu trả về" if is_response else "Không có tham số"
+        _add_normal_text(doc, text, style)
         return
 
-    dto_map = {p.type.strip().lower(): p for p in payloads}
-    visited_lower = set()
-    ordered_payloads: list[ApiPayload] = []
+    if is_response:
+        heading = f"Response (data = {root_type})"
+    else:
+        heading = f"Request Body ({root_type})"
+    _add_bold_text(doc, heading, style)
 
-    def dfs(dto_id: str):
-        lower_id = dto_id.strip().lower()
-        if lower_id in visited_lower:
-            return
-        visited_lower.add(lower_id)
-        
-        payload = dto_map.get(lower_id)
-        if not payload:
-            return
-        
-        ordered_payloads.append(payload)
-        
-        for field in payload.fields:
-            if field.type:
-                field_lower_type = field.type.strip().lower()
-                if field_lower_type in dto_map:
-                    dfs(field.type)
-
-    dfs(root_type)
-
-    for idx, payload in enumerate(ordered_payloads):
-        is_root = (idx == 0)
-
-        if is_root:
-            if is_response:
-                heading = f"Response (data = {payload.type})"
-            else:
-                heading = f"Request Body ({payload.type})"
-            _add_bold_text(doc, heading, style)
-        else:
+    for idx, payload in enumerate(payloads):
+        if idx > 0:
             # Child DTO heading
             _add_normal_text(doc, payload.type, style)
 
@@ -255,10 +233,22 @@ def _add_api_section(doc: Document, api: Api, style: StyleConfig, api_index: int
     _add_normal_text(doc, f"URL: {api.url}", style)
 
     # 1. Request Payload
-    _add_payload_section(doc, api.requestRootType, api.request, is_response=False, style=style)
+    _add_payload_section(
+        doc,
+        api.requestRootType,
+        api.request,
+        is_response=False,
+        style=style,
+    )
 
     # 2. Response Payload
-    _add_payload_section(doc, api.responseRootType, api.response, is_response=True, style=style)
+    _add_payload_section(
+        doc,
+        api.responseRootType,
+        api.response,
+        is_response=True,
+        style=style,
+    )
 
 
 # ============================================================

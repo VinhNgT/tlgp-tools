@@ -433,3 +433,40 @@ class TestBuildDocumentSectionNumbering:
         # 2 components -> sections 1.1.1 and 1.1.2
         # Screen -> section 1.1.3
         assert "1.1.3." in text
+
+    def test_api_with_primitive_payloads(self, tmp_path):
+        analysis = _minimal_spec(
+            tmp_path,
+            apis=[
+                Api(
+                    name="GET Primitives",
+                    url="/api/primitives",
+                    responseRootType="List<string>",
+                    response=[],
+                ),
+            ],
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Response (data = List<string>)" in text
+
+    def test_api_with_empty_payloads(self, tmp_path):
+        analysis = _minimal_spec(
+            tmp_path,
+            apis=[
+                Api(
+                    name="GET Empty",
+                    url="/api/empty",
+                    requestRootType=None,
+                    responseRootType=None,
+                    request=[],
+                    response=[],
+                ),
+            ],
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Request Body" in text
+        assert "Không có tham số" in text
+        assert "Response" in text
+        assert "Không có dữ liệu trả về" in text

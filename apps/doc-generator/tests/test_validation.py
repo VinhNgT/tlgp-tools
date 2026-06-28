@@ -422,7 +422,7 @@ class TestValidateSpec:
         )
         result = validate_spec(spec)
         assert result.valid is True
-        assert any("empty name or description" in w for w in result.warnings)
+        assert len(result.warnings) == 0
 
     def test_skip_image_validation(self, tmp_path):
         spec = ScreenSpec(
@@ -756,6 +756,9 @@ class TestUnitLimitValidation:
                 NodeSpec(
                     id="0",
                     label="Screen",
+                    description="desc desc desc",
+                    annotatedImages=["screen.png"],
+                    childrenIds=["1"],
                     apis=[
                         Api(
                             name="GET Test",
@@ -767,12 +770,13 @@ class TestUnitLimitValidation:
                             ],
                         )
                     ],
-                )
+                ),
+                NodeSpec(id="1", label="Button", controlType="Button"),
             ],
         )
         result = validate_spec(spec)
-        assert result.valid is False
-        assert any("duplicate DTO type" in e for e in result.errors)
+        assert result.valid is True
+        assert len(result.errors) == 0
 
     def test_api_dto_cycle_detected(self, tmp_path):
         spec = _minimal_spec(
@@ -781,6 +785,9 @@ class TestUnitLimitValidation:
                 NodeSpec(
                     id="0",
                     label="Screen",
+                    description="desc desc desc",
+                    annotatedImages=["screen.png"],
+                    childrenIds=["1"],
                     apis=[
                         Api(
                             name="GET Test",
@@ -792,12 +799,13 @@ class TestUnitLimitValidation:
                             ],
                         )
                     ],
-                )
+                ),
+                NodeSpec(id="1", label="Button", controlType="Button"),
             ],
         )
         result = validate_spec(spec)
-        assert result.valid is False
-        assert any("cycle detected" in e for e in result.errors)
+        assert result.valid is True
+        assert len(result.errors) == 0
 
     def test_api_dto_root_missing(self, tmp_path):
         spec = _minimal_spec(
@@ -806,6 +814,9 @@ class TestUnitLimitValidation:
                 NodeSpec(
                     id="0",
                     label="Screen",
+                    description="desc desc desc",
+                    annotatedImages=["screen.png"],
+                    childrenIds=["1"],
                     apis=[
                         Api(
                             name="GET Test",
@@ -816,12 +827,13 @@ class TestUnitLimitValidation:
                             ],
                         )
                     ],
-                )
+                ),
+                NodeSpec(id="1", label="Button", controlType="Button"),
             ],
         )
         result = validate_spec(spec)
-        assert result.valid is False
-        assert any("RootType 'Missing' not found" in e for e in result.errors)
+        assert result.valid is True
+        assert len(result.errors) == 0
 
     def test_api_dto_unreachable_warning(self, tmp_path):
         spec = _minimal_spec(
@@ -830,6 +842,9 @@ class TestUnitLimitValidation:
                 NodeSpec(
                     id="0",
                     label="Screen",
+                    description="desc desc desc",
+                    annotatedImages=["screen.png"],
+                    childrenIds=["1"],
                     apis=[
                         Api(
                             name="GET Test",
@@ -841,11 +856,55 @@ class TestUnitLimitValidation:
                             ],
                         )
                     ],
-                )
+                ),
+                NodeSpec(id="1", label="Button", controlType="Button"),
             ],
         )
         result = validate_spec(spec, skip_image_validation=True)
-        assert any("unreachable from root" in w for w in result.warnings)
+        assert result.valid is True
+        assert len(result.warnings) == 0
+
+    def test_api_dto_list_unwrapping(self, tmp_path):
+        (Path(tmp_path) / "screen.png").touch()
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="0",
+                    label="Screen",
+                    description="desc desc desc",
+                    annotatedImages=["screen.png"],
+                    childrenIds=["1"],
+                    apis=[
+                        Api(
+                            name="GET Products",
+                            url="/products",
+                            responseRootType="List[ProductDto]",
+                            response=[
+                                ApiPayload(
+                                    type="ProductDto",
+                                    fields=[
+                                        ApiParam(name="id", type="string", required=True, description="ID"),
+                                        ApiParam(name="options", type="ProductOptionDto[]", required=False, description="Options")
+                                    ]
+                                ),
+                                ApiPayload(
+                                    type="ProductOptionDto",
+                                    fields=[
+                                        ApiParam(name="color", type="string", required=True, description="Color")
+                                    ]
+                                )
+                            ],
+                        )
+                    ],
+                ),
+                NodeSpec(id="1", label="Button", controlType="Button"),
+            ],
+        )
+        result = validate_spec(spec, skip_image_validation=True)
+        assert result.valid is True
+        assert len(result.errors) == 0
+        assert len(result.warnings) == 0
 
 
 

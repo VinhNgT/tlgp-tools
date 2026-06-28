@@ -98,12 +98,6 @@ class NodeSpec(BaseModel):
                 return False
         return bool(v)
 
-    @field_validator("maxLength", mode="before")
-    @classmethod
-    def _parse_int(cls, v):
-        if v is None or v == "":
-            return None
-        return int(v)
 
 
 class ScreenSpec(BaseModel):

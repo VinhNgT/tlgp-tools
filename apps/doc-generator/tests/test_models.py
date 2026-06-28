@@ -38,6 +38,48 @@ class TestNodeSpec:
         assert c.apis == []
 
 
+class TestNodeSpecMaxLength:
+    def test_valid_integer_maxLength(self):
+        c = NodeSpec(
+            id=1,
+            label="Submit",
+            controlType="Button",
+            absoluteBounds=Bounds(x=0, y=0, w=100, h=50),
+            required=True,
+            editable=True,
+            description="Submit button component",
+            rawImage="raw/submit.png",
+            maxLength=20
+        )
+        assert c.maxLength == 20
+
+    def test_coerced_string_integer_maxLength(self):
+        c = NodeSpec(
+            id=1,
+            label="Submit",
+            controlType="Button",
+            absoluteBounds=Bounds(x=0, y=0, w=100, h=50),
+            required=True,
+            editable=True,
+            description="Submit button component",
+            rawImage="raw/submit.png",
+            maxLength="20"
+        )
+        assert c.maxLength == 20
+
+    def test_invalid_string_maxLength(self):
+        with pytest.raises(ValidationError):
+            NodeSpec(
+                id=1,
+                label="Submit",
+                controlType="Button",
+                absoluteBounds=Bounds(x=0, y=0, w=100, h=50),
+                required=True,
+                editable=True,
+                description="Submit button component",
+                rawImage="raw/submit.png",
+                maxLength="unlimited"
+            )
 class TestInteraction:
     def test_required_fields(self):
         i = Interaction(action="Click", reaction="Submits form")
