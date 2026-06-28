@@ -78,4 +78,5 @@ def start_gui(workspace_manager, port: int = 8000):
 
     # Show and run
     view.showMaximized()
-    sys.exit(app.exec())
+    return app.exec()
+

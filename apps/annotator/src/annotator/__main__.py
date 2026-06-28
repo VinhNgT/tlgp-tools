@@ -139,8 +139,14 @@ def main():
             logger.error("Startup path does not exist: %s", path)
 
     # GUI on main thread — server is guaranteed running
-    start_gui(workspace, port)
+    exit_code = start_gui(workspace, port)
+    if exit_code == 0:
+        logger.info("Application closed cleanly by the user")
+    else:
+        logger.warning("Application closed with exit code %s", exit_code)
+    sys.exit(exit_code)
 
 
 if __name__ == "__main__":
     main()
+
