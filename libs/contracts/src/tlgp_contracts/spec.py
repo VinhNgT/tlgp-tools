@@ -118,6 +118,7 @@ class ScreenSpec(BaseModel):
 
     _spec_dir: Path | None = PrivateAttr(default=None)
 
+
     @field_validator("rootId", mode="before")
     @classmethod
     def _coerce_root_id(cls, v):
@@ -187,3 +188,4 @@ class ScreenSpec(BaseModel):
         if self._spec_dir:
             return self._spec_dir / p
         return p
+

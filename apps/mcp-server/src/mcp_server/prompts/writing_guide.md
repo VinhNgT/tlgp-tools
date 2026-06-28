@@ -18,9 +18,11 @@ This guide defines the semantic rules, content guidelines, and UI classification
 - The node `description` must be a true high-level summary (Mô tả chung) of the component's role, function, or purpose.
 - Do NOT simply re-state or list the UI elements or children inside it, as those are already automatically detailed in the detailed UI elements table in the generated document.
 
-### Rule 4: API Placement
-- Document each API under the non-leaf component that **uses** its response data to render/update the UI.
-- If an API is used by multiple sibling nodes, place it on their closest common ancestor node. Do not duplicate API definitions.
+### Rule 4: API & Interaction Placement
+- **DOCX Compilation Context:** The compiler generates dedicated heading sections and tables only for non-leaf components and the screen container. Leaf nodes (buttons, texts, images, icons, textfields) do not get their own sections; they are rendered as rows inside their parent component's **UI Elements** table. Therefore, any APIs or interactions defined directly on leaf nodes will be ignored and lost during compilation. To ensure they are documented, you must write them on the parent component or screen container.
+- **APIs:** Document each API under the non-leaf component (or screen container) that uses its response data to render/update the UI. If an API is used by multiple sibling nodes, place it on their closest common ancestor node (do not duplicate API definitions).
+- **Interactions:** Document each interaction under the specific component container that contains/triggers the interaction (e.g., the parent component of the triggering leaf element). Duplication of interactions is allowed anywhere in the tree as the AI sees fit (e.g., across siblings, nested components, or different branches); do not promote interactions to a common ancestor node.
+- **Writing Parent-Level Interactions:** When writing interactions on a parent component container (or screen), the `action` and `reaction` descriptions must be written from the perspective of the parent. They **must explicitly refer to the specific child element** by name (e.g., "Người dùng nhấn nút Đóng" instead of "Người dùng nhấn vào nút") to avoid ambiguity.
 
 ### Rule 5: Source Code Discovery
 - Map components, interactions, and APIs to actual widgets, controllers, or classes in the source code.

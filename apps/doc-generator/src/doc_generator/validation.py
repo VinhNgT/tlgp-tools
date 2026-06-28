@@ -257,6 +257,16 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                     f"Leaf node '{node.label}' (id={node.id}) has invalid controlType '{node.controlType}'. "
                     f"Must not be 'Screen' or 'Component'."
                 )
+            if node.interactions:
+                result.errors.append(
+                    f"Leaf node '{node.label}' (id={node.id}) must not define interactions. "
+                    f"Interactions must be defined on its parent component or screen."
+                )
+            if node.apis:
+                result.errors.append(
+                    f"Leaf node '{node.label}' (id={node.id}) must not define apis. "
+                    f"APIs must be defined on its parent component or screen."
+                )
         else:
             if is_screen:
                 if node.controlType != "Screen":

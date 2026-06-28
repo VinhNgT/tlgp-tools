@@ -55,11 +55,15 @@ This guide maps 1-to-1 to the programmatic checks performed by the `doc-generato
 - **Rule:** Elements with no children (leaf nodes) must have valid control types (e.g. `Button`, `Text`, `Icon`, `Image`, `TextField`, `Checkbox`, `Switch`, etc.). They must **not** be `Screen` or `Component`.
 - **Failure:** Validator fails if a leaf node's control type is `Screen` or `Component`.
 
-### 13. Container Node Control Types
+### 13. Leaf Node Interactions & APIs Restriction
+- **Rule:** Leaf nodes must **not** define any interactions or APIs directly. All interactions and APIs must be declared on their parent component or the screen container.
+- **Failure:** Validator fails if a leaf node has a non-empty `interactions` or `apis` list.
+
+### 14. Container Node Control Types
 - **Rule:** The root Screen node must have control type `Screen`. All non-leaf components must have control type `Component`.
 - **Failure:** Validator fails if the root is not `Screen`, or if a container node (any component ID other than `"root"` with children) is not `Component`.
 
-### 14. No "TODO" Placeholders
+### 15. No "TODO" Placeholders
 - **Rule:** No field in the specification JSON is allowed to contain the string `"TODO"`. This applies to:
   - Node `label`, `description`, and `controlType`.
   - Interaction `action` and `reaction` strings.
@@ -67,7 +71,7 @@ This guide maps 1-to-1 to the programmatic checks performed by the `doc-generato
   - API Request/Response DTO payload field names and descriptions.
 - **Failure:** Validator fails if the substring `"TODO"` is found in any of these properties.
 
-### 15. Missing API Root Type Warnings
+### 16. Missing API Root Type Warnings
 - **Rule:** If an API defines a list of payload fields in its `request` or `response` lists, it **must** specify the corresponding entry-point type in `requestRootType` or `responseRootType`.
 - **Warning:** Validator emits a warning if payloads are defined but their root types are missing (meaning those tables will be omitted from the final `.docx` document).
 

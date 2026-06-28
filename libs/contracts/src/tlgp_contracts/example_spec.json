@@ -456,7 +456,16 @@
         16,
         17
       ],
-      "interactions": [],
+      "interactions": [
+        {
+          "action": "Người dùng nhấn nút chat",
+          "reaction": "Hệ thống mở giao diện chat tương ứng với cửa hàng bán sản phẩm này."
+        },
+        {
+          "action": "Người dùng nhấn nút mua ngay",
+          "reaction": "Hệ thống kiểm tra tồn kho và điều hướng người dùng đến trang đặt hàng."
+        }
+      ],
       "apis": [
         {
           "name": "Thêm vào giỏ hàng",
@@ -556,12 +565,7 @@
       "editable": false,
       "description": "Nút nhấn kích hoạt khung trò chuyện trực tiếp với nhà bán hàng.",
       "rawImage": "dummy_screen.png",
-      "interactions": [
-        {
-          "action": "Người dùng nhấn nút chat",
-          "reaction": "Hệ thống mở giao diện chat tương ứng với cửa hàng bán sản phẩm này."
-        }
-      ]
+      "interactions": []
     },
     {
       "id": 17,
@@ -578,12 +582,7 @@
       "editable": false,
       "description": "Nút bấm chuyển nhanh đến màn hình thanh toán đơn hàng sản phẩm hiện tại.",
       "rawImage": "dummy_screen.png",
-      "interactions": [
-        {
-          "action": "Người dùng nhấn nút mua ngay",
-          "reaction": "Hệ thống kiểm tra tồn kho và điều hướng người dùng đến trang đặt hàng."
-        }
-      ]
+      "interactions": []
     }
   ]
 }

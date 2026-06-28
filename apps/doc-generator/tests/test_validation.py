@@ -709,6 +709,60 @@ class TestUnitLimitValidation:
             for e in result.errors
         )
 
+    def test_leaf_node_with_interactions_fails_validation(self, tmp_path):
+        (Path(tmp_path) / "screen.png").touch()
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="root",
+                    label="Test",
+                    description="desc desc desc",
+                    annotatedImages=["screen.png"],
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
+                    label="My Button",
+                    controlType="Button",
+                    interactions=[Interaction(action="Click", reaction="React")],
+                ),
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is False
+        assert any(
+            "Leaf node 'My Button' (id=1) must not define interactions" in e
+            for e in result.errors
+        )
+
+    def test_leaf_node_with_apis_fails_validation(self, tmp_path):
+        (Path(tmp_path) / "screen.png").touch()
+        spec = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="root",
+                    label="Test",
+                    description="desc desc desc",
+                    annotatedImages=["screen.png"],
+                    childrenIds=["1"],
+                ),
+                NodeSpec(
+                    id="1",
+                    label="My Button",
+                    controlType="Button",
+                    apis=[Api(name="POST API", url="/api")],
+                ),
+            ],
+        )
+        result = validate_spec(spec)
+        assert result.valid is False
+        assert any(
+            "Leaf node 'My Button' (id=1) must not define apis" in e
+            for e in result.errors
+        )
+
     def test_warnings_unreachable_orphan_nodes(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
         spec = _minimal_spec(
