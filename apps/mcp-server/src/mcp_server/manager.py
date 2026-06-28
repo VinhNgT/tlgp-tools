@@ -5,24 +5,23 @@ from __future__ import annotations
 import asyncio
 import os
 import shutil
-import subprocess
 import sys
-import threading
 from collections import deque
+from typing import TYPE_CHECKING
 
 import httpx
 from tlgp_logger import get_logger
 
-logger = get_logger(__name__)
+if TYPE_CHECKING:
+    import asyncio.subprocess
 
-# Thread-safe lock for standard stream output mirroring
-STDERR_LOCK = threading.Lock()
+logger = get_logger(__name__)
 
 
 class DaemonManager:
     """Manages the lifecycle, execution, status, and logging of background daemons.
 
-    Maintains in-memory log deques.
+    Maintains in-memory log deques and runs async background readers.
     """
 
     def __init__(
@@ -57,8 +56,11 @@ class DaemonManager:
         # In-memory log buffers
         self.annotator_logs: deque[str] = deque(maxlen=log_maxlen)
 
-        # Active process tracking
-        self.active_processes: list[subprocess.Popen] = []
+        # Store strong references to background tasks to prevent garbage collection (RUF006)
+        self._background_tasks: set[asyncio.Task] = set()
+
+        # Active process tracking (asyncio processes)
+        self.active_processes: list[asyncio.subprocess.Process] = []
 
         # Target annotator URL
         self.annotator_url = os.environ.get(
@@ -74,43 +76,38 @@ class DaemonManager:
                 logger.warning("Failed to terminate process %s: %s", proc.pid, e)
         self.active_processes.clear()
 
-    def _pipe_stream(
+    async def _pipe_stream(
         self,
-        stream,
-        log_deque,
+        stream: asyncio.StreamReader,
+        log_deque: deque[str],
         dest_stream,
         port_future: asyncio.Future | None = None,
-        loop: asyncio.AbstractEventLoop | None = None,
     ) -> None:
-        """Pipe lines from stream to the log deque and write atomic output to dest_stream."""
+        """Pipe lines from stream to the log deque and write output to dest_stream."""
         try:
-            for line in iter(stream.readline, b""):
+            while True:
+                line = await stream.readline()
+                if not line:
+                    break
                 decoded = line.decode("utf-8", errors="replace")
                 log_deque.append(decoded)
 
                 # Check for port reporting
                 if (
                     port_future is not None
-                    and loop is not None
                     and not port_future.done()
                 ):
                     if decoded.startswith("PORT="):
                         try:
                             port_num = int(decoded.strip().split("=")[1])
-                            loop.call_soon_threadsafe(port_future.set_result, port_num)
+                            port_future.set_result(port_num)
                         except ValueError:
                             pass
 
-                with STDERR_LOCK:
-                    dest_stream.write(decoded)
-                    dest_stream.flush()
+                dest_stream.write(decoded)
+                dest_stream.flush()
         except Exception as e:
             logger.debug("Stream pipe exception encountered: %s", e)
-        finally:
-            try:
-                stream.close()
-            except Exception:
-                pass
 
     async def launch_annotator(
         self,
@@ -130,13 +127,13 @@ class DaemonManager:
         if path:
             annotator_cmd.append(os.path.abspath(path))
 
-        annotator_proc = subprocess.Popen(
-            annotator_cmd,
+        annotator_proc = await asyncio.create_subprocess_exec(
+            *annotator_cmd,
             cwd=annotator_dir,
             env=env,
-            stdin=subprocess.DEVNULL,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdin=asyncio.subprocess.DEVNULL,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
             start_new_session=True,
         )
 
@@ -145,29 +142,28 @@ class DaemonManager:
         loop = asyncio.get_running_loop()
         port_future = loop.create_future()
 
-        # Start background stream pipe threads
-        threading.Thread(
-            target=self._pipe_stream,
-            args=(
+        # Start background stream pipe tasks (non-blocking)
+        t1 = asyncio.create_task(
+            self._pipe_stream(
                 annotator_proc.stdout,
                 self.annotator_logs,
                 sys.stderr,
                 port_future,
-                loop,
-            ),
-            daemon=True,
-        ).start()
-        threading.Thread(
-            target=self._pipe_stream,
-            args=(
+            )
+        )
+        self._background_tasks.add(t1)
+        t1.add_done_callback(self._background_tasks.discard)
+
+        t2 = asyncio.create_task(
+            self._pipe_stream(
                 annotator_proc.stderr,
                 self.annotator_logs,
                 sys.stderr,
                 port_future,
-                loop,
-            ),
-            daemon=True,
-        ).start()
+            )
+        )
+        self._background_tasks.add(t2)
+        t2.add_done_callback(self._background_tasks.discard)
 
         # Wait for the PORT line in the logs
         logger.info("Waiting for Annotator port reporting...")

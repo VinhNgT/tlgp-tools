@@ -23,9 +23,14 @@ def get_spec_workflow() -> str:
     return _read("spec_workflow.md")
 
 
-def get_classification_guide() -> str:
-    """Rules for categorizing UI elements into control types."""
-    return _read("classification_guide.md")
+def get_validation_guide() -> str:
+    """Detailed validation rules mapping 1-to-1 to validator checks."""
+    return _read("validation_guide.md")
+
+
+def get_writing_guide() -> str:
+    """Semantic writing rules and UI control type classification rules."""
+    return _read("writing_guide.md")
 
 
 def get_example_analysis() -> str:

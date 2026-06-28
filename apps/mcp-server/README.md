@@ -4,12 +4,13 @@ MCP (Model Context Protocol) server that exposes the TLGP annotation and documen
 
 ## Overview
 
-This server exposes four tools and five resources:
+This server exposes tools, resources, and prompt templates for screenshot annotation and .docx specification document generation:
 
 | Type | Count | Purpose |
 |---|---|---|
-| **Tools** | 4 | Launch the annotator GUI, manage workspaces, export component crops, and generate spec documents |
-| **Resources** | 5 | Read-only access to workflow guides, schema definitions, classification rules, example analysis, and the active workspace state |
+| **Tools** | 6 | Launch/connect to the annotator GUI, scaffold `spec.json`, programmatically edit spec nodes, validate spec files, and compile final documents |
+| **Resources** | 5 | Read-only access to step-by-step workflows, 1-to-1 validation guides, writing & classification rules, example spec JSON, and schemas |
+| **Prompts** | 1 | Pre-written workflow prompts to initiate spec generation sessions |
 
 ## Installation
 
@@ -22,7 +23,7 @@ uv sync
 
 ### Antigravity IDE
 
-1. Open the side panel → click **"..."** → **MCP Servers** → **Manage MCP Servers** → **View raw config**.
+1. Open the side panel → click **"..."** → **MCP Servers** → **View raw config**.
 2. This opens `~/.gemini/config/mcp_config.json`. Add the `tlgp-tools` entry:
 
 ```json
@@ -37,7 +38,7 @@ uv sync
 ```
 
 3. Save the file and click **Refresh** in the MCP Servers panel.
-4. The server should appear with 4 tools and 5 resources.
+4. The server should appear with 6 tools, 5 resources, and 1 prompt.
 
 ### Android Studio (Gemini)
 
@@ -77,66 +78,71 @@ uv run tlgp-mcp
 ## Tools
 
 ### `launch_annotator`
-
-Spawns the TLGP Annotation Tool GUI as a background process. The user annotates screenshots with component boxes and exports when finished.
-
-**Args:**
-- `path` — optional path to a raw screenshot image or a previously exported `.zip` workspace to pre-load.
-
-### `export_images`
-
-Export cropped component images (both raw and annotated) from the workspace screenshot to a directory.
-
-**Args:**
-- `output_path` — Absolute path to the destination directory.
+Launch the annotation tool GUI to draw and export component bounding boxes.
+- **Args:**
+  - `path` *(optional)* — Absolute file path to a raw screenshot image or a previously exported `.zip` workspace to pre-load.
 
 ### `connect_to_annotator`
+Connect the MCP server to a running annotator GUI instance at a local URL.
+- **Args:**
+  - `url` — The local URL (e.g. `http://127.0.0.1:8000`).
 
-Connect the MCP server to a running annotator instance at the specified URL.
+### `scaffold_spec`
+Generates the base structural skeleton file (`spec.json`) and exports the raw and annotated cropped component images.
+- **Args:**
+  - `output_dir` — Absolute path to the destination directory.
 
-**Args:**
-- `url` — The URL of the running annotator instance (e.g. `http://127.0.0.1:55432`).
+### `update_spec_node`
+Programmatically edits any semantic properties of a specific component or screen node in the specification JSON file.
+- **Args:**
+  - `spec_path` — Absolute path to `spec.json`.
+  - `node_id` — Node ID to update.
+  - `label`, `description`, `control_type`, `required`, `editable`, `max_length`, `interactions`, `apis` — Properties to update.
 
-### `generate_spec_doc`
+### `validate_spec`
+Runs schema validations, cycle checks, complexity limits, and placeholder validation.
+- **Args:**
+  - `spec_path` — Absolute path to `spec.json`.
 
-Validates spec data from a JSON file, generates a formatted `.docx` specification document, and saves the final spec JSON data alongside it as `spec.json` for record-keeping. It validates the data against the Pydantic schema, cross-checks that all referenced images exist, and generates the document.
-
-**Args:**
-- `spec_path` — path to the `spec.json` file on disk.
-- `output_path` — optional path for the generated `.docx` (defaults to `<screen_name>.docx` in `imageDir`). The spec JSON data will also be saved next to it.
-- `validate_only` — if `True`, validate without generating (useful for catching errors early)
+### `compile_spec`
+Compiles the spec JSON into a final Word specification document (.docx) and bundles the companion `workspace.zip`.
+- **Args:**
+  - `spec_path` — Absolute path to `spec.json`.
+  - `output_path` *(optional)* — Target path for the `.docx` document.
 
 ## Resources
 
-The server exposes read-only data and reference guides to assist with generating valid spec JSON structures.
+The server exposes read-only data and reference guides to assist with generating valid spec JSON structures:
 
-- **`tlgp://spec/workflow`**: End-to-end workflow guide for creating specification documents. **Agents must read this first.**
-- **`tlgp://workspace/state`**: The active annotation hierarchy state in a flattened JSON structure.
-- **`tlgp://spec/schema`**: JSON Schema reference for the spec JSON structure.
-- **`tlgp://spec/classification-guide`**: UI Control Type Classification Guide detailing what UI elements fall under which categories.
-- **`tlgp://spec/example-analysis`**: Complete example spec JSON structure for reference.
+- **`tlgp://spec/workflow`**: Step-by-step workflow guide for creating specification documents.
+- **`tlgp://spec/validation-guide`**: Programmatic 1-to-1 validation rule mapping.
+- **`tlgp://spec/writing-guide`**: Semantic guidelines (Vietnamese rules, no prefixes) and UI control classification guide.
+- **`tlgp://spec/example-analysis`**: Complete reference `spec.json` structure for a Product Detail Screen.
+- **`tlgp://spec/schema`**: JSON Schema of the specification JSON structure.
+
+## Prompts
+
+- **`generate_spec`**: Guides the agent step-by-step through the specification workflow. Takes an optional `path` to load a file or starts fresh if omitted.
 
 ## Workflow
 
 The intended end-to-end workflow for an AI agent:
 
 ```text
-User: "Open the annotation tool"
-  → Agent calls launch_annotator() or connect_to_annotator()
+User: Launches the prompt template `generate_spec` (optionally specifying mockup.png)
+  → Agent calls launch_annotator(path="mockup.png")
 
 User annotates components in the GUI...
 
 User: "Done annotating"
-  → Agent reads tlgp://workspace/state
-  → Agent calls export_images()
-  → Agent analyzes images and builds spec JSON
-  → Agent saves spec.json to disk
-  → Agent calls generate_spec_doc(validate_only=True), fixes errors
-  → Agent calls generate_spec_doc(validate_only=False)
-  → .docx document is generated
+  → Agent calls scaffold_spec(output_dir="...")
+  → Agent inspects visual crop files and searches codebase widgets
+  → Agent calls update_spec_node() iteratively for each node
+  → Agent calls validate_spec()
+  → Agent corrects validation errors/warnings via update_spec_node()
+  → Agent calls compile_spec()
+  → Spec document (.docx) and companion workspace.zip are generated
 ```
-
-The detailed step-by-step instructions are embedded in the `tlgp://spec/workflow` resource, which the server instructs agents to read before starting any work.
 
 ## Architecture
 
@@ -147,9 +153,11 @@ Agent ──MCP──▸ mcp-server
                      │
                      ├── connect_to_annotator ──http──▸ annotator (API)
                      │
-                     └── generate_spec_doc ──subprocess──▸ doc-generator
+                     ├── scaffold_spec ──http──▸ annotator (API)
+                     │
+                     ├── update_spec_node ──file update──▸ spec.json
+                     │
+                     ├── validate_spec ──subprocess──▸ doc-generator (CLI)
+                     │
+                     └── compile_spec ──subprocess──▸ doc-generator (CLI)
 ```
-
-- The MCP server invokes `doc-generator` as a subprocess via the CLI to validate data and generate documents, communicating via a structured JSON contract over stdout.
-- The annotation tool GUI runs as a detached subprocess (since GUI applications cannot block inside an MCP tool call).
-- All document formatting is driven by `spec_format.toml` in the doc-generator package.

@@ -33,17 +33,6 @@ class ScaffoldResult(BaseModel):
     screen_name: str = ""
 
 
-class PrepareAnalysisResult(BaseModel):
-    """Structured result from a prepare_analysis operation (export + scaffold)."""
-
-    spec_path: str
-    export_path: str = ""
-    components: int = 0
-    screen_name: str = ""
-    annotated_images: int = 0
-    raw_images: int = 0
-
-
 # Placeholder constants for fields the AI must fill via vision analysis
 _TODO_LABEL = "[TODO: Descriptive Vietnamese label from vision analysis]"
 _TODO_DESCRIPTION = "[TODO: Vietnamese description (high-level summary) from vision analysis - NOT a list/restatement of UI elements]"

@@ -10,18 +10,19 @@ from contextlib import asynccontextmanager
 from typing import TypedDict
 
 from mcp.server.fastmcp import Context, FastMCP
-from tlgp_contracts import DocGenResult
 from tlgp_logger import get_logger
 
 from mcp_server.client import WorkspaceClient
 from mcp_server.manager import DaemonManager
 from mcp_server.prompts import (
-    get_classification_guide,
     get_example_analysis,
     get_spec_workflow,
+    get_validation_guide,
+    get_writing_guide,
 )
-from mcp_server.scaffold import PrepareAnalysisResult, scaffold_and_save
+from mcp_server.scaffold import scaffold_and_save
 from mcp_server.services import SpecGeneratorService
+from mcp_server.spec_editor import update_node_in_spec_file
 
 logger = get_logger(__name__)
 
@@ -118,10 +119,16 @@ def get_spec_workflow_resource() -> str:
     return get_spec_workflow()
 
 
-@mcp.resource("tlgp://spec/classification-guide")
-def get_spec_classification_guide_resource() -> str:
-    """Rules for categorizing UI elements into control types."""
-    return get_classification_guide()
+@mcp.resource("tlgp://spec/validation-guide")
+def get_spec_validation_guide_resource() -> str:
+    """Detailed validation rules mapping 1-to-1 to validator checks."""
+    return get_validation_guide()
+
+
+@mcp.resource("tlgp://spec/writing-guide")
+def get_spec_writing_guide_resource() -> str:
+    """Semantic writing rules and UI control type classification rules."""
+    return get_writing_guide()
 
 
 @mcp.resource("tlgp://spec/example-analysis")
@@ -137,7 +144,28 @@ async def get_spec_schema_resource() -> str:
     if not spec_service:
         raise RuntimeError("Spec generator service not initialized")
     return await spec_service.get_schema()
+# ============================================================
+# Prompts
+# ============================================================
 
+
+@mcp.prompt()
+def generate_spec(
+    path: str | None = None,
+) -> str:
+    """Guide the agent to generate a screen specification document from a screenshot image or previously exported .zip workspace."""
+    workflow = get_spec_workflow()
+    if path:
+        return (
+            f"{workflow}\n\n"
+            f"Please begin the workflow by launching the annotator with the "
+            f"provided path: `{path}`."
+        )
+    return (
+        f"{workflow}\n\n"
+        f"Please begin the workflow by launching a fresh annotator session "
+        f"without providing any pre-loaded path to start fresh."
+    )
 
 # ============================================================
 # Tools
@@ -170,78 +198,6 @@ async def launch_annotator(
     if res.get("annotator_ready") and "annotator_url" in res:
         client.base_url = res["annotator_url"]
     return res
-
-
-@mcp.tool()
-async def prepare_analysis(
-    ctx: Context,
-    output_path: str,
-    section_prefix: str = "1.1",
-) -> PrepareAnalysisResult:
-    """Export images and scaffold spec.json in one step.
-
-    Call this after the user finishes annotating. It:
-    1. Exports cropped component images (both annotated and raw) from the workspace
-    2. Reads the workspace state and mapping.json to auto-generate the structural
-       skeleton of spec.json (component hierarchy, image paths, cross-references)
-    3. Saves spec.json to the output directory with TODO placeholders for
-       semantic fields (Vietnamese labels, descriptions, interactions, APIs)
-
-    Args:
-        output_path: Absolute path to the destination directory for exported images and spec.json.
-        section_prefix: Section number prefix for component headings in the generated document (default "1.1").
-
-    Returns:
-        dict with spec_path, component count, screen name, and image export summary.
-    """
-    client = _get_client(ctx)
-
-    # Step 1: Export images
-    export_result = await client.export_images(output_path, mode="both")
-
-    # Step 2: Scaffold spec.json from workspace state + exported mapping
-    state = await client.get_workspace_state()
-    scaffold_result = scaffold_and_save(state, export_result.output_path, section_prefix)
-
-    return PrepareAnalysisResult(
-        spec_path=scaffold_result.spec_path,
-        export_path=export_result.output_path,
-        components=scaffold_result.components,
-        screen_name=scaffold_result.screen_name,
-        annotated_images=export_result.annotated_images,
-        raw_images=export_result.raw_images,
-    )
-
-
-@mcp.tool()
-async def generate_spec_doc(
-    ctx: Context,
-    spec_path: str,
-    output_path: str | None = None,
-    validate_only: bool = False,
-) -> DocGenResult:
-    """Generate a TLGP specification document (.docx).
-
-    CRITICAL REQUIREMENTS:
-    1. Vietnamese Translation: All component labels, descriptions, and outputs inside the spec payload must be written in Vietnamese.
-    2. Strict Validation Workflow: Always run `generate_spec_doc(validate_only=True)` first to validate the payload structure and component images. Address any warnings or errors before proceeding to document generation with `validate_only=False`.
-    3. Guidelines: Read the resource `tlgp://spec/workflow` for the complete workflow instructions.
-    4. Output Location: When generating the document (validate_only=False), the spec JSON payload is always saved as `spec.json` in the same directory as the generated `.docx` file.
-
-    Args:
-        spec_path: Path to the saved spec.json file on disk.
-        output_path: Where to save the .docx. Defaults to <screen_name>.docx in imageDir. The spec.json file will be written to the same directory.
-        validate_only: If True, validates structure and checks files without compiling.
-
-    Returns:
-        dict with valid, output_path, tables, images, warnings, errors.
-    """
-    return await _get_spec_service(ctx).generate(
-        spec_path=spec_path,
-        ctx=ctx,
-        output_path=output_path,
-        validate_only=validate_only,
-    )
 
 
 @mcp.tool()
@@ -287,3 +243,155 @@ async def connect_to_annotator(ctx: Context, url: str) -> dict:
             "screen_name": None,
             "components": 0,
         }
+
+
+@mcp.tool()
+async def scaffold_spec(
+    ctx: Context,
+    output_dir: str,
+    section_prefix: str = "1.1",
+) -> dict:
+    """Export component images and scaffold spec.json in one step.
+
+    Call this after the user finishes annotating. It:
+    1. Exports cropped component images (both annotated and raw) from the workspace
+    2. Reads the workspace state and mapping.json to auto-generate the structural
+       skeleton of spec.json (component hierarchy, image paths, cross-references)
+    3. Saves spec.json to the output directory with TODO placeholders for
+       semantic fields (Vietnamese labels, descriptions, interactions, APIs)
+
+    Args:
+        output_dir: Absolute path to the destination directory for exported images and spec.json.
+        section_prefix: Section number prefix for component headings in the generated document (default "1.1").
+
+    Returns:
+        dict with spec_path, export_path, components, screen_name, annotated_images, raw_images.
+    """
+    client = _get_client(ctx)
+
+    # Step 1: Export images
+    export_result = await client.export_images(output_dir, mode="both")
+
+    # Step 2: Scaffold spec.json from workspace state + exported mapping
+    state = await client.get_workspace_state()
+    scaffold_result = scaffold_and_save(state, export_result.output_path, section_prefix)
+
+    return {
+        "spec_path": scaffold_result.spec_path,
+        "export_path": export_result.output_path,
+        "components": scaffold_result.components,
+        "screen_name": scaffold_result.screen_name,
+        "annotated_images": export_result.annotated_images,
+        "raw_images": export_result.raw_images,
+    }
+
+
+@mcp.tool()
+async def update_spec_node(
+    ctx: Context,
+    spec_path: str,
+    node_id: int,
+    label: str | None = None,
+    description: str | None = None,
+    control_type: str | None = None,
+    required: bool | None = None,
+    editable: bool | None = None,
+    max_length: int | None = None,
+    interactions: list[dict] | None = None,
+    apis: list[dict] | None = None,
+) -> dict:
+    """Programmatically update semantic fields of a specific node in spec.json.
+
+    Args:
+        spec_path: Absolute path to the spec.json file.
+        node_id: The integer ID of the node to update (e.g. 0 for Screen).
+        label: Descriptive Vietnamese label for the node.
+        description: Vietnamese high-level description/summary of the node.
+        control_type: The UI control type (e.g. Button, Text, Icon, Image).
+        required: For leaf elements, whether the field is required.
+        editable: For leaf elements, whether the field is editable.
+        max_length: For leaf elements, maximum character length constraints.
+        interactions: List of interaction dicts containing action and reaction.
+        apis: List of API dicts documenting endpoints, request and response structures.
+
+    Returns:
+        dict with status and message.
+    """
+    try:
+        update_node_in_spec_file(
+            spec_path=spec_path,
+            node_id=node_id,
+            label=label,
+            description=description,
+            control_type=control_type,
+            required=required,
+            editable=editable,
+            max_length=max_length,
+            interactions=interactions,
+            apis=apis,
+        )
+        return {
+            "status": "success",
+            "message": f"Node {node_id} successfully updated in {spec_path}",
+        }
+    except Exception as e:
+        logger.error("Failed to update node %d: %s", node_id, e)
+        return {
+            "status": "error",
+            "message": f"Failed to update node {node_id}: {e}",
+        }
+
+
+@mcp.tool()
+async def validate_spec(
+    ctx: Context,
+    spec_path: str,
+) -> dict:
+    """Run validation checks against spec.json using the doc-generator validator.
+
+    Args:
+        spec_path: Absolute path to the spec.json file on disk.
+
+    Returns:
+        dict with valid, errors, warnings, components, interactions, apis, images.
+    """
+    res = await _get_spec_service(ctx).validate(spec_path=spec_path, ctx=ctx)
+    return {
+        "valid": res.valid,
+        "errors": res.errors,
+        "warnings": res.warnings,
+        "components": res.components,
+        "interactions": res.interactions,
+        "apis": res.apis,
+        "images": res.images,
+    }
+
+
+@mcp.tool()
+async def compile_spec(
+    ctx: Context,
+    spec_path: str,
+    output_path: str | None = None,
+) -> dict:
+    """Compile the spec.json into a final specification document (.docx).
+
+    Args:
+        spec_path: Absolute path to the spec.json file.
+        output_path: Optional absolute path where the .docx should be saved.
+
+    Returns:
+        dict with valid, output_path, errors, warnings, tables, images.
+    """
+    res = await _get_spec_service(ctx).compile(
+        spec_path=spec_path,
+        output_path=output_path,
+        ctx=ctx,
+    )
+    return {
+        "valid": res.valid,
+        "output_path": res.output_path,
+        "errors": res.errors,
+        "warnings": res.warnings,
+        "tables": res.tables,
+        "images": res.images,
+    }

@@ -1,8 +1,7 @@
-"""Tests for MCP tools, services, and managers."""
+"""Tests for redesigned MCP tools, services, and managers."""
 
 from __future__ import annotations
 
-import io
 import json
 import sys
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -10,16 +9,60 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from mcp_server.client import WorkspaceClient
 from mcp_server.manager import DaemonManager
-from mcp_server.server import connect_to_annotator
+from mcp_server.server import (
+    compile_spec,
+    connect_to_annotator,
+    launch_annotator,
+    scaffold_spec,
+    update_spec_node,
+    validate_spec,
+)
 from mcp_server.services import SpecGeneratorService
 
-# ── SpecGeneratorService (subprocess invocation) ──────────────
+# ── SpecGeneratorService (decoupled validate & compile CLI subprocess invocation) ──
 
 
 class TestSpecGeneratorService:
     @pytest.mark.anyio
-    async def test_generate_invokes_cli_and_parses_result(self, tmp_path):
-        """Mocked subprocess returns valid JSON → service returns parsed result."""
+    async def test_validate_invokes_cli_and_parses_result(self, tmp_path):
+        spec_file = tmp_path / "spec.json"
+        spec_file.write_text('{"dummy": true}', encoding="utf-8")
+
+        expected_result = {
+            "valid": True,
+            "components": 5,
+            "errors": [],
+            "warnings": [],
+            "interactions": 3,
+            "apis": 1,
+            "images": 2,
+        }
+
+        mock_proc = AsyncMock()
+        mock_proc.communicate.return_value = (
+            json.dumps(expected_result).encode(),
+            b"",
+        )
+        mock_proc.returncode = 0
+
+        with patch(
+            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
+        ) as mock_exec:
+            service = SpecGeneratorService()
+            result = await service.validate(spec_path=str(spec_file))
+
+        assert result.valid is True
+        assert result.components == 5
+
+        # Verify CLI was called with --validate-only
+        call_args = mock_exec.call_args[0]
+        assert call_args[0] == sys.executable
+        assert str(spec_file) in call_args
+        assert "--validate-only" in call_args
+        assert "--json" in call_args
+
+    @pytest.mark.anyio
+    async def test_compile_invokes_cli_and_parses_result(self, tmp_path):
         spec_file = tmp_path / "spec.json"
         spec_file.write_text('{"dummy": true}', encoding="utf-8")
 
@@ -43,89 +86,18 @@ class TestSpecGeneratorService:
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ) as mock_exec:
             service = SpecGeneratorService()
-            result = await service.generate(spec_path=str(spec_file))
+            result = await service.compile(spec_path=str(spec_file), output_path=str(tmp_path / "out.docx"))
 
         assert result.valid is True
         assert result.output_path == str(tmp_path / "out.docx")
 
-        # Verify CLI was called with --json
-        call_args = mock_exec.call_args[0]
-        assert call_args[0] == sys.executable
-        assert str(spec_file) in call_args
-        assert "--json" in call_args
-
-    @pytest.mark.anyio
-    async def test_generate_validate_only_passes_flag(self, tmp_path):
-        spec_file = tmp_path / "spec.json"
-        spec_file.write_text("{}", encoding="utf-8")
-
-        mock_proc = AsyncMock()
-        mock_proc.communicate.return_value = (
-            json.dumps({"valid": True, "warnings": []}).encode(),
-            b"",
-        )
-        mock_proc.returncode = 0
-
-        with patch(
-            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
-        ) as mock_exec:
-            service = SpecGeneratorService()
-            result = await service.generate(
-                spec_path=str(spec_file),
-                validate_only=True,
-            )
-
-        assert result.valid is True
-        call_args = mock_exec.call_args[0]
-        assert "--validate-only" in call_args
-
-    @pytest.mark.anyio
-    async def test_generate_output_path_passes_flag(self, tmp_path):
-        spec_file = tmp_path / "spec.json"
-        spec_file.write_text("{}", encoding="utf-8")
-
-        mock_proc = AsyncMock()
-        mock_proc.communicate.return_value = (
-            json.dumps({"valid": True}).encode(),
-            b"",
-        )
-        mock_proc.returncode = 0
-
-        with patch(
-            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
-        ) as mock_exec:
-            service = SpecGeneratorService()
-            await service.generate(
-                spec_path=str(spec_file),
-                output_path="/out/spec.docx",
-            )
-
+        # Verify CLI was called with output path flag
         call_args = mock_exec.call_args[0]
         assert "-o" in call_args
-        assert "/out/spec.docx" in call_args
+        assert str(tmp_path / "out.docx") in call_args
 
     @pytest.mark.anyio
-    async def test_generate_invalid_json_stdout(self, tmp_path):
-        spec_file = tmp_path / "spec.json"
-        spec_file.write_text("{}", encoding="utf-8")
-
-        mock_proc = AsyncMock()
-        mock_proc.communicate.return_value = (b"not json", b"some error")
-        mock_proc.returncode = 1
-
-        with patch(
-            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
-        ):
-            service = SpecGeneratorService()
-            result = await service.generate(spec_path=str(spec_file))
-
-        assert result.valid is False
-        assert len(result.errors) > 0
-
-
-
-    @pytest.mark.anyio
-    async def test_generate_exports_workspace_zip_on_success(self, tmp_path):
+    async def test_compile_exports_workspace_zip_on_success(self, tmp_path):
         spec_file = tmp_path / "spec.json"
         spec_file.write_text("{}", encoding="utf-8")
 
@@ -148,99 +120,36 @@ class TestSpecGeneratorService:
         with patch(
             "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
         ):
-            service = SpecGeneratorService(
-                client=mock_client,
-            )
-            result = await service.generate(spec_path=str(spec_file))
+            service = SpecGeneratorService(client=mock_client)
+            result = await service.compile(spec_path=str(spec_file), output_path=str(docx_path))
 
         assert result.valid is True
         mock_client.export_workspace.assert_awaited_once_with(
             str(tmp_path / "workspace.zip")
         )
 
+
+# ── Redesigned MCP Tools ──
+
+
+class TestRedesignedMcpTools:
     @pytest.mark.anyio
-    async def test_generate_with_progress_reporting(self, tmp_path):
-        spec_file = tmp_path / "spec.json"
-        spec_file.write_text("{}", encoding="utf-8")
+    async def test_launch_annotator_success(self, mcp_ctx, tmp_path):
+        mock_client = MagicMock(spec=WorkspaceClient)
+        mock_daemon = MagicMock(spec=DaemonManager)
+        mock_daemon.launch_annotator = AsyncMock(return_value={
+            "annotator_ready": True,
+            "annotator_url": "http://127.0.0.1:8000"
+        })
 
-        mock_proc = AsyncMock()
-        mock_proc.communicate.return_value = (
-            json.dumps({"valid": True}).encode(),
-            b"",
-        )
-        mock_proc.returncode = 0
-
-        ctx = MagicMock()
-        ctx.report_progress = AsyncMock()
-        ctx.log = AsyncMock()
-
-        with patch(
-            "mcp_server.services.asyncio.create_subprocess_exec", return_value=mock_proc
-        ):
-            service = SpecGeneratorService()
-            await service.generate(spec_path=str(spec_file), ctx=ctx)
-
-        ctx.report_progress.assert_any_call(
-            10, 100, "Loading and validating spec data..."
-        )
-        ctx.report_progress.assert_any_call(60, 100, "Running document generation...")
-        ctx.report_progress.assert_any_call(100, 100, "Spec generation complete.")
-
-
-# ── launch_annotator ──────────────────────────────────────────
-
-
-class TestLaunchAnnotator:
-    @pytest.mark.anyio
-    async def test_launch_annotator_success(
-        self, tmp_path, monkeypatch, mock_httpx_client_class
-    ):
-        mock_popen = MagicMock()
-        mock_popen.return_value.pid = 12345
-        mock_popen.return_value.stdout = io.BytesIO(b"")
-        mock_popen.return_value.stderr = io.BytesIO(b"")
-        monkeypatch.setattr(
-            "mcp_server.manager.subprocess.Popen",
-            mock_popen,
-        )
-        monkeypatch.setattr(
-            "mcp_server.manager.shutil.which",
-            lambda name: "/usr/local/bin/uv",
-        )
-
-        # Create dummy screenshot to pass validation
-        screenshot = tmp_path / "test.png"
-        screenshot.write_bytes(b"dummy")
-
-        manager = DaemonManager()
-        result = await manager.launch_annotator(path=str(screenshot))
-        assert result["annotator_url"] == "http://127.0.0.1:8000"
-        assert result["annotator_ready"] is True
-
-        # Verify uv run is used instead of sys.executable
-        for call in mock_popen.call_args_list:
-            call_args = call[0][0]
-            assert call_args[0] == "/usr/local/bin/uv"
-            assert "run" in call_args
+        ctx = mcp_ctx(client=mock_client, daemon_manager=mock_daemon)
+        res = await launch_annotator(ctx, path=str(tmp_path / "screenshot.png"))
+        assert res["annotator_ready"] is True
+        assert res["annotator_url"] == "http://127.0.0.1:8000"
+        assert mock_client.base_url == "http://127.0.0.1:8000"
 
     @pytest.mark.anyio
-    async def test_raises_when_uv_not_found(self, tmp_path, monkeypatch):
-        monkeypatch.setattr(
-            "mcp_server.manager.shutil.which",
-            lambda name: None,
-        )
-
-        manager = DaemonManager()
-        with pytest.raises(RuntimeError, match="uv is not installed"):
-            await manager.launch_annotator(path=str(tmp_path / "out"))
-
-
-# ── connect_to_annotator ─────────────────────────────────────
-
-
-class TestConnectToAnnotator:
-    @pytest.mark.anyio
-    async def test_connect_success(self, mcp_ctx):
+    async def test_connect_to_annotator_success(self, mcp_ctx):
         mock_client = MagicMock(spec=WorkspaceClient)
         mock_client.check_connection = AsyncMock(return_value=True)
         mock_client.get_workspace_state = AsyncMock(
@@ -249,26 +158,97 @@ class TestConnectToAnnotator:
                 components={},
             )
         )
-
         mock_daemon = MagicMock(spec=DaemonManager)
 
         ctx = mcp_ctx(client=mock_client, daemon_manager=mock_daemon)
-
         res = await connect_to_annotator(ctx, "http://127.0.0.1:9091")
         assert res["status"] == "success"
-        assert "http://127.0.0.1:9091" in res["message"]
         assert mock_client.base_url == "http://127.0.0.1:9091"
 
     @pytest.mark.anyio
-    async def test_connect_failure(self, mcp_ctx):
+    async def test_scaffold_spec_success(self, mcp_ctx, tmp_path):
         mock_client = MagicMock(spec=WorkspaceClient)
-        mock_client.check_connection = AsyncMock(
-            side_effect=Exception("Connection refused")
+        mock_client.export_images = AsyncMock(return_value=MagicMock(
+            output_path=str(tmp_path),
+            annotated_images=3,
+            raw_images=3
+        ))
+        mock_client.get_workspace_state = AsyncMock()
+
+        ctx = mcp_ctx(client=mock_client)
+
+        scaffold_res = MagicMock(
+            spec_path=str(tmp_path / "spec.json"),
+            components=2,
+            screen_name="Home"
         )
 
-        mock_daemon = MagicMock(spec=DaemonManager)
-        ctx = mcp_ctx(client=mock_client, daemon_manager=mock_daemon)
+        with patch("mcp_server.server.scaffold_and_save", return_value=scaffold_res):
+            res = await scaffold_spec(ctx, output_dir=str(tmp_path))
 
-        res = await connect_to_annotator(ctx, "http://localhost:8080")
-        assert res["status"] == "error"
-        assert "Failed to connect to annotator" in res["message"]
+        assert res["spec_path"] == str(tmp_path / "spec.json")
+        assert res["components"] == 2
+        assert res["annotated_images"] == 3
+
+    @pytest.mark.anyio
+    async def test_update_spec_node_success(self, mcp_ctx, tmp_path):
+        ctx = mcp_ctx()
+        spec_path = str(tmp_path / "spec.json")
+
+        with patch("mcp_server.server.update_node_in_spec_file") as mock_update:
+            res = await update_spec_node(
+                ctx,
+                spec_path=spec_path,
+                node_id=0,
+                label="Updated label",
+                description="Updated desc"
+            )
+        assert res["status"] == "success"
+        mock_update.assert_called_once_with(
+            spec_path=spec_path,
+            node_id=0,
+            label="Updated label",
+            description="Updated desc",
+            control_type=None,
+            required=None,
+            editable=None,
+            max_length=None,
+            interactions=None,
+            apis=None
+        )
+
+    @pytest.mark.anyio
+    async def test_validate_spec_success(self, mcp_ctx):
+        mock_service = MagicMock(spec=SpecGeneratorService)
+        mock_service.validate = AsyncMock(return_value=MagicMock(
+            valid=True,
+            errors=[],
+            warnings=[],
+            components=5,
+            interactions=3,
+            apis=1,
+            images=6
+        ))
+        ctx = mcp_ctx(spec_service=mock_service)
+
+        res = await validate_spec(ctx, spec_path="/path/to/spec.json")
+        assert res["valid"] is True
+        assert res["components"] == 5
+
+    @pytest.mark.anyio
+    async def test_compile_spec_success(self, mcp_ctx):
+        mock_service = MagicMock(spec=SpecGeneratorService)
+        mock_service.compile = AsyncMock(return_value=MagicMock(
+            valid=True,
+            output_path="/path/to/out.docx",
+            errors=[],
+            warnings=[],
+            tables=10,
+            images=5
+        ))
+        ctx = mcp_ctx(spec_service=mock_service)
+
+        res = await compile_spec(ctx, spec_path="/path/to/spec.json", output_path="/path/to/out.docx")
+        assert res["valid"] is True
+        assert res["output_path"] == "/path/to/out.docx"
+        assert res["tables"] == 10

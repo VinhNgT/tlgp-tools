@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import subprocess
+import sys
 
 import pytest
 from mcp_server.prompts import get_spec_workflow
@@ -25,14 +27,19 @@ class TestSpecWorkflowContent:
     def test_references_current_tools(self):
         tools = [
             "launch_annotator",
-            "prepare_analysis",
-            "generate_spec_doc",
+            "connect_to_annotator",
+            "scaffold_spec",
+            "update_spec_node",
+            "validate_spec",
+            "compile_spec",
         ]
         for tool in tools:
             assert tool in SPEC_WORKFLOW_CONTENT, f"Missing tool reference: {tool}"
 
     def test_does_not_reference_old_tools(self):
         old_tools = [
+            "prepare_analysis",
+            "generate_spec_doc",
             "export_workspace",
             "export_images",
             "scaffold_analysis",
@@ -42,11 +49,23 @@ class TestSpecWorkflowContent:
             assert tool not in SPEC_WORKFLOW_CONTENT, f"Should not reference old tool: {tool}"
 
 
+class TestMcpPrompts:
+    def test_generate_spec_no_args(self):
+        from mcp_server.server import generate_spec
+        res = generate_spec()
+        assert "TLGP Screen Specification Workflow" in res
+        assert "Step 1" in res
+        assert "start fresh" in res
+
+    def test_generate_spec_with_path(self):
+        from mcp_server.server import generate_spec
+        res = generate_spec(path="my_screenshot.png")
+        assert "my_screenshot.png" in res
+
+
+
 class TestExampleAnalysisValidation:
     def test_example_analysis_passes_validation(self, tmp_path):
-        import subprocess
-        import sys
-
         from tlgp_contracts import DocGenResult
 
         # Read the raw JSON

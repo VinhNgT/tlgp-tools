@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import io
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import httpx
 import pytest
@@ -10,14 +9,18 @@ from mcp_server.manager import DaemonManager
 
 @pytest.mark.anyio
 async def test_launch_annotator_timeout_failure(monkeypatch, mock_httpx_client_class):
-    # Mock subprocess.Popen
-    mock_popen = MagicMock()
-    mock_popen.return_value.pid = 9999
-    mock_popen.return_value.stdout = io.BytesIO(b"")
-    mock_popen.return_value.stderr = io.BytesIO(b"")
+    # Mock asyncio.create_subprocess_exec
+    mock_proc = AsyncMock()
+    mock_proc.pid = 9999
+    mock_proc.stdout = AsyncMock()
+    mock_proc.stdout.readline.return_value = b""
+    mock_proc.stderr = AsyncMock()
+    mock_proc.stderr.readline.return_value = b""
+
+    mock_exec = AsyncMock(return_value=mock_proc)
     monkeypatch.setattr(
-        "mcp_server.manager.subprocess.Popen",
-        mock_popen,
+        "mcp_server.manager.asyncio.create_subprocess_exec",
+        mock_exec,
     )
     monkeypatch.setattr(
         "mcp_server.manager.shutil.which",
@@ -40,13 +43,17 @@ async def test_launch_annotator_timeout_failure(monkeypatch, mock_httpx_client_c
 async def test_launch_annotator_import_screenshot(
     tmp_path, monkeypatch, mock_httpx_client_class
 ):
-    mock_popen = MagicMock()
-    mock_popen.return_value.pid = 1111
-    mock_popen.return_value.stdout = io.BytesIO(b"")
-    mock_popen.return_value.stderr = io.BytesIO(b"")
+    mock_proc = AsyncMock()
+    mock_proc.pid = 1111
+    mock_proc.stdout = AsyncMock()
+    mock_proc.stdout.readline.return_value = b""
+    mock_proc.stderr = AsyncMock()
+    mock_proc.stderr.readline.return_value = b""
+
+    mock_exec = AsyncMock(return_value=mock_proc)
     monkeypatch.setattr(
-        "mcp_server.manager.subprocess.Popen",
-        mock_popen,
+        "mcp_server.manager.asyncio.create_subprocess_exec",
+        mock_exec,
     )
     monkeypatch.setattr(
         "mcp_server.manager.shutil.which",
@@ -61,8 +68,8 @@ async def test_launch_annotator_import_screenshot(
     assert result["annotator_ready"] is True
     assert result["annotator_url"] == "http://127.0.0.1:8000"
 
-    # Verify Popen args contains the screenshot path
-    args = mock_popen.call_args[0][0]
+    # Verify create_subprocess_exec args contains the screenshot path
+    args = mock_exec.call_args[0]
     assert str(dummy_screenshot.resolve()) in args
 
 
@@ -70,13 +77,17 @@ async def test_launch_annotator_import_screenshot(
 async def test_launch_annotator_import_workspace_zip(
     tmp_path, monkeypatch, mock_httpx_client_class
 ):
-    mock_popen = MagicMock()
-    mock_popen.return_value.pid = 2222
-    mock_popen.return_value.stdout = io.BytesIO(b"")
-    mock_popen.return_value.stderr = io.BytesIO(b"")
+    mock_proc = AsyncMock()
+    mock_proc.pid = 2222
+    mock_proc.stdout = AsyncMock()
+    mock_proc.stdout.readline.return_value = b""
+    mock_proc.stderr = AsyncMock()
+    mock_proc.stderr.readline.return_value = b""
+
+    mock_exec = AsyncMock(return_value=mock_proc)
     monkeypatch.setattr(
-        "mcp_server.manager.subprocess.Popen",
-        mock_popen,
+        "mcp_server.manager.asyncio.create_subprocess_exec",
+        mock_exec,
     )
     monkeypatch.setattr(
         "mcp_server.manager.shutil.which",
@@ -91,8 +102,8 @@ async def test_launch_annotator_import_workspace_zip(
     assert result["annotator_ready"] is True
     assert result["annotator_url"] == "http://127.0.0.1:8000"
 
-    # Verify Popen args contains the workspace zip path
-    args = mock_popen.call_args[0][0]
+    # Verify create_subprocess_exec args contains the workspace zip path
+    args = mock_exec.call_args[0]
     assert str(dummy_zip.resolve()) in args
 
 
@@ -100,15 +111,17 @@ async def test_launch_annotator_import_workspace_zip(
 async def test_launch_annotator_resolves_dynamic_port(
     monkeypatch, mock_httpx_client_class
 ):
-    mock_popen = MagicMock()
-    mock_popen.return_value.pid = 3333
+    mock_proc = AsyncMock()
+    mock_proc.pid = 3333
+    mock_proc.stdout = AsyncMock()
+    mock_proc.stdout.readline.side_effect = [b"PORT=9191\n", b""]
+    mock_proc.stderr = AsyncMock()
+    mock_proc.stderr.readline.return_value = b""
 
-    mock_popen.return_value.stdout = io.BytesIO(b"PORT=9191\n")
-    mock_popen.return_value.stderr = io.BytesIO(b"")
-
+    mock_exec = AsyncMock(return_value=mock_proc)
     monkeypatch.setattr(
-        "mcp_server.manager.subprocess.Popen",
-        mock_popen,
+        "mcp_server.manager.asyncio.create_subprocess_exec",
+        mock_exec,
     )
     monkeypatch.setattr(
         "mcp_server.manager.shutil.which",
