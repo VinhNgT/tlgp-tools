@@ -198,16 +198,16 @@ def _add_payload_section(
 ):
     """Render request or response payloads list starting from the root type."""
     if not root_type:
-        heading = "Response" if is_response else "Request Body"
+        heading = "Response" if is_response else "Request"
         _add_bold_text(doc, heading, style)
         text = "Không có dữ liệu trả về" if is_response else "Không có tham số"
         _add_normal_text(doc, text, style)
         return
 
     if is_response:
-        heading = f"Response (data = {root_type})"
+        heading = f"Response ({root_type})"
     else:
-        heading = f"Request Body ({root_type})"
+        heading = f"Request ({root_type})"
     _add_bold_text(doc, heading, style)
 
     # Sort payloads so that the root payload is first, preserving the order of others

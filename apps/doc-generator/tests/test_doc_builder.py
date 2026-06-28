@@ -196,7 +196,7 @@ class TestBuildDocumentWithApis:
         text = "\n".join(p.text for p in doc.paragraphs)
         assert "1. GET Products" in text
         assert "URL: /api/products" in text
-        assert "Request Body (ProductsRequest)" in text
+        assert "Request (ProductsRequest)" in text
 
     def test_api_with_response_and_sub_dtos(self, tmp_path):
         analysis = _minimal_spec(
@@ -224,7 +224,7 @@ class TestBuildDocumentWithApis:
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Response (data = ProductDTO)" in text
+        assert "Response (ProductDTO)" in text
         assert "PriceDTO" in text
 
     def test_multiple_apis(self, tmp_path):
@@ -261,7 +261,7 @@ class TestBuildDocumentWithApis:
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Request Body (FavoriteProductRequestDTO)" in text
+        assert "Request (FavoriteProductRequestDTO)" in text
 
     def test_component_apis_under_component_section(self, tmp_path):
         analysis = _minimal_spec(
@@ -448,7 +448,7 @@ class TestBuildDocumentSectionNumbering:
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Response (data = List<string>)" in text
+        assert "Response (List<string>)" in text
 
     def test_api_with_empty_payloads(self, tmp_path):
         analysis = _minimal_spec(
@@ -466,7 +466,7 @@ class TestBuildDocumentSectionNumbering:
         )
         doc = build_document(analysis)
         text = "\n".join(p.text for p in doc.paragraphs)
-        assert "Request Body" in text
+        assert "Request" in text
         assert "Không có tham số" in text
         assert "Response" in text
         assert "Không có dữ liệu trả về" in text
