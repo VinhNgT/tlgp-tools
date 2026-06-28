@@ -36,4 +36,4 @@ uv.lock
 *.~lock.*
 
 # agent
-agent_tmp/
+agent-tmp/
