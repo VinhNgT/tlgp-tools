@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field, PrivateAttr, field_validator
 
 
 class Bounds(BaseModel):
@@ -70,9 +70,9 @@ class NodeSpec(BaseModel):
     absoluteBounds: Bounds
     label: str = Field(min_length=1)
     controlType: str = Field(min_length=1)
-    required: bool
+    required: bool | None = Field(default=None)
     maxLength: int | None = None
-    editable: bool
+    editable: bool | None = Field(default=None)
     description: str = Field(min_length=1)
     rawImage: str = Field(min_length=1)
     annotatedImages: list[str] = Field(default_factory=list)
@@ -101,6 +101,8 @@ class ScreenSpec(BaseModel):
     sectionPrefix: str = Field(min_length=1)
     rootId: int
     nodes: list[NodeSpec]
+
+    _spec_dir: Path | None = PrivateAttr(default=None)
 
     @property
     def nodes_map(self) -> dict[int, NodeSpec]:
@@ -149,8 +151,18 @@ class ScreenSpec(BaseModel):
 
     def resolve_annotated_image(self, path: str) -> Path:
         """Resolve an annotated image path."""
-        return Path(path)
+        p = Path(path)
+        if p.is_absolute():
+            return p
+        if self._spec_dir:
+            return self._spec_dir / p
+        return p
 
     def resolve_raw_image(self, path: str) -> Path:
         """Resolve a raw image path."""
-        return Path(path)
+        p = Path(path)
+        if p.is_absolute():
+            return p
+        if self._spec_dir:
+            return self._spec_dir / p
+        return p

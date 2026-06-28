@@ -14,6 +14,8 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from tlgp_contracts import (
+    DEFAULT_UNIT_COST_ANNOTATION,
+    DEFAULT_UNIT_LIMIT,
     ScreenSpec,
     TreeUtils,
     WorkspaceState,
@@ -93,6 +95,44 @@ def build_scaffold(
         A dict matching the ScreenSpec schema, with structural fields
         pre-filled and semantic fields set to TODO placeholders.
     """
+    # Early Unit limit complexity checks on annotations alone
+    screen_annotations = len(state.rootComponents)
+    screen_cost = screen_annotations * DEFAULT_UNIT_COST_ANNOTATION
+    if screen_cost > DEFAULT_UNIT_LIMIT:
+        raise ValueError(
+            f"Screen '{state.screen.name or 'Screen'}' exceeds the unit limit: {screen_cost}/{DEFAULT_UNIT_LIMIT} units "
+            f"({screen_annotations} annotations × {DEFAULT_UNIT_COST_ANNOTATION} = {screen_cost}). "
+            "Please re-annotate in the Annotation Tool to group child elements."
+        )
+
+    logger.info(
+        "Screen '%s' annotation complexity: %d/%d units used (headroom for %d APIs)",
+        state.screen.name or "Screen",
+        screen_cost,
+        DEFAULT_UNIT_LIMIT,
+        (DEFAULT_UNIT_LIMIT - screen_cost) // 3,
+    )
+
+    for uuid, comp in state.components.items():
+        comp_annotations = len(comp.childrenIds)
+        comp_cost = comp_annotations * DEFAULT_UNIT_COST_ANNOTATION
+        if comp_cost > DEFAULT_UNIT_LIMIT:
+            comp_label = comp.label or f"Component {comp.number or str(uuid)}"
+            raise ValueError(
+                f"Component '{comp_label}' exceeds the unit limit: {comp_cost}/{DEFAULT_UNIT_LIMIT} units "
+                f"({comp_annotations} annotations × {DEFAULT_UNIT_COST_ANNOTATION} = {comp_cost}). "
+                "Please re-annotate in the Annotation Tool to group child elements."
+            )
+        if comp_annotations > 0:
+            comp_label = comp.label or f"Component {comp.number or str(uuid)}"
+            logger.info(
+                "Component '%s' annotation complexity: %d/%d units used (headroom for %d APIs)",
+                comp_label,
+                comp_cost,
+                DEFAULT_UNIT_LIMIT,
+                (DEFAULT_UNIT_LIMIT - comp_cost) // 3,
+            )
+
     mapping = _load_mapping(export_dir)
 
     str(export_dir.resolve())
@@ -145,11 +185,8 @@ def build_scaffold(
 
     screen_children_ids = [uuid_to_id[rid] for rid in state.rootComponents if rid in state.components and rid in uuid_to_id]
 
-    raw_screen_image_rel = raw_root_images[0] if raw_root_images else (annotated_root_images[0] if annotated_root_images else "raw/root.png")
-    annotated_screen_images_rel = list(annotated_root_images) if annotated_root_images else (list(raw_root_images) if raw_root_images else [])
-
-    raw_screen_image = str(export_dir / raw_screen_image_rel)
-    annotated_screen_images = [str(export_dir / img) for img in annotated_screen_images_rel]
+    raw_screen_image = raw_root_images[0] if raw_root_images else (annotated_root_images[0] if annotated_root_images else "raw/root.png")
+    annotated_screen_images = list(annotated_root_images) if annotated_root_images else (list(raw_root_images) if raw_root_images else [])
 
     nodes.append({
         "id": 0,
@@ -164,8 +201,6 @@ def build_scaffold(
         "description": screen_desc,
         "rawImage": raw_screen_image,
         "annotatedImages": annotated_screen_images,
-        "required": False,
-        "editable": False,
         "childrenIds": screen_children_ids,
         "interactions": [],
         "apis": [],
@@ -189,12 +224,9 @@ def build_scaffold(
         else:
             control_type = "Component"
 
-        raw_comp_img_rel = raw_mapping.get(uuid_str) or annotated_mapping.get(uuid_str) or f"raw/{uuid_str}.png"
-        ann_comp_img_rel = annotated_mapping.get(uuid_str) or raw_mapping.get(uuid_str)
-        annotated_comp_images_rel = [ann_comp_img_rel] if ann_comp_img_rel else []
-
-        raw_comp_img = str(export_dir / raw_comp_img_rel)
-        annotated_comp_images = [str(export_dir / img) for img in annotated_comp_images_rel]
+        raw_comp_img = raw_mapping.get(uuid_str) or annotated_mapping.get(uuid_str) or f"raw/{uuid_str}.png"
+        ann_comp_img = annotated_mapping.get(uuid_str) or raw_mapping.get(uuid_str)
+        annotated_comp_images = [ann_comp_img] if ann_comp_img else []
 
         comp_node = {
             "id": uuid_to_id[uuid],
@@ -206,9 +238,6 @@ def build_scaffold(
             },
             "label": label,
             "controlType": control_type,
-            "required": False,
-            "maxLength": None,
-            "editable": False,
             "description": _TODO_DESCRIPTION,
             "rawImage": raw_comp_img,
             "annotatedImages": annotated_comp_images,
@@ -216,6 +245,11 @@ def build_scaffold(
             "interactions": [],
             "apis": [],
         }
+        if is_leaf:
+            comp_node["required"] = False
+            comp_node["editable"] = False
+            comp_node["maxLength"] = None
+
         nodes.append(comp_node)
 
     return {

@@ -271,6 +271,60 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                         f"Must be 'Component'."
                     )
 
+    # --- Check for TODO placeholders ---
+    for node in data.nodes:
+        if node.id in reachable:
+            if "TODO" in node.label:
+                result.errors.append(
+                    f"Placeholder detected in label of node '{node.label}' (id={node.id})"
+                )
+            if "TODO" in node.description:
+                result.errors.append(
+                    f"Placeholder detected in description of node '{node.label}' (id={node.id})"
+                )
+            if "TODO" in node.controlType:
+                result.errors.append(
+                    f"Placeholder detected in controlType of node '{node.label}' (id={node.id})"
+                )
+            for i, inter in enumerate(node.interactions):
+                if "TODO" in inter.action:
+                    result.errors.append(
+                        f"Placeholder detected in interaction {i + 1} action of node '{node.label}' (id={node.id})"
+                    )
+                if "TODO" in inter.reaction:
+                    result.errors.append(
+                        f"Placeholder detected in interaction {i + 1} reaction of node '{node.label}' (id={node.id})"
+                    )
+            for api in node.apis:
+                if "TODO" in api.name:
+                    result.errors.append(
+                        f"Placeholder detected in API name '{api.name}' of node '{node.label}' (id={node.id})"
+                    )
+                if "TODO" in api.url:
+                    result.errors.append(
+                        f"Placeholder detected in API URL '{api.url}' of node '{node.label}' (id={node.id})"
+                    )
+                for payload in api.request:
+                    for field in payload.fields:
+                        if "TODO" in field.name:
+                            result.errors.append(
+                                f"Placeholder detected in API Request payload field name '{field.name}' of node '{node.label}' (id={node.id})"
+                            )
+                        if "TODO" in field.description:
+                            result.errors.append(
+                                f"Placeholder detected in API Request payload field description of '{field.name}' on node '{node.label}' (id={node.id})"
+                            )
+                for payload in api.response:
+                    for field in payload.fields:
+                        if "TODO" in field.name:
+                            result.errors.append(
+                                f"Placeholder detected in API Response payload field name '{field.name}' of node '{node.label}' (id={node.id})"
+                            )
+                        if "TODO" in field.description:
+                            result.errors.append(
+                                f"Placeholder detected in API Response payload field description of '{field.name}' on node '{node.label}' (id={node.id})"
+                            )
+
     # --- Final validity ---
     if result.errors:
         result.valid = False

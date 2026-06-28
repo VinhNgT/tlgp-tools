@@ -43,7 +43,9 @@ def _load_spec(path: Path) -> ScreenSpec:
         sys.exit(1)
 
     try:
-        return ScreenSpec.model_validate(raw)
+        spec = ScreenSpec.model_validate(raw)
+        spec._spec_dir = path.parent
+        return spec
     except ValidationError as e:
         logger.error("Schema validation failed", error=str(e))
         sys.exit(1)
@@ -178,6 +180,7 @@ def _run_json_mode(
         return 1
 
     data: ScreenSpec = parsed
+    data._spec_dir = spec_path.parent
 
     # Run validation
     vr = validate_spec(data, skip_image_validation=skip_image_validation)

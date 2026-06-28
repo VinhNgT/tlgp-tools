@@ -198,3 +198,36 @@ class TestSampleSpecFixture:
         assert len(cart_add_api.request) == 2
         assert cart_add_api.request[0].type == "AddToCartRequestDto"
         assert cart_add_api.request[1].type == "ProductOptionDto"
+
+    def test_relative_path_resolver(self):
+        from pathlib import Path
+        spec = ScreenSpec(
+            sectionPrefix="1.1",
+            rootId=0,
+            nodes=[
+                NodeSpec(
+                    id=0,
+                    label="Test",
+                    controlType="Screen",
+                    description="desc",
+                    rawImage="raw/root.png",
+                    annotatedImages=["annotated/root.png"],
+                )
+            ]
+        )
+        # Without _spec_dir, resolves relative to current working directory
+        assert spec.resolve_raw_image("raw/root.png") == Path("raw/root.png")
+        assert spec.resolve_annotated_image("annotated/root.png") == Path("annotated/root.png")
+
+        # With _spec_dir set
+        base_dir = Path("/some/path/to/spec")
+        spec._spec_dir = base_dir
+        assert spec.resolve_raw_image("raw/root.png") == base_dir / "raw/root.png"
+        assert spec.resolve_annotated_image("annotated/root.png") == base_dir / "annotated/root.png"
+
+        # Absolute paths are preserved
+        abs_path = "/absolute/image.png"
+        import platform
+        if platform.system() == "Windows":
+            abs_path = "C:\\absolute\\image.png"
+        assert spec.resolve_raw_image(abs_path) == Path(abs_path)

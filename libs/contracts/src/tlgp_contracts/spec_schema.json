@@ -212,8 +212,16 @@
           "type": "string"
         },
         "required": {
-          "title": "Required",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Required"
         },
         "maxLength": {
           "anyOf": [
@@ -228,8 +236,16 @@
           "title": "Maxlength"
         },
         "editable": {
-          "title": "Editable",
-          "type": "boolean"
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Editable"
         },
         "description": {
           "minLength": 1,
@@ -275,8 +291,6 @@
         "absoluteBounds",
         "label",
         "controlType",
-        "required",
-        "editable",
         "description",
         "rawImage"
       ],

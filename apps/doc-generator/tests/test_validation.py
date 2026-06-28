@@ -908,5 +908,64 @@ class TestUnitLimitValidation:
         assert len(result.errors) == 0
         assert len(result.warnings) == 0
 
+    def test_todo_placeholders_fail_validation(self, tmp_path):
+        """Spec validation fails if any reachable node or API has TODO placeholders."""
+        (Path(tmp_path) / "screen.png").touch()
+
+        # Test placeholder in node label
+        spec_label = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id=0,
+                    label="[TODO: title]",
+                    description="Valid description",
+                    annotatedImages=["screen.png"],
+                    childrenIds=[1],
+                ),
+                NodeSpec(id=1, label="Button", controlType="Button"),
+            ]
+        )
+        result = validate_spec(spec_label)
+        assert result.valid is False
+        assert any("Placeholder detected in label" in e for e in result.errors)
+
+        # Test placeholder in node description
+        spec_desc = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id=0,
+                    label="Valid Label",
+                    description="[TODO: desc]",
+                    annotatedImages=["screen.png"],
+                    childrenIds=[1],
+                ),
+                NodeSpec(id=1, label="Button", controlType="Button"),
+            ]
+        )
+        result = validate_spec(spec_desc)
+        assert result.valid is False
+        assert any("Placeholder detected in description" in e for e in result.errors)
+
+        # Test placeholder in API name
+        spec_api = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id=0,
+                    label="Valid Label",
+                    description="Valid description",
+                    annotatedImages=["screen.png"],
+                    childrenIds=[1],
+                    apis=[Api(name="TODO: test api", url="/test")],
+                ),
+                NodeSpec(id=1, label="Button", controlType="Button"),
+            ]
+        )
+        result = validate_spec(spec_api)
+        assert result.valid is False
+        assert any("Placeholder detected in API name" in e for e in result.errors)
+
 
 

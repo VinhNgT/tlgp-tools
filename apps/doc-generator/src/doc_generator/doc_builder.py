@@ -210,8 +210,23 @@ def _add_payload_section(
         heading = f"Request Body ({root_type})"
     _add_bold_text(doc, heading, style)
 
-    for idx, payload in enumerate(payloads):
-        if idx > 0:
+    # Sort payloads so that the root payload is first, preserving the order of others
+    root_payload = None
+    other_payloads = []
+    for p in payloads:
+        if p.type == root_type:
+            root_payload = p
+        else:
+            other_payloads.append(p)
+
+    ordered_payloads = []
+    if root_payload:
+        ordered_payloads.append(root_payload)
+    ordered_payloads.extend(other_payloads)
+
+    for idx, payload in enumerate(ordered_payloads):
+        # Print DTO type heading only if it's a child DTO (i.e., not the root_type)
+        if idx > 0 or payload.type != root_type:
             # Child DTO heading
             _add_normal_text(doc, payload.type, style)
 
