@@ -159,11 +159,12 @@ def build_scaffold(
             "h": state.image.height if state.image else 812,
         },
         "label": screen_name,
+        "controlType": "Screen",
         "description": screen_desc,
         "rawImage": raw_screen_image,
         "annotatedImages": annotated_screen_images,
-        "required": None,
-        "editable": None,
+        "required": False,
+        "editable": False,
         "childrenIds": screen_children_ids,
         "interactions": [],
         "apis": [],
@@ -180,11 +181,12 @@ def build_scaffold(
         comp_label = comp.label.strip()
         label = f"[TODO: Descriptive Vietnamese label from vision analysis. Suggestion: {comp_label}]" if comp_label else _TODO_LABEL
 
-        # If it has no children, it's a leaf node (element), so we set a TODO controlType
+        # If it has no children, it's a leaf node (element), otherwise it's a container/sub-component
         is_leaf = len(comp.childrenIds) == 0
-        control_type = ""
         if is_leaf:
             control_type = "[TODO: Control Type (e.g. Button, Text, Icon, Image)]"
+        else:
+            control_type = "[TODO: Container Type (e.g. Container, Card, Header)]"
 
         raw_comp_img_rel = raw_mapping.get(uuid_str) or annotated_mapping.get(uuid_str) or f"raw/{uuid_str}.png"
         ann_comp_img_rel = annotated_mapping.get(uuid_str) or raw_mapping.get(uuid_str)
@@ -203,9 +205,9 @@ def build_scaffold(
             },
             "label": label,
             "controlType": control_type,
-            "required": None,
+            "required": False,
             "maxLength": None,
-            "editable": None,
+            "editable": False,
             "description": _TODO_DESCRIPTION,
             "rawImage": raw_comp_img,
             "annotatedImages": annotated_comp_images,

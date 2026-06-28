@@ -8,20 +8,31 @@ from doc_generator.models import (
     ApiParam,
     Interaction,
     ApiPayload,
+    Bounds,
 )
 from pydantic import ValidationError
 
 
 class TestNodeSpec:
     def test_required_fields(self):
-        c = NodeSpec(id=1, label="Submit", controlType="Button")
+        c = NodeSpec(
+            id=1,
+            label="Submit",
+            controlType="Button",
+            absoluteBounds=Bounds(x=0, y=0, w=100, h=50),
+            required=True,
+            editable=True,
+            description="Submit button component",
+            rawImage="raw/submit.png"
+        )
         assert c.id == 1
         assert c.label == "Submit"
         assert c.controlType == "Button"
-        assert c.required is None
+        assert c.required is True
         assert c.maxLength is None
-        assert c.editable is None
-        assert c.description is None
+        assert c.editable is True
+        assert c.description == "Submit button component"
+        assert c.rawImage == "raw/submit.png"
         assert c.childrenIds == []
         assert c.interactions == []
         assert c.apis == []
@@ -36,11 +47,11 @@ class TestInteraction:
 
 class TestApiParam:
     def test_required_fields(self):
-        p = ApiParam(name="id")
+        p = ApiParam(name="id", description="ID field", required=True, type="int")
         assert p.name == "id"
-        assert p.description is None
-        assert p.type is None
-        assert p.required is None
+        assert p.description == "ID field"
+        assert p.type == "int"
+        assert p.required is True
 
 
 class TestApiPayload:

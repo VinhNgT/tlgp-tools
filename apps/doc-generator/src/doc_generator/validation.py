@@ -140,10 +140,10 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
             )
 
     # --- Image checks ---
-    for comp in all_components:
-        is_screen = (comp.id == data.rootId)
-        if not skip_image_validation:
-            # 1. Check annotatedImages
+    if not skip_image_validation:
+        # 1. Check annotatedImages for components
+        for comp in all_components:
+            is_screen = (comp.id == data.rootId)
             if not comp.annotatedImages:
                 if is_screen:
                     result.errors.append("No screen-level images specified")
@@ -162,34 +162,22 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                         )
                         result.errors.append(err_msg)
 
-            # 2. Check rawImage
-            if not comp.rawImage:
-                if is_screen:
-                    result.errors.append("Screen has no rawImage specified")
-                else:
-                    result.errors.append(
-                        f"Component '{comp.label}' (id={comp.id}): no rawImage specified"
-                    )
-            elif comp.rawImage == "dummy.png":
-                pass
-            else:
-                raw_img = data.resolve_raw_image(comp.rawImage)
+        # 2. Check rawImage exists for all nodes
+        for node in data.nodes:
+            is_screen = (node.id == data.rootId)
+            if node.rawImage and node.rawImage != "dummy.png":
+                raw_img = data.resolve_raw_image(node.rawImage)
                 if not raw_img.exists():
                     err_msg = (
                         f"Screen raw image not found: {raw_img}"
                         if is_screen
-                        else f"Component '{comp.label}' (id={comp.id}): raw image not found: {raw_img}"
+                        else f"Node '{node.label}' (id={node.id}): raw image not found: {raw_img}"
                     )
                     result.errors.append(err_msg)
 
-        if not comp.description:
-            if is_screen:
-                result.errors.append("Screen description is empty")
-            else:
-                result.errors.append(
-                    f"Component '{comp.label}' (id={comp.id}): empty description"
-                )
-
+    # --- Structure checks ---
+    for comp in all_components:
+        is_screen = (comp.id == data.rootId)
         if not comp.childrenIds:
             if is_screen:
                 result.errors.append("Screen has no children")
@@ -201,20 +189,6 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
 
     # Update summary images count
     result.images = sum(len(c.annotatedImages) for c in all_components)
-
-    # --- Content completeness warnings ---
-    # Check for empty controlType in Element (leaf) nodes that are reachable
-    empty_controls = 0
-    for node_id in reachable:
-        node = nodes_dict.get(node_id)
-        if node and node_id != data.rootId and len(node.childrenIds) == 0:
-            control_type = node.controlType or ""
-            if not control_type.strip():
-                empty_controls += 1
-    if empty_controls:
-        result.warnings.append(
-            f"{empty_controls} child element(s) have empty controlType"
-        )
 
     if screen.description and len(screen.description) < 10:
         result.warnings.append(
@@ -229,11 +203,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                 )
             if not comp.label.strip():
                 result.warnings.append(f"Component (id={comp.id}) has an empty label")
-            control_type = comp.controlType or ""
-            if len(comp.childrenIds) > 0 and control_type.strip():
-                result.warnings.append(
-                    f"Component '{comp.label}' (id={comp.id}) has children but also specifies a controlType ('{control_type}'). controlType should only be used on leaf elements."
-                )
+            # Non-leaf components must specify controlType (container/screen type), so we no longer warn about controlType on non-leaf nodes.
 
     # Check for empty interaction actions/reactions
     for node in data.nodes:

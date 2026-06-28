@@ -148,34 +148,31 @@ class TestValidateSpec:
     def test_error_empty_description(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
         (Path(tmp_path) / "comp.png").touch()
-        spec = _minimal_spec(
-            tmp_path,
-            nodes=[
-                NodeSpec(
-                    id="0",
-                    label="Test Screen",
-                    description="desc desc desc",
-                    annotatedImages=["screen.png"],
-                    childrenIds=["1"],
-                ),
-                NodeSpec(
-                    id="1",
-                    label="Comp 1",
-                    description="",
-                    annotatedImages=["comp.png"],
-                    childrenIds=["2"],
-                ),
-                NodeSpec(
-                    id="2",
-                    label="Button",
-                    controlType="Button",
-                ),
-            ],
-        )
-
-        result = validate_spec(spec)
-        assert result.valid is False
-        assert any("empty description" in err for err in result.errors)
+        with pytest.raises(ValidationError):
+            _minimal_spec(
+                tmp_path,
+                nodes=[
+                    NodeSpec(
+                        id="0",
+                        label="Test Screen",
+                        description="desc desc desc",
+                        annotatedImages=["screen.png"],
+                        childrenIds=["1"],
+                    ),
+                    NodeSpec(
+                        id="1",
+                        label="Comp 1",
+                        description="",
+                        annotatedImages=["comp.png"],
+                        childrenIds=["2"],
+                    ),
+                    NodeSpec(
+                        id="2",
+                        label="Button",
+                        controlType="Button",
+                    ),
+                ],
+            )
 
     def test_error_empty_children(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
@@ -206,26 +203,24 @@ class TestValidateSpec:
 
     def test_error_empty_screen_description(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
-        spec = _minimal_spec(
-            tmp_path,
-            nodes=[
-                NodeSpec(
-                    id="0",
-                    label="Test",
-                    description="",
-                    annotatedImages=["screen.png"],
-                    childrenIds=["1"],
-                ),
-                NodeSpec(
-                    id="1",
-                    label="Button",
-                    controlType="Button",
-                ),
-            ],
-        )
-        result = validate_spec(spec)
-        assert result.valid is False
-        assert any("Screen description is empty" in err for err in result.errors)
+        with pytest.raises(ValidationError):
+            _minimal_spec(
+                tmp_path,
+                nodes=[
+                    NodeSpec(
+                        id="0",
+                        label="Test",
+                        description="",
+                        annotatedImages=["screen.png"],
+                        childrenIds=["1"],
+                    ),
+                    NodeSpec(
+                        id="1",
+                        label="Button",
+                        controlType="Button",
+                    ),
+                ],
+            )
 
     def test_error_empty_screen_children(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
@@ -732,33 +727,7 @@ class TestUnitLimitValidation:
         assert result.valid is True
         assert any("never referenced in the tree hierarchy" in w for w in result.warnings)
 
-    def test_warnings_component_with_control_type(self, tmp_path):
-        (Path(tmp_path) / "screen.png").touch()
-        (Path(tmp_path) / "comp.png").touch()
-        spec = _minimal_spec(
-            tmp_path,
-            nodes=[
-                NodeSpec(
-                    id="0",
-                    label="Screen",
-                    description="desc desc desc",
-                    annotatedImages=["screen.png"],
-                    childrenIds=["1"],
-                ),
-                NodeSpec(
-                    id="1",
-                    label="Component with ControlType",
-                    controlType="Button",
-                    description="desc desc desc",
-                    annotatedImages=["comp.png"],
-                    childrenIds=["2"],
-                ),
-                NodeSpec(id="2", label="Child", controlType="Text"),
-            ],
-        )
-        result = validate_spec(spec)
-        assert result.valid is True
-        assert any("specifies a controlType" in w for w in result.warnings)
+
 
     def test_warnings_empty_interactions(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()

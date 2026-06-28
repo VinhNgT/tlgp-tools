@@ -13,25 +13,23 @@ from pydantic import BaseModel, Field, model_validator, field_validator
 class Interaction(BaseModel):
     """A single user-action / system-reaction pair."""
 
-    action: str
-    reaction: str
+    action: str = Field(min_length=1)
+    reaction: str = Field(min_length=1)
 
 
 class ApiParam(BaseModel):
     """A single field in a request/response API table."""
 
     name: str = Field(min_length=1)
-    description: str | None = None
-    required: bool | None = None
-    type: str | None = None
-    limit: str | None = None
-    defaultValue: str | None = None
+    description: str = Field(min_length=1)
+    required: bool
+    type: str = Field(min_length=1)
+    limit: str | None = Field(default=None, min_length=1)
+    defaultValue: str | None = Field(default=None, min_length=1)
 
     @field_validator("required", mode="before")
     @classmethod
     def _parse_bool(cls, v):
-        if v is None or v == "":
-            return None
         if isinstance(v, str):
             val = v.strip().upper()
             if val in ("Y", "YES", "TRUE", "1", "CÓ", "CO"):
@@ -53,9 +51,9 @@ class Api(BaseModel):
 
     name: str = Field(min_length=1)
     url: str = Field(min_length=1)
-    requestRootType: str | None = None
+    requestRootType: str | None = Field(default=None, min_length=1)
     request: list[ApiPayload] = Field(default_factory=list)
-    responseRootType: str | None = None
+    responseRootType: str | None = Field(default=None, min_length=1)
     response: list[ApiPayload] = Field(default_factory=list)
 
 
@@ -72,14 +70,14 @@ class NodeSpec(BaseModel):
     """A single visual or logical node (Screen, Component, or Element) in the flat tree."""
 
     id: int
-    absoluteBounds: Bounds = Field(default_factory=lambda: Bounds(x=0, y=0, w=0, h=0))
-    label: str
-    controlType: str | None = None
-    required: bool | None = None
+    absoluteBounds: Bounds
+    label: str = Field(min_length=1)
+    controlType: str = Field(min_length=1)
+    required: bool
     maxLength: int | None = None
-    editable: bool | None = None
-    description: str | None = None
-    rawImage: str = "dummy.png"
+    editable: bool
+    description: str = Field(min_length=1)
+    rawImage: str = Field(min_length=1)
     annotatedImages: list[str] = Field(default_factory=list)
     childrenIds: list[int] = Field(default_factory=list)  # Sibling order is preserved here
     interactions: list[Interaction] = Field(default_factory=list)
@@ -111,8 +109,8 @@ class NodeSpec(BaseModel):
 class ScreenSpec(BaseModel):
     """Root schema for spec.json representing the normalized flat tree."""
 
-    sectionPrefix: str = "1.1"
-    rootId: int = 0
+    sectionPrefix: str = Field(min_length=1)
+    rootId: int
     nodes: list[NodeSpec]
 
     @property
