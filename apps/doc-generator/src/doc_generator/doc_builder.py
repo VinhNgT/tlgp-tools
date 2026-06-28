@@ -197,24 +197,32 @@ def _add_payload_section(
     style: StyleConfig,
 ):
     """Render request or response payloads list starting from the root type."""
-    if not root_type:
-        heading = "Response" if is_response else "Request"
-        _add_bold_text(doc, heading, style)
-        text = "Không có dữ liệu trả về" if is_response else "Không có tham số"
-        _add_normal_text(doc, text, style)
-        return
-
     if is_response:
-        heading = f"Response ({root_type})"
+        if not root_type:
+            heading = "Response"
+            _add_bold_text(doc, heading, style)
+            text = "Không có dữ liệu trả về"
+            _add_normal_text(doc, text, style)
+            return
     else:
-        heading = f"Request ({root_type})"
+        if not root_type and not payloads:
+            heading = "Request"
+            _add_bold_text(doc, heading, style)
+            text = "Không có tham số"
+            _add_normal_text(doc, text, style)
+            return
+
+    if root_type:
+        heading = f"Response ({root_type})" if is_response else f"Request ({root_type})"
+    else:
+        heading = "Response" if is_response else "Request"
     _add_bold_text(doc, heading, style)
 
     # Sort payloads so that the root payload is first, preserving the order of others
     root_payload = None
     other_payloads = []
     for p in payloads:
-        if p.type == root_type:
+        if root_type and p.type == root_type:
             root_payload = p
         else:
             other_payloads.append(p)
@@ -224,9 +232,9 @@ def _add_payload_section(
         ordered_payloads.append(root_payload)
     ordered_payloads.extend(other_payloads)
 
-    for idx, payload in enumerate(ordered_payloads):
+    for payload in ordered_payloads:
         # Print DTO type heading only if it's a child DTO (i.e., not the root_type)
-        if idx > 0 or payload.type != root_type:
+        if not root_type or payload.type != root_type:
             # Child DTO heading
             _add_normal_text(doc, payload.type, style)
 

@@ -337,11 +337,6 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
 
     # --- Check for API payloads with missing root types ---
     for api in data.all_apis:
-        if api.request and not api.requestRootType:
-            result.warnings.append(
-                f"API '{api.name}' has defined request payload fields but 'requestRootType' is missing. "
-                "The request parameter table will be omitted."
-            )
         if api.response and not api.responseRootType:
             result.warnings.append(
                 f"API '{api.name}' has defined response payload fields but 'responseRootType' is missing. "

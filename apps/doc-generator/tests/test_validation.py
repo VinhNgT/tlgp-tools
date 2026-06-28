@@ -1022,7 +1022,7 @@ class TestUnitLimitValidation:
         assert any("Placeholder detected in API name" in e for e in result.errors)
 
     def test_warnings_for_missing_api_root_types(self, tmp_path):
-        # 1. Test request payload defined but missing requestRootType
+        # 1. Test request payload defined but missing requestRootType (no longer warns)
         spec_req = _minimal_spec(
             tmp_path,
             nodes=[
@@ -1050,9 +1050,9 @@ class TestUnitLimitValidation:
         )
         res_req = validate_spec(spec_req)
         assert res_req.valid is True
-        assert any("has defined request payload fields but 'requestRootType' is missing" in w for w in res_req.warnings)
+        assert not any("has defined request payload fields but 'requestRootType' is missing" in w for w in res_req.warnings)
 
-        # 2. Test response payload defined but missing responseRootType
+        # 2. Test response payload defined but missing responseRootType (still warns)
         spec_res = _minimal_spec(
             tmp_path,
             nodes=[

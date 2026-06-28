@@ -470,3 +470,65 @@ class TestBuildDocumentSectionNumbering:
         assert "Không có tham số" in text
         assert "Response" in text
         assert "Không có dữ liệu trả về" in text
+
+    def test_api_with_null_request_root_type_and_payloads(self, tmp_path):
+        analysis = _minimal_spec(
+            tmp_path,
+            apis=[
+                Api(
+                    name="GET Parameters",
+                    url="/api/params",
+                    requestRootType=None,
+                    responseRootType=None,
+                    request=[
+                        ApiPayload(
+                            type="QueryParams",
+                            fields=[ApiParam(name="page", description="Page number", required=True, type="int")],
+                        ),
+                        ApiPayload(
+                            type="Headers",
+                            fields=[ApiParam(name="token", description="Auth token", required=True, type="String")],
+                        ),
+                    ],
+                    response=[],
+                ),
+            ],
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Request" in text
+        assert "Request (" not in text  # Ensures we don't render "Request (None)" or similar
+        assert "QueryParams" in text
+        assert "Headers" in text
+        
+        # Verify the tables were actually built and added to the doc
+        assert len(doc.tables) == 4
+
+    def test_api_with_null_response_root_type_and_payloads(self, tmp_path):
+        analysis = _minimal_spec(
+            tmp_path,
+            apis=[
+                Api(
+                    name="GET Response Params",
+                    url="/api/response-params",
+                    requestRootType=None,
+                    responseRootType=None,
+                    request=[],
+                    response=[
+                        ApiPayload(
+                            type="ResDto",
+                            fields=[ApiParam(name="data", description="Response data", required=True, type="String")],
+                        )
+                    ],
+                ),
+            ],
+        )
+        doc = build_document(analysis)
+        text = "\n".join(p.text for p in doc.paragraphs)
+        assert "Response" in text
+        assert "Không có dữ liệu trả về" in text
+        assert "ResDto" not in text
+        
+        # Verify the response tables were omitted (only the 2 default screen tables exist)
+        assert len(doc.tables) == 2
+
