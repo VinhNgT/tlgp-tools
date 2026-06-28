@@ -31,7 +31,7 @@ This guide defines the semantic rules, content guidelines, and UI classification
 - Do NOT attempt to bypass the MCP server layer (e.g., using raw curl or HTTP requests) to interact with the Annotator REST API directly.
 
 ### Rule 7: Programmatic Editing Only
-- Do not modify `spec.json` directly using text replacement or file writing tools. Always update node properties (labels, descriptions, control types, interactions, APIs) using the `update_spec_node` or `update_spec_nodes` (for batch updates) tools.
+- Do not modify `spec.json` directly using text replacement or file writing tools. Always update node properties (labels, descriptions, control types, interactions, APIs) using the `update_spec_node` tool.
 
 
 ---
