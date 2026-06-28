@@ -184,9 +184,9 @@ def build_scaffold(
         # If it has no children, it's a leaf node (element), otherwise it's a container/sub-component
         is_leaf = len(comp.childrenIds) == 0
         if is_leaf:
-            control_type = "[TODO: Control Type (e.g. Button, Text, Icon, Image)]"
+            control_type = "[TODO: Widget Type (e.g. Button, Text, Icon, Input, Tabbar)]"
         else:
-            control_type = "[TODO: Container Type (e.g. Container, Card, Header)]"
+            control_type = "Component"
 
         raw_comp_img_rel = raw_mapping.get(uuid_str) or annotated_mapping.get(uuid_str) or f"raw/{uuid_str}.png"
         ann_comp_img_rel = annotated_mapping.get(uuid_str) or raw_mapping.get(uuid_str)
@@ -218,6 +218,7 @@ def build_scaffold(
         nodes.append(comp_node)
 
     return {
+        "$schema": "schema.json",
         "sectionPrefix": section_prefix,
         "rootId": 0,
         "nodes": nodes,
@@ -244,6 +245,14 @@ def scaffold_and_save(
         raise FileNotFoundError(f"Export directory does not exist: {export_dir}")
 
     scaffold = build_scaffold(state, export_path, section_prefix)
+
+    # Write the JSON schema file to the export directory
+    from doc_generator.models import ScreenSpec
+    schema_path = export_path / "schema.json"
+    schema_path.write_text(
+        json.dumps(ScreenSpec.model_json_schema(), indent=2, ensure_ascii=False),
+        encoding="utf-8",
+    )
 
     output_path = export_path / "spec.json"
     output_path.write_text(

@@ -1,6 +1,7 @@
 import pytest
 
 def pytest_configure(config):
+    print("pytest_configure RUNNING!")
     from doc_generator.models import NodeSpec, ScreenSpec, Bounds, ApiParam
     
     # Patch ApiParam.__init__ to inject required test defaults
@@ -23,7 +24,20 @@ def pytest_configure(config):
         if "rawImage" not in kwargs:
             kwargs["rawImage"] = "dummy.png"
         if "controlType" not in kwargs:
-            kwargs["controlType"] = "Screen"
+            node_id = kwargs.get("id")
+            children = kwargs.get("childrenIds", [])
+            # Coerce to int if string
+            try:
+                coerced_id = int(node_id) if node_id is not None else None
+            except ValueError:
+                coerced_id = None
+
+            if coerced_id == 0:
+                kwargs["controlType"] = "Screen"
+            elif len(children) > 0:
+                kwargs["controlType"] = "Component"
+            else:
+                kwargs["controlType"] = "Button"
         if "editable" not in kwargs:
             kwargs["editable"] = False
         if "description" not in kwargs:

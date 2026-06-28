@@ -1,4 +1,5 @@
 {
+  "$schema": "./spec_schema.json",
   "sectionPrefix": "1.1",
   "rootId": 0,
   "nodes": [
@@ -84,7 +85,7 @@
       ],
       "interactions": [],
       "apis": [],
-      "controlType": "Container"
+      "controlType": "Component"
     },
     {
       "id": 2,
@@ -129,7 +130,7 @@
         }
       ],
       "apis": [],
-      "controlType": "Container"
+      "controlType": "Component"
     },
     {
       "id": 4,

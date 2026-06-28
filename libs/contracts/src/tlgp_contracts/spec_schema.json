@@ -1,0 +1,325 @@
+{
+  "$defs": {
+    "Api": {
+      "description": "A single API endpoint's documentation.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "url": {
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        },
+        "requestRootType": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Requestroottype"
+        },
+        "request": {
+          "items": {
+            "$ref": "#/$defs/ApiPayload"
+          },
+          "title": "Request",
+          "type": "array"
+        },
+        "responseRootType": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Responseroottype"
+        },
+        "response": {
+          "items": {
+            "$ref": "#/$defs/ApiPayload"
+          },
+          "title": "Response",
+          "type": "array"
+        }
+      },
+      "required": [
+        "name",
+        "url"
+      ],
+      "title": "Api",
+      "type": "object"
+    },
+    "ApiParam": {
+      "description": "A single field in a request/response API table.",
+      "properties": {
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "limit": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Limit"
+        },
+        "defaultValue": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Defaultvalue"
+        }
+      },
+      "required": [
+        "name",
+        "description",
+        "required",
+        "type"
+      ],
+      "title": "ApiParam",
+      "type": "object"
+    },
+    "ApiPayload": {
+      "description": "A single flat DTO payload schema.",
+      "properties": {
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "fields": {
+          "items": {
+            "$ref": "#/$defs/ApiParam"
+          },
+          "title": "Fields",
+          "type": "array"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "ApiPayload",
+      "type": "object"
+    },
+    "Bounds": {
+      "description": "Bounding box coordinates of the component on the original screen image.",
+      "properties": {
+        "x": {
+          "title": "X",
+          "type": "integer"
+        },
+        "y": {
+          "title": "Y",
+          "type": "integer"
+        },
+        "w": {
+          "title": "W",
+          "type": "integer"
+        },
+        "h": {
+          "title": "H",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "x",
+        "y",
+        "w",
+        "h"
+      ],
+      "title": "Bounds",
+      "type": "object"
+    },
+    "Interaction": {
+      "description": "A single user-action / system-reaction pair.",
+      "properties": {
+        "action": {
+          "minLength": 1,
+          "title": "Action",
+          "type": "string"
+        },
+        "reaction": {
+          "minLength": 1,
+          "title": "Reaction",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "reaction"
+      ],
+      "title": "Interaction",
+      "type": "object"
+    },
+    "NodeSpec": {
+      "description": "A single visual or logical node (Screen, Component, or Element) in the flat tree.",
+      "properties": {
+        "id": {
+          "title": "Id",
+          "type": "integer"
+        },
+        "absoluteBounds": {
+          "$ref": "#/$defs/Bounds"
+        },
+        "label": {
+          "minLength": 1,
+          "title": "Label",
+          "type": "string"
+        },
+        "controlType": {
+          "minLength": 1,
+          "title": "Controltype",
+          "type": "string"
+        },
+        "required": {
+          "title": "Required",
+          "type": "boolean"
+        },
+        "maxLength": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Maxlength"
+        },
+        "editable": {
+          "title": "Editable",
+          "type": "boolean"
+        },
+        "description": {
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "rawImage": {
+          "minLength": 1,
+          "title": "Rawimage",
+          "type": "string"
+        },
+        "annotatedImages": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Annotatedimages",
+          "type": "array"
+        },
+        "childrenIds": {
+          "items": {
+            "type": "integer"
+          },
+          "title": "Childrenids",
+          "type": "array"
+        },
+        "interactions": {
+          "items": {
+            "$ref": "#/$defs/Interaction"
+          },
+          "title": "Interactions",
+          "type": "array"
+        },
+        "apis": {
+          "items": {
+            "$ref": "#/$defs/Api"
+          },
+          "title": "Apis",
+          "type": "array"
+        }
+      },
+      "required": [
+        "id",
+        "absoluteBounds",
+        "label",
+        "controlType",
+        "required",
+        "editable",
+        "description",
+        "rawImage"
+      ],
+      "title": "NodeSpec",
+      "type": "object"
+    }
+  },
+  "description": "Root schema for spec.json representing the normalized flat tree.",
+  "properties": {
+    "$schema": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "$Schema"
+    },
+    "sectionPrefix": {
+      "minLength": 1,
+      "title": "Sectionprefix",
+      "type": "string"
+    },
+    "rootId": {
+      "title": "Rootid",
+      "type": "integer"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/NodeSpec"
+      },
+      "title": "Nodes",
+      "type": "array"
+    }
+  },
+  "required": [
+    "sectionPrefix",
+    "rootId",
+    "nodes"
+  ],
+  "title": "ScreenSpec",
+  "type": "object"
+}

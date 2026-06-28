@@ -60,7 +60,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
         seen_ids.add(n.id)
 
     screen = data.screen
-    non_leaf = [n for n in data.nodes if n.id != data.rootId and (len(n.childrenIds) > 0 or len(n.annotatedImages) > 0)]
+    non_leaf = [n for n in data.nodes if n.id != data.rootId and len(n.childrenIds) > 0]
     all_components = [screen] + non_leaf
 
     result = ValidationResult(
@@ -134,7 +134,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
     # Warn about unreachable orphan nodes
     for node in data.nodes:
         if node.id != data.rootId and node.id not in reachable:
-            node_type = "Component" if (len(node.childrenIds) > 0 or len(node.annotatedImages) > 0) else "Element"
+            node_type = "Component" if len(node.childrenIds) > 0 else "Element"
             result.warnings.append(
                 f"{node_type} '{node.label}' (id={node.id}) is defined in nodes list but never referenced in the tree hierarchy"
             )
@@ -190,17 +190,8 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
     # Update summary images count
     result.images = sum(len(c.annotatedImages) for c in all_components)
 
-    if screen.description and len(screen.description) < 10:
-        result.warnings.append(
-            f"Screen description is suspiciously short (< 10 chars): '{screen.description}'"
-        )
-
     for comp in non_leaf:
         if comp.id in reachable:
-            if comp.description and len(comp.description) < 10:
-                result.warnings.append(
-                    f"Component '{comp.label}' (id={comp.id}) description is suspiciously short (< 10 chars)"
-                )
             if not comp.label.strip():
                 result.warnings.append(f"Component (id={comp.id}) has an empty label")
             # Non-leaf components must specify controlType (container/screen type), so we no longer warn about controlType on non-leaf nodes.
@@ -257,6 +248,31 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                 len(comp.apis),
                 f"Component '{comp.label}' (id={comp.id})",
             )
+
+    # --- Strict controlType validations ---
+    for node in data.nodes:
+        is_screen = (node.id == data.rootId)
+        is_leaf = (len(node.childrenIds) == 0)
+
+        if is_leaf:
+            if node.controlType in {"Screen", "Component"}:
+                result.errors.append(
+                    f"Leaf node '{node.label}' (id={node.id}) has invalid controlType '{node.controlType}'. "
+                    f"Must not be 'Screen' or 'Component'."
+                )
+        else:
+            if is_screen:
+                if node.controlType != "Screen":
+                    result.errors.append(
+                        f"Root screen node '{node.label}' (id={node.id}) has invalid controlType '{node.controlType}'. "
+                        f"Must be 'Screen'."
+                    )
+            else:
+                if node.controlType != "Component":
+                    result.errors.append(
+                        f"Non-root container node '{node.label}' (id={node.id}) has invalid controlType '{node.controlType}'. "
+                        f"Must be 'Component'."
+                    )
 
     # --- Final validity ---
     if result.errors:

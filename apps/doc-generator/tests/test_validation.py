@@ -190,16 +190,17 @@ class TestValidateSpec:
                 NodeSpec(
                     id="1",
                     label="Comp 1",
-                    description="desc",
+                    description="desc desc desc",
                     annotatedImages=["comp.png"],
                     childrenIds=[],
+                    controlType="Component",
                 )
             ],
         )
 
         result = validate_spec(spec)
         assert result.valid is False
-        assert any("no children specified" in err for err in result.errors)
+        assert any("invalid controlType 'Component'" in err for err in result.errors)
 
     def test_error_empty_screen_description(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
@@ -384,7 +385,7 @@ class TestValidateSpec:
         )
         result = validate_spec(spec)
         assert result.valid is True
-        assert any("suspiciously short" in w for w in result.warnings)
+        assert len(result.warnings) == 0
 
     def test_warnings_empty_api_param(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()

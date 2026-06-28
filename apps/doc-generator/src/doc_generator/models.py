@@ -103,6 +103,7 @@ class NodeSpec(BaseModel):
 class ScreenSpec(BaseModel):
     """Root schema for spec.json representing the normalized flat tree."""
 
+    schema_url: str | None = Field(default=None, alias="$schema")
     sectionPrefix: str = Field(min_length=1)
     rootId: int
     nodes: list[NodeSpec]
