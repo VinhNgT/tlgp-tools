@@ -26,13 +26,9 @@ def pytest_configure(config):
         if "controlType" not in kwargs:
             node_id = kwargs.get("id")
             children = kwargs.get("childrenIds", [])
-            # Coerce to int if string
-            try:
-                coerced_id = int(node_id) if node_id is not None else None
-            except ValueError:
-                coerced_id = None
+            coerced_id = str(node_id) if node_id is not None else None
 
-            if coerced_id == 0:
+            if coerced_id == "0":
                 kwargs["controlType"] = "Screen"
             elif len(children) > 0:
                 kwargs["controlType"] = "Component"
@@ -53,6 +49,6 @@ def pytest_configure(config):
         if "sectionPrefix" not in kwargs:
             kwargs["sectionPrefix"] = "1.1"
         if "rootId" not in kwargs:
-            kwargs["rootId"] = 0
+            kwargs["rootId"] = "0"
         original_screen_init(self, *args, **kwargs)
     ScreenSpec.__init__ = new_screen_init

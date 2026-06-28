@@ -97,7 +97,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
     visited = set()
     path = set()
 
-    def check_cycle(node_id: int) -> bool:
+    def check_cycle(node_id: str) -> bool:
         if node_id in path:
             return True
         if node_id in visited:
@@ -118,7 +118,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
 
     # --- Reachability and Orphan validation ---
     reachable = set()
-    def traverse(node_id: int):
+    def traverse(node_id: str):
         if node_id in reachable:
             return
         reachable.add(node_id)

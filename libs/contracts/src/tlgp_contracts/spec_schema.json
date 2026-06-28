@@ -196,7 +196,7 @@
       "properties": {
         "id": {
           "title": "Id",
-          "type": "integer"
+          "type": "string"
         },
         "absoluteBounds": {
           "$ref": "#/$defs/Bounds"
@@ -266,7 +266,7 @@
         },
         "childrenIds": {
           "items": {
-            "type": "integer"
+            "type": "string"
           },
           "title": "Childrenids",
           "type": "array"
@@ -319,7 +319,7 @@
     },
     "rootId": {
       "title": "Rootid",
-      "type": "integer"
+      "type": "string"
     },
     "nodes": {
       "items": {

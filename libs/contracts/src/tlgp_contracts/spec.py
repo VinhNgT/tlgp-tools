@@ -66,7 +66,7 @@ class Api(BaseModel):
 class NodeSpec(BaseModel):
     """A single visual or logical node (Screen, Component, or Element) in the flat tree."""
 
-    id: int
+    id: str
     absoluteBounds: Bounds
     label: str = Field(min_length=1)
     controlType: str = Field(min_length=1)
@@ -76,9 +76,23 @@ class NodeSpec(BaseModel):
     description: str = Field(min_length=1)
     rawImage: str = Field(min_length=1)
     annotatedImages: list[str] = Field(default_factory=list)
-    childrenIds: list[int] = Field(default_factory=list)  # Sibling order is preserved here
+    childrenIds: list[str] = Field(default_factory=list)  # Sibling order is preserved here
     interactions: list[Interaction] = Field(default_factory=list)
     apis: list[Api] = Field(default_factory=list)
+
+    @field_validator("id", mode="before")
+    @classmethod
+    def _coerce_id(cls, v):
+        if isinstance(v, int):
+            return str(v)
+        return v
+
+    @field_validator("childrenIds", mode="before")
+    @classmethod
+    def _coerce_children_ids(cls, v):
+        if isinstance(v, list):
+            return [str(item) if isinstance(item, int) else item for item in v]
+        return v
 
     @field_validator("required", "editable", mode="before")
     @classmethod
@@ -99,13 +113,20 @@ class ScreenSpec(BaseModel):
 
     schema_url: str | None = Field(default=None, alias="$schema")
     sectionPrefix: str = Field(min_length=1)
-    rootId: int
+    rootId: str
     nodes: list[NodeSpec]
 
     _spec_dir: Path | None = PrivateAttr(default=None)
 
+    @field_validator("rootId", mode="before")
+    @classmethod
+    def _coerce_root_id(cls, v):
+        if isinstance(v, int):
+            return str(v)
+        return v
+
     @property
-    def nodes_map(self) -> dict[int, NodeSpec]:
+    def nodes_map(self) -> dict[str, NodeSpec]:
         """Helper mapping node ID to node object for O(1) lookups."""
         return {n.id: n for n in self.nodes}
 
@@ -120,11 +141,11 @@ class ScreenSpec(BaseModel):
     @property
     def all_apis(self) -> list[Api]:
         """Combine APIs from the screen and all components in DFS order."""
-        dfs_order: list[int] = []
-        visited: set[int] = set()
+        dfs_order: list[str] = []
+        visited: set[str] = set()
         nodes_dict = self.nodes_map
 
-        def dfs(node_id: int):
+        def dfs(node_id: str):
             if node_id in visited:
                 return
             visited.add(node_id)

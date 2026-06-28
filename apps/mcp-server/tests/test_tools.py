@@ -199,14 +199,14 @@ class TestRedesignedMcpTools:
             res = await update_spec_node(
                 ctx,
                 spec_path=spec_path,
-                node_id=0,
+                node_id="root",
                 label="Updated label",
                 description="Updated desc"
             )
         assert res["status"] == "success"
         mock_update.assert_called_once_with(
             spec_path=spec_path,
-            node_id=0,
+            node_id="root",
             label="Updated label",
             description="Updated desc",
             control_type=None,

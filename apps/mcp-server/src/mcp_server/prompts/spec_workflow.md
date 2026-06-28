@@ -25,7 +25,12 @@ Before starting, you **must** read these resources:
 ### Step 2: Scaffold the Specification
 - **Goal:** Export cropped images and auto-generate the structural skeleton of spec.json.
 - **Action:** Call `scaffold_spec(output_dir="<directory>")`.
-- **Result:** This exports cropped raw and annotated component images to the output directory and auto-generates `spec.json` (and `schema.json`) with pre-filled structural hierarchies, bounding boxes, and ID mappings.
+- **Result:** This creates the following outputs in the specified output directory:
+  - `spec.json`: The generated structural skeleton of the screen specification with TODO placeholders for semantic details.
+  - `schema.json`: The JSON schema validation file for `spec.json`.
+  - `mapping.json`: A file mapping component UUIDs to their exported image paths.
+  - `raw/`: Subdirectory containing clean, raw cropped images of all annotated components.
+  - `annotated/`: Subdirectory containing cropped images of components highlighted with colored borders and red number pills.
 
 ### Step 3: Populate Semantic Fields Node-by-Node
 - **Goal:** Act strictly as a "fill in the blank" worker. Replace TODO placeholders with real content by cross-referencing both the cropped images and the source code.

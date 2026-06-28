@@ -7,15 +7,15 @@ This guide maps 1-to-1 to the programmatic checks performed by the `doc-generato
 ## 1-to-1 Validation Rules
 
 ### 1. Screen Root Single Definition
-- **Rule:** The Screen root node (ID `0`) must be defined exactly once in `nodes`.
+- **Rule:** The Screen root node (ID `"root"`) must be defined exactly once in `nodes`.
 - **Failure:** Validator fails if the Screen root is missing or duplicated.
 
 ### 2. Unique Node IDs
-- **Rule:** Every node in `nodes` must have a unique integer ID.
+- **Rule:** Every node in `nodes` must have a unique string/UUID ID.
 - **Failure:** Validator fails if two nodes share the same ID.
 
 ### 3. Reachability & Orphan Nodes
-- **Rule:** Every node must be reachable in the tree hierarchy starting from the Screen root (ID `0`) through `childrenIds`.
+- **Rule:** Every node must be reachable in the tree hierarchy starting from the Screen root (ID `"root"`) through `childrenIds`.
 - **Warning:** Validator emits a warning if a node is defined in `nodes` but never referenced in any parent's `childrenIds`.
 
 ### 4. Cycle Detection
@@ -57,7 +57,7 @@ This guide maps 1-to-1 to the programmatic checks performed by the `doc-generato
 
 ### 13. Container Node Control Types
 - **Rule:** The root Screen node must have control type `Screen`. All non-leaf components must have control type `Component`.
-- **Failure:** Validator fails if the root is not `Screen`, or if a container node (ID > `0` with children) is not `Component`.
+- **Failure:** Validator fails if the root is not `Screen`, or if a container node (any component ID other than `"root"` with children) is not `Component`.
 
 ### 14. No "TODO" Placeholders
 - **Rule:** No field in the specification JSON is allowed to contain the string `"TODO"`. This applies to:

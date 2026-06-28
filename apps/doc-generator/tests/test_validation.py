@@ -18,17 +18,17 @@ from tlgp_contracts import (
 def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
     nodes = overrides.pop("nodes", [])
 
-    # Ensure exactly one screen component (id == 0) exists
-    screen_comp = [n for n in nodes if n.id == 0]
+    # Ensure exactly one screen component (id == "root") exists
+    screen_comp = [n for n in nodes if n.id == "root"]
     if not screen_comp:
         (Path(tmp_path) / "screen.png").touch()
         nodes.append(
             NodeSpec(
-                id=0,
+                id="root",
                 label="Test",
                 description="desc desc desc",
                 annotatedImages=[str(Path(tmp_path) / "screen.png")],
-                childrenIds=[1],
+                childrenIds=["1"],
                 apis=[Api(name="GET Test", url="/test")],
                 required=False,
                 editable=False,
@@ -36,7 +36,7 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
         )
         nodes.append(
             NodeSpec(
-                id=1,
+                id="1",
                 label="Test Child",
                 controlType="Button",
                 required=False,
@@ -74,7 +74,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -119,7 +119,7 @@ class TestValidateSpec:
 
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["missing_screen.png"],
@@ -154,7 +154,7 @@ class TestValidateSpec:
                 tmp_path,
                 nodes=[
                     NodeSpec(
-                        id="0",
+                        id="root",
                         label="Test Screen",
                         description="desc desc desc",
                         annotatedImages=["screen.png"],
@@ -182,7 +182,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -210,7 +210,7 @@ class TestValidateSpec:
                 tmp_path,
                 nodes=[
                     NodeSpec(
-                        id="0",
+                        id="root",
                         label="Test",
                         description="",
                         annotatedImages=["screen.png"],
@@ -230,7 +230,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="desc",
                     annotatedImages=["screen.png"],
@@ -247,7 +247,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="desc",
                     annotatedImages=[],
@@ -272,7 +272,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="desc",
                     annotatedImages=["screen.png"],
@@ -304,7 +304,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -336,7 +336,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -371,7 +371,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="short",
                     annotatedImages=["screen.png"],
@@ -394,7 +394,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -431,7 +431,7 @@ class TestValidateSpec:
 
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["missing_screen.png"],
@@ -460,13 +460,13 @@ class TestValidateSpec:
 
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen A",
                     description="desc desc desc",
                     childrenIds=["2"],
                 ),
                 NodeSpec(
-                    id="0",  # Duplicate screen ID
+                    id="root",  # Duplicate screen ID
                     label="Screen B",
                     description="desc desc desc",
                     childrenIds=["2"],
@@ -497,7 +497,7 @@ class TestValidateSpec:
         spec = ScreenSpec(
 
             nodes=[
-                NodeSpec(id="0", label="Screen", description="desc", childrenIds=["1"]),
+                NodeSpec(id="root", label="Screen", description="desc", childrenIds=["1"]),
                 NodeSpec(id="1", label="Button A", controlType="Button"),
                 NodeSpec(id="1", label="Button B", controlType="Button"),  # Duplicate ID
             ]
@@ -512,7 +512,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -531,7 +531,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -563,7 +563,7 @@ class TestValidateSpec:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -613,7 +613,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -632,7 +632,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -656,7 +656,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -685,7 +685,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="Test",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -715,7 +715,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -737,7 +737,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -756,7 +756,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -785,7 +785,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -814,7 +814,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -842,7 +842,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -872,7 +872,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id="root",
                     label="Screen",
                     description="desc desc desc",
                     annotatedImages=["screen.png"],
@@ -917,7 +917,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="[TODO: title]",
                     description="Valid description",
                     annotatedImages=["screen.png"],
@@ -935,7 +935,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="Valid Label",
                     description="[TODO: desc]",
                     annotatedImages=["screen.png"],
@@ -953,7 +953,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="Valid Label",
                     description="Valid description",
                     annotatedImages=["screen.png"],

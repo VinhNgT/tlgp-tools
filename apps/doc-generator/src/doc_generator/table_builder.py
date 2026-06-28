@@ -307,7 +307,7 @@ def build_ui_elements_table(
     for r, child_id in enumerate(children):
         child = None
         if analysis is not None:
-            child = analysis.nodes_map.get(child_id)
+            child = analysis.nodes_map.get(str(child_id))
 
         if child is None:
             label = f"Node {child_id}"

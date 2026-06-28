@@ -25,7 +25,7 @@ class TestNodeSpec:
             description="Submit button component",
             rawImage="raw/submit.png"
         )
-        assert c.id == 1
+        assert c.id == "1"
         assert c.label == "Submit"
         assert c.controlType == "Button"
         assert c.required is True
@@ -133,7 +133,7 @@ class TestScreenSpec:
     def test_valid_with_real_dir(self, tmp_path):
         data = ScreenSpec(
             sectionPrefix="1.1",
-            nodes=[NodeSpec(id=0, label="Test")],
+            nodes=[NodeSpec(id="root", label="Test")],
         )
         assert data.sectionPrefix == "1.1"
         assert len(data.nodes) == 1
@@ -142,7 +142,7 @@ class TestScreenSpec:
     def test_resolve_image(self, tmp_path):
         (tmp_path / "test.png").touch()
         data = ScreenSpec(
-            nodes=[NodeSpec(id=0, label="Test")],
+            nodes=[NodeSpec(id="root", label="Test")],
         )
         resolved = data.resolve_annotated_image(str(tmp_path / "test.png"))
         assert resolved == tmp_path / "test.png"
@@ -165,7 +165,7 @@ class TestJsonRoundTrip:
                     controlType="Icon",
                 ),
                 NodeSpec(
-                    id=0,
+                    id="root",
                     label="Cart",
                     childrenIds=[1],
                     apis=[
@@ -181,8 +181,8 @@ class TestJsonRoundTrip:
         assert len(restored.nodes) == 3
         # Assert specific node details
         nodes_dict = restored.nodes_map
-        assert nodes_dict[1].label == "Header"
-        assert nodes_dict[2].controlType == "Icon"
+        assert nodes_dict["1"].label == "Header"
+        assert nodes_dict["2"].controlType == "Icon"
 
 
 class TestSampleSpecFixture:

@@ -10,7 +10,7 @@ from tlgp_contracts import ScreenSpec
 
 def update_node_in_spec_file(
     spec_path: str,
-    node_id: int,
+    node_id: str,
     label: str | None = None,
     description: str | None = None,
     control_type: str | None = None,

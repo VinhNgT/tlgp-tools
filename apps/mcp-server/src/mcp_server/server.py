@@ -290,7 +290,7 @@ async def scaffold_spec(
 async def update_spec_node(
     ctx: Context,
     spec_path: str,
-    node_id: int,
+    node_id: str,
     label: str | None = None,
     description: str | None = None,
     control_type: str | None = None,
@@ -304,7 +304,7 @@ async def update_spec_node(
 
     Args:
         spec_path: Absolute path to the spec.json file.
-        node_id: The integer ID of the node to update (e.g. 0 for Screen).
+        node_id: The ID of the node to update (e.g. '0' for Screen or UUID string for component).
         label: Descriptive Vietnamese label for the node.
         description: Vietnamese high-level description/summary of the node.
         control_type: The UI control type (e.g. Button, Text, Icon, Image).

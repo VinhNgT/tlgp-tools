@@ -322,11 +322,11 @@ def build_document(analysis: ScreenSpec) -> Document:
         section.right_margin = Inches(1)
 
     # Find all components using post-order DFS starting from rootId
-    dfs_order: list[int] = []
-    visited: set[int] = set()
+    dfs_order: list[str] = []
+    visited: set[str] = set()
     nodes_dict = analysis.nodes_map
 
-    def dfs(node_id: int):
+    def dfs(node_id: str):
         if node_id in visited:
             return
         visited.add(node_id)

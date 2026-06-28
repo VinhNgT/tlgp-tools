@@ -142,43 +142,25 @@ def build_scaffold(
         raw_mapping = {}
         raw_root_images = []
 
-    # Build UUID -> integer ID mapping based on component number
-    uuid_to_id = {}
-    assigned_ids = {0}  # 0 is reserved for Screen root
-    for uuid, comp in state.components.items():
-        if comp.number and comp.number.isdigit():
-            val = int(comp.number)
-            uuid_to_id[uuid] = val
-            assigned_ids.add(val)
-
-    next_id = 1
-    for uuid in state.components:
-        if uuid not in uuid_to_id:
-            while next_id in assigned_ids:
-                next_id += 1
-            uuid_to_id[uuid] = next_id
-            assigned_ids.add(next_id)
-            next_id += 1
-
     # Walk in post-order DFS to get the component ordering (for readable ordering in JSON)
     ordered_uuids = _walk_post_order_dfs(state)
 
     nodes = []
 
-    # 1. Add the Screen node (always 0)
+    # 1. Add the Screen node (always "0")
     screen_name_val = state.screen.name.strip()
     screen_name = f"[TODO: Vietnamese screen name. Suggestion: {screen_name_val}]" if screen_name_val else _TODO_SCREEN_NAME
 
     screen_desc_val = state.screen.description.strip()
     screen_desc = f"[TODO: Vietnamese screen description (high-level summary) - NOT a list/restatement of UI elements. Suggestion: {screen_desc_val}]" if screen_desc_val else _TODO_SCREEN_DESC
 
-    screen_children_ids = [uuid_to_id[rid] for rid in state.rootComponents if rid in state.components and rid in uuid_to_id]
+    screen_children_ids = [str(rid) for rid in state.rootComponents if rid in state.components]
 
     raw_screen_image = raw_root_images[0] if raw_root_images else (annotated_root_images[0] if annotated_root_images else "raw/root.png")
     annotated_screen_images = list(annotated_root_images) if annotated_root_images else (list(raw_root_images) if raw_root_images else [])
 
     nodes.append({
-        "id": 0,
+        "id": "root",
         "absoluteBounds": {
             "x": 0,
             "y": 0,
@@ -218,7 +200,7 @@ def build_scaffold(
         annotated_comp_images = [ann_comp_img] if ann_comp_img else []
 
         comp_node = {
-            "id": uuid_to_id[uuid],
+            "id": uuid_str,
             "absoluteBounds": {
                 "x": comp.bounds.x if comp.bounds else 0,
                 "y": comp.bounds.y if comp.bounds else 0,
@@ -230,7 +212,7 @@ def build_scaffold(
             "description": _TODO_DESCRIPTION,
             "rawImage": raw_comp_img,
             "annotatedImages": annotated_comp_images,
-            "childrenIds": [uuid_to_id[cid] for cid in comp.childrenIds if cid in state.components and cid in uuid_to_id],
+            "childrenIds": [str(cid) for cid in comp.childrenIds if cid in state.components],
             "interactions": [],
             "apis": [],
         }
@@ -244,7 +226,7 @@ def build_scaffold(
     return {
         "$schema": "schema.json",
         "sectionPrefix": section_prefix,
-        "rootId": 0,
+        "rootId": "root",
         "nodes": nodes,
     }
 
