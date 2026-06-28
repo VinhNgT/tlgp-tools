@@ -6,8 +6,6 @@ import json
 from pathlib import Path
 
 import pytest
-from doc_generator.models import ScreenSpec
-from doc_generator.validation import validate_spec
 from mcp_server.prompts import _read, get_spec_workflow
 from tlgp_contracts import get_example_spec_json
 
@@ -47,6 +45,10 @@ class TestSpecWorkflowContent:
 
 class TestExampleAnalysisValidation:
     def test_example_analysis_passes_validation(self, tmp_path):
+        import sys
+        import subprocess
+        from tlgp_contracts import DocGenResult
+
         # Read the raw JSON
         raw_json = get_example_spec_json()
         data_dict = json.loads(raw_json)
@@ -62,8 +64,16 @@ class TestExampleAnalysisValidation:
         (tmp_path / "dummy_header.png").touch()
         (tmp_path / "dummy_back_button.png").touch()
 
-        spec = ScreenSpec(**data_dict)
-        result = validate_spec(spec)
+        # Write the JSON payload to a temp file so the doc_generator CLI can read it
+        spec_path = tmp_path / "spec.json"
+        spec_path.write_text(json.dumps(data_dict, indent=2, ensure_ascii=False), encoding="utf-8")
+
+        # Invoke the doc_generator validator CLI via subprocess
+        cmd = [sys.executable, "-m", "doc_generator", str(spec_path), "--validate-only", "--json"]
+        proc = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8")
+        assert proc.returncode == 0, f"Validator CLI exited with code {proc.returncode}. Stderr: {proc.stderr}"
+
+        result = DocGenResult.model_validate_json(proc.stdout)
 
         # Assert validation is successful with zero errors and warnings
         assert result.valid is True

@@ -5,9 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, Field, model_validator, field_validator
+from pydantic import BaseModel, Field, field_validator
 
-# ChildElement was removed in favor of the unified NodeSpec
+
+class Bounds(BaseModel):
+    """Bounding box coordinates of the component on the original screen image."""
+
+    x: int
+    y: int
+    w: int
+    h: int
 
 
 class Interaction(BaseModel):
@@ -57,15 +64,6 @@ class Api(BaseModel):
     response: list[ApiPayload] = Field(default_factory=list)
 
 
-class Bounds(BaseModel):
-    """Bounding box coordinates of the component on the original screen image."""
-
-    x: int
-    y: int
-    w: int
-    h: int
-
-
 class NodeSpec(BaseModel):
     """A single visual or logical node (Screen, Component, or Element) in the flat tree."""
 
@@ -83,8 +81,6 @@ class NodeSpec(BaseModel):
     interactions: list[Interaction] = Field(default_factory=list)
     apis: list[Api] = Field(default_factory=list)
 
-
-
     @field_validator("required", "editable", mode="before")
     @classmethod
     def _parse_bool(cls, v):
@@ -97,7 +93,6 @@ class NodeSpec(BaseModel):
             if val in ("N", "NO", "FALSE", "0", "KHÔNG", "KHONG", "K"):
                 return False
         return bool(v)
-
 
 
 class ScreenSpec(BaseModel):
@@ -144,7 +139,7 @@ class ScreenSpec(BaseModel):
                 dfs_order.append(node_id)
 
         dfs(self.rootId)
-        
+
         # Collect APIs starting with Screen, then sub-components in DFS order
         res = list(self.screen.apis)
         for comp_id in dfs_order:

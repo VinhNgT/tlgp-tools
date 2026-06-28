@@ -247,7 +247,7 @@ def scaffold_and_save(
     scaffold = build_scaffold(state, export_path, section_prefix)
 
     # Write the JSON schema file to the export directory
-    from doc_generator.models import ScreenSpec
+    from tlgp_contracts import ScreenSpec
     schema_path = export_path / "schema.json"
     schema_path.write_text(
         json.dumps(ScreenSpec.model_json_schema(), indent=2, ensure_ascii=False),

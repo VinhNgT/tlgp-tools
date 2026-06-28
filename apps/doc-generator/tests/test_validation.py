@@ -2,7 +2,7 @@
 
 from pathlib import Path
 import pytest
-from doc_generator.models import (
+from tlgp_contracts import (
     NodeSpec,
     ScreenSpec,
     Api,

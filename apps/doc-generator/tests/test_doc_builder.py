@@ -1,7 +1,7 @@
 from typing import Any
 
 from doc_generator.doc_builder import build_document
-from doc_generator.models import (
+from tlgp_contracts import (
     NodeSpec,
     ScreenSpec,
     Api,

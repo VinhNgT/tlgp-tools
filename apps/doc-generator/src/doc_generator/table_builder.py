@@ -16,7 +16,7 @@ from docx.oxml.ns import nsdecls, qn
 from docx.shared import Pt
 from docx.table import Table
 
-from doc_generator.models import (
+from tlgp_contracts import (
     ScreenSpec,
     ApiParam,
     Interaction,

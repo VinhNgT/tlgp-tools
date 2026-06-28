@@ -1,15 +1,15 @@
 """Tests for Pydantic models."""
 
 import pytest
-from doc_generator.models import (
+from tlgp_contracts import (
     NodeSpec,
     ScreenSpec,
     Api,
     ApiParam,
     Interaction,
     ApiPayload,
-    Bounds,
 )
+from tlgp_contracts.spec import Bounds
 from pydantic import ValidationError
 
 

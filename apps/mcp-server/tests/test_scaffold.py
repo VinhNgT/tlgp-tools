@@ -7,14 +7,13 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 import pytest
-from doc_generator.models import ScreenSpec
 from mcp_server.scaffold import (
     ScaffoldResult,
     _walk_post_order_dfs,
     build_scaffold,
     scaffold_and_save,
 )
-from tlgp_contracts import Bounds, Component, ScreenInfo, WorkspaceState, ImageInfo
+from tlgp_contracts import Bounds, Component, ScreenInfo, WorkspaceState, ImageInfo, ScreenSpec
 
 
 def _make_component(

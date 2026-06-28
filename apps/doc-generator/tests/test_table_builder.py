@@ -1,7 +1,7 @@
 """Tests for table_builder — verifies table structure and styling."""
 
 import pytest
-from doc_generator.models import (
+from tlgp_contracts import (
     ApiParam,
     Interaction,
     NodeSpec,

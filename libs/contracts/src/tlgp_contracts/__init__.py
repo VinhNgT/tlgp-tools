@@ -18,6 +18,14 @@ from .workspace import (
     Style,
     WorkspaceState,
 )
+from .spec import (
+    Interaction,
+    ApiParam,
+    ApiPayload,
+    Api,
+    NodeSpec,
+    ScreenSpec,
+)
 
 import importlib.resources
 
@@ -42,5 +50,11 @@ __all__ = [
     "TreeUtils",
     "WorkspaceState",
     "get_example_spec_json",
+    "Interaction",
+    "ApiParam",
+    "ApiPayload",
+    "Api",
+    "NodeSpec",
+    "ScreenSpec",
 ]
 

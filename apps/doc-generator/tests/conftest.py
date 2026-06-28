@@ -2,7 +2,8 @@ import pytest
 
 def pytest_configure(config):
     print("pytest_configure RUNNING!")
-    from doc_generator.models import NodeSpec, ScreenSpec, Bounds, ApiParam
+    from tlgp_contracts import NodeSpec, ScreenSpec, ApiParam
+    from tlgp_contracts.spec import Bounds
     
     # Patch ApiParam.__init__ to inject required test defaults
     original_param_init = ApiParam.__init__

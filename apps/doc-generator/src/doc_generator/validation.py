@@ -13,9 +13,9 @@ from tlgp_contracts import (
     DEFAULT_UNIT_COST_ANNOTATION,
     DEFAULT_UNIT_COST_API,
     DEFAULT_UNIT_LIMIT,
+    Api,
+    ScreenSpec,
 )
-
-from .models import ScreenSpec, Api
 
 
 class ValidationResult(BaseModel):

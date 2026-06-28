@@ -42,3 +42,12 @@ To run tests:
 ```bash
 uv run pytest libs/contracts/
 ```
+
+### Spec Schema Synchronization
+
+The static JSON schema `libs/contracts/src/tlgp_contracts/spec_schema.json` is validated in unit tests to ensure it matches the Pydantic model (`ScreenSpec`) exactly. 
+
+If you make modifications to the Pydantic models in `spec.py`, regenerate the schema by running the following command:
+```bash
+python -c "import json, tlgp_contracts; print(json.dumps(tlgp_contracts.ScreenSpec.model_json_schema(), indent=2, ensure_ascii=False))" > libs/contracts/src/tlgp_contracts/spec_schema.json
+```
