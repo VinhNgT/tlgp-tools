@@ -72,17 +72,20 @@ class NodeSpec(BaseModel):
     """A single visual or logical node (Screen, Component, or Element) in the flat tree."""
 
     id: int
-    absoluteBounds: Bounds | None = None
+    absoluteBounds: Bounds = Field(default_factory=lambda: Bounds(x=0, y=0, w=0, h=0))
     label: str
     controlType: str | None = None
     required: bool | None = None
     maxLength: int | None = None
     editable: bool | None = None
     description: str | None = None
-    imageFiles: list[str] = Field(default_factory=list)  # Present for Screens and Components
+    rawImage: str = "dummy.png"
+    annotatedImages: list[str] = Field(default_factory=list)
     childrenIds: list[int] = Field(default_factory=list)  # Sibling order is preserved here
     interactions: list[Interaction] = Field(default_factory=list)
     apis: list[Api] = Field(default_factory=list)
+
+
 
     @field_validator("required", "editable", mode="before")
     @classmethod
@@ -109,9 +112,8 @@ class ScreenSpec(BaseModel):
     """Root schema for spec.json representing the normalized flat tree."""
 
     sectionPrefix: str = "1.1"
-    imageDir: str
     rootId: int = 0
-    nodes: list[NodeSpec] = Field(default_factory=list)
+    nodes: list[NodeSpec]
 
     @property
     def nodes_map(self) -> dict[int, NodeSpec]:
@@ -129,11 +131,11 @@ class ScreenSpec(BaseModel):
     @property
     def all_apis(self) -> list[Api]:
         """Combine APIs from the screen and all components in DFS order."""
-        dfs_order: list[str] = []
-        visited: set[str] = set()
+        dfs_order: list[int] = []
+        visited: set[int] = set()
         nodes_dict = self.nodes_map
 
-        def dfs(node_id: str):
+        def dfs(node_id: int):
             if node_id in visited:
                 return
             visited.add(node_id)
@@ -158,6 +160,10 @@ class ScreenSpec(BaseModel):
                 res.extend(comp.apis)
         return res
 
-    def resolve_image(self, relative_path: str) -> Path:
-        """Resolve an image filename relative to imageDir."""
-        return Path(self.imageDir) / relative_path
+    def resolve_annotated_image(self, path: str) -> Path:
+        """Resolve an annotated image path."""
+        return Path(path)
+
+    def resolve_raw_image(self, path: str) -> Path:
+        """Resolve a raw image path."""
+        return Path(path)

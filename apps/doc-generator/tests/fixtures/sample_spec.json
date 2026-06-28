@@ -1,6 +1,5 @@
 {
   "sectionPrefix": "1.1",
-  "imageDir": "./workspace_xyz/annotated",
   "rootId": 0,
   "nodes": [
     {
@@ -13,7 +12,8 @@
       },
       "label": "Chi tiết sản phẩm",
       "description": "Màn hình hiển thị chi tiết thông tin của một sản phẩm, cho phép người dùng xem thông tin, chọn thuộc tính và thêm vào giỏ hàng.",
-      "imageFiles": [
+      "rawImage": "raw/Chi_tiết_sản_phẩm.png",
+      "annotatedImages": [
         "Chi_tiết_sản_phẩm_1.png",
         "Chi_tiết_sản_phẩm_2.png"
       ],
@@ -77,7 +77,8 @@
       },
       "label": "Thanh tiêu đề",
       "description": "Thanh tiêu đề phía trên cùng của màn hình, chứa nút quay lại và tên sản phẩm",
-      "imageFiles": [
+      "rawImage": "raw/1_Thanh_tiêu_đề_a1b2c3d4.png",
+      "annotatedImages": [
         "1_Thanh_tiêu_đề_a1b2c3d4.png"
       ],
       "required": null,
@@ -139,7 +140,8 @@
       },
       "label": "Khối chọn thuộc tính sản phẩm",
       "description": "Khu vực cho phép người dùng lựa chọn màu sắc và kích thước sản phẩm trước khi mua hàng.",
-      "imageFiles": [
+      "rawImage": "raw/3_Khối_chọn_thuộc_tính_c5d6e7f8.png",
+      "annotatedImages": [
         "3_Khối_chọn_thuộc_tính_c5d6e7f8.png"
       ],
       "required": null,

@@ -28,7 +28,7 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
                 id=0,
                 label=screen_name,
                 description=screen_desc,
-                imageFiles=[],
+                annotatedImages=[],
                 childrenIds=[1],
                 apis=screen_apis,
             )
@@ -37,9 +37,13 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
             NodeSpec(id=1, label="Dummy", controlType="Text")
         )
 
+    for n in nodes:
+        n.annotatedImages = [str(Path(tmp_path) / img) if img and not Path(img).is_absolute() else img for img in n.annotatedImages]
+        if n.rawImage and n.rawImage != "dummy.png" and not Path(n.rawImage).is_absolute():
+            n.rawImage = str(Path(tmp_path) / n.rawImage)
+
     defaults = {
         "sectionPrefix": "1.1",
-        "imageDir": str(tmp_path),
         "nodes": nodes,
     }
     defaults.update(overrides)
@@ -305,7 +309,7 @@ class TestBuildDocumentWithImages:
                     id="1",
                     label="Nav",
                     description="Nav bar",
-                    imageFiles=["nonexistent.png"],
+                    annotatedImages=[str(tmp_path / "nonexistent.png")],
                     childrenIds=["2"],
                 ),
                 NodeSpec(id="2", label="Back", controlType="Icon"),
@@ -333,7 +337,7 @@ class TestBuildDocumentWithImages:
                     id="1",
                     label="Nav",
                     description="Nav bar",
-                    imageFiles=["test.png"],
+                    annotatedImages=[str(img_path)],
                     childrenIds=["2"],
                 ),
                 NodeSpec(id="2", label="Back", controlType="Icon"),
@@ -351,7 +355,7 @@ class TestBuildDocumentWithImages:
                     id="0",
                     label="Test Screen",
                     description="Test description",
-                    imageFiles=[],
+                    annotatedImages=[],
                     childrenIds=["1"],
                 ),
                 NodeSpec(id="1", label="Dummy", controlType="Text"),

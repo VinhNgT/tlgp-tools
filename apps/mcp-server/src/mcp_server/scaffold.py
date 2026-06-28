@@ -96,16 +96,21 @@ def build_scaffold(
 
     image_dir = str(export_dir.resolve())
 
-    # Build UUID → annotated image filename lookup
+    # Build UUID → image filename lookup
     annotated_mapping: dict[str, str] = {}
+    raw_mapping: dict[str, str] = {}
     if "annotated" in mapping:
         # "both" mode export
         annotated_mapping = mapping["annotated"].get("components", {})
-        root_images = mapping["annotated"].get("root", [])
+        annotated_root_images = mapping["annotated"].get("root", [])
+        raw_mapping = mapping["raw"].get("components", {})
+        raw_root_images = mapping["raw"].get("root", [])
     else:
         # single-mode export (annotated only)
         annotated_mapping = mapping.get("components", {})
-        root_images = mapping.get("root", [])
+        annotated_root_images = mapping.get("root", [])
+        raw_mapping = {}
+        raw_root_images = []
 
     # Build UUID -> integer ID mapping based on component number
     uuid_to_id = {}
@@ -139,17 +144,24 @@ def build_scaffold(
 
     screen_children_ids = [uuid_to_id[rid] for rid in state.rootComponents if rid in state.components and rid in uuid_to_id]
 
+    raw_screen_image_rel = raw_root_images[0] if raw_root_images else (annotated_root_images[0] if annotated_root_images else "raw/root.png")
+    annotated_screen_images_rel = list(annotated_root_images) if annotated_root_images else (list(raw_root_images) if raw_root_images else [])
+
+    raw_screen_image = str(export_dir / raw_screen_image_rel)
+    annotated_screen_images = [str(export_dir / img) for img in annotated_screen_images_rel]
+
     nodes.append({
         "id": 0,
         "absoluteBounds": {
             "x": 0,
             "y": 0,
-            "w": state.image.width,
-            "h": state.image.height,
-        } if state.image else None,
+            "w": state.image.width if state.image else 375,
+            "h": state.image.height if state.image else 812,
+        },
         "label": screen_name,
         "description": screen_desc,
-        "imageFiles": list(root_images),
+        "rawImage": raw_screen_image,
+        "annotatedImages": annotated_screen_images,
         "required": None,
         "editable": None,
         "childrenIds": screen_children_ids,
@@ -174,24 +186,29 @@ def build_scaffold(
         if is_leaf:
             control_type = "[TODO: Control Type (e.g. Button, Text, Icon, Image)]"
 
-        image_file = annotated_mapping.get(uuid_str)
-        image_files = [image_file] if image_file else []
+        raw_comp_img_rel = raw_mapping.get(uuid_str) or annotated_mapping.get(uuid_str) or f"raw/{uuid_str}.png"
+        ann_comp_img_rel = annotated_mapping.get(uuid_str) or raw_mapping.get(uuid_str)
+        annotated_comp_images_rel = [ann_comp_img_rel] if ann_comp_img_rel else []
+
+        raw_comp_img = str(export_dir / raw_comp_img_rel)
+        annotated_comp_images = [str(export_dir / img) for img in annotated_comp_images_rel]
 
         comp_node = {
             "id": uuid_to_id[uuid],
             "absoluteBounds": {
-                "x": comp.bounds.x,
-                "y": comp.bounds.y,
-                "w": comp.bounds.w,
-                "h": comp.bounds.h,
-            } if comp.bounds else None,
+                "x": comp.bounds.x if comp.bounds else 0,
+                "y": comp.bounds.y if comp.bounds else 0,
+                "w": comp.bounds.w if comp.bounds else 0,
+                "h": comp.bounds.h if comp.bounds else 0,
+            },
             "label": label,
             "controlType": control_type,
             "required": None,
             "maxLength": None,
             "editable": None,
             "description": _TODO_DESCRIPTION,
-            "imageFiles": image_files,
+            "rawImage": raw_comp_img,
+            "annotatedImages": annotated_comp_images,
             "childrenIds": [uuid_to_id[cid] for cid in comp.childrenIds if cid in state.components and cid in uuid_to_id],
             "interactions": [],
             "apis": [],
@@ -200,7 +217,6 @@ def build_scaffold(
 
     return {
         "sectionPrefix": section_prefix,
-        "imageDir": image_dir,
         "rootId": 0,
         "nodes": nodes,
     }

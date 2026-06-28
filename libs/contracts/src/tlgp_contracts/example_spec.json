@@ -1,6 +1,5 @@
 {
   "sectionPrefix": "1.1",
-  "imageDir": "./tests/fixtures/images",
   "rootId": 0,
   "nodes": [
     {
@@ -13,7 +12,8 @@
       },
       "label": "Màn hình chi tiết sản phẩm",
       "description": "Màn hình hiển thị toàn bộ thông tin chi tiết của sản phẩm bao gồm hình ảnh, giá cả, thông tin nhà bán hàng, các thuộc tính lựa chọn và các hành động mua hàng.",
-      "imageFiles": ["dummy_screen.png"],
+      "rawImage": "dummy_screen.png",
+      "annotatedImages": ["dummy_screen.png"],
       "required": null,
       "editable": null,
       "childrenIds": [1, 2],
@@ -66,7 +66,8 @@
       },
       "label": "Thanh tiêu đề điều hướng (Header)",
       "description": "Thanh công cụ nằm ở đầu màn hình, chứa tiêu đề của màn hình hiện tại và các nút điều hướng nhanh.",
-      "imageFiles": ["dummy_header.png"],
+      "rawImage": "dummy_header.png",
+      "annotatedImages": ["dummy_header.png"],
       "required": null,
       "editable": null,
       "childrenIds": [3, 6],
@@ -98,7 +99,8 @@
       },
       "label": "Khối điều khiển nút chức năng quay lại",
       "description": "Nút bấm chứa biểu tượng mũi tên quay lại màn hình trước đó, xử lý lưu trạng thái tạm thời nếu có.",
-      "imageFiles": ["dummy_back_button.png"],
+      "rawImage": "dummy_back_button.png",
+      "annotatedImages": ["dummy_back_button.png"],
       "required": null,
       "editable": null,
       "childrenIds": [4, 5],

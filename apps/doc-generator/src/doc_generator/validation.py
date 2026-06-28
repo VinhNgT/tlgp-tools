@@ -60,7 +60,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
         seen_ids.add(n.id)
 
     screen = data.screen
-    non_leaf = [n for n in data.nodes if n.id != data.rootId and (len(n.childrenIds) > 0 or len(n.imageFiles) > 0)]
+    non_leaf = [n for n in data.nodes if n.id != data.rootId and (len(n.childrenIds) > 0 or len(n.annotatedImages) > 0)]
     all_components = [screen] + non_leaf
 
     result = ValidationResult(
@@ -71,7 +71,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
         apis=len(data.all_apis),
     )
 
-    base_dir = Path(data.imageDir).resolve()
+
 
     # --- Structural integrity checks (Parent-child references) ---
     nodes_dict = data.nodes_map
@@ -134,7 +134,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
     # Warn about unreachable orphan nodes
     for node in data.nodes:
         if node.id != data.rootId and node.id not in reachable:
-            node_type = "Component" if (len(node.childrenIds) > 0 or len(node.imageFiles) > 0) else "Element"
+            node_type = "Component" if (len(node.childrenIds) > 0 or len(node.annotatedImages) > 0) else "Element"
             result.warnings.append(
                 f"{node_type} '{node.label}' (id={node.id}) is defined in nodes list but never referenced in the tree hierarchy"
             )
@@ -143,30 +143,44 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
     for comp in all_components:
         is_screen = (comp.id == data.rootId)
         if not skip_image_validation:
-            if not comp.imageFiles:
+            # 1. Check annotatedImages
+            if not comp.annotatedImages:
                 if is_screen:
                     result.errors.append("No screen-level images specified")
                 else:
                     result.errors.append(
-                        f"Component '{comp.label}' (id={comp.id}): no imageFiles specified"
+                        f"Component '{comp.label}' (id={comp.id}): no annotatedImages specified"
                     )
-            for img_file in comp.imageFiles:
+            for img_file in comp.annotatedImages:
                 if img_file:
-                    img = data.resolve_image(img_file)
-                    if not img.resolve().is_relative_to(base_dir):
-                        err_msg = (
-                            f"Screen image path escapes imageDir: {img_file}"
-                            if is_screen
-                            else f"Component '{comp.label}' (id={comp.id}): image path escapes imageDir: {img_file}"
-                        )
-                        result.errors.append(err_msg)
-                    elif not img.exists():
+                    img = data.resolve_annotated_image(img_file)
+                    if not img.exists():
                         err_msg = (
                             f"Screen image not found: {img}"
                             if is_screen
                             else f"Component '{comp.label}' (id={comp.id}): image not found: {img}"
                         )
                         result.errors.append(err_msg)
+
+            # 2. Check rawImage
+            if not comp.rawImage:
+                if is_screen:
+                    result.errors.append("Screen has no rawImage specified")
+                else:
+                    result.errors.append(
+                        f"Component '{comp.label}' (id={comp.id}): no rawImage specified"
+                    )
+            elif comp.rawImage == "dummy.png":
+                pass
+            else:
+                raw_img = data.resolve_raw_image(comp.rawImage)
+                if not raw_img.exists():
+                    err_msg = (
+                        f"Screen raw image not found: {raw_img}"
+                        if is_screen
+                        else f"Component '{comp.label}' (id={comp.id}): raw image not found: {raw_img}"
+                    )
+                    result.errors.append(err_msg)
 
         if not comp.description:
             if is_screen:
@@ -186,7 +200,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                 )
 
     # Update summary images count
-    result.images = sum(len(c.imageFiles) for c in all_components)
+    result.images = sum(len(c.annotatedImages) for c in all_components)
 
     # --- Content completeness warnings ---
     # Check for empty controlType in Element (leaf) nodes that are reachable

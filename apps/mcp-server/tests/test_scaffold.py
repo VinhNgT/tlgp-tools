@@ -140,14 +140,13 @@ class TestBuildScaffold:
         scaffold = build_scaffold(state, tmp_path)
 
         assert scaffold["sectionPrefix"] == "1.1"
-        assert scaffold["imageDir"] == str(tmp_path.resolve())
         assert len(scaffold["nodes"]) == 2  # screen + comp
 
         # Screen (id=0)
         screen_node = scaffold["nodes"][0]
         assert screen_node["id"] == 0
         assert "Trang chủ" in screen_node["label"]
-        assert screen_node["imageFiles"] == ["annotated/root_Trang_chu.png"]
+        assert screen_node["annotatedImages"] == [str(tmp_path / "annotated/root_Trang_chu.png")]
         assert screen_node["childrenIds"] == [1]
         assert screen_node["absoluteBounds"] == {"x": 0, "y": 0, "w": 375, "h": 812}
 
@@ -156,7 +155,7 @@ class TestBuildScaffold:
         assert comp_entry["id"] == 1
         assert comp_entry["absoluteBounds"] == {"x": 0, "y": 0, "w": 100, "h": 100}
         # In the new logic, the leaf gets a default imageFiles with its screenshot if mapped
-        assert comp_entry["imageFiles"] == [f"annotated/1_Comp_{str(comp.id)[:8]}.png"]
+        assert comp_entry["annotatedImages"] == [str(tmp_path / f"annotated/1_Comp_{str(comp.id)[:8]}.png")]
         assert comp_entry["childrenIds"] == []
 
     def test_non_leaf_component_gets_image_file(self, tmp_path):
@@ -191,8 +190,8 @@ class TestBuildScaffold:
         child_entry = nodes_map[1]
         parent_entry = nodes_map[2]
 
-        assert child_entry["imageFiles"] == [child_img]
-        assert parent_entry["imageFiles"] == [parent_img]
+        assert child_entry["annotatedImages"] == [str(tmp_path / child_img)]
+        assert parent_entry["annotatedImages"] == [str(tmp_path / parent_img)]
 
     def test_retains_annotated_prefix_for_image_paths(self, tmp_path):
         """Image paths in the scaffold should retain the 'annotated/' prefix."""
@@ -225,10 +224,10 @@ class TestBuildScaffold:
         comp_entry = nodes_map[1]
 
         # Screen imageFiles should have the prefix
-        assert screen_node["imageFiles"] == ["annotated/root_screen.png"]
+        assert screen_node["annotatedImages"] == [str(tmp_path / "annotated/root_screen.png")]
 
         # Non-leaf component imageFile should have the prefix
-        assert comp_entry["imageFiles"] == ["annotated/1_Header_abc12345.png"]
+        assert comp_entry["annotatedImages"] == [str(tmp_path / "annotated/1_Header_abc12345.png")]
 
     def test_placeholder_screen_name_when_empty(self, tmp_path):
         """Empty screen name gets a TODO placeholder."""

@@ -80,7 +80,6 @@ class TestScreenSpec:
     def test_valid_with_real_dir(self, tmp_path):
         data = ScreenSpec(
             sectionPrefix="1.1",
-            imageDir=str(tmp_path),
             nodes=[NodeSpec(id=0, label="Test")],
         )
         assert data.sectionPrefix == "1.1"
@@ -90,10 +89,9 @@ class TestScreenSpec:
     def test_resolve_image(self, tmp_path):
         (tmp_path / "test.png").touch()
         data = ScreenSpec(
-            imageDir=str(tmp_path),
             nodes=[NodeSpec(id=0, label="Test")],
         )
-        resolved = data.resolve_image("test.png")
+        resolved = data.resolve_annotated_image(str(tmp_path / "test.png"))
         assert resolved == tmp_path / "test.png"
         assert resolved.exists()
 
@@ -102,7 +100,6 @@ class TestJsonRoundTrip:
     def test_serialize_and_deserialize(self, tmp_path):
         data = ScreenSpec(
             sectionPrefix="2.3",
-            imageDir=str(tmp_path),
             nodes=[
                 NodeSpec(
                     id=1,

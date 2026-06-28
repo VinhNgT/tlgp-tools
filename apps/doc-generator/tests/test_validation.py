@@ -26,7 +26,7 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
                 id=0,
                 label="Test",
                 description="desc desc desc",
-                imageFiles=["screen.png"],
+                annotatedImages=[str(Path(tmp_path) / "screen.png")],
                 childrenIds=[1],
                 apis=[Api(name="GET Test", url="/test")],
                 required=False,
@@ -43,15 +43,20 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
             )
         )
     else:
-        # touch any defined image files to avoid validation issues
+        # Resolve all relative paths to absolute and touch them
         for n in nodes:
-            for img_file in n.imageFiles:
+            n.annotatedImages = [str(Path(tmp_path) / img) if img and not Path(img).is_absolute() else img for img in n.annotatedImages]
+            if n.rawImage and n.rawImage != "dummy.png" and not Path(n.rawImage).is_absolute():
+                n.rawImage = str(Path(tmp_path) / n.rawImage)
+
+            for img_file in n.annotatedImages:
                 if img_file:
-                    (Path(tmp_path) / img_file).touch()
+                    Path(img_file).touch()
+            if n.rawImage and n.rawImage != "dummy.png":
+                Path(n.rawImage).touch()
 
     defaults = {
         "sectionPrefix": "1.1",
-        "imageDir": str(tmp_path),
         "nodes": nodes,
     }
     defaults.update(overrides)
@@ -71,7 +76,7 @@ class TestValidateSpec:
                     id="0",
                     label="Test Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1", "2"],
                     apis=[Api(name="GET Test", url="/test")],
                 ),
@@ -79,7 +84,7 @@ class TestValidateSpec:
                     id="1",
                     label="Comp 1",
                     description="desc desc desc",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=["3"],
                     interactions=[Interaction(action="Click", reaction="Test")],
                 ),
@@ -110,20 +115,20 @@ class TestValidateSpec:
 
     def test_missing_images(self, tmp_path):
         spec = ScreenSpec(
-            imageDir=str(tmp_path),
+            
             nodes=[
                 NodeSpec(
                     id="0",
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["missing_screen.png"],
+                    annotatedImages=["missing_screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Comp 1",
                     description="desc desc desc",
-                    imageFiles=["missing_comp.png"],
+                    annotatedImages=["missing_comp.png"],
                     childrenIds=["2"],
                 ),
                 NodeSpec(
@@ -150,14 +155,14 @@ class TestValidateSpec:
                     id="0",
                     label="Test Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Comp 1",
                     description="",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=["2"],
                 ),
                 NodeSpec(
@@ -182,14 +187,14 @@ class TestValidateSpec:
                     id="0",
                     label="Test Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Comp 1",
                     description="desc",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=[],
                 )
             ],
@@ -208,7 +213,7 @@ class TestValidateSpec:
                     id="0",
                     label="Test",
                     description="",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
@@ -231,7 +236,7 @@ class TestValidateSpec:
                     id="0",
                     label="Test",
                     description="desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=[],
                 )
             ],
@@ -248,7 +253,7 @@ class TestValidateSpec:
                     id="0",
                     label="Test",
                     description="desc",
-                    imageFiles=[],
+                    annotatedImages=[],
                     childrenIds=["1"],
                     apis=[Api(name="GET Test", url="/test")],
                 ),
@@ -273,14 +278,14 @@ class TestValidateSpec:
                     id="0",
                     label="Test",
                     description="desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Comp 1",
                     description="desc",
-                    imageFiles=[],
+                    annotatedImages=[],
                     childrenIds=["2"],
                 ),
                 NodeSpec(
@@ -293,41 +298,8 @@ class TestValidateSpec:
 
         result = validate_spec(spec)
         assert result.valid is False
-        assert any("no imageFiles specified" in err for err in result.errors)
+        assert any("no annotatedImages specified" in err for err in result.errors)
 
-    def test_error_image_path_traversal(self, tmp_path):
-        (Path(tmp_path) / "screen.png").touch()
-        outside_file = Path(tmp_path).parent / "outside.png"
-        outside_file.touch()
-
-        spec = _minimal_spec(
-            tmp_path,
-            nodes=[
-                NodeSpec(
-                    id="0",
-                    label="Test",
-                    description="desc",
-                    imageFiles=["screen.png"],
-                    childrenIds=["1"],
-                ),
-                NodeSpec(
-                    id="1",
-                    label="Comp 1",
-                    description="desc",
-                    imageFiles=["../outside.png"],
-                    childrenIds=["2"],
-                ),
-                NodeSpec(
-                    id="2",
-                    label="Button",
-                    controlType="Button",
-                ),
-            ],
-        )
-        result = validate_spec(spec)
-        assert result.valid is False
-        assert any("escapes imageDir" in e for e in result.errors)
-        outside_file.unlink()
 
     def test_warnings_empty_labels(self, tmp_path):
         (Path(tmp_path) / "screen.png").touch()
@@ -338,14 +310,14 @@ class TestValidateSpec:
                     id="0",
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
                     id="1",
                     label=" ",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["2"],
                     interactions=[Interaction(action="A", reaction="B")],
                 ),
@@ -370,14 +342,14 @@ class TestValidateSpec:
                     id="0",
                     label="Test Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["2"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Orphan Component",
                     description="desc desc desc",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=["3"],
                 ),
                 NodeSpec(
@@ -405,7 +377,7 @@ class TestValidateSpec:
                     id="0",
                     label="Test",
                     description="short",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
@@ -428,7 +400,7 @@ class TestValidateSpec:
                     id="0",
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                     apis=[
                         Api(
@@ -459,20 +431,20 @@ class TestValidateSpec:
 
     def test_skip_image_validation(self, tmp_path):
         spec = ScreenSpec(
-            imageDir=str(tmp_path),
+            
             nodes=[
                 NodeSpec(
                     id="0",
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["missing_screen.png"],
+                    annotatedImages=["missing_screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Comp 1",
                     description="desc desc desc",
-                    imageFiles=["missing_comp.png"],
+                    annotatedImages=["missing_comp.png"],
                     childrenIds=["2"],
                 ),
                 NodeSpec(
@@ -488,7 +460,7 @@ class TestValidateSpec:
 
     def test_error_multiple_screens(self, tmp_path):
         spec = ScreenSpec(
-            imageDir=str(tmp_path),
+            
             nodes=[
                 NodeSpec(
                     id="0",
@@ -510,7 +482,7 @@ class TestValidateSpec:
 
     def test_error_zero_screens(self, tmp_path):
         spec = ScreenSpec(
-            imageDir=str(tmp_path),
+            
             nodes=[
                 NodeSpec(
                     id="1",
@@ -526,7 +498,7 @@ class TestValidateSpec:
 
     def test_error_duplicate_node_ids(self, tmp_path):
         spec = ScreenSpec(
-            imageDir=str(tmp_path),
+            
             nodes=[
                 NodeSpec(id="0", label="Screen", description="desc", childrenIds=["1"]),
                 NodeSpec(id="1", label="Button A", controlType="Button"),
@@ -546,7 +518,7 @@ class TestValidateSpec:
                     id="0",
                     label="Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["99"],  # Non-existent child
                 )
             ]
@@ -565,14 +537,14 @@ class TestValidateSpec:
                     id="0",
                     label="Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1", "2"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Comp 1",
                     description="desc desc desc",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=["2"],  # Child ID 2 has parent 1
                 ),
                 NodeSpec(
@@ -597,21 +569,21 @@ class TestValidateSpec:
                     id="0",
                     label="Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
                     id="1",
                     label="Comp 1",
                     description="desc desc desc",
-                    imageFiles=["comp1.png"],
+                    annotatedImages=["comp1.png"],
                     childrenIds=["2"],
                 ),
                 NodeSpec(
                     id="2",
                     label="Comp 2",
                     description="desc desc desc",
-                    imageFiles=["comp2.png"],
+                    annotatedImages=["comp2.png"],
                     childrenIds=["1"],  # Cycle: 1 -> 2 -> 1
                 ),
             ]
@@ -647,7 +619,7 @@ class TestUnitLimitValidation:
                     id=0,
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=[c.id for c in children],
                 )
             ] + children
@@ -666,7 +638,7 @@ class TestUnitLimitValidation:
                     id=0,
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=[c.id for c in children],
                     apis=self._make_apis(1),
                 )
@@ -690,14 +662,14 @@ class TestUnitLimitValidation:
                     id=0,
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=[1],
                 ),
                 NodeSpec(
                     id=1,
                     label="Big Component",
                     description="desc desc desc",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=[c.id for c in children],
                     interactions=[Interaction(action="Click", reaction="React")],
                     apis=self._make_apis(1),
@@ -719,14 +691,14 @@ class TestUnitLimitValidation:
                     id=0,
                     label="Test",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=[1],
                 ),
                 NodeSpec(
                     id=1,
                     label="Heavy Component",
                     description="desc desc desc",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=[c.id for c in children],
                     interactions=[Interaction(action="Click", reaction="React")],
                     apis=self._make_apis(4),
@@ -749,7 +721,7 @@ class TestUnitLimitValidation:
                     id="0",
                     label="Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(id="1", label="Button", controlType="Button"),
@@ -770,7 +742,7 @@ class TestUnitLimitValidation:
                     id="0",
                     label="Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                 ),
                 NodeSpec(
@@ -778,7 +750,7 @@ class TestUnitLimitValidation:
                     label="Component with ControlType",
                     controlType="Button",
                     description="desc desc desc",
-                    imageFiles=["comp.png"],
+                    annotatedImages=["comp.png"],
                     childrenIds=["2"],
                 ),
                 NodeSpec(id="2", label="Child", controlType="Text"),
@@ -797,7 +769,7 @@ class TestUnitLimitValidation:
                     id="0",
                     label="Screen",
                     description="desc desc desc",
-                    imageFiles=["screen.png"],
+                    annotatedImages=["screen.png"],
                     childrenIds=["1"],
                     interactions=[Interaction(action=" ", reaction="Reaction")],
                 ),

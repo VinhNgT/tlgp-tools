@@ -51,10 +51,13 @@ class TestExampleAnalysisValidation:
         raw_json = get_example_spec_json()
         data_dict = json.loads(raw_json)
 
-        # Override imageDir and create files
-        data_dict["imageDir"] = str(tmp_path)
+        # Convert relative image paths to absolute and touch them
+        for node in data_dict.get("nodes", []):
+            if "rawImage" in node and node["rawImage"] and node["rawImage"] != "dummy.png":
+                node["rawImage"] = str(tmp_path / node["rawImage"])
+            if "annotatedImages" in node:
+                node["annotatedImages"] = [str(tmp_path / img) for img in node["annotatedImages"]]
 
-        # Touch the required files defined in the example spec
         (tmp_path / "dummy_screen.png").touch()
         (tmp_path / "dummy_header.png").touch()
         (tmp_path / "dummy_back_button.png").touch()

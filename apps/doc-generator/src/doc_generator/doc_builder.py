@@ -111,7 +111,7 @@ def _add_content_section(
     _add_h4(doc, f"{section_number}.{sub} Màn hình chức năng", style)
     for img_file in image_files:
         if img_file:
-            image_path = analysis.resolve_image(img_file)
+            image_path = analysis.resolve_annotated_image(img_file)
             insert_image(doc, image_path, full_width=True)
     sub += 1
 
@@ -156,7 +156,7 @@ def _add_component_section(
         info_label="Tên chức năng",
         info_value=f"Component {component.label}",
         info_description=component.description,
-        image_files=component.imageFiles,
+        image_files=component.annotatedImages,
         children=component.childrenIds,
         interactions=component.interactions,
         apis=component.apis,
@@ -180,7 +180,7 @@ def _add_screen_section(
         info_label="Tên màn hình",
         info_value=f"Màn hình {screen.label}",
         info_description=screen.description,
-        image_files=screen.imageFiles,
+        image_files=screen.annotatedImages,
         children=screen.childrenIds,
         interactions=screen.interactions,
         apis=screen.apis,

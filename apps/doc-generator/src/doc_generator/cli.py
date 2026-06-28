@@ -89,7 +89,10 @@ def _print_summary(spec: ScreenSpec):
     logger.info("  TLGP Doc Generator — Dry Run Summary")
     logger.info("=" * 50)
     logger.info("  Section prefix:     %s", spec.sectionPrefix)
-    logger.info("  Export dir:         %s", spec.imageDir)
+    export_dir = "N/A"
+    if spec.screen.rawImage and spec.screen.rawImage != "dummy.png":
+        export_dir = str(Path(spec.screen.rawImage).parent)
+    logger.info("  Export dir:         %s", export_dir)
     logger.info("  Screen:             %s", spec.screen.label)
     logger.info("")
     logger.info("  Components:         %d sub-components", len(sub_components))
@@ -110,14 +113,14 @@ def _print_summary(spec: ScreenSpec):
     image_count = 0
     missing_images = []
     for c in sub_components:
-        for img_file in c.imageFiles:
+        for img_file in c.annotatedImages:
             if img_file:
-                img = spec.resolve_image(img_file)
+                img = spec.resolve_annotated_image(img_file)
                 image_count += 1
                 if not img.exists():
                     missing_images.append(str(img))
-    for img_file in spec.screen.imageFiles:
-        img = spec.resolve_image(img_file)
+    for img_file in spec.screen.annotatedImages:
+        img = spec.resolve_annotated_image(img_file)
         image_count += 1
         if not img.exists():
             missing_images.append(str(img))

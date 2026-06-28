@@ -62,14 +62,14 @@ class TestCliDryRun:
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
-            "imageDir": str(tmp_path),
+            
             "rootId": 0,
             "nodes": [
                 {
                     "id": 0,
                     "label": "Test",
                     "description": "desc desc desc",
-                    "imageFiles": ["test.png"],
+                    "annotatedImages": [str(tmp_path / "test.png")],
                     "childrenIds": [1],
                 },
                 {
@@ -95,14 +95,14 @@ class TestCliGeneration:
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
-            "imageDir": str(tmp_path),
+            
             "rootId": 0,
             "nodes": [
                 {
                     "id": 0,
                     "label": "My Screen",
                     "description": "D",
-                    "imageFiles": ["test.png"],
+                    "annotatedImages": [str(tmp_path / "test.png")],
                     "childrenIds": [1],
                 },
                 {
@@ -126,14 +126,14 @@ class TestCliGeneration:
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
-            "imageDir": str(tmp_path),
+            
             "rootId": 0,
             "nodes": [
                 {
                     "id": 0,
                     "label": "Product Detail",
                     "description": "desc desc desc",
-                    "imageFiles": ["test.png"],
+                    "annotatedImages": [str(tmp_path / "test.png")],
                     "childrenIds": [1],
                 },
                 {
@@ -156,14 +156,14 @@ class TestCliGeneration:
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
-            "imageDir": str(tmp_path),
+            
             "rootId": 0,
             "nodes": [
                 {
                     "id": 0,
                     "label": "My Screen",
                     "description": "D",
-                    "imageFiles": ["test.png"],
+                    "annotatedImages": [str(tmp_path / "test.png")],
                     "childrenIds": [1],
                 },
                 {
@@ -190,14 +190,14 @@ class TestCliGeneration:
         Image.new("RGB", (10, 10)).save(tmp_path / "test.png")
         analysis = {
             "sectionPrefix": "1.1",
-            "imageDir": str(tmp_path),
+            
             "rootId": 0,
             "nodes": [
                 {
                     "id": 0,
                     "label": "My Screen",
                     "description": "D",
-                    "imageFiles": ["test.png"],
+                    "annotatedImages": [str(tmp_path / "test.png")],
                     "childrenIds": [1],
                 },
                 {
@@ -232,21 +232,21 @@ class TestCliImageWarnings:
     def test_validation_enforced_in_human_readable_mode(self, tmp_path, capsys):
         analysis = {
             "sectionPrefix": "1.1",
-            "imageDir": str(tmp_path),
+            
             "rootId": 0,
             "nodes": [
                 {
                     "id": 0,
                     "label": "T",
                     "description": "desc desc desc",
-                    "imageFiles": ["missing.png"],
+                    "annotatedImages": ["missing.png"],
                     "childrenIds": [1],
                 },
                 {
                     "id": 1,
                     "label": "A",
                     "description": "desc desc desc",
-                    "imageFiles": ["also_missing.png"],
+                    "annotatedImages": ["also_missing.png"],
                     "childrenIds": [2],
                 },
                 {
@@ -270,21 +270,21 @@ class TestCliImageWarnings:
     def test_skip_image_validation_cli(self, tmp_path):
         analysis = {
             "sectionPrefix": "1.1",
-            "imageDir": str(tmp_path),
+            
             "rootId": 0,
             "nodes": [
                 {
                     "id": 0,
                     "label": "T",
                     "description": "desc desc desc",
-                    "imageFiles": ["missing.png"],
+                    "annotatedImages": ["missing.png"],
                     "childrenIds": [1],
                 },
                 {
                     "id": 1,
                     "label": "A",
                     "description": "desc desc desc",
-                    "imageFiles": ["also_missing.png"],
+                    "annotatedImages": ["also_missing.png"],
                     "childrenIds": [2],
                 },
                 {
