@@ -59,10 +59,20 @@ class Api(BaseModel):
     response: list[ApiPayload] = Field(default_factory=list)
 
 
+class Bounds(BaseModel):
+    """Bounding box coordinates of the component on the original screen image."""
+
+    x: int
+    y: int
+    w: int
+    h: int
+
+
 class NodeSpec(BaseModel):
     """A single visual or logical node (Screen, Component, or Element) in the flat tree."""
 
-    id: str  # Globally unique ID (can be UUID string or number string)
+    id: int
+    absoluteBounds: Bounds | None = None
     label: str
     controlType: str | None = None
     required: bool | None = None
@@ -70,7 +80,7 @@ class NodeSpec(BaseModel):
     editable: bool | None = None
     description: str | None = None
     imageFiles: list[str] = Field(default_factory=list)  # Present for Screens and Components
-    childrenIds: list[str] = Field(default_factory=list)  # Sibling order is preserved here
+    childrenIds: list[int] = Field(default_factory=list)  # Sibling order is preserved here
     interactions: list[Interaction] = Field(default_factory=list)
     apis: list[Api] = Field(default_factory=list)
 
@@ -100,11 +110,11 @@ class ScreenSpec(BaseModel):
 
     sectionPrefix: str = "1.1"
     imageDir: str
-    rootId: str = "0"  # Entry point of the tree (always Screen "0" or Screen UUID string)
+    rootId: int = 0
     nodes: list[NodeSpec] = Field(default_factory=list)
 
     @property
-    def nodes_map(self) -> dict[str, NodeSpec]:
+    def nodes_map(self) -> dict[int, NodeSpec]:
         """Helper mapping node ID to node object for O(1) lookups."""
         return {n.id: n for n in self.nodes}
 

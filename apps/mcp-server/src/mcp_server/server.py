@@ -113,16 +113,6 @@ mcp = FastMCP(
 # ============================================================
 
 
-@mcp.resource("tlgp://workspace/state")
-async def get_workspace_state_resource() -> str:
-    """Read-only access to the latest flat-map JSON WorkspaceState."""
-    client = _lifespan_state.client
-    if not client:
-        raise RuntimeError("Workspace client not initialized")
-    state = await client.get_workspace_state()
-    return json.dumps(state.model_dump(mode="json"), indent=2, ensure_ascii=False)
-
-
 @mcp.resource("tlgp://spec/workflow")
 def get_spec_workflow_resource() -> str:
     """End-to-end workflow guide for creating specification documents."""

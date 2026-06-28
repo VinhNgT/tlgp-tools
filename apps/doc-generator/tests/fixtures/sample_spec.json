@@ -1,10 +1,16 @@
 {
   "sectionPrefix": "1.1",
   "imageDir": "./workspace_xyz/annotated",
-  "rootId": "0",
+  "rootId": 0,
   "nodes": [
     {
-      "id": "0",
+      "id": 0,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 0,
+        "w": 375,
+        "h": 812
+      },
       "label": "Chi tiết sản phẩm",
       "description": "Màn hình hiển thị chi tiết thông tin của một sản phẩm, cho phép người dùng xem thông tin, chọn thuộc tính và thêm vào giỏ hàng.",
       "imageFiles": [
@@ -13,7 +19,7 @@
       ],
       "required": null,
       "editable": null,
-      "childrenIds": ["1", "2", "3", "4"],
+      "childrenIds": [1, 2, 3, 4],
       "interactions": [
         {
           "action": "Vuốt màn hình lên/xuống",
@@ -62,7 +68,13 @@
       ]
     },
     {
-      "id": "1",
+      "id": 1,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 0,
+        "w": 375,
+        "h": 50
+      },
       "label": "Thanh tiêu đề",
       "description": "Thanh tiêu đề phía trên cùng của màn hình, chứa nút quay lại và tên sản phẩm",
       "imageFiles": [
@@ -70,7 +82,7 @@
       ],
       "required": null,
       "editable": null,
-      "childrenIds": ["5", "6"],
+      "childrenIds": [5, 6],
       "interactions": [
         {
           "action": "Nhấn vào nút quay lại",
@@ -103,7 +115,13 @@
       ]
     },
     {
-      "id": "2",
+      "id": 2,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 50,
+        "w": 375,
+        "h": 200
+      },
       "label": "Ảnh banner quảng cáo",
       "controlType": "Image",
       "required": false,
@@ -112,7 +130,13 @@
       "description": "Hình ảnh quảng cáo sản phẩm"
     },
     {
-      "id": "3",
+      "id": 3,
+      "absoluteBounds": {
+        "x": 10,
+        "y": 260,
+        "w": 355,
+        "h": 100
+      },
       "label": "Khối chọn thuộc tính sản phẩm",
       "description": "Khu vực cho phép người dùng lựa chọn màu sắc và kích thước sản phẩm trước khi mua hàng.",
       "imageFiles": [
@@ -120,7 +144,7 @@
       ],
       "required": null,
       "editable": null,
-      "childrenIds": ["7", "8"],
+      "childrenIds": [7, 8],
       "interactions": [
         {
           "action": "Nhấn chọn một tùy chọn màu sắc hoặc kích cỡ",
@@ -212,7 +236,13 @@
       ]
     },
     {
-      "id": "4",
+      "id": 4,
+      "absoluteBounds": {
+        "x": 10,
+        "y": 600,
+        "w": 100,
+        "h": 40
+      },
       "label": "Nút chat với người bán",
       "controlType": "Button",
       "required": false,
@@ -221,7 +251,13 @@
       "description": "Nút mở màn hình chat với cửa hàng"
     },
     {
-      "id": "5",
+      "id": 5,
+      "absoluteBounds": {
+        "x": 10,
+        "y": 10,
+        "w": 30,
+        "h": 30
+      },
       "label": "Nút quay lại",
       "controlType": "Icon",
       "required": false,
@@ -230,7 +266,13 @@
       "description": "Biểu tượng mũi tên quay lại màn hình trước"
     },
     {
-      "id": "6",
+      "id": 6,
+      "absoluteBounds": {
+        "x": 50,
+        "y": 10,
+        "w": 200,
+        "h": 30
+      },
       "label": "Tiêu đề sản phẩm",
       "controlType": "Text",
       "required": false,
@@ -239,7 +281,13 @@
       "description": "Hiển thị tên của sản phẩm đang xem chi tiết"
     },
     {
-      "id": "7",
+      "id": 7,
+      "absoluteBounds": {
+        "x": 20,
+        "y": 280,
+        "w": 300,
+        "h": 30
+      },
       "label": "Danh sách màu sắc",
       "controlType": "Tabbar",
       "required": true,
@@ -248,7 +296,13 @@
       "description": "Các tùy chọn màu sắc hiển thị dưới dạng danh sách nhãn tròn"
     },
     {
-      "id": "8",
+      "id": 8,
+      "absoluteBounds": {
+        "x": 20,
+        "y": 320,
+        "w": 300,
+        "h": 30
+      },
       "label": "Danh sách kích thước",
       "controlType": "Tabbar",
       "required": true,

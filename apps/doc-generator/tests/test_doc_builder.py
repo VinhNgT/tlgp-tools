@@ -20,21 +20,21 @@ def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
     screen_name = overrides.pop("screen_name", "Test Screen")
     nodes = overrides.pop("nodes", [])
 
-    # Ensure exactly one screen component (id == "0") exists
-    screen_comp = [n for n in nodes if n.id == "0"]
+    # Ensure exactly one screen component (id == 0) exists
+    screen_comp = [n for n in nodes if n.id == 0]
     if not screen_comp:
         nodes.append(
             NodeSpec(
-                id="0",
+                id=0,
                 label=screen_name,
                 description=screen_desc,
                 imageFiles=[],
-                childrenIds=["1"],
+                childrenIds=[1],
                 apis=screen_apis,
             )
         )
         nodes.append(
-            NodeSpec(id="1", label="Dummy", controlType="Text")
+            NodeSpec(id=1, label="Dummy", controlType="Text")
         )
 
     defaults = {
@@ -264,16 +264,16 @@ class TestBuildDocumentWithApis:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id=0,
                     label="Test Screen",
                     description="Desc",
-                    childrenIds=["1"],
+                    childrenIds=[1],
                 ),
                 NodeSpec(
-                    id="1",
+                    id=1,
                     label="Header",
                     description="Header component",
-                    childrenIds=["2"],
+                    childrenIds=[2],
                     apis=[
                         Api(
                             name="GET Get Header Data",
@@ -281,7 +281,7 @@ class TestBuildDocumentWithApis:
                         ),
                     ],
                 ),
-                NodeSpec(id="2", label="Back", controlType="Icon"),
+                NodeSpec(id=2, label="Back", controlType="Icon"),
             ],
         )
         doc = build_document(analysis)

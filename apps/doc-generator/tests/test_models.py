@@ -14,8 +14,8 @@ from pydantic import ValidationError
 
 class TestNodeSpec:
     def test_required_fields(self):
-        c = NodeSpec(id="1", label="Submit", controlType="Button")
-        assert c.id == "1"
+        c = NodeSpec(id=1, label="Submit", controlType="Button")
+        assert c.id == 1
         assert c.label == "Submit"
         assert c.controlType == "Button"
         assert c.required is None
@@ -81,7 +81,7 @@ class TestScreenSpec:
         data = ScreenSpec(
             sectionPrefix="1.1",
             imageDir=str(tmp_path),
-            nodes=[NodeSpec(id="0", label="Test")],
+            nodes=[NodeSpec(id=0, label="Test")],
         )
         assert data.sectionPrefix == "1.1"
         assert len(data.nodes) == 1
@@ -91,7 +91,7 @@ class TestScreenSpec:
         (tmp_path / "test.png").touch()
         data = ScreenSpec(
             imageDir=str(tmp_path),
-            nodes=[NodeSpec(id="0", label="Test")],
+            nodes=[NodeSpec(id=0, label="Test")],
         )
         resolved = data.resolve_image("test.png")
         assert resolved == tmp_path / "test.png"
@@ -105,19 +105,19 @@ class TestJsonRoundTrip:
             imageDir=str(tmp_path),
             nodes=[
                 NodeSpec(
-                    id="1",
+                    id=1,
                     label="Header",
-                    childrenIds=["2"],
+                    childrenIds=[2],
                 ),
                 NodeSpec(
-                    id="2",
+                    id=2,
                     label="Back",
                     controlType="Icon",
                 ),
                 NodeSpec(
-                    id="0",
+                    id=0,
                     label="Cart",
-                    childrenIds=["1"],
+                    childrenIds=[1],
                     apis=[
                         Api(name="POST Add to cart", url="/api/cart"),
                     ],
@@ -131,8 +131,8 @@ class TestJsonRoundTrip:
         assert len(restored.nodes) == 3
         # Assert specific node details
         nodes_dict = restored.nodes_map
-        assert nodes_dict["1"].label == "Header"
-        assert nodes_dict["2"].controlType == "Icon"
+        assert nodes_dict[1].label == "Header"
+        assert nodes_dict[2].controlType == "Icon"
 
 
 class TestSampleSpecFixture:

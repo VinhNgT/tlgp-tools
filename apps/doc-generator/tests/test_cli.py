@@ -63,17 +63,17 @@ class TestCliDryRun:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "rootId": "0",
+            "rootId": 0,
             "nodes": [
                 {
-                    "id": "0",
+                    "id": 0,
                     "label": "Test",
                     "description": "desc desc desc",
                     "imageFiles": ["test.png"],
-                    "childrenIds": ["1"],
+                    "childrenIds": [1],
                 },
                 {
-                    "id": "1",
+                    "id": 1,
                     "label": "A",
                     "controlType": "T",
                 }
@@ -96,17 +96,17 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "rootId": "0",
+            "rootId": 0,
             "nodes": [
                 {
-                    "id": "0",
+                    "id": 0,
                     "label": "My Screen",
                     "description": "D",
                     "imageFiles": ["test.png"],
-                    "childrenIds": ["1"],
+                    "childrenIds": [1],
                 },
                 {
-                    "id": "1",
+                    "id": 1,
                     "label": "A",
                     "controlType": "T",
                 }
@@ -127,17 +127,17 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "rootId": "0",
+            "rootId": 0,
             "nodes": [
                 {
-                    "id": "0",
+                    "id": 0,
                     "label": "Product Detail",
                     "description": "desc desc desc",
                     "imageFiles": ["test.png"],
-                    "childrenIds": ["1"],
+                    "childrenIds": [1],
                 },
                 {
-                    "id": "1",
+                    "id": 1,
                     "label": "A",
                     "controlType": "T",
                 }
@@ -157,17 +157,17 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "rootId": "0",
+            "rootId": 0,
             "nodes": [
                 {
-                    "id": "0",
+                    "id": 0,
                     "label": "My Screen",
                     "description": "D",
                     "imageFiles": ["test.png"],
-                    "childrenIds": ["1"],
+                    "childrenIds": [1],
                 },
                 {
-                    "id": "1",
+                    "id": 1,
                     "label": "A",
                     "controlType": "T",
                 }
@@ -191,17 +191,17 @@ class TestCliGeneration:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "rootId": "0",
+            "rootId": 0,
             "nodes": [
                 {
-                    "id": "0",
+                    "id": 0,
                     "label": "My Screen",
                     "description": "D",
                     "imageFiles": ["test.png"],
-                    "childrenIds": ["1"],
+                    "childrenIds": [1],
                 },
                 {
-                    "id": "1",
+                    "id": 1,
                     "label": "A",
                     "controlType": "T",
                 }
@@ -233,24 +233,24 @@ class TestCliImageWarnings:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "rootId": "0",
+            "rootId": 0,
             "nodes": [
                 {
-                    "id": "0",
+                    "id": 0,
                     "label": "T",
                     "description": "desc desc desc",
                     "imageFiles": ["missing.png"],
-                    "childrenIds": ["1"],
+                    "childrenIds": [1],
                 },
                 {
-                    "id": "1",
+                    "id": 1,
                     "label": "A",
                     "description": "desc desc desc",
                     "imageFiles": ["also_missing.png"],
-                    "childrenIds": ["2"],
+                    "childrenIds": [2],
                 },
                 {
-                    "id": "2",
+                    "id": 2,
                     "label": "B",
                     "controlType": "B",
                 }
@@ -271,24 +271,24 @@ class TestCliImageWarnings:
         analysis = {
             "sectionPrefix": "1.1",
             "imageDir": str(tmp_path),
-            "rootId": "0",
+            "rootId": 0,
             "nodes": [
                 {
-                    "id": "0",
+                    "id": 0,
                     "label": "T",
                     "description": "desc desc desc",
                     "imageFiles": ["missing.png"],
-                    "childrenIds": ["1"],
+                    "childrenIds": [1],
                 },
                 {
-                    "id": "1",
+                    "id": 1,
                     "label": "A",
                     "description": "desc desc desc",
                     "imageFiles": ["also_missing.png"],
-                    "childrenIds": ["2"],
+                    "childrenIds": [2],
                 },
                 {
-                    "id": "2",
+                    "id": 2,
                     "label": "B",
                     "controlType": "B",
                 }

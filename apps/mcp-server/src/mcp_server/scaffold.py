@@ -107,22 +107,46 @@ def build_scaffold(
         annotated_mapping = mapping.get("components", {})
         root_images = mapping.get("root", [])
 
+    # Build UUID -> integer ID mapping based on component number
+    uuid_to_id = {}
+    assigned_ids = {0}  # 0 is reserved for Screen root
+    for uuid, comp in state.components.items():
+        if comp.number and comp.number.isdigit():
+            val = int(comp.number)
+            uuid_to_id[uuid] = val
+            assigned_ids.add(val)
+
+    next_id = 1
+    for uuid in state.components:
+        if uuid not in uuid_to_id:
+            while next_id in assigned_ids:
+                next_id += 1
+            uuid_to_id[uuid] = next_id
+            assigned_ids.add(next_id)
+            next_id += 1
+
     # Walk in post-order DFS to get the component ordering (for readable ordering in JSON)
     ordered_uuids = _walk_post_order_dfs(state)
 
     nodes = []
 
-    # 1. Add the Screen node (always "0")
+    # 1. Add the Screen node (always 0)
     screen_name_val = state.screen.name.strip()
     screen_name = f"[TODO: Vietnamese screen name. Suggestion: {screen_name_val}]" if screen_name_val else _TODO_SCREEN_NAME
 
     screen_desc_val = state.screen.description.strip()
     screen_desc = f"[TODO: Vietnamese screen description (high-level summary) - NOT a list/restatement of UI elements. Suggestion: {screen_desc_val}]" if screen_desc_val else _TODO_SCREEN_DESC
 
-    screen_children_ids = [str(rid) for rid in state.rootComponents if rid in state.components]
+    screen_children_ids = [uuid_to_id[rid] for rid in state.rootComponents if rid in state.components and rid in uuid_to_id]
 
     nodes.append({
-        "id": "0",
+        "id": 0,
+        "absoluteBounds": {
+            "x": 0,
+            "y": 0,
+            "w": state.image.width,
+            "h": state.image.height,
+        } if state.image else None,
         "label": screen_name,
         "description": screen_desc,
         "imageFiles": list(root_images),
@@ -154,7 +178,13 @@ def build_scaffold(
         image_files = [image_file] if image_file else []
 
         comp_node = {
-            "id": uuid_str,
+            "id": uuid_to_id[uuid],
+            "absoluteBounds": {
+                "x": comp.bounds.x,
+                "y": comp.bounds.y,
+                "w": comp.bounds.w,
+                "h": comp.bounds.h,
+            } if comp.bounds else None,
             "label": label,
             "controlType": control_type,
             "required": None,
@@ -162,7 +192,7 @@ def build_scaffold(
             "editable": None,
             "description": _TODO_DESCRIPTION,
             "imageFiles": image_files,
-            "childrenIds": [str(cid) for cid in comp.childrenIds if cid in state.components],
+            "childrenIds": [uuid_to_id[cid] for cid in comp.childrenIds if cid in state.components and cid in uuid_to_id],
             "interactions": [],
             "apis": [],
         }
@@ -171,7 +201,7 @@ def build_scaffold(
     return {
         "sectionPrefix": section_prefix,
         "imageDir": image_dir,
-        "rootId": "0",
+        "rootId": 0,
         "nodes": nodes,
     }
 

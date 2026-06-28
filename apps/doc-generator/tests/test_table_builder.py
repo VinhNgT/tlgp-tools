@@ -130,7 +130,7 @@ class TestUiElementsTable:
             imageDir=".",
             nodes=[
                 NodeSpec(
-                    id="1",
+                    id=1,
                     label="Share",
                     controlType="Icon",
                     description="Share product",
@@ -140,7 +140,7 @@ class TestUiElementsTable:
                 ),
             ]
         )
-        table = build_ui_elements_table(doc, ["1"], style, analysis=analysis)
+        table = build_ui_elements_table(doc, [1], style, analysis=analysis)
         assert table.cell(1, 0).text == "1"
         assert table.cell(1, 1).text == "Share"
         assert table.cell(1, 2).text == "Icon"

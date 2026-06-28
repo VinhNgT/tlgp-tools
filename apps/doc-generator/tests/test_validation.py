@@ -17,25 +17,25 @@ from pydantic import ValidationError
 def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
     nodes = overrides.pop("nodes", [])
 
-    # Ensure exactly one screen component (id == "0") exists
-    screen_comp = [n for n in nodes if n.id == "0"]
+    # Ensure exactly one screen component (id == 0) exists
+    screen_comp = [n for n in nodes if n.id == 0]
     if not screen_comp:
         (Path(tmp_path) / "screen.png").touch()
         nodes.append(
             NodeSpec(
-                id="0",
+                id=0,
                 label="Test",
                 description="desc desc desc",
                 imageFiles=["screen.png"],
-                childrenIds=["1"],
-                apis=[Api(api="GET Test", url="/test")],
+                childrenIds=[1],
+                apis=[Api(name="GET Test", url="/test")],
                 required=False,
                 editable=False,
             )
         )
         nodes.append(
             NodeSpec(
-                id="1",
+                id=1,
                 label="Test Child",
                 controlType="Button",
                 required=False,
@@ -626,7 +626,7 @@ class TestUnitLimitValidation:
 
     def _make_nodes(self, count: int) -> list[NodeSpec]:
         return [
-            NodeSpec(id=f"child_{i}", label=f"Child {i}", controlType="Button")
+            NodeSpec(id=100 + i, label=f"Child {i}", controlType="Button")
             for i in range(1, count + 1)
         ]
 
@@ -644,7 +644,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id=0,
                     label="Test",
                     description="desc desc desc",
                     imageFiles=["screen.png"],
@@ -663,7 +663,7 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id=0,
                     label="Test",
                     description="desc desc desc",
                     imageFiles=["screen.png"],
@@ -687,14 +687,14 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id=0,
                     label="Test",
                     description="desc desc desc",
                     imageFiles=["screen.png"],
-                    childrenIds=["1"],
+                    childrenIds=[1],
                 ),
                 NodeSpec(
-                    id="1",
+                    id=1,
                     label="Big Component",
                     description="desc desc desc",
                     imageFiles=["comp.png"],
@@ -716,14 +716,14 @@ class TestUnitLimitValidation:
             tmp_path,
             nodes=[
                 NodeSpec(
-                    id="0",
+                    id=0,
                     label="Test",
                     description="desc desc desc",
                     imageFiles=["screen.png"],
-                    childrenIds=["1"],
+                    childrenIds=[1],
                 ),
                 NodeSpec(
-                    id="1",
+                    id=1,
                     label="Heavy Component",
                     description="desc desc desc",
                     imageFiles=["comp.png"],

@@ -14,7 +14,7 @@ from mcp_server.scaffold import (
     build_scaffold,
     scaffold_and_save,
 )
-from tlgp_contracts import Bounds, Component, ScreenInfo, WorkspaceState
+from tlgp_contracts import Bounds, Component, ScreenInfo, WorkspaceState, ImageInfo
 
 
 def _make_component(
@@ -39,13 +39,17 @@ def _make_workspace(
     root_ids: list[UUID] | None = None,
     screen_name: str = "",
     screen_desc: str = "",
+    image: ImageInfo | None = None,
 ) -> WorkspaceState:
     comp_dict = {c.id: c for c in (components or [])}
+    if image is None:
+        image = ImageInfo(filename="root.png", width=375, height=812)
     return WorkspaceState(
         workspaceId=uuid4(),
         screen=ScreenInfo(name=screen_name, description=screen_desc),
         rootComponents=root_ids or [],
         components=comp_dict,
+        image=image,
     )
 
 
@@ -115,7 +119,7 @@ class TestWalkPostOrderDfs:
 class TestBuildScaffold:
     def test_minimal_scaffold(self, tmp_path):
         """A workspace with one leaf component produces a valid scaffold."""
-        comp = _make_component()
+        comp = _make_component(number="1")
         state = _make_workspace(
             components=[comp],
             root_ids=[comp.id],
@@ -139,24 +143,26 @@ class TestBuildScaffold:
         assert scaffold["imageDir"] == str(tmp_path.resolve())
         assert len(scaffold["nodes"]) == 2  # screen + comp
 
-        # Screen (id="0")
+        # Screen (id=0)
         screen_node = scaffold["nodes"][0]
-        assert screen_node["id"] == "0"
+        assert screen_node["id"] == 0
         assert "Trang chủ" in screen_node["label"]
         assert screen_node["imageFiles"] == ["annotated/root_Trang_chu.png"]
-        assert screen_node["childrenIds"] == [str(comp.id)]
+        assert screen_node["childrenIds"] == [1]
+        assert screen_node["absoluteBounds"] == {"x": 0, "y": 0, "w": 375, "h": 812}
 
         # Leaf component (comp)
         comp_entry = scaffold["nodes"][1]
-        assert comp_entry["id"] == str(comp.id)
+        assert comp_entry["id"] == 1
+        assert comp_entry["absoluteBounds"] == {"x": 0, "y": 0, "w": 100, "h": 100}
         # In the new logic, the leaf gets a default imageFiles with its screenshot if mapped
         assert comp_entry["imageFiles"] == [f"annotated/1_Comp_{str(comp.id)[:8]}.png"]
         assert comp_entry["childrenIds"] == []
 
     def test_non_leaf_component_gets_image_file(self, tmp_path):
         """Non-leaf components get imageFile from mapping."""
-        child = _make_component()
-        parent = _make_component(children_ids=[child.id])
+        child = _make_component(number="1")
+        parent = _make_component(number="2", children_ids=[child.id])
         child = child.model_copy(update={"parentId": parent.id})
 
         state = _make_workspace(
@@ -164,8 +170,8 @@ class TestBuildScaffold:
             root_ids=[parent.id],
         )
         _make_annotated_dir(tmp_path)
-        parent_img = f"annotated/1_Comp_{str(parent.id)[:8]}.png"
-        child_img = f"annotated/2_Comp_{str(child.id)[:8]}.png"
+        parent_img = f"annotated/2_Comp_{str(parent.id)[:8]}.png"
+        child_img = f"annotated/1_Comp_{str(child.id)[:8]}.png"
         _write_mapping(tmp_path, {
             "annotated": {
                 "root": ["annotated/root.png"],
@@ -182,18 +188,18 @@ class TestBuildScaffold:
         assert len(scaffold["nodes"]) == 3  # screen + child + parent
         nodes_map = {n["id"]: n for n in scaffold["nodes"]}
 
-        child_entry = nodes_map[str(child.id)]
-        parent_entry = nodes_map[str(parent.id)]
+        child_entry = nodes_map[1]
+        parent_entry = nodes_map[2]
 
         assert child_entry["imageFiles"] == [child_img]
         assert parent_entry["imageFiles"] == [parent_img]
 
     def test_retains_annotated_prefix_for_image_paths(self, tmp_path):
         """Image paths in the scaffold should retain the 'annotated/' prefix."""
-        comp = _make_component(children_ids=[uuid4()])
+        comp = _make_component(number="1", children_ids=[uuid4()])
         # Add a fake child so comp is non-leaf
         child_id = comp.childrenIds[0]
-        child = _make_component(component_id=child_id)
+        child = _make_component(number="2", component_id=child_id)
         child = child.model_copy(update={"parentId": comp.id})
 
         state = _make_workspace(
@@ -215,8 +221,8 @@ class TestBuildScaffold:
         scaffold = build_scaffold(state, tmp_path)
 
         nodes_map = {n["id"]: n for n in scaffold["nodes"]}
-        screen_node = nodes_map["0"]
-        comp_entry = nodes_map[str(comp.id)]
+        screen_node = nodes_map[0]
+        comp_entry = nodes_map[1]
 
         # Screen imageFiles should have the prefix
         assert screen_node["imageFiles"] == ["annotated/root_screen.png"]
@@ -270,10 +276,10 @@ class TestBuildScaffold:
 
     def test_scaffold_parses_into_screen_spec(self, tmp_path):
         """Ensure the generated scaffold successfully validates against ScreenSpec schema."""
-        child = _make_component()
-        non_leaf_root = _make_component(children_ids=[child.id])
+        child = _make_component(number="1")
+        non_leaf_root = _make_component(number="2", children_ids=[child.id])
         child = child.model_copy(update={"parentId": non_leaf_root.id})
-        leaf_root = _make_component()
+        leaf_root = _make_component(number="3")
 
         state = _make_workspace(
             components=[non_leaf_root, child, leaf_root],
@@ -288,7 +294,7 @@ class TestBuildScaffold:
         scaffold = build_scaffold(state, tmp_path)
         spec = ScreenSpec.model_validate(scaffold)
         assert len(spec.nodes) == 4  # screen + 3 components
-        assert spec.rootId == "0"
+        assert spec.rootId == 0
 
 
 class TestScaffoldAndSave:

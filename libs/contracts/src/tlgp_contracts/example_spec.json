@@ -1,16 +1,22 @@
 {
   "sectionPrefix": "1.1",
   "imageDir": "./tests/fixtures/images",
-  "rootId": "0",
+  "rootId": 0,
   "nodes": [
     {
-      "id": "0",
+      "id": 0,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 0,
+        "w": 375,
+        "h": 812
+      },
       "label": "Màn hình chi tiết sản phẩm",
       "description": "Màn hình hiển thị toàn bộ thông tin chi tiết của sản phẩm bao gồm hình ảnh, giá cả, thông tin nhà bán hàng, các thuộc tính lựa chọn và các hành động mua hàng.",
       "imageFiles": ["dummy_screen.png"],
       "required": null,
       "editable": null,
-      "childrenIds": ["1", "2"],
+      "childrenIds": [1, 2],
       "interactions": [
         {
           "action": "Người dùng vuốt màn hình lên/xuống",
@@ -51,18 +57,30 @@
       ]
     },
     {
-      "id": "1",
+      "id": 1,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 0,
+        "w": 375,
+        "h": 56
+      },
       "label": "Thanh tiêu đề điều hướng (Header)",
       "description": "Thanh công cụ nằm ở đầu màn hình, chứa tiêu đề của màn hình hiện tại và các nút điều hướng nhanh.",
       "imageFiles": ["dummy_header.png"],
       "required": null,
       "editable": null,
-      "childrenIds": ["3", "6"],
+      "childrenIds": [3, 6],
       "interactions": [],
       "apis": []
     },
     {
-      "id": "2",
+      "id": 2,
+      "absoluteBounds": {
+        "x": 0,
+        "y": 56,
+        "w": 375,
+        "h": 200
+      },
       "label": "Ảnh banner quảng cáo",
       "controlType": "Image",
       "required": false,
@@ -71,13 +89,19 @@
       "description": "Hình ảnh hoặc slider hiển thị các chương trình khuyến mãi liên quan đến sản phẩm."
     },
     {
-      "id": "3",
+      "id": 3,
+      "absoluteBounds": {
+        "x": 10,
+        "y": 10,
+        "w": 36,
+        "h": 36
+      },
       "label": "Khối điều khiển nút chức năng quay lại",
       "description": "Nút bấm chứa biểu tượng mũi tên quay lại màn hình trước đó, xử lý lưu trạng thái tạm thời nếu có.",
       "imageFiles": ["dummy_back_button.png"],
       "required": null,
       "editable": null,
-      "childrenIds": ["4", "5"],
+      "childrenIds": [4, 5],
       "interactions": [
         {
           "action": "Người dùng chạm vào nút quay lại",
@@ -87,7 +111,13 @@
       "apis": []
     },
     {
-      "id": "4",
+      "id": 4,
+      "absoluteBounds": {
+        "x": 12,
+        "y": 12,
+        "w": 20,
+        "h": 20
+      },
       "label": "Biểu tượng mũi tên quay lại",
       "controlType": "Icon",
       "required": true,
@@ -96,7 +126,13 @@
       "description": "Biểu tượng trực quan hỗ trợ nhận diện hành động quay lại."
     },
     {
-      "id": "5",
+      "id": 5,
+      "absoluteBounds": {
+        "x": 38,
+        "y": 12,
+        "w": 60,
+        "h": 20
+      },
       "label": "Nhãn văn bản gợi ý",
       "controlType": "Text",
       "required": false,
@@ -105,7 +141,13 @@
       "description": "Văn bản hiển thị bên cạnh mũi tên (ví dụ: 'Quay lại' hoặc 'Back')."
     },
     {
-      "id": "6",
+      "id": 6,
+      "absoluteBounds": {
+        "x": 100,
+        "y": 10,
+        "w": 175,
+        "h": 36
+      },
       "label": "Tiêu đề màn hình",
       "controlType": "Text",
       "required": true,
