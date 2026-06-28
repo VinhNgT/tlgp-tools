@@ -8,6 +8,7 @@ content file — no indirection maps or template substitution.
 from __future__ import annotations
 
 from pathlib import Path
+
 from tlgp_contracts import get_example_spec_json
 
 _PROMPT_DIR = Path(__file__).parent

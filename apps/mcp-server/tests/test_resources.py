@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 from mcp_server.server import (
     get_spec_classification_guide_resource,
     get_spec_example_analysis_resource,

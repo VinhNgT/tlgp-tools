@@ -10,10 +10,11 @@ import sys
 from pathlib import Path
 
 from pydantic import ValidationError
-from doc_generator.doc_builder import build_document
 from tlgp_contracts import DocGenResult, ScreenSpec
-from doc_generator.validation import validate_spec
 from tlgp_logger import get_logger, setup_logging
+
+from doc_generator.doc_builder import build_document
+from doc_generator.validation import validate_spec
 
 logger = get_logger(__name__)
 

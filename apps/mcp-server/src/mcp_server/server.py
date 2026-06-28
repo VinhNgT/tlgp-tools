@@ -5,7 +5,6 @@ Exposes tools for screenshot annotation and .docx specification document generat
 
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import TypedDict

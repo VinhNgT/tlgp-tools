@@ -1,16 +1,16 @@
 """Tests for Pydantic models."""
 
 import pytest
+from pydantic import ValidationError
 from tlgp_contracts import (
-    NodeSpec,
-    ScreenSpec,
     Api,
     ApiParam,
-    Interaction,
     ApiPayload,
+    Interaction,
+    NodeSpec,
+    ScreenSpec,
 )
 from tlgp_contracts.spec import Bounds
-from pydantic import ValidationError
 
 
 class TestNodeSpec:

@@ -1,5 +1,6 @@
-import json
 import importlib.resources
+import json
+
 from tlgp_contracts import ScreenSpec
 
 

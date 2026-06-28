@@ -14,6 +14,7 @@ from uuid import UUID
 
 from pydantic import BaseModel
 from tlgp_contracts import (
+    ScreenSpec,
     TreeUtils,
     WorkspaceState,
 )
@@ -94,7 +95,7 @@ def build_scaffold(
     """
     mapping = _load_mapping(export_dir)
 
-    image_dir = str(export_dir.resolve())
+    str(export_dir.resolve())
 
     # Build UUID → image filename lookup
     annotated_mapping: dict[str, str] = {}
@@ -247,7 +248,6 @@ def scaffold_and_save(
     scaffold = build_scaffold(state, export_path, section_prefix)
 
     # Write the JSON schema file to the export directory
-    from tlgp_contracts import ScreenSpec
     schema_path = export_path / "schema.json"
     schema_path.write_text(
         json.dumps(ScreenSpec.model_json_schema(), indent=2, ensure_ascii=False),

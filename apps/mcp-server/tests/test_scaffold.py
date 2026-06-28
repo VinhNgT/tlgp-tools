@@ -13,7 +13,14 @@ from mcp_server.scaffold import (
     build_scaffold,
     scaffold_and_save,
 )
-from tlgp_contracts import Bounds, Component, ScreenInfo, WorkspaceState, ImageInfo, ScreenSpec
+from tlgp_contracts import (
+    Bounds,
+    Component,
+    ImageInfo,
+    ScreenInfo,
+    ScreenSpec,
+    WorkspaceState,
+)
 
 
 def _make_component(

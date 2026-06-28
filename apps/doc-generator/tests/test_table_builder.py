@@ -1,12 +1,6 @@
 """Tests for table_builder — verifies table structure and styling."""
 
 import pytest
-from tlgp_contracts import (
-    ApiParam,
-    Interaction,
-    NodeSpec,
-    ScreenSpec,
-)
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
     build_api_table,
@@ -16,6 +10,12 @@ from doc_generator.table_builder import (
 )
 from docx import Document
 from docx.oxml.ns import qn
+from tlgp_contracts import (
+    ApiParam,
+    Interaction,
+    NodeSpec,
+    ScreenSpec,
+)
 
 style: StyleConfig
 

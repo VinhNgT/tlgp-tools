@@ -693,7 +693,7 @@ class WorkspaceManager:
                         "comp_id": None,
                     }
 
-                def get_annotated_root_nodes() -> Generator[ExportNode, None, None]:
+                def get_annotated_root_nodes() -> Generator[ExportNode]:
                     root_children = TreeUtils.get_children(state_snapshot, None)
                     if state_snapshot.image.filename:
                         base_filename = state_snapshot.image.filename.replace('\\', '/').split('/')[-1]
@@ -735,7 +735,7 @@ class WorkspaceManager:
                                 "comp_id": None,
                             }
 
-                def get_component_nodes() -> Generator[ExportNode, None, None]:
+                def get_component_nodes() -> Generator[ExportNode]:
                     for comp_id, comp in state_snapshot.components.items():
                         children = TreeUtils.get_children(state_snapshot, comp_id)
                         name_parts = []

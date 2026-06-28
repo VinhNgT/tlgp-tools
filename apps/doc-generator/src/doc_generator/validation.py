@@ -6,14 +6,11 @@ image existence, content completeness warnings, bottom-up DFS traversal order.
 
 from __future__ import annotations
 
-from pathlib import Path
-
 from pydantic import BaseModel, Field
 from tlgp_contracts import (
     DEFAULT_UNIT_COST_ANNOTATION,
     DEFAULT_UNIT_COST_API,
     DEFAULT_UNIT_LIMIT,
-    Api,
     ScreenSpec,
 )
 
@@ -61,7 +58,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
 
     screen = data.screen
     non_leaf = [n for n in data.nodes if n.id != data.rootId and len(n.childrenIds) > 0]
-    all_components = [screen] + non_leaf
+    all_components = [screen, *non_leaf]
 
     result = ValidationResult(
         components=len(all_components),
@@ -85,7 +82,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                     f"Component '{parent.label}' (id={parent.id}) references non-existent child ID: '{cid}'"
                 )
                 continue
-            
+
             # Check for multiple parents
             if cid in parent_map:
                 result.errors.append(
@@ -93,7 +90,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                 )
             else:
                 parent_map[cid] = parent.id
-                
+
             referenced_child_ids.add(cid)
 
     # --- Cycle detection ---
@@ -105,7 +102,7 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
             return True
         if node_id in visited:
             return False
-        
+
         path.add(node_id)
         node = nodes_dict.get(node_id)
         if node:

@@ -69,9 +69,9 @@ def mcp_ctx():
 
 
 def pytest_configure(config):
-    from tlgp_contracts import NodeSpec, ScreenSpec, ApiParam
+    from tlgp_contracts import ApiParam, NodeSpec, ScreenSpec
     from tlgp_contracts.spec import Bounds
-    
+
     # Patch ApiParam.__init__ to inject required test defaults
     original_param_init = ApiParam.__init__
     def new_param_init(self, *args, **kwargs):

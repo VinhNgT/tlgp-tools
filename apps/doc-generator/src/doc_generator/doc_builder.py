@@ -9,9 +9,9 @@ from docx.document import Document
 from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.shared import Inches, Pt
+from tlgp_contracts import Api, ApiPayload, NodeSpec, ScreenSpec
 
 from doc_generator.image_handler import insert_image
-from tlgp_contracts import NodeSpec, ScreenSpec, Api, ApiPayload
 from doc_generator.style_constants import StyleConfig, load_default_style
 from doc_generator.table_builder import (
     build_api_table,

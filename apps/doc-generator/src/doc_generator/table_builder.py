@@ -15,12 +15,12 @@ from docx.oxml import parse_xml
 from docx.oxml.ns import nsdecls, qn
 from docx.shared import Pt
 from docx.table import Table
-
 from tlgp_contracts import (
-    ScreenSpec,
     ApiParam,
     Interaction,
+    ScreenSpec,
 )
+
 from doc_generator.style_constants import StyleConfig
 
 # ============================================================

@@ -39,7 +39,7 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"**/tests/**" = ["SLF", "RUF"]
+"**/tests/**" = ["SLF", "RUF", "PLC0415"]
 
 [tool.ruff.format]
 quote-style = "double"
@@ -60,5 +60,7 @@ project-includes = [
 ]
 project-excludes = [
     "**/__pyrefly_virtual__/**",
+    "**/test_*.py",
+    "**/conftest.py",
 ]
 check-unannotated-defs = true

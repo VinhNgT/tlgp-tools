@@ -3,10 +3,9 @@
 from __future__ import annotations
 
 import json
-from pathlib import Path
 
 import pytest
-from mcp_server.prompts import _read, get_spec_workflow
+from mcp_server.prompts import get_spec_workflow
 from tlgp_contracts import get_example_spec_json
 
 SPEC_WORKFLOW_CONTENT = ""
@@ -45,8 +44,9 @@ class TestSpecWorkflowContent:
 
 class TestExampleAnalysisValidation:
     def test_example_analysis_passes_validation(self, tmp_path):
-        import sys
         import subprocess
+        import sys
+
         from tlgp_contracts import DocGenResult
 
         # Read the raw JSON

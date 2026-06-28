@@ -1,6 +1,16 @@
 """TLGP Contracts — shared Pydantic schemas defining module boundaries."""
 
+import importlib.resources
+
 from .docgen import DocGenResult
+from .spec import (
+    Api,
+    ApiParam,
+    ApiPayload,
+    Interaction,
+    NodeSpec,
+    ScreenSpec,
+)
 from .tree import TreeUtils
 from .unit_limit import (
     DEFAULT_UNIT_COST_ANNOTATION,
@@ -18,16 +28,7 @@ from .workspace import (
     Style,
     WorkspaceState,
 )
-from .spec import (
-    Interaction,
-    ApiParam,
-    ApiPayload,
-    Api,
-    NodeSpec,
-    ScreenSpec,
-)
 
-import importlib.resources
 
 def get_example_spec_json() -> str:
     """Retrieve the canonical example spec JSON string."""
@@ -38,23 +39,23 @@ __all__ = [
     "DEFAULT_UNIT_COST_ANNOTATION",
     "DEFAULT_UNIT_COST_API",
     "DEFAULT_UNIT_LIMIT",
+    "Api",
+    "ApiParam",
+    "ApiPayload",
     "Bounds",
     "Component",
     "DocGenResult",
     "ImageExportManifest",
     "ImageExportManifestBoth",
     "ImageInfo",
+    "Interaction",
+    "NodeSpec",
     "PillCorner",
     "ScreenInfo",
+    "ScreenSpec",
     "Style",
     "TreeUtils",
     "WorkspaceState",
     "get_example_spec_json",
-    "Interaction",
-    "ApiParam",
-    "ApiPayload",
-    "Api",
-    "NodeSpec",
-    "ScreenSpec",
 ]
 

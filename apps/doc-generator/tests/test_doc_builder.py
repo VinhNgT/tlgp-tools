@@ -1,16 +1,16 @@
+from pathlib import Path
 from typing import Any
 
 from doc_generator.doc_builder import build_document
+from PIL import Image
 from tlgp_contracts import (
-    NodeSpec,
-    ScreenSpec,
     Api,
     ApiParam,
-    Interaction,
     ApiPayload,
+    Interaction,
+    NodeSpec,
+    ScreenSpec,
 )
-from PIL import Image
-from pathlib import Path
 
 
 def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:

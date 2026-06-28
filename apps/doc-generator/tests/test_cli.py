@@ -1,9 +1,11 @@
 """Tests for CLI argument parsing and integration."""
 import json
 from unittest.mock import patch
+
 import pytest
 from doc_generator.cli import main
 from PIL import Image
+
 
 class TestCliHelp:
 
@@ -113,7 +115,7 @@ class TestCliGeneration:
         captured = capsys.readouterr()
         result = json.loads(captured.out)
         assert result['valid'] is False
-        assert any(('Permission denied' in err for err in result['errors']))
+        assert any('Permission denied' in err for err in result['errors'])
 
 class TestCliImageWarnings:
 

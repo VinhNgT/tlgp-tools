@@ -1,17 +1,18 @@
 """Tests for validation logic."""
 
 from pathlib import Path
+
 import pytest
-from tlgp_contracts import (
-    NodeSpec,
-    ScreenSpec,
-    Api,
-    ApiParam,
-    Interaction,
-    ApiPayload,
-)
 from doc_generator.validation import validate_spec
 from pydantic import ValidationError
+from tlgp_contracts import (
+    Api,
+    ApiParam,
+    ApiPayload,
+    Interaction,
+    NodeSpec,
+    ScreenSpec,
+)
 
 
 def _minimal_spec(tmp_path, **overrides) -> ScreenSpec:
@@ -115,7 +116,7 @@ class TestValidateSpec:
 
     def test_missing_images(self, tmp_path):
         spec = ScreenSpec(
-            
+
             nodes=[
                 NodeSpec(
                     id="0",
@@ -427,7 +428,7 @@ class TestValidateSpec:
 
     def test_skip_image_validation(self, tmp_path):
         spec = ScreenSpec(
-            
+
             nodes=[
                 NodeSpec(
                     id="0",
@@ -456,7 +457,7 @@ class TestValidateSpec:
 
     def test_error_multiple_screens(self, tmp_path):
         spec = ScreenSpec(
-            
+
             nodes=[
                 NodeSpec(
                     id="0",
@@ -478,7 +479,7 @@ class TestValidateSpec:
 
     def test_error_zero_screens(self, tmp_path):
         spec = ScreenSpec(
-            
+
             nodes=[
                 NodeSpec(
                     id="1",
@@ -494,7 +495,7 @@ class TestValidateSpec:
 
     def test_error_duplicate_node_ids(self, tmp_path):
         spec = ScreenSpec(
-            
+
             nodes=[
                 NodeSpec(id="0", label="Screen", description="desc", childrenIds=["1"]),
                 NodeSpec(id="1", label="Button A", controlType="Button"),
