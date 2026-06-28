@@ -675,8 +675,25 @@ class WorkspaceManager:
         with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
             with Image.open(io.BytesIO(image_bytes)) as img:
 
-                def get_export_nodes() -> Generator[ExportNode]:
-                    # Yield root node(s) — split by cut lines into segments
+                def get_uncut_root_node() -> ExportNode:
+                    root_children = TreeUtils.get_children(state_snapshot, None)
+                    if state_snapshot.image.filename:
+                        base_filename = state_snapshot.image.filename.replace('\\', '/').split('/')[-1]
+                        root_base = base_filename.rsplit(".", 1)[0]
+                    else:
+                        root_base = "root"
+                    img_w = state_snapshot.image.width
+                    img_h = state_snapshot.image.height
+                    return {
+                        "is_leaf": False,
+                        "bounds": (0, 0, img_w, img_h),
+                        "children": root_children,
+                        "parent_comp": None,
+                        "filename": f"root_{sanitize_filename(root_base)}.png",
+                        "comp_id": None,
+                    }
+
+                def get_annotated_root_nodes() -> Generator[ExportNode, None, None]:
                     root_children = TreeUtils.get_children(state_snapshot, None)
                     if state_snapshot.image.filename:
                         base_filename = state_snapshot.image.filename.replace('\\', '/').split('/')[-1]
@@ -693,9 +710,8 @@ class WorkspaceManager:
                     ]
 
                     if len(segments) <= 1:
-                        # No cuts: single root node (original behavior)
                         yield {
-                            "is_leaf": False,  # Root is a screen crop, always export
+                            "is_leaf": False,
                             "bounds": (0, 0, img_w, img_h),
                             "children": root_children,
                             "parent_comp": None,
@@ -703,7 +719,6 @@ class WorkspaceManager:
                             "comp_id": None,
                         }
                     else:
-                        # Yield one root segment per cut-delimited strip
                         for seg_idx, (seg_start, seg_end) in enumerate(segments):
                             seg_children = [
                                 c
@@ -712,7 +727,7 @@ class WorkspaceManager:
                                 and c.bounds.bottom <= seg_end
                             ]
                             yield {
-                                "is_leaf": False,  # Root segment is a screen crop, always export
+                                "is_leaf": False,
                                 "bounds": (0, seg_start, img_w, seg_end),
                                 "children": seg_children,
                                 "parent_comp": None,
@@ -720,7 +735,7 @@ class WorkspaceManager:
                                 "comp_id": None,
                             }
 
-                    # Yield component nodes
+                def get_component_nodes() -> Generator[ExportNode, None, None]:
                     for comp_id, comp in state_snapshot.components.items():
                         children = TreeUtils.get_children(state_snapshot, comp_id)
                         name_parts = []
@@ -753,14 +768,26 @@ class WorkspaceManager:
                     mapping["components"] = {}
 
                 exported_count = 0
-                for node in get_export_nodes():
-                    if mode in ("annotated", "both"):
+
+                # 1. Export annotated
+                if mode in ("annotated", "both"):
+                    for node in get_annotated_root_nodes():
+                        if self._export_node_annotated(
+                            img, node, state_snapshot, zf, mapping, mode
+                        ):
+                            exported_count += 1
+                    for node in get_component_nodes():
                         if self._export_node_annotated(
                             img, node, state_snapshot, zf, mapping, mode
                         ):
                             exported_count += 1
 
-                    if mode in ("raw", "both"):
+                # 2. Export raw
+                if mode in ("raw", "both"):
+                    node = get_uncut_root_node()
+                    if self._export_node_raw(img, node, zf, mapping, mode):
+                        exported_count += 1
+                    for node in get_component_nodes():
                         if self._export_node_raw(img, node, zf, mapping, mode):
                             exported_count += 1
 

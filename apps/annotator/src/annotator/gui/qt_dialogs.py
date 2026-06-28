@@ -132,12 +132,12 @@ class _ExportImagesDialog(QDialog):
         layout.addWidget(lbl_mode)
 
         self.rad_annotated = QRadioButton(
-            "Annotated (skips leaves, paints child annotations)"
+            "Annotated (skips leaves, paints annotations, segments screen by cut lines)"
         )
         self.rad_annotated.setChecked(True)
         layout.addWidget(self.rad_annotated)
 
-        self.rad_raw = QRadioButton("Raw (includes leaves, no annotations)")
+        self.rad_raw = QRadioButton("Raw (includes leaves, no annotations, uncut screen)")
         layout.addWidget(self.rad_raw)
 
         self.rad_both = QRadioButton("Both (exports both annotated and raw modes)")

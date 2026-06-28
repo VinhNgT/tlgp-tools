@@ -463,15 +463,22 @@ class TestExportImages:
         ws.add_component(lower_id, "Lower", Bounds(x=10, y=350, w=100, h=100))
         ws.update_cut_lines([300])
 
-        zip_bytes = ws.export_images("raw")
-        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        # Verify annotated splits root
+        zip_bytes_ann = ws.export_images("annotated")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes_ann), "r") as zf:
             names = zf.namelist()
             segment_files = [n for n in names if "segment_" in n]
             assert len(segment_files) == 2
             assert any("segment_1" in n for n in segment_files)
             assert any("segment_2" in n for n in segment_files)
-            # No unsplit root file
             assert not any("root_" in n and "segment_" not in n for n in names)
+
+        # Verify raw does not split root
+        zip_bytes_raw = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes_raw), "r") as zf:
+            names = zf.namelist()
+            assert any("root_" in n and "segment_" not in n for n in names)
+            assert not any("segment_" in n for n in names)
 
     def test_export_images_with_multiple_cut_lines(self):
         ws = _workspace_with_image(800, 600)
@@ -483,11 +490,19 @@ class TestExportImages:
         ws.add_component(comp3, "Bot", Bounds(x=10, y=450, w=100, h=80))
         ws.update_cut_lines([200, 400])
 
-        zip_bytes = ws.export_images("raw")
-        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        # Verify annotated splits root
+        zip_bytes_ann = ws.export_images("annotated")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes_ann), "r") as zf:
             names = zf.namelist()
             segment_files = [n for n in names if "segment_" in n]
             assert len(segment_files) == 3
+
+        # Verify raw does not split root
+        zip_bytes_raw = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes_raw), "r") as zf:
+            names = zf.namelist()
+            assert any("root_" in n and "segment_" not in n for n in names)
+            assert not any("segment_" in n for n in names)
 
     def test_export_images_no_cut_lines_single_root(self):
         ws = _workspace_with_image(800, 600)
@@ -518,11 +533,19 @@ class TestExportImages:
         ws.add_component(comp_id, "Box", Bounds(x=10, y=10, w=100, h=100))
         ws.update_cut_lines([300])
 
-        zip_bytes = ws.export_images("raw")
-        with zipfile.ZipFile(io.BytesIO(zip_bytes), "r") as zf:
+        # Verify annotated mapping lists 2 segments
+        zip_bytes_ann = ws.export_images("annotated")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes_ann), "r") as zf:
             mapping = json.loads(zf.read("mapping.json"))
             assert isinstance(mapping["root"], list)
             assert len(mapping["root"]) == 2
+
+        # Verify raw mapping lists 1 uncut root
+        zip_bytes_raw = ws.export_images("raw")
+        with zipfile.ZipFile(io.BytesIO(zip_bytes_raw), "r") as zf:
+            mapping = json.loads(zf.read("mapping.json"))
+            assert isinstance(mapping["root"], list)
+            assert len(mapping["root"]) == 1
 
     def test_export_annotated_includes_empty_segments(self):
         """Root segments are screen crops and should always be exported, even if empty."""
