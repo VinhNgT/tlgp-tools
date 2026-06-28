@@ -217,8 +217,8 @@ def build_scaffold(
             "apis": [],
         }
         if is_leaf:
-            comp_node["required"] = False
-            comp_node["editable"] = False
+            comp_node["required"] = None
+            comp_node["editable"] = None
             comp_node["maxLength"] = None
 
         nodes.append(comp_node)

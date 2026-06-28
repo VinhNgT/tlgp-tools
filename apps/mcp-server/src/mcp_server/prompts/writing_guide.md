@@ -63,6 +63,7 @@ This guide defines the semantic rules, content guidelines, and UI classification
 6. If it accepts user input → `TextField`
 7. When in doubt between Button and Icon: if it has text, it's a Button
 8. **Extensibility:** The above list of control types is not exhaustive. If a UI element does not fit into any of these standard types, you can proactively introduce/invent a new descriptive control type name (e.g., `Dropdown`, `RatingBar`, `WebView`) as long as it is not `Screen` or `Component` (which are reserved for structural nodes).
+9. **Optional Validation Fields:** The properties `required` ("Bắt buộc") and `editable` ("Chỉnh sửa") are optional/nullable for all elements. You should populate them only when clearly applicable or explicitly specified; otherwise, you have full freedom to ignore them or leave them as `null`.
 
 ### Interaction Inference
 

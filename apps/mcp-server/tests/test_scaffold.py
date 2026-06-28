@@ -163,6 +163,8 @@ class TestBuildScaffold:
         # In the new logic, the leaf gets a default imageFiles with its screenshot if mapped
         assert comp_entry["annotatedImages"] == [f"annotated/1_Comp_{str(comp.id)[:8]}.png"]
         assert comp_entry["childrenIds"] == []
+        assert comp_entry["required"] is None
+        assert comp_entry["editable"] is None
 
     def test_non_leaf_component_gets_image_file(self, tmp_path):
         """Non-leaf components get imageFile from mapping."""
