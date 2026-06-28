@@ -22,7 +22,7 @@ from mcp_server.prompts import (
 )
 from mcp_server.scaffold import scaffold_and_save
 from mcp_server.services import SpecGeneratorService
-from mcp_server.spec_editor import update_node_in_spec_file
+from mcp_server.spec_editor import update_node_in_spec_file, update_nodes_in_spec_file
 
 logger = get_logger(__name__)
 
@@ -339,6 +339,38 @@ async def update_spec_node(
         return {
             "status": "error",
             "message": f"Failed to update node {node_id}: {e}",
+        }
+
+
+@mcp.tool()
+async def update_spec_nodes(
+    ctx: Context,
+    spec_path: str,
+    updates: list[dict],
+) -> dict:
+    """Programmatically update semantic fields of multiple nodes in spec.json in one batch.
+
+    Args:
+        spec_path: Absolute path to the spec.json file.
+        updates: A list of dicts. Each dict must contain 'id' or 'node_id' and optional fields to update.
+
+    Returns:
+        dict with status and message.
+    """
+    try:
+        update_nodes_in_spec_file(
+            spec_path=spec_path,
+            updates=updates,
+        )
+        return {
+            "status": "success",
+            "message": f"Successfully updated {len(updates)} nodes in {spec_path}",
+        }
+    except Exception as e:
+        logger.error("Failed to batch update nodes: %s", e)
+        return {
+            "status": "error",
+            "message": f"Failed to batch update nodes: {e}",
         }
 
 

@@ -15,6 +15,7 @@ from mcp_server.server import (
     launch_annotator,
     scaffold_spec,
     update_spec_node,
+    update_spec_nodes,
     validate_spec,
 )
 from mcp_server.services import SpecGeneratorService
@@ -252,3 +253,25 @@ class TestRedesignedMcpTools:
         assert res["valid"] is True
         assert res["output_path"] == "/path/to/out.docx"
         assert res["tables"] == 10
+
+    @pytest.mark.anyio
+    async def test_update_spec_nodes_success(self, mcp_ctx, tmp_path):
+        ctx = mcp_ctx()
+        spec_path = str(tmp_path / "spec.json")
+        updates = [
+            {"id": "root", "label": "Updated Screen"},
+            {"id": "node-1", "label": "Updated Component", "control_type": "Component"}
+        ]
+
+        with patch("mcp_server.server.update_nodes_in_spec_file") as mock_batch_update:
+            res = await update_spec_nodes(
+                ctx,
+                spec_path=spec_path,
+                updates=updates
+            )
+        assert res["status"] == "success"
+        mock_batch_update.assert_called_once_with(
+            spec_path=spec_path,
+            updates=updates
+        )
+

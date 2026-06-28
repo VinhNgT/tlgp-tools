@@ -967,5 +967,67 @@ class TestUnitLimitValidation:
         assert result.valid is False
         assert any("Placeholder detected in API name" in e for e in result.errors)
 
+    def test_warnings_for_missing_api_root_types(self, tmp_path):
+        # 1. Test request payload defined but missing requestRootType
+        spec_req = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="root",
+                    label="Valid Label",
+                    description="Valid description",
+                    annotatedImages=["screen.png"],
+                    childrenIds=[1],
+                    apis=[
+                        Api(
+                            name="POST test",
+                            url="/test",
+                            request=[
+                                ApiPayload(
+                                    type="ReqDto",
+                                    fields=[ApiParam(name="field", type="String")],
+                                )
+                            ],
+                        )
+                    ],
+                ),
+                NodeSpec(id=1, label="Button", controlType="Button"),
+            ]
+        )
+        res_req = validate_spec(spec_req)
+        assert res_req.valid is True
+        assert any("has defined request payload fields but 'requestRootType' is missing" in w for w in res_req.warnings)
+
+        # 2. Test response payload defined but missing responseRootType
+        spec_res = _minimal_spec(
+            tmp_path,
+            nodes=[
+                NodeSpec(
+                    id="root",
+                    label="Valid Label",
+                    description="Valid description",
+                    annotatedImages=["screen.png"],
+                    childrenIds=[1],
+                    apis=[
+                        Api(
+                            name="GET test",
+                            url="/test",
+                            response=[
+                                ApiPayload(
+                                    type="ResDto",
+                                    fields=[ApiParam(name="field", type="String")],
+                                )
+                            ],
+                        )
+                    ],
+                ),
+                NodeSpec(id=1, label="Button", controlType="Button"),
+            ]
+        )
+        res_res = validate_spec(spec_res)
+        assert res_res.valid is True
+        assert any("has defined response payload fields but 'responseRootType' is missing" in w for w in res_res.warnings)
+
+
 
 

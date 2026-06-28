@@ -325,8 +325,22 @@ def validate_spec(data: ScreenSpec, skip_image_validation: bool = False) -> Vali
                                 f"Placeholder detected in API Response payload field description of '{field.name}' on node '{node.label}' (id={node.id})"
                             )
 
+    # --- Check for API payloads with missing root types ---
+    for api in data.all_apis:
+        if api.request and not api.requestRootType:
+            result.warnings.append(
+                f"API '{api.name}' has defined request payload fields but 'requestRootType' is missing. "
+                "The request parameter table will be omitted."
+            )
+        if api.response and not api.responseRootType:
+            result.warnings.append(
+                f"API '{api.name}' has defined response payload fields but 'responseRootType' is missing. "
+                "The response payload table will be omitted."
+            )
+
     # --- Final validity ---
     if result.errors:
         result.valid = False
 
     return result
+

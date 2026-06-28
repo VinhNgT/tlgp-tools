@@ -66,3 +66,59 @@ def update_node_in_spec_file(
     # Save to disk
     with open(path, "w", encoding="utf-8") as f:
         json.dump(spec_data, f, indent=2, ensure_ascii=False)
+
+
+def update_nodes_in_spec_file(spec_path: str, updates: list[dict]) -> None:
+    """Load spec.json, apply multiple node updates, validate, and save."""
+    path = Path(spec_path).resolve()
+    if not path.exists():
+        raise FileNotFoundError(f"Spec file not found at {spec_path}")
+
+    with open(path, encoding="utf-8") as f:
+        spec_data = json.load(f)
+
+    nodes = spec_data.get("nodes", [])
+    nodes_map = {n.get("id"): n for n in nodes if n.get("id") is not None}
+
+    for update in updates:
+        node_id = update.get("id") or update.get("node_id")
+        if not node_id:
+            raise ValueError("Each update dictionary must contain a 'node_id' or 'id' key")
+
+        node = nodes_map.get(node_id)
+        if node is None:
+            raise ValueError(f"Node with id {node_id} not found in spec file")
+
+        # Update semantic fields if provided (handling both camelCase and snake_case keys)
+        if "label" in update:
+            node["label"] = update["label"]
+        if "description" in update:
+            node["description"] = update["description"]
+
+        control_type = update.get("control_type") or update.get("controlType")
+        if control_type is not None:
+            node["controlType"] = control_type
+
+        # Optional leaf fields
+        if "required" in update:
+            node["required"] = update["required"]
+        if "editable" in update:
+            node["editable"] = update["editable"]
+
+        max_length = update.get("max_length") or update.get("maxLength")
+        if "max_length" in update or "maxLength" in update:
+            node["maxLength"] = max_length
+
+        # Arrays
+        if "interactions" in update:
+            node["interactions"] = update["interactions"]
+        if "apis" in update:
+            node["apis"] = update["apis"]
+
+    # Validate structural correctness and types using Pydantic contract
+    ScreenSpec.model_validate(spec_data)
+
+    # Save to disk
+    with open(path, "w", encoding="utf-8") as f:
+        json.dump(spec_data, f, indent=2, ensure_ascii=False)
+
