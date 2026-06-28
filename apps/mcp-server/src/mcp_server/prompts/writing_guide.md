@@ -86,6 +86,7 @@ This guide defines the semantic rules, content guidelines, and UI classification
 
 ### API Document Modeling
 - **DTO Schema Mapping:** Document the API structures using separate DTO definitions. If an API payload references a nested sub-DTO (e.g., `HotProductDto` includes a `price` of type `PriceDto`), define both DTOs as separate payloads. The compiler will render the root DTO first, followed by all other defined DTOs in order.
+- **Collection (List) Mapping:** When a field is a collection (list), it is fine to write its type as a list (e.g., `List<ObjectA>`). When writing the detailed schemas for the DTO payload tables, you can ignore the `List` wrapper part and define `ObjectA` as a separate DTO payload.
 - **Request vs. Response Namespace:** The request payloads and response payloads are compiled as two completely independent lists/trees. If a shared DTO (e.g., a common entity like `UserDto` or `ImageDto`) is used in both the request parameters and response data, it must be defined separately in both the `request` and `response` lists.
 - **Rendering Trigger:** For the document compiler to generate parameter tables, you must declare the entry-point DTO names (`requestRootType` and `responseRootType`). If they are omitted or null, the generator assumes no structured data exists and skips compiling the tables.
 
